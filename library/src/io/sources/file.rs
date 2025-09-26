@@ -1,6 +1,7 @@
 use std::fs::File as StdFile;
 use std::io::{Read, Seek, SeekFrom};
 
+
 /// A file-based implementation for reading JSON data from disk.
 /// Provides functionality to read and traverse file content byte by byte.
 pub struct File {

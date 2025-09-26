@@ -18,7 +18,10 @@ fn skip_whitespace(source: &mut dyn ISource) {
 }
 
 fn parse_scalar(value: &str) -> Node {
-    if value == "null" || value == "~" {
+    // Check if the value is a comment (starts with #)
+    if value.starts_with('#') {
+        Node::Comment(value[1..].trim().to_string())
+    } else if value == "null" || value == "~" {
         Node::None
     } else if value == "true" {
         Node::Boolean(true)
@@ -36,12 +39,22 @@ fn parse_scalar(value: &str) -> Node {
 fn parse_sequence(source: &mut dyn ISource) -> Result<Node, String> {
     let mut items = Vec::new();
     while let Some(c) = source.current() {
-        if c == '-' {
+        if c == '#' {
+            // Parse comment
+            source.next();
+            let mut comment = String::new();
+            while let Some(c) = source.current() {
+                if c == '\n' { break; }
+                comment.push(c);
+                source.next();
+            }
+            items.push(Node::Comment(comment.trim().to_string()));
+        } else if c == '-' {
             source.next();
             skip_whitespace(source);
             let mut value = String::new();
             while let Some(c) = source.current() {
-                if c == '\n' { break; }
+                if c == '\n' || c == '#' { break; }
                 value.push(c);
                 source.next();
             }
@@ -57,7 +70,18 @@ fn parse_sequence(source: &mut dyn ISource) -> Result<Node, String> {
 fn parse_mapping(source: &mut dyn ISource) -> Result<Node, String> {
     let mut map = HashMap::new();
     while let Some(c) = source.current() {
-        if c.is_alphanumeric() {
+        if c == '#' {
+            // Parse comment
+            source.next();
+            let mut comment = String::new();
+            while let Some(c) = source.current() {
+                if c == '\n' { break; }
+                comment.push(c);
+                source.next();
+            }
+            // Store comment with a special key
+            map.insert(format!("__comment_{}", map.len()), Node::Comment(comment.trim().to_string()));
+        } else if c.is_alphanumeric() {
             let mut key = String::new();
             while let Some(c) = source.current() {
                 if c == ':' { break; }
@@ -69,7 +93,7 @@ fn parse_mapping(source: &mut dyn ISource) -> Result<Node, String> {
 
             let mut value = String::new();
             while let Some(c) = source.current() {
-                if c == '\n' { break; }
+                if c == '\n' || c == '#' { break; }
                 value.push(c);
                 source.next();
             }
@@ -81,12 +105,21 @@ fn parse_mapping(source: &mut dyn ISource) -> Result<Node, String> {
     Ok(Node::Dictionary(map))
 }
 
-
 pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
     skip_whitespace(source);
 
     match source.current() {
         None => Ok(Node::None),
+        Some('#') => {
+            source.next();
+            let mut comment = String::new();
+            while let Some(c) = source.current() {
+                if c == '\n' { break; }
+                comment.push(c);
+                source.next();
+            }
+            Ok(Node::Comment(comment.trim().to_string()))
+        },
         Some('-') => parse_sequence(source),
         Some(c) if c.is_alphanumeric() => parse_mapping(source),
         Some(c) => Err(format!("Unexpected character: {}", c))
@@ -107,6 +140,7 @@ mod tests {
         assert_eq!(parse_scalar("42"), Node::Number(Numeric::Integer(42)));
         assert_eq!(parse_scalar("3.14"), Node::Number(Numeric::Float(3.14)));
         assert_eq!(parse_scalar("hello"), Node::Str("hello".to_string()));
+        assert_eq!(parse_scalar("#comment"), Node::Comment("comment".to_string()));
     }
 
     #[test]
@@ -121,6 +155,18 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_sequence_with_comments() {
+        let mut source = Buffer::new(b"- 1\n# Comment 1\n- 2\n# Comment 2");
+        let result = parse(&mut source).unwrap();
+        assert_eq!(result, Node::Array(vec![
+            Node::Number(Numeric::Integer(1)),
+            Node::Comment("Comment 1".to_string()),
+            Node::Number(Numeric::Integer(2)),
+            Node::Comment("Comment 2".to_string())
+        ]));
+    }
+
+    #[test]
     fn test_parse_mapping() {
         let mut source = Buffer::new(b"key1: value1\nkey2: 42");
         let result = parse(&mut source).unwrap();
@@ -131,11 +177,38 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_mapping_with_comments() {
+        let mut source = Buffer::new(b"key1: value1\n# Comment 1\nkey2: 42\n# Comment 2");
+        let result = parse(&mut source).unwrap();
+        let mut expected = HashMap::new();
+        expected.insert("key1".to_string(), Node::Str("value1".to_string()));
+        expected.insert("__comment_0".to_string(), Node::Comment("Comment 1".to_string()));
+        expected.insert("key2".to_string(), Node::Number(Numeric::Integer(42)));
+        expected.insert("__comment_1".to_string(), Node::Comment("Comment 2".to_string()));
+        assert_eq!(result, Node::Dictionary(expected));
+    }
+
+    #[test]
     fn test_parse_empty() {
         let mut source = Buffer::new(b"");
         let result = parse(&mut source).unwrap();
         assert_eq!(result, Node::None);
     }
 
+    #[test]
+    fn test_parse_invalid_char() {
+        let mut source = Buffer::new(b"@invalid");
+        let result = parse(&mut source);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Unexpected character: @");
+    }
+
+    #[test]
+    fn test_parse_comment_only() {
+        let mut source = Buffer::new(b"# Just a comment");
+        let result = parse(&mut source).unwrap();
+        assert_eq!(result, Node::Comment("Just a comment".to_string()));
+    }
 }
+
 
