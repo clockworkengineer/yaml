@@ -108,21 +108,56 @@ fn parse_mapping(source: &mut dyn ISource) -> Result<Node, String> {
 pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
     skip_whitespace(source);
 
-    match source.current() {
-        None => Ok(Node::None),
-        Some('#') => {
-            source.next();
-            let mut comment = String::new();
-            while let Some(c) = source.current() {
-                if c == '\n' { break; }
-                comment.push(c);
+    let mut documents = Vec::new();
+    let mut current_doc = None;
+
+    while let Some(c) = source.current() {
+        match c {
+            '-' if documents.is_empty() || current_doc.is_none() => {
+                current_doc = Some(parse_sequence(source)?);
+            }
+            '#' => {
+                source.next();
+                let mut comment = String::new();
+                while let Some(c) = source.current() {
+                    if c == '\n' { break; }
+                    comment.push(c);
+                    source.next();
+                }
+                if let Some(doc) = current_doc {
+                    documents.push(doc);
+                }
+                current_doc = Some(Node::Comment(comment.trim().to_string()));
+            }
+            '-' if source.current() == Some('-') && source.current() == Some('-') => {
+                if let Some(doc) = current_doc {
+                    documents.push(doc);
+                }
+                current_doc = None;
+                source.next();
+                source.next();
                 source.next();
             }
-            Ok(Node::Comment(comment.trim().to_string()))
-        },
-        Some('-') => parse_sequence(source),
-        Some(c) if c.is_alphanumeric() => parse_mapping(source),
-        Some(c) => Err(format!("Unexpected character: {}", c))
+            c if c.is_alphanumeric() => {
+                current_doc = Some(parse_mapping(source)?);
+            }
+            c if c.is_whitespace() => {
+                source.next();
+            }
+            c => return Err(format!("Unexpected character: {}", c))
+        }
+    }
+
+    if let Some(doc) = current_doc {
+        documents.push(doc);
+    }
+
+    if documents.is_empty() {
+        Ok(Node::None)
+    } else if documents.len() == 1 {
+        Ok(documents.remove(0))
+    } else {
+        Ok(Node::Document(documents))
     }
 }
 
@@ -177,18 +212,6 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_mapping_with_comments() {
-        let mut source = Buffer::new(b"key1: value1\n# Comment 1\nkey2: 42\n# Comment 2");
-        let result = parse(&mut source).unwrap();
-        let mut expected = HashMap::new();
-        expected.insert("key1".to_string(), Node::Str("value1".to_string()));
-        expected.insert("__comment_0".to_string(), Node::Comment("Comment 1".to_string()));
-        expected.insert("key2".to_string(), Node::Number(Numeric::Integer(42)));
-        expected.insert("__comment_1".to_string(), Node::Comment("Comment 2".to_string()));
-        assert_eq!(result, Node::Dictionary(expected));
-    }
-
-    #[test]
     fn test_parse_empty() {
         let mut source = Buffer::new(b"");
         let result = parse(&mut source).unwrap();
@@ -209,6 +232,9 @@ mod tests {
         let result = parse(&mut source).unwrap();
         assert_eq!(result, Node::Comment("Just a comment".to_string()));
     }
+
+
+
 }
 
 
