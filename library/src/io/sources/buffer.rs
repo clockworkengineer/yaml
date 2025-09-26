@@ -7,6 +7,8 @@ pub struct Buffer {
     buffer: Vec<u8>,
     /// Current reading position in the buffer
     position: usize,
+    /// Last position in the buffer
+    last_position: usize,
 }
 
 impl Buffer {
@@ -18,7 +20,7 @@ impl Buffer {
     /// # Returns
     /// A new Buffer containing the provided bytes
     pub fn new(to_add: &[u8]) -> Self {
-        Self { buffer : to_add.to_vec(), position: 0 }
+        Self { buffer: to_add.to_vec(), position: 0, last_position: 0 }
     }
     /// Converts the buffer content to a String.
     ///
@@ -32,6 +34,8 @@ impl Buffer {
 impl ISource for Buffer {
     /// Moves to the next character in the buffer
     fn next(&mut self) {
+        self.last_position = self.position;
+        self.last_position = self.position;
         self.position += 1;
     }
     /// Returns the current character at the buffer position
@@ -49,6 +53,10 @@ impl ISource for Buffer {
     /// Resets the buffer position to the start
     fn reset(&mut self) {
         self.position = 0;
+    }
+    /// Moves the position back to the previous character
+    fn backup(&mut self) {
+        self.position = self.last_position;
     }
 }
 #[cfg(test)]
@@ -111,4 +119,14 @@ mod tests {
         }
     }
 
+    #[test]
+    fn backup_works() {
+        let mut source = Buffer::new(String::from("abc").as_bytes());
+        source.next();
+        source.backup();
+        match source.current() {
+            Some('a') => assert!(true),
+            _ => assert!(false)
+        }
+    }
 }

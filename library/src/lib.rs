@@ -15,8 +15,8 @@
 pub mod io;
 // /// Module containing YAML data structure definitions and node types
 pub mod nodes;
-// /// Module implementing YAML parsing and value extraction
-// pub mod parser;
+/// Module implementing YAML parsing and value extraction
+pub mod parser;
 // /// Module defining error types and handling for YAML operations.
 // pub mod error;
 // /// Module for converting YAML structures to formatted strings
