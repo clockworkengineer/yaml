@@ -16,6 +16,17 @@ fn skip_whitespace(source: &mut dyn ISource) {
     }
 }
 
+fn parse_comment(source: &mut dyn ISource) -> String {
+    source.next(); // Skip the '#' character
+    let mut comment = String::new();
+    while let Some(c) = source.current() {
+        if c == '\n' { break; }
+        comment.push(c);
+        source.next();
+    }
+    comment.trim().to_string()
+}
+
 fn parse_scalar(value: &str) -> Node {
     // Check if the value is a comment (starts with #)
     if value.starts_with('#') {
@@ -39,15 +50,7 @@ fn parse_sequence(source: &mut dyn ISource) -> Result<Node, String> {
     let mut items = Vec::new();
     while let Some(c) = source.current() {
         if c == '#' {
-            // Parse comment
-            source.next();
-            let mut comment = String::new();
-            while let Some(c) = source.current() {
-                if c == '\n' { break; }
-                comment.push(c);
-                source.next();
-            }
-            items.push(Node::Comment(comment.trim().to_string()));
+            items.push(Node::Comment(parse_comment(source)));
         } else if c == '-' {
             source.next();
             skip_whitespace(source);
@@ -72,16 +75,7 @@ fn parse_mapping(source: &mut dyn ISource) -> Result<Node, String> {
         if peek_ahead_for_document_start(source) {
             return Ok(Node::Dictionary(map));
         } else if c == '#' {
-            // Parse comment
-            source.next();
-            let mut comment = String::new();
-            while let Some(c) = source.current() {
-                if c == '\n' { break; }
-                comment.push(c);
-                source.next();
-            }
-            // Store comment with a special key
-            map.insert(format!("__comment_{}", map.len()), Node::Comment(comment.trim().to_string()));
+            parse_comment(source);
         } else if c.is_alphanumeric() {
             let mut key = String::new();
             while let Some(c) = source.current() {
@@ -126,7 +120,7 @@ fn peek_ahead_for_document_start(source: &mut dyn ISource) -> bool {
     true
 }
 
-pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
+pub fn parse_documents(source: &mut dyn ISource) -> Result<Node, String> {
     skip_whitespace(source);
 
     let mut documents = Vec::new();
@@ -176,6 +170,9 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
 
     Ok(Node::Documents(documents))
 
+}
+pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
+    parse_documents(source)
 }
 
 #[cfg(test)]
