@@ -38,7 +38,7 @@ pub enum Node {
     Comment(String),
     /// Represents a document node
     /// Contains a sequence of top-level nodes making up a YAML document
-    Document(Vec<Node>),
+    Documents(Vec<Node>),
     /// Represents a null value or uninitialized node
     /// Used for explicit null values in YAML or missing/undefined values
     None,
@@ -370,9 +370,9 @@ mod tests {
 
     #[test]
     fn test_document_node() {
-        let doc = Node::Document(vec![Node::from(1), Node::from("test")]);
+        let doc = Node::Documents(vec![Node::from(1), Node::from("test")]);
         match doc {
-            Node::Document(nodes) => {
+            Node::Documents(nodes) => {
                 assert_eq!(nodes.len(), 2);
                 assert_eq!(nodes[0], Node::Number(Numeric::Int32(1)));
                 assert_eq!(nodes[1], Node::Str("test".to_string()));
