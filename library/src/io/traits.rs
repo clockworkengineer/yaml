@@ -15,6 +15,7 @@ pub trait ISource {
     fn is_whitespace(&self, c: char) -> bool {
         c == ' ' || c == '\t' || c == '\n' || c == '\r'
     }
+   
 }
 
 /// Trait defining the interface for writing YAML data to a destination.

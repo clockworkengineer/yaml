@@ -70,7 +70,9 @@ fn parse_sequence(source: &mut dyn ISource) -> Result<Node, String> {
 fn parse_mapping(source: &mut dyn ISource) -> Result<Node, String> {
     let mut map = HashMap::new();
     while let Some(c) = source.current() {
-        if c == '#' {
+        if peek_ahead_for_document_start(source) {
+            return Ok(Node::Dictionary(map));
+        } else if c == '#' {
             // Parse comment
             source.next();
             let mut comment = String::new();
@@ -105,6 +107,26 @@ fn parse_mapping(source: &mut dyn ISource) -> Result<Node, String> {
     Ok(Node::Dictionary(map))
 }
 
+fn peek_ahead_for_document_start(source: &mut dyn ISource) -> bool {
+    if source.current() != Some('-') {
+        return false;
+    }
+    source.next();
+    if source.current() != Some('-') {
+        source.backup();
+        return false;
+    }
+    source.next();
+    if source.current() != Some('-') {
+        source.backup();
+        source.backup();
+        return false;
+    }
+    source.backup();
+    source.backup();
+    true
+}
+
 pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
     skip_whitespace(source);
 
@@ -113,6 +135,16 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
 
     while let Some(c) = source.current() {
         match c {
+            '-' if peek_ahead_for_document_start(source) => {
+                if let Some(doc) = current_doc.take() {
+                    documents.push(doc);
+                }
+                // Skip the document separator
+                source.next();
+                source.next();
+                source.next();
+                // skip_whitespace(source);
+            }
             '-' if documents.is_empty() || current_doc.is_none() => {
                 current_doc = Some(parse_sequence(source)?);
             }
@@ -129,15 +161,6 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
                 }
                 current_doc = Some(Node::Comment(comment.trim().to_string()));
             }
-            '-' if source.current() == Some('-') && source.current() == Some('-') => {
-                if let Some(doc) = current_doc {
-                    documents.push(doc);
-                }
-                current_doc = None;
-                source.next();
-                source.next();
-                source.next();
-            }
             c if c.is_alphanumeric() => {
                 current_doc = Some(parse_mapping(source)?);
             }
@@ -152,13 +175,13 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
         documents.push(doc);
     }
 
-    // if documents.is_empty() {
-    //     Ok(Node::None)
-    // } else if documents.len() == 1 {
-    //     Ok(documents.remove(0))
-    // } else {
+    if documents.is_empty() {
+        Ok(Node::None)
+    } else if documents.len() == 1 {
+        Ok(documents.remove(0))
+    } else {
         Ok(Node::Documents(documents))
-    // }
+    }
 }
 
 #[cfg(test)]
@@ -182,12 +205,10 @@ mod tests {
     fn test_parse_sequence() {
         let mut source = Buffer::new(b"- 1\n- 2\n- 3");
         let result = parse(&mut source).unwrap();
-        assert_eq!(result, Node::Documents(vec![
-            Node::Array(vec![
-                Node::Number(Numeric::Integer(1)),
-                Node::Number(Numeric::Integer(2)),
-                Node::Number(Numeric::Integer(3))
-            ])
+        assert_eq!(result, Node::Array(vec![
+            Node::Number(Numeric::Integer(1)),
+            Node::Number(Numeric::Integer(2)),
+            Node::Number(Numeric::Integer(3))
         ]));
     }
 
@@ -195,13 +216,11 @@ mod tests {
     fn test_parse_sequence_with_comments() {
         let mut source = Buffer::new(b"- 1\n# Comment 1\n- 2\n# Comment 2");
         let result = parse(&mut source).unwrap();
-        assert_eq!(result, Node::Documents(vec![
-            Node::Array(vec![
-                Node::Number(Numeric::Integer(1)),
-                Node::Comment("Comment 1".to_string()),
-                Node::Number(Numeric::Integer(2)),
-                Node::Comment("Comment 2".to_string())
-            ])
+        assert_eq!(result, Node::Array(vec![
+            Node::Number(Numeric::Integer(1)),
+            Node::Comment("Comment 1".to_string()),
+            Node::Number(Numeric::Integer(2)),
+            Node::Comment("Comment 2".to_string())
         ]));
     }
 
@@ -212,14 +231,14 @@ mod tests {
         let mut expected = HashMap::new();
         expected.insert("key1".to_string(), Node::Str("value1".to_string()));
         expected.insert("key2".to_string(), Node::Number(Numeric::Integer(42)));
-        assert_eq!(result, Node::Documents(vec![Node::Dictionary(expected)]));
+        assert_eq!(result, Node::Dictionary(expected));
     }
 
     #[test]
     fn test_parse_empty() {
         let mut source = Buffer::new(b"");
         let result = parse(&mut source).unwrap();
-        assert_eq!(result, Node::Documents(vec![]));
+        assert_eq!(result, Node::None);
     }
 
     #[test]
@@ -234,7 +253,7 @@ mod tests {
     fn test_parse_comment_only() {
         let mut source = Buffer::new(b"# Just a comment");
         let result = parse(&mut source).unwrap();
-        assert_eq!(result, Node::Documents(vec![Node::Comment("Just a comment".to_string())]));
+        assert_eq!(result, Node::Comment("Just a comment".to_string()));
     }
 
     #[test]
@@ -249,11 +268,15 @@ mod tests {
         doc3.insert("key3".to_string(), Node::Str("value3".to_string()));
         doc3.insert("key4".to_string(), Node::Str("value4".to_string()));
         assert_eq!(result, Node::Documents(vec![
-            Node::Documents(vec![Node::Dictionary(doc1)]),
-            Node::Documents(vec![Node::Dictionary(doc2)]),
-            Node::Documents(vec![Node::Dictionary(doc3)])
+            Node::Dictionary(doc1),
+            Node::Dictionary(doc2),
+            Node::Dictionary(doc3)
         ]));
     }
+
+
 }
+
+
 
 
