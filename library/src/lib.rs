@@ -17,6 +17,7 @@ pub mod io;
 pub mod nodes;
 /// Module implementing YAML parsing and value extraction
 pub mod parser;
+pub mod stringify;
 // /// Module defining error types and handling for YAML operations.
 // pub mod error;
 // /// Module for converting YAML structures to formatted strings
