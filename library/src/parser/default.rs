@@ -6,7 +6,6 @@ use crate::nodes::node::Node;
 use crate::nodes::node::Numeric;
 use std::collections::HashMap;
 use crate::io::traits::ISource;
-// use crate::error::messages::*;
 
 fn skip_whitespace(source: &mut dyn ISource) {
     while let Some(c) = source.current() {
@@ -143,7 +142,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
                 source.next();
                 source.next();
                 source.next();
-                // skip_whitespace(source);
+                skip_whitespace(source);
             }
             '-' if documents.is_empty() || current_doc.is_none() => {
                 current_doc = Some(parse_sequence(source)?);
