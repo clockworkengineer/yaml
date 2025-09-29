@@ -142,13 +142,7 @@ pub fn parse_documents(source: &mut dyn ISource) -> Result<Node, String> {
                 current_doc = Some(parse_sequence(source)?);
             }
             '#' => {
-                source.next();
-                let mut comment = String::new();
-                while let Some(c) = source.current() {
-                    if c == '\n' { break; }
-                    comment.push(c);
-                    source.next();
-                }
+                let comment =parse_comment(source);
                 if let Some(doc) = current_doc {
                     documents.push(doc);
                 }
@@ -162,11 +156,15 @@ pub fn parse_documents(source: &mut dyn ISource) -> Result<Node, String> {
             }
             c => return Err(format!("Unexpected character: {}", c))
         }
+        if let Some(doc) = &current_doc {
+            documents.push(doc.clone());
+            current_doc = None;
+        }
     }
 
-    if let Some(doc) = current_doc {
-        documents.push(doc);
-    }
+    // if let Some(doc) = current_doc {
+    //     documents.push(doc);
+    // }
 
     Ok(Node::Documents(documents))
 
@@ -265,7 +263,21 @@ mod tests {
         ]));
     }
 
-
+    #[test]
+    fn test_parse_header_comments() {
+        let mut source = Buffer::new(b"# Header comment 1\n# Header comment 2\n# Header comment 3\nkey: value\n");
+        let result = parse(&mut source).unwrap();
+        assert_eq!(result, Node::Documents(vec![
+            Node::Comment("Header comment 1".to_string()),
+            Node::Comment("Header comment 2".to_string()),
+            Node::Comment("Header comment 3".to_string()),
+            Node::Dictionary({
+                let mut map = HashMap::new();
+                map.insert("key".to_string(), Node::Str("value".to_string()));
+                map
+            })
+        ]));
+    }
 }
 
 
