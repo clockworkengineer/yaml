@@ -9,6 +9,7 @@ pub fn stringify(node: &Node, destination: &mut dyn IDestination)-> Result<(), S
         Node::Str(s) => destination.add_bytes(&format!("\"{}\"", s)),
         Node::Comment(c) => destination.add_bytes(&format!("// {}", c)),
         Node::Documents(docs) => {
+            destination.add_bytes("---\n");
             for (i, doc) in docs.iter().enumerate() {
                 if i > 0 {
                     destination.add_bytes("\n---\n");
@@ -116,6 +117,7 @@ mod tests {
         let mut dest = Buffer::new();
         let docs = vec![Node::Str("doc1".to_string()), Node::Str("doc2".to_string())];
         stringify(&Node::Documents(docs), &mut dest).unwrap();
-        assert_eq!(dest.to_string(), "\"doc1\"\n---\n\"doc2\"");
+        assert_eq!(dest.to_string(), "---\n\"doc1\"\n---\n\"doc2\"");
     }
+
 }
