@@ -174,13 +174,8 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
         documents.push(doc);
     }
 
-    if documents.is_empty() {
-        Ok(Node::None)
-    } else if documents.len() == 1 {
-        Ok(documents.remove(0))
-    } else {
-        Ok(Node::Documents(documents))
-    }
+    Ok(Node::Documents(documents))
+
 }
 
 #[cfg(test)]
@@ -204,23 +199,23 @@ mod tests {
     fn test_parse_sequence() {
         let mut source = Buffer::new(b"- 1\n- 2\n- 3");
         let result = parse(&mut source).unwrap();
-        assert_eq!(result, Node::Array(vec![
+        assert_eq!(result, Node::Documents(vec![Node::Array(vec![
             Node::Number(Numeric::Integer(1)),
             Node::Number(Numeric::Integer(2)),
             Node::Number(Numeric::Integer(3))
-        ]));
+        ])]));
     }
 
     #[test]
     fn test_parse_sequence_with_comments() {
         let mut source = Buffer::new(b"- 1\n# Comment 1\n- 2\n# Comment 2");
         let result = parse(&mut source).unwrap();
-        assert_eq!(result, Node::Array(vec![
+        assert_eq!(result, Node::Documents(vec![Node::Array(vec![
             Node::Number(Numeric::Integer(1)),
             Node::Comment("Comment 1".to_string()),
             Node::Number(Numeric::Integer(2)),
             Node::Comment("Comment 2".to_string())
-        ]));
+        ])]));
     }
 
     #[test]
@@ -230,14 +225,14 @@ mod tests {
         let mut expected = HashMap::new();
         expected.insert("key1".to_string(), Node::Str("value1".to_string()));
         expected.insert("key2".to_string(), Node::Number(Numeric::Integer(42)));
-        assert_eq!(result, Node::Dictionary(expected));
+        assert_eq!(result, Node::Documents(vec![Node::Dictionary(expected)]));
     }
 
     #[test]
     fn test_parse_empty() {
         let mut source = Buffer::new(b"");
         let result = parse(&mut source).unwrap();
-        assert_eq!(result, Node::None);
+        assert_eq!(result, Node::Documents(vec![]));
     }
 
     #[test]
@@ -252,7 +247,7 @@ mod tests {
     fn test_parse_comment_only() {
         let mut source = Buffer::new(b"# Just a comment");
         let result = parse(&mut source).unwrap();
-        assert_eq!(result, Node::Comment("Just a comment".to_string()));
+        assert_eq!(result, Node::Documents(vec![Node::Comment("Just a comment".to_string())]));
     }
 
     #[test]
