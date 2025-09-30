@@ -138,8 +138,7 @@ pub fn parse_documents(source: &mut dyn ISource) -> Result<Node, String> {
                 source.next();
                 skip_whitespace(source);
             }
-            '-' if documents.is_empty() || current_doc.is_none() => {
-                current_doc = Some(parse_sequence(source)?);
+            '-' => { current_doc = Some(parse_sequence(source)?);
             }
             '#' => {
                 let comment =parse_comment(source);
@@ -278,7 +277,22 @@ mod tests {
             })
         ]));
     }
+
+    #[test]
+    fn test_parse_nested_sequence() {
+        let mut source = Buffer::new(b"- item1\n- - nested1\n  - nested2\n- item2");
+        let result = parse(&mut source).unwrap();
+        assert_eq!(result, Node::Documents(vec![Node::Array(vec![
+            Node::Str("item1".to_string()),
+            Node::Array(vec![
+                Node::Str("nested1".to_string()),
+                Node::Str("nested2".to_string())
+            ]),
+            Node::Str("item2".to_string())
+        ])]));
+    }
 }
+
 
 
 
