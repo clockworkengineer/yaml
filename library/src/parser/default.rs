@@ -125,12 +125,12 @@ pub fn parse_documents(source: &mut dyn ISource) -> Result<Node, String> {
     skip_whitespace(source);
 
     let mut documents = Vec::new();
-    let mut current_doc = None;
+    let mut current_documwnt = None;
 
     while let Some(c) = source.current() {
         match c {
             '-' if peek_ahead_for_document_start(source) => {
-                if let Some(doc) = current_doc.take() {
+                if let Some(doc) = current_documwnt.take() {
                     documents.push(doc);
                 }
                 // Skip the document separator
@@ -140,33 +140,29 @@ pub fn parse_documents(source: &mut dyn ISource) -> Result<Node, String> {
                 skip_whitespace(source);
                 return Ok(Document(documents))
             }
-            '-' => { current_doc = Some(parse_sequence(source)?);
+            '-' => { current_documwnt = Some(parse_sequence(source)?);
             }
             '#' => {
                 let comment =parse_comment(source);
-                if let Some(doc) = current_doc {
+                if let Some(doc) = current_documwnt {
                     documents.push(doc);
                 }
-                current_doc = Some(Node::Comment(comment.trim().to_string()));
+                current_documwnt = Some(Node::Comment(comment.trim().to_string()));
             }
             c if c.is_alphanumeric() => {
-                current_doc = Some(parse_mapping(source)?);
+                current_documwnt = Some(parse_mapping(source)?);
             }
             c if c.is_whitespace() => {
                 source.next();
             }
             c => return Err(format!("Unexpected character: {}", c))
         }
-        if let Some(doc) = &current_doc {
+        if let Some(doc) = &current_documwnt {
             documents.push(doc.clone());
-            current_doc = None;
+            current_documwnt = None;
         }
     }
-
-    // if let Some(doc) = current_doc {
-    //     documents.push(doc);
-    // }
-
+    
     Ok(Document(documents))
 
 }
@@ -186,6 +182,12 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
     Ok(Node::Documents(docs))
 }
 
+pub fn get_number_of_documents(documents: &Node) -> Result<usize, String> {
+    match documents {
+        Node::Documents(docs) => Ok(docs.len()),
+        _ => Err("Expected Documents node".to_string())
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -294,19 +296,30 @@ mod tests {
         ]));
     }
 
-    // #[test]
-    // fn test_parse_nested_sequence() {
-    //     let mut source = Buffer::new(b"- item1\n- - nested1\n  - nested2\n- item2");
-    //     let result = parse(&mut source).unwrap();
-    //     assert_eq!(result, Node::Documents(vec![Node::Document(vec![Node::Array(vec![
-    //         Node::Str("item1".to_string()),
-    //         Node::Array(vec![
-    //             Node::Str("nested1".to_string()),
-    //             Node::Str("nested2".to_string())
-    //         ]),
-    //         Node::Str("item2".to_string())
-    //     ])])]));
-    // }
+    #[test]
+    fn test_parse_nested_sequence() {
+        let mut source = Buffer::new(b"- item1\n- - nested1\n  - nested2\n- item2");
+        let result = parse(&mut source).unwrap();
+        assert_eq!(result, Node::Documents(vec![Node::Document(vec![Node::Array(vec![
+            Node::Str("item1".to_string()),
+            Node::Array(vec![
+                Node::Str("nested1".to_string()),
+                Node::Str("nested2".to_string())
+            ]),
+            Node::Str("item2".to_string())
+        ])])]));
+    }
+
+    #[test]
+    fn test_get_number_of_documents() {
+        let mut source = Buffer::new(b"doc1: value1\n---\ndoc2: value2\n---\ndoc3: value3");
+        let result = parse(&mut source).unwrap();
+        assert_eq!(get_number_of_documents(&result).unwrap(), 3);
+
+        // Test error case with non-Documents node
+        let non_docs_node = Node::Str("test".to_string());
+        assert!(get_number_of_documents(&non_docs_node).is_err());
+    }
 }
 
 
