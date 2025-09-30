@@ -125,12 +125,12 @@ pub fn parse_documents(source: &mut dyn ISource) -> Result<Node, String> {
     skip_whitespace(source);
 
     let mut documents = Vec::new();
-    let mut current_documwnt = None;
+    let mut current_document = None;
 
     while let Some(c) = source.current() {
         match c {
             '-' if peek_ahead_for_document_start(source) => {
-                if let Some(doc) = current_documwnt.take() {
+                if let Some(doc) = current_document.take() {
                     documents.push(doc);
                 }
                 // Skip the document separator
@@ -140,26 +140,26 @@ pub fn parse_documents(source: &mut dyn ISource) -> Result<Node, String> {
                 skip_whitespace(source);
                 return Ok(Document(documents))
             }
-            '-' => { current_documwnt = Some(parse_sequence(source)?);
+            '-' => { current_document = Some(parse_sequence(source)?);
             }
             '#' => {
                 let comment =parse_comment(source);
-                if let Some(doc) = current_documwnt {
+                if let Some(doc) = current_document {
                     documents.push(doc);
                 }
-                current_documwnt = Some(Node::Comment(comment.trim().to_string()));
+                current_document = Some(Node::Comment(comment.trim().to_string()));
             }
             c if c.is_alphanumeric() => {
-                current_documwnt = Some(parse_mapping(source)?);
+                current_document = Some(parse_mapping(source)?);
             }
             c if c.is_whitespace() => {
                 source.next();
             }
             c => return Err(format!("Unexpected character: {}", c))
         }
-        if let Some(doc) = &current_documwnt {
+        if let Some(doc) = &current_document {
             documents.push(doc.clone());
-            current_documwnt = None;
+            current_document = None;
         }
     }
     
@@ -300,7 +300,7 @@ mod tests {
     fn test_parse_nested_sequence() {
         let mut source = Buffer::new(b"- item1\n- - nested1\n  - nested2\n- item2");
         let result = parse(&mut source).unwrap();
-        assert_eq!(result, Node::Documents(vec![Node::Document(vec![Node::Array(vec![
+        assert_eq!(result, Node::Documents(vec![Document(vec![Node::Array(vec![
             Node::Str("item1".to_string()),
             Node::Array(vec![
                 Node::Str("nested1".to_string()),
