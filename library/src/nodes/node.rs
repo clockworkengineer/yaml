@@ -38,6 +38,7 @@ pub enum Node {
     Comment(String),
     /// Represents a document node
     /// Contains a sequence of top-level nodes making up a YAML document
+    Document(Vec<Node>),
     Documents(Vec<Node>),
     /// Represents a null value or uninitialized node
     /// Used for explicit null values in YAML or missing/undefined values

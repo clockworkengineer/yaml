@@ -35,6 +35,11 @@ pub fn stringify(node: &Node, destination: &mut dyn IDestination)-> Result<(), S
                 stringify(value, destination)?;
                 destination.add_bytes("\n");
             }
+        },
+        Node::Document(nodes) => {
+            for node in nodes {
+                stringify(node, destination)?;
+            }
         }
     }
     Ok(())
