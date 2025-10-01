@@ -104,33 +104,65 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
     Ok(Node::Array(items))
 }
 
-fn parse_mapping(source: &mut dyn ISource, _indent_level:usize) -> Result<Node, String> {
+fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, String> {
     let mut map = HashMap::new();
     while let Some(c) = source.current() {
         if peek_ahead_for_document_start(source) {
             return Ok(Node::Dictionary(map));
         } else if c == '#' {
             parse_comment(source);
-        } else if c.is_alphanumeric() {
-            let mut key = String::new();
-            while let Some(c) = source.current() {
-                if c == ':' { break; }
-                key.push(c);
-                source.next();
-            }
-            source.next(); // Skip ':'
-            skip_whitespace(source);
-
-            let mut value = String::new();
-            while let Some(c) = source.current() {
-                if c == '\n' || c == '#' { break; }
-                value.push(c);
-                source.next();
+        } else {
+            let current_indent = source.get_current_indent_level();
+            if current_indent < indent_level {
+                break;
             }
 
-            map.insert(key.trim().to_string(), parse_scalar(value.trim()));
+            if c.is_alphanumeric() {
+                let mut key = String::new();
+                while let Some(c) = source.current() {
+                    if c == ':' { break; }
+                    key.push(c);
+                    source.next();
+                }
+
+                let mut newline = false;
+                source.next(); // Skip ':'
+                if let Some(next_char) = source.current() {
+                    if !next_char.is_whitespace() {
+                        return Err("Expected space after colon in mapping".to_string());
+                    }
+                }
+                skip_whitespace(source);
+                if let Some(c) = source.current() {
+                    newline = c == '\n';
+                    if newline { 
+                        source.next();
+                         skip_whitespace(source);
+                    }
+                }
+
+                let next_indent = source.get_current_indent_level();
+                if next_indent > indent_level && newline {
+                    // Nested mapping
+                    map.insert(key.trim().to_string(), parse_mapping(source, next_indent)?);
+                } else {
+                    let mut value = String::new();
+                    while let Some(c) = source.current() {
+                        if c == '\n' || c == '#' { break; }
+                        value.push(c);
+                        source.next();
+                    }
+
+                    if !value.trim().is_empty() {
+                        map.insert(key.trim().to_string(), parse_scalar(value.trim()));
+                    } else {
+                        map.insert(key.trim().to_string(), Node::None);
+                    }
+                }
+            }
         }
-        source.next();
+        skip_until_newline(source);
+        skip_whitespace(source);
     }
     Ok(Node::Dictionary(map))
 }
@@ -366,20 +398,34 @@ mod tests {
         assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(expected)])]));
     }
 
-    // #[test]
-    // fn test_parse_nested_mapping() {
-    //     let mut source = Buffer::new(b"outer:\n  inner1: value1\n  inner2: value2");
-    //     let result = parse(&mut source).unwrap();
-    //
-    //     let mut inner_map = HashMap::new();
-    //     inner_map.insert("inner1".to_string(), Node::Str("value1".to_string()));
-    //     inner_map.insert("inner2".to_string(), Node::Str("value2".to_string()));
-    //
-    //     let mut outer_map = HashMap::new();
-    //     outer_map.insert("outer".to_string(), Node::Dictionary(inner_map));
-    //
-    //     assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(outer_map)])]));
-    // }
+    #[test]
+    fn test_parse_nested_mapping() {
+        let mut source = Buffer::new(b"outer:\n  inner1: value1\n  inner2: value2");
+        let result = parse(&mut source).unwrap();
+
+        let mut inner_map = HashMap::new();
+        inner_map.insert("inner1".to_string(), Node::Str("value1".to_string()));
+        inner_map.insert("inner2".to_string(), Node::Str("value2".to_string()));
+
+        let mut outer_map = HashMap::new();
+        outer_map.insert("outer".to_string(), Node::Dictionary(inner_map));
+
+        assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(outer_map)])]));
+    }
+    #[test]
+    fn test_parse_nested_mapping_with_key_after_nested() {
+        let mut source = Buffer::new(b"outer1:\n  inner1: value1\n  inner2: value2\nouter1: value3");
+        let result = parse(&mut source).unwrap();
+
+        let mut inner_map = HashMap::new();
+        inner_map.insert("inner1".to_string(), Node::Str("value1".to_string()));
+        inner_map.insert("inner2".to_string(), Node::Str("value2".to_string()));
+
+        let mut outer_map = HashMap::new();
+        outer_map.insert("outer1".to_string(), Node::Dictionary(inner_map));
+
+        assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(outer_map)])]));
+    }
 }
 
 

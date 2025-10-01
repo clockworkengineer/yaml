@@ -13,9 +13,9 @@ pub trait ISource {
     fn backup(&mut self);
 
     fn is_whitespace(&self, c: char) -> bool {
-        c == ' ' || c == '\t' || c == '\n' || c == '\r'
+        c == ' ' || c == '\t'
     }
-    
+
     fn get_current_indent_level(&self) -> usize;
 }
 
