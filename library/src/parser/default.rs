@@ -366,6 +366,20 @@ mod tests {
         assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(expected)])]));
     }
 
+    // #[test]
+    // fn test_parse_nested_mapping() {
+    //     let mut source = Buffer::new(b"outer:\n  inner1: value1\n  inner2: value2");
+    //     let result = parse(&mut source).unwrap();
+    //
+    //     let mut inner_map = HashMap::new();
+    //     inner_map.insert("inner1".to_string(), Node::Str("value1".to_string()));
+    //     inner_map.insert("inner2".to_string(), Node::Str("value2".to_string()));
+    //
+    //     let mut outer_map = HashMap::new();
+    //     outer_map.insert("outer".to_string(), Node::Dictionary(inner_map));
+    //
+    //     assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(outer_map)])]));
+    // }
 }
 
 
