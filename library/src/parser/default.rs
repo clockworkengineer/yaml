@@ -201,6 +201,34 @@ fn peek_ahead_for_document_start(source: &mut dyn ISource) -> bool {
     true
 }
 
+pub fn parse_inner(source: &mut dyn ISource, indent_level:usize) -> Result<Node, String> {
+    let mut current_node = None;
+    match source.current() {
+        Some('-') => {
+            let indent_level = source.get_current_indent_level();
+            current_node = Some(parse_sequence(source, indent_level)?);
+        }
+        Some('#') => {
+            let comment = parse_comment(source);
+            current_node = Some(Node::Comment(comment.trim().to_string()));
+        }
+        Some(c) if c.is_alphanumeric() => {
+            current_node = Some(parse_mapping(source, indent_level)?);
+        }
+        Some(c) if c.is_whitespace() => {
+            source.next();
+            return parse_inner(source, indent_level);
+        }
+        Some(c) => return Err(format!("Unexpected character: {}", c)),
+        None => return Err("Unexpected end of input".to_string())
+    }
+
+    if let Some(node) = current_node {
+        Ok(node)
+    } else {
+        Err("Failed to parse node".to_string())
+    }
+}
 pub fn parse_document(source: &mut dyn ISource, indent_level:usize) -> Result<Node, String> {
     skip_whitespace(source);
 
@@ -220,25 +248,14 @@ pub fn parse_document(source: &mut dyn ISource, indent_level:usize) -> Result<No
                 skip_whitespace(source);
                 return Ok(Document(document_nodes))
             }
-            '-' => {
-                let indent_level = source.get_current_indent_level();
-                current_node = Some(parse_sequence(source, indent_level)?);
-            }
-            '#' => {
-                let comment =parse_comment(source);
-                if let Some(doc) = current_node {
-                    document_nodes.push(doc);
+            _ => {
+                current_node= Some(parse_inner(source, indent_level)?);
+                if let Some(doc) = &current_node {
+                    document_nodes.push(doc.clone());
+                    current_node = None;
                 }
-                current_node = Some(Node::Comment(comment.trim().to_string()));
             }
-            c if c.is_alphanumeric() => {
-                current_node = Some(parse_mapping(source, indent_level)?);
-            }
-            c if c.is_whitespace() => {
-                source.next();
-            }
-            c => return Err(format!("Unexpected character: {}", c))
-        }
+       }
         if let Some(doc) = &current_node {
             document_nodes.push(doc.clone());
             current_node = None;
