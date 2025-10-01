@@ -10,13 +10,23 @@ use crate::nodes::node::Node::Document;
 
 fn skip_whitespace(source: &mut dyn ISource) {
     while let Some(c) = source.current() {
-        if !c.is_whitespace() {
+        if source.is_whitespace(c) {
+            source.next();
+        } else {
+            break;
+        }
+    }
+}
+
+fn skip_until_newline(source: &mut dyn ISource) {
+    while let Some(c) = source.current() {
+        if c == '\n' {
+            source.next();
             break;
         }
         source.next();
     }
 }
-
 fn parse_comment(source: &mut dyn ISource) -> String {
     source.next(); // Skip the '#' character
     let mut comment = String::new();
@@ -69,6 +79,7 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
                     // Check for nested sequence
                     let nested_indent = source.get_current_indent_level();
                     items.push(parse_sequence(source, nested_indent)?);
+                    continue;
                 } else {
                     // Parse scalar value
                     let mut value = String::new();
@@ -86,21 +97,8 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
             return Err(format!("Expected sequence item starting with '-', got '{}'", c));
         }
 
-
-        // Move to next line
-        while let Some(c) = source.current() {
-            if c == '\n' {
-                source.next();
-                break;
-            } else if c == '-' {
-                break;
-            }
-            source.next();
-        }
-        // source.next();
+        skip_until_newline(source);
         skip_whitespace(source);
-        // current_indent = source.get_current_indent_level();
-
 
     }
     Ok(Node::Array(items))
