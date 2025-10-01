@@ -2,8 +2,7 @@
 //! Provides functions for parsing different YAML data types including mappings,
 //! sequences, strings, numbers, boolean and null values.
 
-use crate::nodes::node::Node;
-use crate::nodes::node::Numeric;
+use crate::nodes::node::{Node, Numeric};
 use std::collections::HashMap;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node::Document;
@@ -230,6 +229,7 @@ pub fn parse_inner(source: &mut dyn ISource, indent_level:usize) -> Result<Node,
     }
 }
 pub fn parse_document(source: &mut dyn ISource, indent_level:usize) -> Result<Node, String> {
+
     skip_whitespace(source);
 
     let mut document_nodes = Vec::new();
