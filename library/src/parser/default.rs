@@ -145,6 +145,7 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
                 if next_indent > indent_level && newline {
                     // Nested mapping
                     map.insert(key.trim().to_string(), parse_mapping(source, next_indent)?);
+                    continue;
                 } else {
                     let mut value = String::new();
                     while let Some(c) = source.current() {
@@ -414,7 +415,7 @@ mod tests {
     }
     #[test]
     fn test_parse_nested_mapping_with_key_after_nested() {
-        let mut source = Buffer::new(b"outer1:\n  inner1: value1\n  inner2: value2\nouter1: value3");
+        let mut source = Buffer::new(b"outer1:\n  inner1: value1\n  inner2: value2\nouter2: value3");
         let result = parse(&mut source).unwrap();
 
         let mut inner_map = HashMap::new();
@@ -423,6 +424,7 @@ mod tests {
 
         let mut outer_map = HashMap::new();
         outer_map.insert("outer1".to_string(), Node::Dictionary(inner_map));
+        outer_map.insert("outer2".to_string(), Node::Str("value3".to_string()));
 
         assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(outer_map)])]));
     }
