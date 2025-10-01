@@ -227,14 +227,10 @@ pub fn parse_document(source: &mut dyn ISource, indent_level:usize) -> Result<No
     skip_whitespace(source);
 
     let mut document_nodes = Vec::new();
-    let mut current_node = None;
 
     while let Some(c) = source.current() {
         match c {
             '-' if peek_ahead_for_document_start(source) => {
-                if let Some(doc) = current_node.take() {
-                    document_nodes.push(doc);
-                }
                 // Skip the document separator
                 source.next();
                 source.next();
@@ -243,17 +239,9 @@ pub fn parse_document(source: &mut dyn ISource, indent_level:usize) -> Result<No
                 return Ok(Document(document_nodes))
             }
             _ => {
-                current_node= Some(parse_inner(source, indent_level)?);
-                if let Some(doc) = &current_node {
-                    document_nodes.push(doc.clone());
-                    current_node = None;
-                }
+                document_nodes.push(parse_inner(source, indent_level)?);
             }
        }
-        if let Some(doc) = &current_node {
-            document_nodes.push(doc.clone());
-            current_node = None;
-        }
     }
 
     Ok(Document(document_nodes))
