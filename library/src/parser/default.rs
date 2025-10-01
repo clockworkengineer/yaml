@@ -358,6 +358,16 @@ mod tests {
         let non_docs_node = Node::Str("test".to_string());
         assert!(get_number_of_documents(&non_docs_node).is_err());
     }
+    #[test]
+    fn test_parse_mapping_with_comments() {
+        let mut source = Buffer::new(b"key1: value1\n# Comment 1\nkey2: 42\n# Comment 2");
+        let result = parse(&mut source).unwrap();
+        let mut expected = HashMap::new();
+        expected.insert("key1".to_string(), Node::Str("value1".to_string()));
+        expected.insert("key2".to_string(), Node::Number(Numeric::Integer(42)));
+        assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(expected)])]));
+    }
+
 }
 
 
