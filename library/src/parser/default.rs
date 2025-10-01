@@ -26,6 +26,33 @@ fn skip_until_newline(source: &mut dyn ISource) {
         source.next();
     }
 }
+
+fn parse_mapping_key(source: &mut dyn ISource) -> Result<(String, bool), String> {
+    let mut key = String::new();
+    while let Some(c) = source.current() {
+        if c == ':' { break; }
+        key.push(c);
+        source.next();
+    }
+
+    let mut newline = false;
+    source.next(); // Skip ':'
+    if let Some(next_char) = source.current() {
+        if !next_char.is_whitespace() {
+            return Err("Expected space after colon in mapping".to_string());
+        }
+    }
+    skip_whitespace(source);
+    if let Some(c) = source.current() {
+        newline = c == '\n';
+        if newline {
+            source.next();
+            skip_whitespace(source);
+        }
+    }
+    Ok((key, newline))
+}
+
 fn parse_comment(source: &mut dyn ISource) -> String {
     source.next(); // Skip the '#' character
     let mut comment = String::new();
@@ -119,33 +146,11 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
                 parse_comment(source);
             }
             Some(c) if c.is_alphanumeric() => {
-                let current_indent = source.get_current_indent_level();
-                if current_indent < indent_level {
+                if  source.get_current_indent_level() < indent_level {
                     break;
                 }
 
-                let mut key = String::new();
-                while let Some(c) = source.current() {
-                    if c == ':' { break; }
-                    key.push(c);
-                    source.next();
-                }
-
-                let mut newline = false;
-                source.next(); // Skip ':'
-                if let Some(next_char) = source.current() {
-                    if !next_char.is_whitespace() {
-                        return Err("Expected space after colon in mapping".to_string());
-                    }
-                }
-                skip_whitespace(source);
-                if let Some(c) = source.current() {
-                    newline = c == '\n';
-                    if newline {
-                        source.next();
-                        skip_whitespace(source);
-                    }
-                }
+                let ( key,  newline) = parse_mapping_key(source)?;
 
                 let next_indent = source.get_current_indent_level();
                 if next_indent > indent_level && newline {
