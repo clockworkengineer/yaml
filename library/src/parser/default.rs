@@ -188,57 +188,57 @@ fn peek_ahead_for_document_start(source: &mut dyn ISource) -> bool {
     true
 }
 
-pub fn parse_documents(source: &mut dyn ISource, indent_level:usize) -> Result<Node, String> {
+pub fn parse_document(source: &mut dyn ISource, indent_level:usize) -> Result<Node, String> {
     skip_whitespace(source);
 
-    let mut documents = Vec::new();
-    let mut current_document = None;
+    let mut document_nodes = Vec::new();
+    let mut current_node = None;
 
     while let Some(c) = source.current() {
         match c {
             '-' if peek_ahead_for_document_start(source) => {
-                if let Some(doc) = current_document.take() {
-                    documents.push(doc);
+                if let Some(doc) = current_node.take() {
+                    document_nodes.push(doc);
                 }
                 // Skip the document separator
                 source.next();
                 source.next();
                 source.next();
                 skip_whitespace(source);
-                return Ok(Document(documents))
+                return Ok(Document(document_nodes))
             }
             '-' => {
                 let indent_level = source.get_current_indent_level();
-                current_document = Some(parse_sequence(source, indent_level)?);
+                current_node = Some(parse_sequence(source, indent_level)?);
             }
             '#' => {
                 let comment =parse_comment(source);
-                if let Some(doc) = current_document {
-                    documents.push(doc);
+                if let Some(doc) = current_node {
+                    document_nodes.push(doc);
                 }
-                current_document = Some(Node::Comment(comment.trim().to_string()));
+                current_node = Some(Node::Comment(comment.trim().to_string()));
             }
             c if c.is_alphanumeric() => {
-                current_document = Some(parse_mapping(source,indent_level)?);
+                current_node = Some(parse_mapping(source, indent_level)?);
             }
             c if c.is_whitespace() => {
                 source.next();
             }
             c => return Err(format!("Unexpected character: {}", c))
         }
-        if let Some(doc) = &current_document {
-            documents.push(doc.clone());
-            current_document = None;
+        if let Some(doc) = &current_node {
+            document_nodes.push(doc.clone());
+            current_node = None;
         }
     }
 
-    Ok(Document(documents))
+    Ok(Document(document_nodes))
 
 }
 pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
     let mut docs: Vec<Node> = Vec::new();
     while source.more() {
-        let document = parse_documents(source, 0);
+        let document = parse_document(source, 0);
         match document {
             Ok(doc) => {
                 docs.push(doc.into());
@@ -428,6 +428,23 @@ mod tests {
 
         assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(outer_map)])]));
     }
+
+    // #[test]
+    // fn test_parse_mapping_with_nested_sequence() {
+    //     let mut source = Buffer::new(b"key1:\n  - item1\n  - item2\nkey2: value2");
+    //     let result = parse(&mut source).unwrap();
+    //
+    //     let sequence = Node::Array(vec![
+    //         Node::Str("item1".to_string()),
+    //         Node::Str("item2".to_string())
+    //     ]);
+    //
+    //     let mut map = HashMap::new();
+    //     map.insert("key1".to_string(), sequence);
+    //     map.insert("key2".to_string(), Node::Str("value2".to_string()));
+    //
+    //     assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(map)])]));
+    // }
 }
 
 
