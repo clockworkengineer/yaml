@@ -78,7 +78,7 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
                         '-' => {
                             // Check for a nested sequence
                             let nested_indent = source.get_current_indent_level();
-                            items.push(parse_sequence(source, nested_indent)?);
+                            items.push(parse_inner(source, nested_indent)?);
                             continue;
                         },
                         _ => {
@@ -151,7 +151,7 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
                 let next_indent = source.get_current_indent_level();
                 if next_indent > indent_level && newline {
                     // Nested mapping
-                    map.insert(key.trim().to_string(), parse_mapping(source, next_indent)?);
+                    map.insert(key.trim().to_string(), parse_inner(source, next_indent)?);
                     continue;
                 } else {
                     let mut value = String::new();
@@ -201,32 +201,26 @@ fn peek_ahead_for_document_start(source: &mut dyn ISource) -> bool {
 }
 
 pub fn parse_inner(source: &mut dyn ISource, indent_level:usize) -> Result<Node, String> {
-    let mut current_node = None;
-    match source.current() {
+     match source.current() {
         Some('-') => {
             let indent_level = source.get_current_indent_level();
-            current_node = Some(parse_sequence(source, indent_level)?);
+            Ok(parse_sequence(source, indent_level)?)
         }
         Some('#') => {
             let comment = parse_comment(source);
-            current_node = Some(Node::Comment(comment.trim().to_string()));
+            Ok(Node::Comment(comment.trim().to_string()))
         }
         Some(c) if c.is_alphanumeric() => {
-            current_node = Some(parse_mapping(source, indent_level)?);
+            Ok(parse_mapping(source, indent_level)?)
         }
         Some(c) if c.is_whitespace() => {
             source.next();
-            return parse_inner(source, indent_level);
+            Ok(parse_inner(source, indent_level)?)
         }
-        Some(c) => return Err(format!("Unexpected character: {}", c)),
-        None => return Err("Unexpected end of input".to_string())
+        Some(c) => Err(format!("Unexpected character: {}", c)),
+        None => Err("Unexpected end of input".to_string())
     }
 
-    if let Some(node) = current_node {
-        Ok(node)
-    } else {
-        Err("Failed to parse node".to_string())
-    }
 }
 pub fn parse_document(source: &mut dyn ISource, indent_level:usize) -> Result<Node, String> {
 
@@ -459,22 +453,22 @@ mod tests {
         assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(outer_map)])]));
     }
 
-    // #[test]
-    // fn test_parse_mapping_with_nested_sequence() {
-    //     let mut source = Buffer::new(b"key1:\n  - item1\n  - item2\nkey2: value2");
-    //     let result = parse(&mut source).unwrap();
-    //
-    //     let sequence = Node::Array(vec![
-    //         Node::Str("item1".to_string()),
-    //         Node::Str("item2".to_string())
-    //     ]);
-    //
-    //     let mut map = HashMap::new();
-    //     map.insert("key1".to_string(), sequence);
-    //     map.insert("key2".to_string(), Node::Str("value2".to_string()));
-    //
-    //     assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(map)])]));
-    // }
+    #[test]
+    fn test_parse_mapping_with_nested_sequence() {
+        let mut source = Buffer::new(b"key1:\n  - item1\n  - item2\nkey2: value2");
+        let result = parse(&mut source).unwrap();
+
+        let sequence = Node::Array(vec![
+            Node::Str("item1".to_string()),
+            Node::Str("item2".to_string())
+        ]);
+
+        let mut map = HashMap::new();
+        map.insert("key1".to_string(), sequence);
+        map.insert("key2".to_string(), Node::Str("value2".to_string()));
+
+        assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(map)])]));
+    }
 }
 
 
