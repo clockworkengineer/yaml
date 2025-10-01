@@ -15,7 +15,8 @@ pub trait ISource {
     fn is_whitespace(&self, c: char) -> bool {
         c == ' ' || c == '\t' || c == '\n' || c == '\r'
     }
-   
+    
+    fn get_current_indent_level(&self) -> usize;
 }
 
 /// Trait defining the interface for writing YAML data to a destination.

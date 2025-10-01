@@ -7,6 +7,16 @@ pub struct Buffer {
     buffer: Vec<u8>,
     /// Current reading position in the buffer
     position: usize,
+    /// Current column position in the buffer
+    column: usize,
+    /// Current line position in the buffer
+    line: usize,
+    // /// Last position in the buffer
+    // last_position: usize,
+    // /// Last column position in the buffer
+    // last_column: usize,
+    // /// Last line position in the buffer
+    // last_line: usize,
 }
 
 impl Buffer {
@@ -18,7 +28,7 @@ impl Buffer {
     /// # Returns
     /// A new Buffer containing the provided bytes
     pub fn new(to_add: &[u8]) -> Self {
-        Self { buffer: to_add.to_vec(), position: 0 }
+        Self { buffer: to_add.to_vec(), position: 0 , column: 0, line: 0 }
     }
     /// Converts the buffer content to a String.
     ///
@@ -32,9 +42,15 @@ impl Buffer {
 impl ISource for Buffer {
     /// Moves to the next character in the buffer
     fn next(&mut self) {
-        // self.last_position = self.position;
-        // self.last_position = self.position;
         self.position += 1;
+        if self.more() {
+            self.column += 1;
+            if self.buffer[self.position - 1] == b'\n' {
+                self.line += 1;
+                self.column = 0;
+            }
+        }
+
     }
     /// Returns the current character at the buffer position
     fn current(&mut self) -> Option<char> {
@@ -55,8 +71,12 @@ impl ISource for Buffer {
     /// Moves the position back to the previous character
     fn backup(&mut self) {
         self.position -= 1;
+        self.column -= 1;
     }
 
+    fn get_current_indent_level(&self) -> usize {
+        return self.column
+    }
 }
 #[cfg(test)]
 mod tests {
@@ -127,5 +147,12 @@ mod tests {
             Some('a') => assert!(true),
             _ => assert!(false)
         }
+    }
+    #[test]
+    fn get_current_indent_level_works() {
+        let mut source = Buffer::new(String::from("  abc").as_bytes());
+        source.next();
+        source.next();
+        assert_eq!(source.get_current_indent_level(), 2);
     }
 }

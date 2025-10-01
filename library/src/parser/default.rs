@@ -47,30 +47,66 @@ fn parse_scalar(value: &str) -> Node {
     }
 }
 
-fn parse_sequence(source: &mut dyn ISource) -> Result<Node, String> {
+fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node, String> {
     let mut items = Vec::new();
     while let Some(c) = source.current() {
         if c == '#' {
             items.push(Node::Comment(parse_comment(source)));
-        } else if c == '-' {
-            source.next();
-            skip_whitespace(source);
-            let mut value = String::new();
-            while let Some(c) = source.current() {
-                if c == '\n' || c == '#' { break; }
-                value.push(c);
-                source.next();
-            }
-            items.push(parse_scalar(value.trim()));
-        } else {
+            continue;
+        }
+
+        let current_indent = source.get_current_indent_level();
+        if current_indent < indent_level {
             break;
         }
-        source.next();
+
+        if c == '-' {
+            source.next(); // Skip the dash
+            skip_whitespace(source);
+
+            if let Some(next_c) = source.current() {
+                if next_c == '-' {
+                    // Check for nested sequence
+                    let nested_indent = source.get_current_indent_level();
+                    items.push(parse_sequence(source, nested_indent)?);
+                } else {
+                    // Parse scalar value
+                    let mut value = String::new();
+                    while let Some(c) = source.current() {
+                        if c == '\n' || c == '#' { break; }
+                        value.push(c);
+                        source.next();
+                    }
+                    if !value.trim().is_empty() {
+                        items.push(parse_scalar(value.trim()));
+                    }
+                }
+            }
+        } else if !c.is_whitespace() {
+            return Err(format!("Expected sequence item starting with '-', got '{}'", c));
+        }
+
+
+        // Move to next line
+        while let Some(c) = source.current() {
+            if c == '\n' {
+                source.next();
+                break;
+            } else if c == '-' {
+                break;
+            }
+            source.next();
+        }
+        // source.next();
+        skip_whitespace(source);
+        // current_indent = source.get_current_indent_level();
+
+
     }
     Ok(Node::Array(items))
 }
 
-fn parse_mapping(source: &mut dyn ISource) -> Result<Node, String> {
+fn parse_mapping(source: &mut dyn ISource, _indent_level:usize) -> Result<Node, String> {
     let mut map = HashMap::new();
     while let Some(c) = source.current() {
         if peek_ahead_for_document_start(source) {
@@ -121,7 +157,7 @@ fn peek_ahead_for_document_start(source: &mut dyn ISource) -> bool {
     true
 }
 
-pub fn parse_documents(source: &mut dyn ISource) -> Result<Node, String> {
+pub fn parse_documents(source: &mut dyn ISource, indent_level:usize) -> Result<Node, String> {
     skip_whitespace(source);
 
     let mut documents = Vec::new();
@@ -140,7 +176,9 @@ pub fn parse_documents(source: &mut dyn ISource) -> Result<Node, String> {
                 skip_whitespace(source);
                 return Ok(Document(documents))
             }
-            '-' => { current_document = Some(parse_sequence(source)?);
+            '-' => {
+                let indent_level = source.get_current_indent_level();
+                current_document = Some(parse_sequence(source, indent_level)?);
             }
             '#' => {
                 let comment =parse_comment(source);
@@ -150,7 +188,7 @@ pub fn parse_documents(source: &mut dyn ISource) -> Result<Node, String> {
                 current_document = Some(Node::Comment(comment.trim().to_string()));
             }
             c if c.is_alphanumeric() => {
-                current_document = Some(parse_mapping(source)?);
+                current_document = Some(parse_mapping(source,indent_level)?);
             }
             c if c.is_whitespace() => {
                 source.next();
@@ -162,14 +200,14 @@ pub fn parse_documents(source: &mut dyn ISource) -> Result<Node, String> {
             current_document = None;
         }
     }
-    
+
     Ok(Document(documents))
 
 }
 pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
     let mut docs: Vec<Node> = Vec::new();
     while source.more() {
-        let document = parse_documents(source);
+        let document = parse_documents(source, 0);
         match document {
             Ok(doc) => {
                 docs.push(doc.into());
