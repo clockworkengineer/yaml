@@ -60,41 +60,47 @@ fn parse_scalar(value: &str) -> Node {
 fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node, String> {
     let mut items = Vec::new();
     while let Some(c) = source.current() {
-        if c == '#' {
-            items.push(Node::Comment(parse_comment(source)));
-            continue;
-        }
 
-        let current_indent = source.get_current_indent_level();
-        if current_indent < indent_level {
+        if source.get_current_indent_level() < indent_level {
             break;
         }
 
-        if c == '-' {
-            source.next(); // Skip the dash
-            skip_whitespace(source);
+        match c {
+            '#' => {
+                items.push(Node::Comment(parse_comment(source)));
+                continue;
+            }
+            '-' => {
+                source.next(); // Skip the dash
+                skip_whitespace(source);
 
-            if let Some(next_c) = source.current() {
-                if next_c == '-' {
-                    // Check for a nested sequence
-                    let nested_indent = source.get_current_indent_level();
-                    items.push(parse_sequence(source, nested_indent)?);
-                    continue;
-                } else {
-                    // Parse scalar value
-                    let mut value = String::new();
-                    while let Some(c) = source.current() {
-                        if c == '\n' || c == '#' { break; }
-                        value.push(c);
-                        source.next();
-                    }
-                    if !value.trim().is_empty() {
-                        items.push(parse_scalar(value.trim()));
+                if let Some(next_c) = source.current() {
+                    match next_c {
+                        '-' => {
+                            // Check for a nested sequence
+                            let nested_indent = source.get_current_indent_level();
+                            items.push(parse_sequence(source, nested_indent)?);
+                            continue;
+                        },
+                        _ => {
+                            // Parse scalar value
+                            let mut value = String::new();
+                            while let Some(c) = source.current() {
+                                if c == '\n' || c == '#' { break; }
+                                value.push(c);
+                                source.next();
+                            }
+                            if !value.trim().is_empty() {
+                                items.push(parse_scalar(value.trim()));
+                            }
+                        }
                     }
                 }
-            }
-        } else if !c.is_whitespace() {
-            return Err(format!("Expected sequence item starting with '-', got '{}'", c));
+            },
+            _ if !c.is_whitespace() => {
+                return Err(format!("Expected sequence item starting with '-', got '{}'", c));
+            },
+            _ => ()
         }
 
         skip_until_newline(source);
