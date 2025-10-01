@@ -76,7 +76,7 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
 
             if let Some(next_c) = source.current() {
                 if next_c == '-' {
-                    // Check for nested sequence
+                    // Check for a nested sequence
                     let nested_indent = source.get_current_indent_level();
                     items.push(parse_sequence(source, nested_indent)?);
                     continue;
@@ -106,18 +106,20 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
 
 fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, String> {
     let mut map = HashMap::new();
-    while let Some(c) = source.current() {
-        if peek_ahead_for_document_start(source) {
-            return Ok(Node::Dictionary(map));
-        } else if c == '#' {
-            parse_comment(source);
-        } else {
-            let current_indent = source.get_current_indent_level();
-            if current_indent < indent_level {
-                break;
+    while let Some(_) = source.current() {
+        match source.current() {
+            Some('-') if peek_ahead_for_document_start(source) => {
+                return Ok(Node::Dictionary(map));
             }
+            Some('#') => {
+                parse_comment(source);
+            }
+            Some(c) if c.is_alphanumeric() => {
+                let current_indent = source.get_current_indent_level();
+                if current_indent < indent_level {
+                    break;
+                }
 
-            if c.is_alphanumeric() {
                 let mut key = String::new();
                 while let Some(c) = source.current() {
                     if c == ':' { break; }
@@ -135,9 +137,9 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
                 skip_whitespace(source);
                 if let Some(c) = source.current() {
                     newline = c == '\n';
-                    if newline { 
+                    if newline {
                         source.next();
-                         skip_whitespace(source);
+                        skip_whitespace(source);
                     }
                 }
 
@@ -161,6 +163,11 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
                     }
                 }
             }
+            Some(c) if c.is_whitespace() => {
+                source.next();
+                continue;
+            }
+            _ => break,
         }
         skip_until_newline(source);
         skip_whitespace(source);
