@@ -53,6 +53,19 @@ fn parse_mepping_key(source: &mut dyn ISource) -> Result<(String, bool), String>
 
     Ok((key, newline))
 }
+fn parse_mapping_value(source: &mut dyn ISource) -> Node {
+    let mut value = String::new();
+    while let Some(c) = source.current() {
+        if c == '\n' || c == '#' { break; }
+        value.push(c);
+        source.next();
+    }
+    if !value.trim().is_empty() {
+        parse_scalar(value.trim())
+    } else {
+        Node::None
+    }
+}
 
 fn parse_comment(source: &mut dyn ISource) -> String {
     source.next(); // Skip the '#' character
@@ -161,18 +174,7 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
                     map.insert(key.trim().to_string(), parse_inner(source, next_indent)?);
                     continue;
                 } else {
-                    let mut value = String::new();
-                    while let Some(c) = source.current() {
-                        if c == '\n' || c == '#' { break; }
-                        value.push(c);
-                        source.next();
-                    }
-
-                    if !value.trim().is_empty() {
-                        map.insert(key.trim().to_string(), parse_scalar(value.trim()));
-                    } else {
-                        map.insert(key.trim().to_string(), Node::None);
-                    }
+                    map.insert(key.trim().to_string(), parse_mapping_value(source));
                 }
             }
             Some(c) if c.is_whitespace() => {
