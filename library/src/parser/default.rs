@@ -39,20 +39,20 @@ fn parse_comment(source: &mut dyn ISource) -> String {
 
 fn parse_scalar(value: &str) -> Node {
     // Check if the value is a comment (starts with #)
-    match value {
-        s if s.starts_with('#') => Node::Comment(s[1..].trim().to_string()),
-        "null" | "~" => Node::None,
-        "true" => Node::Boolean(true),
-        "false" => Node::Boolean(false),
-        s => {
-            if let Ok(i) = s.parse::<i64>() {
-                Node::Number(Numeric::Integer(i))
-            } else if let Ok(f) = s.parse::<f64>() {
-                Node::Number(Numeric::Float(f))
-            } else {
-                Node::Str(s.to_string())
-            }
-        }
+    if value.starts_with('#') {
+        Node::Comment(value[1..].trim().to_string())
+    } else if value == "null" || value == "~" {
+        Node::None
+    } else if value == "true" {
+        Node::Boolean(true)
+    } else if value == "false" {
+        Node::Boolean(false)
+    } else if let Ok(i) = value.parse::<i64>() {
+        Node::Number(Numeric::Integer(i))
+    } else if let Ok(f) = value.parse::<f64>() {
+        Node::Number(Numeric::Float(f))
+    } else {
+        Node::Str(value.to_string())
     }
 }
 
@@ -78,7 +78,7 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
                         '-' => {
                             // Check for a nested sequence
                             let nested_indent = source.get_current_indent_level();
-                            items.push(parse_document_contents(source, nested_indent)?);
+                            items.push(parse_inner(source, nested_indent)?);
                             continue;
                         },
                         _ => {
@@ -120,8 +120,8 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
                 parse_comment(source);
             }
             Some(c) if c.is_alphanumeric() => {
-
-                if source.get_current_indent_level() < indent_level {
+                let current_indent = source.get_current_indent_level();
+                if current_indent < indent_level {
                     break;
                 }
 
@@ -149,9 +149,9 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
                 }
 
                 let next_indent = source.get_current_indent_level();
-                if source.get_current_indent_level() > indent_level && newline {
+                if next_indent > indent_level && newline {
                     // Nested mapping
-                    map.insert(key.trim().to_string(), parse_document_contents(source, next_indent)?);
+                    map.insert(key.trim().to_string(), parse_inner(source, next_indent)?);
                     continue;
                 } else {
                     let mut value = String::new();
@@ -200,7 +200,7 @@ fn peek_ahead_for_document_start(source: &mut dyn ISource) -> bool {
     true
 }
 
-pub fn parse_document_contents(source: &mut dyn ISource, indent_level:usize) -> Result<Node, String> {
+pub fn parse_inner(source: &mut dyn ISource, indent_level:usize) -> Result<Node, String> {
      match source.current() {
         Some('-') => {
             let indent_level = source.get_current_indent_level();
@@ -215,7 +215,7 @@ pub fn parse_document_contents(source: &mut dyn ISource, indent_level:usize) -> 
         }
         Some(c) if c.is_whitespace() => {
             source.next();
-            Ok(parse_document_contents(source, indent_level)?)
+            Ok(parse_inner(source, indent_level)?)
         }
         Some(c) => Err(format!("Unexpected character: {}", c)),
         None => Err("Unexpected end of input".to_string())
@@ -239,7 +239,7 @@ pub fn parse_document(source: &mut dyn ISource, indent_level:usize) -> Result<No
                 return Ok(Document(document_nodes))
             }
             _ => {
-                document_nodes.push(parse_document_contents(source, indent_level)?);
+                document_nodes.push(parse_inner(source, indent_level)?);
             }
        }
     }
@@ -457,7 +457,6 @@ mod tests {
 
         assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(map)])]));
     }
-
 }
 
 
