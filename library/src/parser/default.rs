@@ -119,7 +119,7 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
                         '-' => {
                             // Check for a nested sequence
                             let nested_indent = source.get_current_indent_level();
-                            items.push(parse_inner(source, nested_indent)?);
+                            items.push(parse_document_contents(source, nested_indent)?);
                             continue;
                         },
                         _ => {
@@ -161,8 +161,8 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
                 parse_comment(source);
             }
             Some(c) if c.is_alphanumeric() => {
-                let current_indent = source.get_current_indent_level();
-                if current_indent < indent_level {
+
+                if  source.get_current_indent_level() < indent_level {
                     break;
                 }
                 
@@ -171,7 +171,7 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
                 let next_indent = source.get_current_indent_level();
                 if next_indent > indent_level && newline {
                     // Nested mapping
-                    map.insert(key.trim().to_string(), parse_inner(source, next_indent)?);
+                    map.insert(key.trim().to_string(), parse_document_contents(source, next_indent)?);
                     continue;
                 } else {
                     map.insert(key.trim().to_string(), parse_mapping_value(source));
@@ -209,7 +209,7 @@ fn peek_ahead_for_document_start(source: &mut dyn ISource) -> bool {
     true
 }
 
-pub fn parse_inner(source: &mut dyn ISource, indent_level:usize) -> Result<Node, String> {
+pub fn parse_document_contents(source: &mut dyn ISource, indent_level:usize) -> Result<Node, String> {
      match source.current() {
         Some('-') => {
             let indent_level = source.get_current_indent_level();
@@ -224,7 +224,7 @@ pub fn parse_inner(source: &mut dyn ISource, indent_level:usize) -> Result<Node,
         }
         Some(c) if c.is_whitespace() => {
             source.next();
-            Ok(parse_inner(source, indent_level)?)
+            Ok(parse_document_contents(source, indent_level)?)
         }
         Some(c) => Err(format!("Unexpected character: {}", c)),
         None => Err("Unexpected end of input".to_string())
@@ -248,7 +248,7 @@ pub fn parse_document(source: &mut dyn ISource, indent_level:usize) -> Result<No
                 return Ok(Document(document_nodes))
             }
             _ => {
-                document_nodes.push(parse_inner(source, indent_level)?);
+                document_nodes.push(parse_document_contents(source, indent_level)?);
             }
        }
     }
@@ -466,6 +466,24 @@ mod tests {
 
         assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(map)])]));
     }
+    // #[test]
+    // fn test_parse_mapping_with_nested_sequence_and_comments() {
+    //     let mut source = Buffer::new(b"key1:\n  - item1\n  - item2\n# Comment 1\nkey2: value2\n# Comment 2");
+    //     let result = parse(&mut source).unwrap();
+    //     let sequence = Node::Array(vec![
+    //         Node::Str("item1".to_string()),
+    //         Node::Str("item2".to_string())
+    //     ]);
+    //     let mut map = HashMap::new();
+    //     map.insert("key1".to_string(), sequence);
+    //     map.insert("key2".to_string(), Node::Str("value2".to_string()));
+    //     assert_eq!(result, Node::Documents(vec![Document(vec![
+    //         Node::Comment("Comment 1".to_string()),
+    //         Node::Dictionary(map),
+    //         Node::Comment("Comment 2".to_string())
+    //     ])]));
+    // }
+
 }
 
 
