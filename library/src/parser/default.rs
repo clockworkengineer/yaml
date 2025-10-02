@@ -26,6 +26,34 @@ fn skip_until_newline(source: &mut dyn ISource) {
         source.next();
     }
 }
+
+fn parse_mepping_key(source: &mut dyn ISource) -> Result<(String, bool), String> {
+    let mut key = String::new();
+    while let Some(c) = source.current() {
+        if c == ':' { break; }
+        key.push(c);
+        source.next();
+    }
+
+    let mut newline = false;
+    source.next(); // Skip ':'
+    if let Some(next_char) = source.current() {
+        if !next_char.is_whitespace() {
+            return Err("Expected space after colon in mapping".to_string());
+        }
+    }
+    skip_whitespace(source);
+    if let Some(c) = source.current() {
+        newline = c == '\n';
+        if newline {
+            source.next();
+            skip_whitespace(source);
+        }
+    }
+
+    Ok((key, newline))
+}
+
 fn parse_comment(source: &mut dyn ISource) -> String {
     source.next(); // Skip the '#' character
     let mut comment = String::new();
@@ -39,20 +67,20 @@ fn parse_comment(source: &mut dyn ISource) -> String {
 
 fn parse_scalar(value: &str) -> Node {
     // Check if the value is a comment (starts with #)
-    if value.starts_with('#') {
-        Node::Comment(value[1..].trim().to_string())
-    } else if value == "null" || value == "~" {
-        Node::None
-    } else if value == "true" {
-        Node::Boolean(true)
-    } else if value == "false" {
-        Node::Boolean(false)
-    } else if let Ok(i) = value.parse::<i64>() {
-        Node::Number(Numeric::Integer(i))
-    } else if let Ok(f) = value.parse::<f64>() {
-        Node::Number(Numeric::Float(f))
-    } else {
-        Node::Str(value.to_string())
+    match value {
+        v if v.starts_with('#') => Node::Comment(v[1..].trim().to_string()),
+        "null" | "~" => Node::None,
+        "true" => Node::Boolean(true),
+        "false" => Node::Boolean(false),
+        v => {
+            if let Ok(i) = v.parse::<i64>() {
+                Node::Number(Numeric::Integer(i))
+            } else if let Ok(f) = v.parse::<f64>() {
+                Node::Number(Numeric::Float(f))
+            } else {
+                Node::Str(v.to_string())
+            }
+        }
     }
 }
 
@@ -124,30 +152,9 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
                 if current_indent < indent_level {
                     break;
                 }
-
-                let mut key = String::new();
-                while let Some(c) = source.current() {
-                    if c == ':' { break; }
-                    key.push(c);
-                    source.next();
-                }
-
-                let mut newline = false;
-                source.next(); // Skip ':'
-                if let Some(next_char) = source.current() {
-                    if !next_char.is_whitespace() {
-                        return Err("Expected space after colon in mapping".to_string());
-                    }
-                }
-                skip_whitespace(source);
-                if let Some(c) = source.current() {
-                    newline = c == '\n';
-                    if newline {
-                        source.next();
-                        skip_whitespace(source);
-                    }
-                }
-
+                
+                let (key, newline) = parse_mepping_key(source)?;
+                
                 let next_indent = source.get_current_indent_level();
                 if next_indent > indent_level && newline {
                     // Nested mapping
