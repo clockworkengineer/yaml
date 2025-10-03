@@ -163,6 +163,12 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
                 items.push(Node::Comment(parse_comment(source)));
                 continue;
             }
+            '-' if peek_ahead_for_document_start(source) => {
+                break;
+            },
+            '.' if peek_ahead_for_document_end(source) => {
+                break;
+            },
             '-' => {
                 source.next(); // Skip the dash
                 skip_whitespace(source);
@@ -182,13 +188,6 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
                     }
                 }
             },
-            '.' if peek_ahead_for_document_end(source) => {
-                // Skip the document end marker
-                source.next();
-                source.next();
-                source.next();
-                return Ok(Node::Array(items));
-            },
             _ if !c.is_whitespace() => {
                 return Err(format!("Expected sequence item starting with '-', got '{}'", c));
             },
@@ -204,15 +203,18 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
 
 fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, String> {
     let mut map = HashMap::new();
-    while let Some(_) = source.current() {
-        match source.current() {
-            Some('-') if peek_ahead_for_document_start(source) => {
-                return Ok(Node::Dictionary(map));
-            }
-            Some('#') => {
+    while let Some(c) = source.current() {
+        match c {
+            '-' if peek_ahead_for_document_start(source) => {
+               break;
+            },
+            '.' if peek_ahead_for_document_end(source) => {
+                
+            },
+            '#' => {
                 parse_comment(source);
             }
-            Some(c) if c.is_alphanumeric() => {
+            c if c.is_alphanumeric() => {
 
                 if  source.get_current_indent_level() < indent_level {
                     break;
@@ -229,7 +231,7 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
                     map.insert(key.trim().to_string(), parse_mapping_value(source));
                 }
             }
-            Some(c) if c.is_whitespace() => {
+            c if c.is_whitespace() => {
                 source.next();
                 continue;
             }
@@ -273,12 +275,16 @@ pub fn parse_document(source: &mut dyn ISource, indent_level:usize) -> Result<No
     while let Some(c) = source.current() {
         match c {
             '-' if peek_ahead_for_document_start(source) => {
-                // Skip the document separator
-                source.next();
-                source.next();
-                source.next();
+                skip_until_newline(source);
                 skip_whitespace(source);
-                return Ok(Document(document_nodes))
+                break;
+                
+            }
+            '.' if peek_ahead_for_document_end(source) => {
+                skip_until_newline(source);
+                skip_whitespace(source);
+                break;
+                
             }
             _ => {
                 document_nodes.push(parse_document_contents(source, indent_level)?);
@@ -565,6 +571,70 @@ mod tests {
     //
     //     }
     // }
+        #[test]
+    fn test_parse_document_end_marker() {
+        let mut source = Buffer::new(b"key: value\n---");
+        let result = parse(&mut source).unwrap();
+        let mut expected = HashMap::new();
+        expected.insert("key".to_string(), Node::Str("value".to_string()));
+        assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(expected)])]));
+    }
+
+    #[test]
+    fn test_parse_document_end_marker_with_trailing_content() {
+        let mut source = Buffer::new(b"key: value\n---\nother: 123");
+        let result = parse(&mut source).unwrap();
+        let mut doc1 = HashMap::new();
+        doc1.insert("key".to_string(), Node::Str("value".to_string()));
+        let mut doc2 = HashMap::new();
+        doc2.insert("other".to_string(), Node::Number(Numeric::Integer(123)));
+        assert_eq!(result, Node::Documents(vec![
+            Document(vec![Node::Dictionary(doc1)]),
+            Document(vec![Node::Dictionary(doc2)])
+        ]));
+    }
+
+    #[test]
+    fn test_parse_document_end_marker_with_comments() {
+        let mut source = Buffer::new(b"# Comment before\nkey: value\n---\n# After doc\nother: 1");
+        let result = parse(&mut source).unwrap();
+        let mut doc1 = HashMap::new();
+        doc1.insert("key".to_string(), Node::Str("value".to_string()));
+        let mut doc2 = HashMap::new();
+        doc2.insert("other".to_string(), Node::Number(Numeric::Integer(1)));
+        assert_eq!(result, Node::Documents(vec![
+            Document(vec![
+                Node::Comment("Comment before".to_string()),
+                Node::Dictionary(doc1)
+            ]),
+            Document(vec![
+                Node::Comment("After doc".to_string()),
+                Node::Dictionary(doc2)
+            ])
+        ]));
+    }
+
+    #[test]
+    fn test_parse_document_end_marker_only() {
+        let mut source = Buffer::new(b"---");
+        let result = parse(&mut source).unwrap();
+        assert_eq!(result, Node::Documents(vec![Document(vec![])]));
+    }
+
+    #[test]
+    fn test_parse_multiple_document_end_markers() {
+        let mut source = Buffer::new(b"key: value\n---\n---\nother: 1");
+        let result = parse(&mut source).unwrap();
+        let mut doc1 = HashMap::new();
+        doc1.insert("key".to_string(), Node::Str("value".to_string()));
+        let mut doc3 = HashMap::new();
+        doc3.insert("other".to_string(), Node::Number(Numeric::Integer(1)));
+        assert_eq!(result, Node::Documents(vec![
+            Document(vec![Node::Dictionary(doc1)]),
+            Document(vec![]),
+            Document(vec![Node::Dictionary(doc3)])
+        ]));
+    }
     
 }
 
