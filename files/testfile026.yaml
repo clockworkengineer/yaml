@@ -1,0 +1,12 @@
+kind: Deployment
+apiVersion: v1
+metadata:
+  name: api-deployment
+spec:
+  replicas: 3             # 3 Pods will run; this gives us redundancy
+  template:
+    spec:
+      containers:
+        - name: api
+          image: my-app/api-server:latest
+...

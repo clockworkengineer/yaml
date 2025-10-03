@@ -5,6 +5,7 @@
 use crate::nodes::node::{Node, Numeric};
 use std::collections::HashMap;
 use crate::io::traits::ISource;
+use crate::io::sources::file::File as FileSource;
 use crate::nodes::node::Node::Document;
 
 fn skip_whitespace(source: &mut dyn ISource) {
@@ -54,6 +55,19 @@ fn parse_mepping_key(source: &mut dyn ISource) -> Result<(String, bool), String>
     Ok((key, newline))
 }
 fn parse_mapping_value(source: &mut dyn ISource) -> Node {
+    let mut value = String::new();
+    while let Some(c) = source.current() {
+        if c == '\n' || c == '#' { break; }
+        value.push(c);
+        source.next();
+    }
+    if !value.trim().is_empty() {
+        parse_scalar(value.trim())
+    } else {
+        Node::None
+    }
+}
+fn parse_scalar_sequence_value(source: &mut dyn ISource) -> Node {
     let mut value = String::new();
     while let Some(c) = source.current() {
         if c == '\n' || c == '#' { break; }
@@ -124,15 +138,7 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
                         },
                         _ => {
                             // Parse scalar value
-                            let mut value = String::new();
-                            while let Some(c) = source.current() {
-                                if c == '\n' || c == '#' { break; }
-                                value.push(c);
-                                source.next();
-                            }
-                            if !value.trim().is_empty() {
-                                items.push(parse_scalar(value.trim()));
-                            }
+                            items.push(parse_scalar_sequence_value(source));
                         }
                     }
                 }
@@ -282,6 +288,7 @@ pub fn get_number_of_documents(documents: &Node) -> Result<usize, String> {
 mod tests {
     use super::*;
     use crate::io::sources::buffer::Buffer;
+    use std::fs;
 
     #[test]
     fn test_parse_scalar() {
@@ -466,24 +473,70 @@ mod tests {
 
         assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(map)])]));
     }
-    // #[test]
-    // fn test_parse_mapping_with_nested_sequence_and_comments() {
-    //     let mut source = Buffer::new(b"key1:\n  - item1\n  - item2\n# Comment 1\nkey2: value2\n# Comment 2");
-    //     let result = parse(&mut source).unwrap();
-    //     let sequence = Node::Array(vec![
-    //         Node::Str("item1".to_string()),
-    //         Node::Str("item2".to_string())
-    //     ]);
-    //     let mut map = HashMap::new();
-    //     map.insert("key1".to_string(), sequence);
-    //     map.insert("key2".to_string(), Node::Str("value2".to_string()));
-    //     assert_eq!(result, Node::Documents(vec![Document(vec![
-    //         Node::Comment("Comment 1".to_string()),
-    //         Node::Dictionary(map),
-    //         Node::Comment("Comment 2".to_string())
-    //     ])]));
-    // }
+    #[test]
+    fn test_parse_mapping_with_nested_sequence_and_comments() {
+        let mut source = Buffer::new(b"key1:\n  - item1\n  - item2\n# Comment 1\nkey2: value2\n# Comment 2");
+        let result = parse(&mut source).unwrap();
+        let sequence = Node::Array(vec![
+            Node::Str("item1".to_string()),
+            Node::Str("item2".to_string())
+        ]);
+        let mut map = HashMap::new();
+        map.insert("key1".to_string(), sequence);
+        map.insert("key2".to_string(), Node::Str("value2".to_string()));
+        assert_eq!(result, Node::Documents(vec![Document(vec![
+            // Node::Comment("Comment 1".to_string()),
+            Node::Dictionary(map),
+            // Node::Comment("Comment 2".to_string())
+        ])]));
+    }
 
+    #[test]
+    fn test_parse_sequence_with_nested_comments() {
+        let mut source = Buffer::new(b"- item1\n# Comment between items\n- item2\n# Final comment\n- item3");
+        let result = parse(&mut source).unwrap();
+        assert_eq!(result, Node::Documents(vec![Document(vec![Node::Array(vec![
+            Node::Str("item1".to_string()),
+            Node::Comment("Comment between items".to_string()),
+            Node::Str("item2".to_string()),
+            Node::Comment("Final comment".to_string()),
+            Node::Str("item3".to_string())
+        ])])]));
+    }
+
+    fn get_json_file_paths(directory: &str) -> Vec<String> {
+        let mut paths = Vec::new();
+        if let Ok(entries) = fs::read_dir(directory) {
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    let path = entry.path();
+                    if path.extension().and_then(|s| s.to_str()) == Some("yaml") {
+                        if let Some(path_str) = path.to_str() {
+                            paths.push(path_str.to_string());
+                        }
+                    }
+                }
+            }
+        }
+        paths
+    }
+
+    #[test]
+    fn test_parse_json_files() {
+        let files_dir = "../files";
+        let json_files = get_json_file_paths(files_dir);
+        for file_path in json_files {
+            match FileSource::new(&file_path.to_string()) {
+                Ok(mut source) => {
+                    let result = parse(&mut source);
+                    assert!(result.is_ok(), "Failed to parse {}: {:?}", file_path, result.err());
+                },
+                Err(e) => panic!("Failed to open {}: {}", file_path, e),
+            }
+
+
+        }
+    }
 }
 
 

@@ -1,0 +1,18 @@
+version: "3.9"
+
+services:
+  production-db: &database-definition
+    image: mysql:5.7
+    volumes:
+      - db_data:/var/lib/mysql
+    restart: always
+    environment: &environment-definition
+     MYSQL_ROOT_PASSWORD: somewordpress
+     MYSQL_DATABASE: wordpress
+     MYSQL_USER: wordpress
+     MYSQL_PASSWORD: production-password
+  test-db:
+    <<: *database-definition
+    environment:
+      <<: *environment-definition
+      MYSQL_PASSWORD: test-password

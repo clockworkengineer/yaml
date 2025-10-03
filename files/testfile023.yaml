@@ -1,0 +1,5 @@
+tutorial:  #nesting level 1
+  - yaml:  #nesting level 2 (2 spaces used for indentation)
+      name: "YAML Ain't Markup Language" #string [literal] #nesting level 3 (4 spaces used for indentation)
+      type: awesome #string [literal]
+      born: 2001 #number [literal]

@@ -1,0 +1,7 @@
+environment:
+  TEST_REPORTS: /tmp/test-reports
+steps:
+  - command: npm install
+    dir: /path/to/project
+  - command: npm run test
+    dir: /path/to/project
