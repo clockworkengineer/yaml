@@ -5,8 +5,8 @@
 use crate::nodes::node::{Node, Numeric};
 use std::collections::HashMap;
 use crate::io::traits::ISource;
-use crate::io::sources::file::File as FileSource;
 use crate::nodes::node::Node::Document;
+
 
 fn skip_whitespace(source: &mut dyn ISource) {
     while let Some(c) = source.current() {
@@ -26,6 +26,45 @@ fn skip_until_newline(source: &mut dyn ISource) {
         }
         source.next();
     }
+}
+
+fn peek_ahead_for_document_start(source: &mut dyn ISource) -> bool {
+    if source.current() != Some('-') {
+        return false;
+    }
+    source.next();
+    if source.current() != Some('-') {
+        source.backup();
+        return false;
+    }
+    source.next();
+    if source.current() != Some('-') {
+        source.backup();
+        source.backup();
+        return false;
+    }
+    source.backup();
+    source.backup();
+    true
+}
+fn peek_ahead_for_document_end(source: &mut dyn ISource) -> bool {
+    if source.current() != Some('.') {
+        return false;
+    }
+    source.next();
+    if source.current() != Some('.') {
+        source.backup();
+        return false;
+    }
+    source.next();
+    if source.current() != Some('.') {
+        source.backup();
+        source.backup();
+        return false;
+    }
+    source.backup();
+    source.backup();
+    true
 }
 
 fn parse_mepping_key(source: &mut dyn ISource) -> Result<(String, bool), String> {
@@ -143,6 +182,13 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
                     }
                 }
             },
+            '.' if peek_ahead_for_document_end(source) => {
+                // Skip the document end marker
+                source.next();
+                source.next();
+                source.next();
+                return Ok(Node::Array(items));
+            },
             _ if !c.is_whitespace() => {
                 return Err(format!("Expected sequence item starting with '-', got '{}'", c));
             },
@@ -171,9 +217,9 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
                 if  source.get_current_indent_level() < indent_level {
                     break;
                 }
-                
+
                 let (key, newline) = parse_mepping_key(source)?;
-                
+
                 let next_indent = source.get_current_indent_level();
                 if next_indent > indent_level && newline {
                     // Nested mapping
@@ -195,25 +241,6 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
     Ok(Node::Dictionary(map))
 }
 
-fn peek_ahead_for_document_start(source: &mut dyn ISource) -> bool {
-    if source.current() != Some('-') {
-        return false;
-    }
-    source.next();
-    if source.current() != Some('-') {
-        source.backup();
-        return false;
-    }
-    source.next();
-    if source.current() != Some('-') {
-        source.backup();
-        source.backup();
-        return false;
-    }
-    source.backup();
-    source.backup();
-    true
-}
 
 pub fn parse_document_contents(source: &mut dyn ISource, indent_level:usize) -> Result<Node, String> {
      match source.current() {
@@ -288,6 +315,7 @@ pub fn get_number_of_documents(documents: &Node) -> Result<usize, String> {
 mod tests {
     use super::*;
     use crate::io::sources::buffer::Buffer;
+    use crate::io::sources::file::File as FileSource;
     use std::fs;
 
     #[test]
