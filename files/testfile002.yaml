@@ -3,7 +3,7 @@ people:
     likes:
       - 'apples'
       - 'bananas'
-  - name: 'Jane'
-    likes:
-      - 'strawberries'
-      - 'oranges'
+#  - name: 'Jane'
+#    likes:
+#      - 'strawberries'
+#      - 'oranges'

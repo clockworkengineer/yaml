@@ -65,9 +65,38 @@ fn peek_ahead_for_document_end(source: &mut dyn ISource) -> bool {
     source.backup();
     source.backup();
     true
+}fn peek_ahead_for_mapping_key(source: &mut dyn ISource) -> bool {
+    let mut found = false;
+    let mut chars = Vec::new();
+
+    // Save current position
+    source.backup(); // Move back to allow restoring after lookahead
+    source.next();   // Move forward to current
+
+    while let Some(c) = source.current() {
+        if c == ':' {
+            found = true;
+            break;
+        }
+        if c == '\n' {
+            break;
+        }
+        chars.push(c);
+        source.next();
+    }
+
+    // Restore position
+    for _ in 0..chars.len() {
+        source.backup();
+    }
+    source.backup(); // Restore to original position
+
+    found
 }
 
-fn parse_mepping_key(source: &mut dyn ISource) -> Result<(String, bool), String> {
+
+
+fn parse_mapping_key(source: &mut dyn ISource) -> Result<(String, bool), String> {
     let mut key = String::new();
     while let Some(c) = source.current() {
         if c == ':' { break; }
@@ -93,20 +122,7 @@ fn parse_mepping_key(source: &mut dyn ISource) -> Result<(String, bool), String>
 
     Ok((key, newline))
 }
-fn parse_mapping_value(source: &mut dyn ISource) -> Node {
-    let mut value = String::new();
-    while let Some(c) = source.current() {
-        if c == '\n' || c == '#' { break; }
-        value.push(c);
-        source.next();
-    }
-    if !value.trim().is_empty() {
-        parse_scalar(value.trim())
-    } else {
-        Node::None
-    }
-}
-fn parse_scalar_sequence_value(source: &mut dyn ISource) -> Node {
+fn parse_value(source: &mut dyn ISource) -> Node {
     let mut value = String::new();
     while let Some(c) = source.current() {
         if c == '\n' || c == '#' { break; }
@@ -182,8 +198,15 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
                             continue;
                         },
                         _ => {
+                            if peek_ahead_for_mapping_key(source) {
+                                let nested_indent = source.get_current_indent_level();
+                                items.push(parse_document_contents(source, nested_indent)?);
+                                // continue;
+                            }
                             // Parse scalar value
-                            items.push(parse_scalar_sequence_value(source));
+                            else {
+                                items.push(parse_value(source));
+                            }
                         }
                     }
                 }
@@ -220,15 +243,14 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
                     break;
                 }
 
-                let (key, newline) = parse_mepping_key(source)?;
+                let (key, newline) = parse_mapping_key(source)?;
 
                 let next_indent = source.get_current_indent_level();
                 if next_indent > indent_level && newline {
-                    // Nested mapping
                     map.insert(key.trim().to_string(), parse_document_contents(source, next_indent)?);
                     continue;
                 } else {
-                    map.insert(key.trim().to_string(), parse_mapping_value(source));
+                    map.insert(key.trim().to_string(), parse_value(source));
                 }
             }
             c if c.is_whitespace() => {
@@ -321,8 +343,8 @@ pub fn get_number_of_documents(documents: &Node) -> Result<usize, String> {
 mod tests {
     use super::*;
     use crate::io::sources::buffer::Buffer;
-    // use crate::io::sources::file::File as FileSource;
-    // use std::fs;
+    use crate::io::sources::file::File as FileSource;
+    use std::fs;
 
     #[test]
     fn test_parse_scalar() {
@@ -538,39 +560,39 @@ mod tests {
         ])])]));
     }
 
-    // fn get_json_file_paths(directory: &str) -> Vec<String> {
-    //     let mut paths = Vec::new();
-    //     if let Ok(entries) = fs::read_dir(directory) {
-    //         for entry in entries {
-    //             if let Ok(entry) = entry {
-    //                 let path = entry.path();
-    //                 if path.extension().and_then(|s| s.to_str()) == Some("yaml") {
-    //                     if let Some(path_str) = path.to_str() {
-    //                         paths.push(path_str.to_string());
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     paths
-    // }
-    //
-    // #[test]
-    // fn test_parse_json_files() {
-    //     let files_dir = "../files";
-    //     let json_files = get_json_file_paths(files_dir);
-    //     for file_path in json_files {
-    //         match FileSource::new(&file_path.to_string()) {
-    //             Ok(mut source) => {
-    //                 let result = parse(&mut source);
-    //                 assert!(result.is_ok(), "Failed to parse {}: {:?}", file_path, result.err());
-    //             },
-    //             Err(e) => panic!("Failed to open {}: {}", file_path, e),
-    //         }
-    //
-    //
-    //     }
-    // }
+    fn get_json_file_paths(directory: &str) -> Vec<String> {
+        let mut paths = Vec::new();
+        if let Ok(entries) = fs::read_dir(directory) {
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    let path = entry.path();
+                    if path.extension().and_then(|s| s.to_str()) == Some("yaml") {
+                        if let Some(path_str) = path.to_str() {
+                            paths.push(path_str.to_string());
+                        }
+                    }
+                }
+            }
+        }
+        paths
+    }
+
+    #[test]
+    fn test_parse_json_files() {
+        let files_dir = "../files";
+        let json_files = get_json_file_paths(files_dir);
+        for file_path in json_files {
+            match FileSource::new(&file_path.to_string()) {
+                Ok(mut source) => {
+                    let result = parse(&mut source);
+                    assert!(result.is_ok(), "Failed to parse {}: {:?}", file_path, result.err());
+                },
+                Err(e) => panic!("Failed to open {}: {}", file_path, e),
+            }
+
+
+        }
+    }
         #[test]
     fn test_parse_document_end_marker() {
         let mut source = Buffer::new(b"key: value\n---");
@@ -635,7 +657,12 @@ mod tests {
             Document(vec![Node::Dictionary(doc3)])
         ]));
     }
-    
+    #[test]
+    fn test_parse_nested_mapping_within_sequence() {
+        let mut source = Buffer::new(b"people:\n  - name: \'John\'\n    likes:\n      - \'apples\'\n      - \'bananas\'\n");
+        let result = parse(&mut source).unwrap();
+        assert_eq!(result, Node::Documents(vec![Document(vec![])]));
+    }
 }
 
 
