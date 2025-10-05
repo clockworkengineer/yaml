@@ -659,13 +659,34 @@ mod tests {
     }
     #[test]
     fn test_parse_nested_mapping_within_sequence() {
-        let mut source = Buffer::new(b"people:\n  - name: \'John\'\n    likes:\n      - \'apples\'\n      - \'bananas\'\n");
+        let mut source = Buffer::new(
+            b"people:\n  - name: John\n    likes:\n      - apples\n      - bananas\n"
+        );
         let result = parse(&mut source).unwrap();
-        assert_eq!(result, Node::Documents(vec![Document(vec![])]));
+
+        let mut likes = Vec::new();
+        likes.push(Node::Str("apples".to_string()));
+        likes.push(Node::Str("bananas".to_string()));
+
+        let mut john_map = HashMap::new();
+        john_map.insert("name".to_string(), Node::Str("John".to_string()));
+        john_map.insert("likes".to_string(), Node::Array(likes));
+
+        let mut people_seq = Vec::new();
+        people_seq.push(Node::Dictionary(john_map));
+
+        let mut outer_map = HashMap::new();
+        outer_map.insert("people".to_string(), Node::Array(people_seq));
+
+        assert_eq!(
+            result,
+            Node::Documents(vec![Document(vec![Node::Dictionary(outer_map)])])
+        );
+
+
     }
+
 }
-
-
 
 
 
