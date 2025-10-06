@@ -80,3 +80,102 @@ impl ISource for File {
         self.column
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use std::fs::OpenOptions;
+    use std::path::Path;
+
+    struct TestFile {
+        path: String,
+    }
+
+    impl TestFile {
+        fn new(content: &[u8]) -> Self {
+            let path = "test_temp_file.yaml";
+            let mut file = OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(path)
+                .unwrap();
+            file.write_all(content).unwrap();
+            Self { path: path.to_string() }
+        }
+    }
+
+    impl Drop for TestFile {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(&self.path);
+        }
+    }
+
+    #[test]
+    fn test_file_new_and_current() {
+        let test_file = TestFile::new(b"abc");
+        let mut file = File::new(&test_file.path).unwrap();
+        assert_eq!(file.current(), Some('a'));
+    }
+
+    #[test]
+    fn test_file_next_and_more() {
+        let test_file = TestFile::new(b"ab");
+        let mut file = File::new(&test_file.path).unwrap();
+        assert!(file.more());
+        assert_eq!(file.current(), Some('a'));
+        file.next();
+        assert_eq!(file.current(), Some('b'));
+        assert!(file.more());
+        file.next();
+        assert_eq!(file.current(), None);
+        assert!(!file.more());
+    }
+
+    #[test]
+    fn test_file_reset() {
+        let test_file = TestFile::new(b"xy");
+        let mut file = File::new(&test_file.path).unwrap();
+        file.next();
+        assert_eq!(file.current(), Some('y'));
+        file.reset();
+        assert_eq!(file.current(), Some('x'));
+    }
+
+    #[test]
+    fn test_file_backup() {
+        let test_file = TestFile::new(b"123");
+        let mut file = File::new(&test_file.path).unwrap();
+        file.next(); // move to '2'
+        file.next(); // move to '3'
+        assert_eq!(file.current(), Some('3'));
+        file.backup(); // should go back to '2'
+        assert_eq!(file.current(), Some('2'));
+        file.backup(); // should go back to '1'
+        assert_eq!(file.current(), Some('1'));
+    }
+
+    #[test]
+    fn test_file_get_current_indent_level() {
+        let test_file = TestFile::new(b"abc\ndef");
+        let mut file = File::new(&test_file.path).unwrap();
+        assert_eq!(file.get_current_indent_level(), 0);
+        file.next();
+        assert_eq!(file.get_current_indent_level(), 1);
+        file.next();
+        assert_eq!(file.get_current_indent_level(), 2);
+        file.next(); // now at '\n'
+        assert_eq!(file.get_current_indent_level(), 3);
+        file.next(); // should reset column to 0
+        assert_eq!(file.get_current_indent_level(), 0);
+    }
+
+    #[test]
+    fn test_file_new_empty_file() {
+        let test_file = TestFile::new(b"");
+        let mut file = File::new(&test_file.path).unwrap();
+        assert_eq!(file.current(), None);
+        assert!(!file.more());
+    }
+}
