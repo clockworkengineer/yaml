@@ -65,7 +65,8 @@ fn peek_ahead_for_document_end(source: &mut dyn ISource) -> bool {
     source.backup();
     source.backup();
     true
-}fn peek_ahead_for_mapping_key(source: &mut dyn ISource) -> bool {
+}
+fn peek_ahead_for_mapping_key(source: &mut dyn ISource) -> bool {
     let mut found = false;
     let mut backup_count = 0;
 
