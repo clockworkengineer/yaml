@@ -35,12 +35,18 @@ impl ISource for File {
             }
         }
         self.current_byte = if self.file.read(&mut byte).unwrap_or(0) == 1 {
-            Some(byte[0])
+            // Treat \r\n as a single \n
+            if self.current_byte == Some(b'\r') && byte[0] == b'\n' {
+                self.line += 1;
+                self.column = 0;
+                Some(b'\n')
+            } else {
+                Some(byte[0])
+            }
         } else {
             None
         };
     }
-
     fn current(&mut self) -> Option<char> {
         self.current_byte.map(|b| b as char)
     }
@@ -86,7 +92,9 @@ mod tests {
     use super::*;
     use std::io::Write;
     use std::fs::OpenOptions;
-    use std::path::Path;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    static TEST_FILE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
     struct TestFile {
         path: String,
@@ -94,15 +102,16 @@ mod tests {
 
     impl TestFile {
         fn new(content: &[u8]) -> Self {
-            let path = "test_temp_file.yaml";
+            let id = TEST_FILE_COUNTER.fetch_add(1, Ordering::SeqCst);
+            let path = format!("test_temp_file_{}.yaml", id);
             let mut file = OpenOptions::new()
                 .write(true)
                 .create(true)
                 .truncate(true)
-                .open(path)
+                .open(&path)
                 .unwrap();
             file.write_all(content).unwrap();
-            Self { path: path.to_string() }
+            Self { path }
         }
     }
 
@@ -178,4 +187,64 @@ mod tests {
         assert_eq!(file.current(), None);
         assert!(!file.more());
     }
+
+        #[test]
+    fn test_file_handles_crlf_newlines() {
+        let test_file = TestFile::new(b"ab\r\ncd\r\nef");
+        let mut file = File::new(&test_file.path).unwrap();
+
+        // 'a'
+        assert_eq!(file.current(), Some('a'));
+        assert_eq!(file.get_current_indent_level(), 0);
+
+        // 'b'
+        file.next();
+        assert_eq!(file.current(), Some('b'));
+        assert_eq!(file.get_current_indent_level(), 1);
+
+        // '\r'
+        file.next();
+        assert_eq!(file.current(), Some('\r'));
+        assert_eq!(file.get_current_indent_level(), 2);
+
+        // '\n' (should reset column)
+        file.next();
+        assert_eq!(file.current(), Some('\n'));
+        assert_eq!(file.get_current_indent_level(), 0);
+
+        // 'c'
+        file.next();
+        assert_eq!(file.current(), Some('c'));
+        assert_eq!(file.get_current_indent_level(), 0);
+
+        // 'd'
+        file.next();
+        assert_eq!(file.current(), Some('d'));
+        assert_eq!(file.get_current_indent_level(), 1);
+
+        // '\r'
+        file.next();
+        assert_eq!(file.current(), Some('\r'));
+        assert_eq!(file.get_current_indent_level(), 2);
+
+        // '\n'
+        file.next();
+        assert_eq!(file.current(), Some('\n'));
+        assert_eq!(file.get_current_indent_level(), 0);
+
+        // 'e'
+        file.next();
+        assert_eq!(file.current(), Some('e'));
+        assert_eq!(file.get_current_indent_level(), 0);
+
+        // 'f'
+        file.next();
+        assert_eq!(file.current(), Some('f'));
+        assert_eq!(file.get_current_indent_level(), 1);
+
+        // None
+        file.next();
+        assert_eq!(file.current(), None);
+    }
+    
 }
