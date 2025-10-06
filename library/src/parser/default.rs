@@ -195,7 +195,7 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
                 source.next(); // Skip the dash
                 skip_whitespace(source);
                 if source.current() == Some('\n') {
-                    skip_until_newline(source);
+                    source.next();
                     skip_whitespace(source);
                 }
 
@@ -211,7 +211,7 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
                             if peek_ahead_for_mapping_key(source) {
                                 let nested_indent = source.get_current_indent_level();
                                 items.push(parse_document_contents(source, nested_indent)?);
-                                // continue;
+                                continue;
                             }
                             // Parse scalar value
                             else {
