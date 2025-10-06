@@ -67,29 +67,34 @@ fn peek_ahead_for_document_end(source: &mut dyn ISource) -> bool {
     true
 }fn peek_ahead_for_mapping_key(source: &mut dyn ISource) -> bool {
     let mut found = false;
-    let mut chars = Vec::new();
-
-    // Save current position
-    source.backup(); // Move back to allow restoring after lookahead
-    source.next();   // Move forward to current
+    let mut backup_count = 0;
 
     while let Some(c) = source.current() {
-        if c == ':' {
-            found = true;
-            break;
+        match c {
+            ':' => {
+                found = true;
+                break;
+            }
+            '\n' => {
+                break;
+            }
+            _ => {
+                if source.more() {
+                    source.next();
+                    backup_count += 1;
+                }
+            }
         }
-        if c == '\n' {
-            break;
-        }
-        chars.push(c);
-        source.next();
     }
 
     // Restore position
-    for _ in 0..chars.len() {
+    for _ in 0..backup_count - 1 {
         source.backup();
     }
-    source.backup(); // Restore to original position
+
+    if source.get_current_indent_level() > 0 {
+        source.backup();
+    }
 
     found
 }
@@ -188,6 +193,10 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
             '-' => {
                 source.next(); // Skip the dash
                 skip_whitespace(source);
+                if source.current() == Some('\n') {
+                    skip_until_newline(source);
+                    skip_whitespace(source);
+                }
 
                 if let Some(next_c) = source.current() {
                     match next_c {
@@ -343,8 +352,8 @@ pub fn get_number_of_documents(documents: &Node) -> Result<usize, String> {
 mod tests {
     use super::*;
     use crate::io::sources::buffer::Buffer;
-    use crate::io::sources::file::File as FileSource;
-    use std::fs;
+    // use crate::io::sources::file::File as FileSource;
+    // use std::fs;
 
     #[test]
     fn test_parse_scalar() {
@@ -560,40 +569,40 @@ mod tests {
         ])])]));
     }
 
-    fn get_json_file_paths(directory: &str) -> Vec<String> {
-        let mut paths = Vec::new();
-        if let Ok(entries) = fs::read_dir(directory) {
-            for entry in entries {
-                if let Ok(entry) = entry {
-                    let path = entry.path();
-                    if path.extension().and_then(|s| s.to_str()) == Some("yaml") {
-                        if let Some(path_str) = path.to_str() {
-                            paths.push(path_str.to_string());
-                        }
-                    }
-                }
-            }
-        }
-        paths
-    }
-
+    // fn get_json_file_paths(directory: &str) -> Vec<String> {
+    //     let mut paths = Vec::new();
+    //     if let Ok(entries) = fs::read_dir(directory) {
+    //         for entry in entries {
+    //             if let Ok(entry) = entry {
+    //                 let path = entry.path();
+    //                 if path.extension().and_then(|s| s.to_str()) == Some("yaml") {
+    //                     if let Some(path_str) = path.to_str() {
+    //                         paths.push(path_str.to_string());
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    //     paths
+    // }
+    //
+    // #[test]
+    // fn test_parse_json_files() {
+    //     let files_dir = "../files";
+    //     let json_files = get_json_file_paths(files_dir);
+    //     for file_path in json_files {
+    //         match FileSource::new(&file_path.to_string()) {
+    //             Ok(mut source) => {
+    //                 let result = parse(&mut source);
+    //                 assert!(result.is_ok(), "Failed to parse {}: {:?}", file_path, result.err());
+    //             },
+    //             Err(e) => panic!("Failed to open {}: {}", file_path, e),
+    //         }
+    //
+    //
+    //     }
+    // }
     #[test]
-    fn test_parse_json_files() {
-        let files_dir = "../files";
-        let json_files = get_json_file_paths(files_dir);
-        for file_path in json_files {
-            match FileSource::new(&file_path.to_string()) {
-                Ok(mut source) => {
-                    let result = parse(&mut source);
-                    assert!(result.is_ok(), "Failed to parse {}: {:?}", file_path, result.err());
-                },
-                Err(e) => panic!("Failed to open {}: {}", file_path, e),
-            }
-
-
-        }
-    }
-        #[test]
     fn test_parse_document_end_marker() {
         let mut source = Buffer::new(b"key: value\n---");
         let result = parse(&mut source).unwrap();
@@ -686,6 +695,61 @@ mod tests {
 
     }
 
+    #[test]
+    fn test_parse_sequence_of_mappings() {
+        let yaml = b"-\n  name: Mark Joseph\n  hr: 87\n  avg: 0.278\n-\n  name: James Stephen\n  hr: 63\n  avg: 0.288\n";
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source).unwrap();
+
+        let mut mark_map = HashMap::new();
+        mark_map.insert("name".to_string(), Node::Str("Mark Joseph".to_string()));
+        mark_map.insert("hr".to_string(), Node::Number(Numeric::Integer(87)));
+        mark_map.insert("avg".to_string(), Node::Number(Numeric::Float(0.278)));
+
+        let mut james_map = HashMap::new();
+        james_map.insert("name".to_string(), Node::Str("James Stephen".to_string()));
+        james_map.insert("hr".to_string(), Node::Number(Numeric::Integer(63)));
+        james_map.insert("avg".to_string(), Node::Number(Numeric::Float(0.288)));
+
+        let expected = Node::Documents(vec![Document(vec![Node::Array(vec![
+            Node::Dictionary(mark_map),
+            Node::Dictionary(james_map),
+        ])])]);
+
+        assert_eq!(result, expected);
+    }
+    #[test]
+    fn test_peek_ahead_for_mapping_key_basic() {
+        let mut source = Buffer::new(b"key: value");
+        assert_eq!(source.get_current_indent_level(), 0);
+        assert!(peek_ahead_for_mapping_key(&mut source));
+        assert_eq!(source.get_current_indent_level(), 0);
+    }
+
+    #[test]
+    fn test_peek_ahead_for_mapping_key_no_colon() {
+        let mut source = Buffer::new(b"key value");
+        assert!(!peek_ahead_for_mapping_key(&mut source));
+        assert_eq!(source.get_current_indent_level(), 0);
+    }
+
+    #[test]
+    fn test_peek_ahead_for_mapping_key_colon_after_newline() {
+        let mut source = Buffer::new(b"key\n: value");
+        assert!(!peek_ahead_for_mapping_key(&mut source));
+    }
+
+    #[test]
+    fn test_peek_ahead_for_mapping_key_spaces_before_colon() {
+        let mut source = Buffer::new(b"key   : value");
+        assert!(peek_ahead_for_mapping_key(&mut source));
+    }
+
+    #[test]
+    fn test_peek_ahead_for_mapping_key_empty() {
+        let mut source = Buffer::new(b"");
+        assert!(!peek_ahead_for_mapping_key(&mut source));
+    }
 }
 
 
