@@ -28,36 +28,17 @@ fn skip_until_newline(source: &mut dyn ISource) {
     }
 }
 
-fn peek_ahead_for_document_start(source: &mut dyn ISource) -> bool {
-    if source.current() != Some('-') {
+fn peek_ahead_for_document_start_end(source: &mut dyn ISource, c: char) -> bool {
+    if source.current() != Some(c) {
         return false;
     }
     source.next();
-    if source.current() != Some('-') {
+    if source.current() != Some(c) {
         source.backup();
         return false;
     }
     source.next();
-    if source.current() != Some('-') {
-        source.backup();
-        source.backup();
-        return false;
-    }
-    source.backup();
-    source.backup();
-    true
-}
-fn peek_ahead_for_document_end(source: &mut dyn ISource) -> bool {
-    if source.current() != Some('.') {
-        return false;
-    }
-    source.next();
-    if source.current() != Some('.') {
-        source.backup();
-        return false;
-    }
-    source.next();
-    if source.current() != Some('.') {
+    if source.current() != Some(c) {
         source.backup();
         source.backup();
         return false;
@@ -185,10 +166,7 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
                 items.push(Node::Comment(parse_comment(source)));
                 continue;
             }
-            '-' if peek_ahead_for_document_start(source) => {
-                break;
-            },
-            '.' if peek_ahead_for_document_end(source) => {
+            '-'|'.' if peek_ahead_for_document_start_end(source,c) => {
                 break;
             },
             '-' => {
@@ -238,11 +216,8 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
     let mut map = HashMap::new();
     while let Some(c) = source.current() {
         match c {
-            '-' if peek_ahead_for_document_start(source) => {
+            '-'|'.'  if peek_ahead_for_document_start_end(source,c) => {
                break;
-            },
-            '.' if peek_ahead_for_document_end(source) => {
-                
             },
             '#' => {
                 parse_comment(source);
@@ -306,13 +281,7 @@ pub fn parse_document(source: &mut dyn ISource, indent_level:usize) -> Result<No
 
     while let Some(c) = source.current() {
         match c {
-            '-' if peek_ahead_for_document_start(source) => {
-                skip_until_newline(source);
-                skip_whitespace(source);
-                break;
-                
-            }
-            '.' if peek_ahead_for_document_end(source) => {
+            '-'|'.' if peek_ahead_for_document_start_end(source,c) => {
                 skip_until_newline(source);
                 skip_whitespace(source);
                 break;
