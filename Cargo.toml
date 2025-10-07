@@ -1,4 +1,4 @@
 [workspace]
 resolver = "3"
-members=["library"]
+members=[ "examples/yaml_fibonacci","library"]
 

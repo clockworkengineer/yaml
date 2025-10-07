@@ -591,7 +591,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_json_files() {
+    fn test_parse_yaml_files() {
         let files_dir = "../files";
         let json_files = get_json_file_paths(files_dir);
         for file_path in json_files {

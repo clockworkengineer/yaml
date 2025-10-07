@@ -26,10 +26,10 @@ pub mod stringify;
 // /// Module containing utility functions and helpers for YAML processing
 // pub mod misc;
 // 
-// ///
-// /// YAML_lib API
-// ///
-// 
+///
+/// YAML_lib API
+///
+
 // /// Returns the current version of the YAML library
 // pub use misc::get_version as version;
 // /// Strip whitespace from a string.
@@ -45,22 +45,22 @@ pub mod stringify;
 // /// This function writes a string to a file in the specified Unicode format
 // pub use file::file::write_file_from_string as write_file_from_string;
 // 
-// /// Source implementation for reading YAML data from a memory buffer
-// pub use io::sources::buffer::Buffer as BufferSource;
-// /// Destination implementation for writing YAML data to a memory buffer
-// pub use io::destinations::buffer::Buffer as BufferDestination;
-// /// Source implementation for reading YAML data from a file
-// pub use io::sources::file::File as FileSource;
-// /// Destination implementation for writing YAML data to a file
-// pub use io::destinations::file::File as FileDestination;
-// /// Core data structure representing a YAML node and numerical node in the parsed tree
-// pub use nodes::node::Node as Node;
-// /// Core data structure representing a numeric value node in the parsed tree
-// pub use nodes::node::Numeric as Numeric;
-// /// Converts a Node tree back to YAML format
-// pub use stringify::default::stringify as stringify;
-// /// Parses YAML data into a Node tree structure
-// pub use parser::default::parse as parse;
+/// Source implementation for reading YAML data from a memory buffer
+pub use io::sources::buffer::Buffer as BufferSource;
+/// Destination implementation for writing YAML data to a memory buffer
+pub use io::destinations::buffer::Buffer as BufferDestination;
+/// Source implementation for reading YAML data from a file
+pub use io::sources::file::File as FileSource;
+/// Destination implementation for writing YAML data to a file
+pub use io::destinations::file::File as FileDestination;
+/// Core data structure representing a YAML node and numerical node in the parsed tree
+pub use nodes::node::Node as Node;
+/// Core data structure representing a numeric value node in the parsed tree
+pub use nodes::node::Numeric as Numeric;
+/// Converts a Node tree back to YAML format
+pub use stringify::default::stringify as stringify;
+/// Parses YAML data into a Node tree structure
+pub use parser::default::parse as parse;
 // /// Converts a Node tree to YAML format
 // pub use stringify::bencode::stringify as to_bencode;
 // /// Converts a Node tree to YAML format
