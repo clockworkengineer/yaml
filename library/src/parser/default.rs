@@ -93,11 +93,7 @@ fn parse_mapping_key(source: &mut dyn ISource) -> Result<(String, bool), String>
 
     let mut newline = false;
     source.next(); // Skip ':'
-    if let Some(next_char) = source.current() {
-        if !next_char.is_whitespace() {
-            return Err("Expected space after colon in mapping".to_string());
-        }
-    }
+    // Allow no space after ':'; proceed and skip optional whitespace
     skip_whitespace(source);
     if let Some(c) = source.current() {
         newline = c == '\n';
@@ -113,6 +109,10 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
     // Support inline mapping values starting with '{'
     if source.current() == Some('{') {
         return parse_inline_mapping(source);
+    }
+    // Support flow sequence values starting with '['
+    if source.current() == Some('[') {
+        return parse_inline_sequence(source);
     }
 
     let mut value = String::new();
@@ -164,6 +164,8 @@ fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, String> {
         // Parse value
         let value_node = if source.current() == Some('{') {
             parse_inline_mapping(source)?
+        } else if source.current() == Some('[') {
+            parse_inline_sequence(source)?
         } else {
             // collect until ',' or '}' or '#'
             let mut val = String::new();
@@ -208,6 +210,77 @@ fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, String> {
     }
 
     Ok(Node::Dictionary(map))
+}
+
+fn parse_inline_sequence(source: &mut dyn ISource) -> Result<Node, String> {
+    // Assumes current char is '['
+    let mut items: Vec<Node> = Vec::new();
+    // consume '['
+    source.next();
+    // skip whitespace
+    skip_whitespace(source);
+
+    // Handle empty sequence
+    if source.current() == Some(']') {
+        source.next(); // consume ']'
+        return Ok(Node::Array(items));
+    }
+
+    loop {
+        // Parse item
+        if source.current() == Some('[') {
+            let nested = parse_inline_sequence(source)?;
+            items.push(nested);
+        } else if source.current() == Some('{') {
+            let nested_map = parse_inline_mapping(source)?;
+            items.push(nested_map);
+        } else {
+            // collect until ',' or ']' or '#'
+            let mut val = String::new();
+            while let Some(c) = source.current() {
+                match c {
+                    ',' | ']' | '#' => break,
+                    _ => {
+                        val.push(c);
+                        source.next();
+                    }
+                }
+            }
+            let trimmed = val.trim();
+            if !trimmed.is_empty() {
+                items.push(parse_scalar(trimmed));
+            } else if source.current() == Some(']') || source.current() == Some(',') {
+                // allow empty entries to be ignored
+            } else {
+                // No valid item
+            }
+        }
+
+        // After item, skip whitespace and optional comment (until end of line)
+        skip_whitespace(source);
+        if source.current() == Some('#') {
+            skip_until_newline(source);
+            skip_whitespace(source);
+        }
+
+        match source.current() {
+            Some(',') => {
+                source.next();
+                skip_whitespace(source);
+                continue;
+            }
+            Some(']') => {
+                source.next();
+                break;
+            }
+            Some(c) => {
+                return Err(format!("Unexpected character in inline sequence: {}", c));
+            }
+            None => return Err("Unexpected end of input in inline sequence".to_string()),
+        }
+    }
+
+    Ok(Node::Array(items))
 }
 
 fn parse_comment(source: &mut dyn ISource) -> String {
@@ -351,6 +424,65 @@ pub fn parse_document_contents(source: &mut dyn ISource, indent_level:usize) -> 
         Some('{') => {
             Ok(parse_inline_mapping(source)?)
         }
+        Some('[') => {
+            Ok(parse_inline_sequence(source)?)
+        }
+        Some('?') => {
+            // Minimal explicit pair support for pattern: ? [ ... ] then : value
+            source.next();
+            skip_whitespace(source);
+            // Parse key (support only flow sequence or plain scalar until EOL)
+            let key_node = if source.current() == Some('[') {
+                parse_inline_sequence(source)?
+            } else {
+                let mut k = String::new();
+                while let Some(c) = source.current() {
+                    if c == '\n' { break; }
+                    k.push(c);
+                    source.next();
+                }
+                Node::Str(k.trim().to_string())
+            };
+            if source.current() == Some('\n') {
+                source.next();
+            }
+            loop {
+                skip_whitespace(source);
+                if source.current() == Some(':') { break; }
+                if source.current().is_none() { break; }
+                skip_until_newline(source);
+                if source.current().is_none() { break; }
+            }
+            if source.current() == Some(':') { source.next(); }
+            skip_whitespace(source);
+            let value_node = if source.current() == Some('[') {
+                parse_inline_sequence(source)?
+            } else if source.current() == Some('{') {
+                parse_inline_mapping(source)?
+            } else if source.current() == Some('-') {
+                let nested_indent = source.get_current_indent_level();
+                parse_sequence(source, nested_indent)?
+            } else {
+                parse_value(source)?
+            };
+            // Stringify key_node into map key
+            let key_str = match key_node {
+                Node::Array(ref items) => {
+                    let parts: Vec<String> = items.iter().map(|n| match n {
+                        Node::Str(s) => s.clone(),
+                        Node::Number(num) => format!("{:?}", num),
+                        Node::Boolean(b) => b.to_string(),
+                        _ => format!("{:?}", n),
+                    }).collect();
+                    format!("[{}]", parts.join(", "))
+                }
+                Node::Str(s) => s,
+                _ => format!("{:?}", key_node),
+            };
+            let mut map = HashMap::new();
+            map.insert(key_str, value_node);
+            Ok(Node::Dictionary(map))
+        }
         Some(c) if c.is_alphanumeric() => {
             Ok(parse_mapping(source, indent_level)?)
         }
@@ -358,8 +490,17 @@ pub fn parse_document_contents(source: &mut dyn ISource, indent_level:usize) -> 
             source.next();
             Ok(parse_document_contents(source, indent_level)?)
         }
+        Some('\0') => {
+            // Treat NUL as ignorable whitespace/end padding
+            source.next();
+            Ok(parse_document_contents(source, indent_level)?)
+        }
+        Some('<') | Some('>') | Some('"') | Some('\'') => {
+            // Allow certain scalar format strings to start with special characters
+            Ok(parse_value(source)?)
+        }
         Some(c) => Err(format!("Unexpected character: {}", c)),
-        None => Err("Unexpected end of input".to_string())
+        None => Ok(Node::None)
     }
 
 }
@@ -839,6 +980,41 @@ mod tests {
         let mut parent = HashMap::new();
         parent.insert("parent".to_string(), Node::Dictionary(child));
         assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(parent)])]));
+    }
+
+    // New tests for block and flow scalar format strings
+    #[test]
+    fn test_block_scalar_like_string_same_line() {
+        // '>' at start of value should be treated as a plain string on the same line
+        let mut source = Buffer::new(b"key: > hello world");
+        let result = parse(&mut source).unwrap();
+        let mut expected = HashMap::new();
+        expected.insert("key".to_string(), Node::Str("> hello world".to_string()));
+        assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(expected)])]));
+    }
+
+    #[test]
+    fn test_block_scalar_like_string_next_line() {
+        // When the value line starts with '>' on the next indented line, treat it as plain string too
+        let mut source = Buffer::new(b"key:\n  > multi line");
+        let result = parse(&mut source).unwrap();
+        let mut expected = HashMap::new();
+        expected.insert("key".to_string(), Node::Str("> multi line".to_string()));
+        assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(expected)])]));
+    }
+
+    #[test]
+    fn test_flow_sequence_with_special_leading_chars_and_quotes() {
+        // In a flow sequence, items that start with special chars or quotes are kept as-is (no unquoting)
+        let mut source = Buffer::new(b"[<tag, 'quoted', \"double\", >folded]");
+        let result = parse(&mut source).unwrap();
+        let expected = Node::Documents(vec![Document(vec![Node::Array(vec![
+            Node::Str("<tag".to_string()),
+            Node::Str("'quoted'".to_string()),
+            Node::Str("\"double\"".to_string()),
+            Node::Str(">folded".to_string()),
+        ])])]);
+        assert_eq!(result, expected);
     }
 }
 
