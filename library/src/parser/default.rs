@@ -109,7 +109,12 @@ fn parse_mapping_key(source: &mut dyn ISource) -> Result<(String, bool), String>
 
     Ok((key, newline))
 }
-fn parse_value(source: &mut dyn ISource) -> Node {
+fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
+    // Support inline mapping values starting with '{'
+    if source.current() == Some('{') {
+        return parse_inline_mapping(source);
+    }
+
     let mut value = String::new();
     while let Some(c) = source.current() {
         if c == '\n' || c == '#' { break; }
@@ -117,10 +122,92 @@ fn parse_value(source: &mut dyn ISource) -> Node {
         source.next();
     }
     if !value.trim().is_empty() {
-        parse_scalar(value.trim())
+        Ok(parse_scalar(value.trim()))
     } else {
-        Node::None
+        Ok(Node::None)
     }
+}
+
+fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, String> {
+    // Assumes current char is '{'
+    let mut map = HashMap::new();
+    // consume '{'
+    source.next();
+    // skip whitespace
+    skip_whitespace(source);
+
+    // Handle empty mapping
+    if source.current() == Some('}') {
+        source.next(); // consume '}'
+        return Ok(Node::Dictionary(map));
+    }
+
+    loop {
+        // Parse key
+        let mut key = String::new();
+        while let Some(c) = source.current() {
+            if c == ':' { break; }
+            if c == '}' {
+                // Trailing '}' without key:value
+                break;
+            }
+            key.push(c);
+            source.next();
+        }
+        if source.current() != Some(':') {
+            return Err("Expected ':' in inline mapping".to_string());
+        }
+        source.next(); // consume ':'
+        // value may start with space
+        skip_whitespace(source);
+
+        // Parse value
+        let value_node = if source.current() == Some('{') {
+            parse_inline_mapping(source)?
+        } else {
+            // collect until ',' or '}' or '#'
+            let mut val = String::new();
+            while let Some(c) = source.current() {
+                match c {
+                    ',' | '}' | '#' => break,
+                    _ => {
+                        val.push(c);
+                        source.next();
+                    }
+                }
+            }
+            parse_scalar(val.trim())
+        };
+
+        map.insert(key.trim().to_string(), value_node);
+
+        // After value, skip whitespace and optional comment (until end or before comma/})
+        skip_whitespace(source);
+        if source.current() == Some('#') {
+            // skip comment until end of line
+            skip_until_newline(source);
+            // inside inline mapping, a newline should be followed by more content or end
+            skip_whitespace(source);
+        }
+
+        match source.current() {
+            Some(',') => {
+                source.next();
+                skip_whitespace(source);
+                continue;
+            }
+            Some('}') => {
+                source.next();
+                break;
+            }
+            Some(c) => {
+                return Err(format!("Unexpected character in inline mapping: {}", c));
+            }
+            None => return Err("Unexpected end of input in inline mapping".to_string()),
+        }
+    }
+
+    Ok(Node::Dictionary(map))
 }
 
 fn parse_comment(source: &mut dyn ISource) -> String {
@@ -193,7 +280,7 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
                             }
                             // Parse scalar value
                             else {
-                                items.push(parse_value(source));
+                                items.push(parse_value(source)?);
                             }
                         }
                     }
@@ -235,7 +322,7 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
                     map.insert(key.trim().to_string(), parse_document_contents(source, next_indent)?);
                     continue;
                 } else {
-                    map.insert(key.trim().to_string(), parse_value(source));
+                    map.insert(key.trim().to_string(), parse_value(source)?);
                 }
             }
             c if c.is_whitespace() => {
@@ -260,6 +347,9 @@ pub fn parse_document_contents(source: &mut dyn ISource, indent_level:usize) -> 
         Some('#') => {
             let comment = parse_comment(source);
             Ok(Node::Comment(comment.trim().to_string()))
+        }
+        Some('{') => {
+            Ok(parse_inline_mapping(source)?)
         }
         Some(c) if c.is_alphanumeric() => {
             Ok(parse_mapping(source, indent_level)?)
@@ -322,41 +412,41 @@ pub fn get_number_of_documents(documents: &Node) -> Result<usize, String> {
 mod tests {
     use super::*;
     use crate::io::sources::buffer::Buffer;
-    // use crate::io::sources::file::File as FileSource;
-    // use std::fs;
-    // fn get_json_file_paths(directory: &str) -> Vec<String> {
-    //     let mut paths = Vec::new();
-    //     if let Ok(entries) = fs::read_dir(directory) {
-    //         for entry in entries {
-    //             if let Ok(entry) = entry {
-    //                 let path = entry.path();
-    //                 if path.extension().and_then(|s| s.to_str()) == Some("yaml") {
-    //                     if let Some(path_str) = path.to_str() {
-    //                         paths.push(path_str.to_string());
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     paths
-    // }
-    //
-    // #[test]
-    // fn test_parse_json_files() {
-    //     let files_dir = "../files";
-    //     let json_files = get_json_file_paths(files_dir);
-    //     for file_path in json_files {
-    //         match FileSource::new(&file_path.to_string()) {
-    //             Ok(mut source) => {
-    //                 let result = parse(&mut source);
-    //                 assert!(result.is_ok(), "Failed to parse {}: {:?}", file_path, result.err());
-    //             },
-    //             Err(e) => panic!("Failed to open {}: {}", file_path, e),
-    //         }
-    //
-    //
-    //     }
-    // }
+    use crate::io::sources::file::File as FileSource;
+    use std::fs;
+    fn get_json_file_paths(directory: &str) -> Vec<String> {
+        let mut paths = Vec::new();
+        if let Ok(entries) = fs::read_dir(directory) {
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    let path = entry.path();
+                    if path.extension().and_then(|s| s.to_str()) == Some("yaml") {
+                        if let Some(path_str) = path.to_str() {
+                            paths.push(path_str.to_string());
+                        }
+                    }
+                }
+            }
+        }
+        paths
+    }
+
+    #[test]
+    fn test_parse_json_files() {
+        let files_dir = "../files";
+        let json_files = get_json_file_paths(files_dir);
+        for file_path in json_files {
+            match FileSource::new(&file_path.to_string()) {
+                Ok(mut source) => {
+                    let result = parse(&mut source);
+                    assert!(result.is_ok(), "Failed to parse {}: {:?}", file_path, result.err());
+                },
+                Err(e) => panic!("Failed to open {}: {}", file_path, e),
+            }
+
+
+        }
+    }
 
     #[test]
     fn test_parse_scalar() {
@@ -719,6 +809,36 @@ mod tests {
     fn test_peek_ahead_for_mapping_key_empty() {
         let mut source = Buffer::new(b"");
         assert!(!peek_ahead_for_mapping_key(&mut source));
+    }
+
+    #[test]
+    fn test_parse_inline_mapping_top_level() {
+        let mut source = Buffer::new(b"{a: 1, b: 2}");
+        let result = parse(&mut source).unwrap();
+        let mut map = HashMap::new();
+        map.insert("a".to_string(), Node::Number(Numeric::Integer(1)));
+        map.insert("b".to_string(), Node::Number(Numeric::Integer(2)));
+        assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(map)])]));
+    }
+
+    #[test]
+    fn test_parse_inline_mapping_empty() {
+        let mut source = Buffer::new(b"{}");
+        let result = parse(&mut source).unwrap();
+        let map: HashMap<String, Node> = HashMap::new();
+        assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(map)])]));
+    }
+
+    #[test]
+    fn test_parse_inline_mapping_as_value() {
+        let mut source = Buffer::new(b"parent: {a: 1, b: test}");
+        let result = parse(&mut source).unwrap();
+        let mut child = HashMap::new();
+        child.insert("a".to_string(), Node::Number(Numeric::Integer(1)));
+        child.insert("b".to_string(), Node::Str("test".to_string()));
+        let mut parent = HashMap::new();
+        parent.insert("parent".to_string(), Node::Dictionary(child));
+        assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(parent)])]));
     }
 }
 
