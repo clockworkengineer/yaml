@@ -23,9 +23,15 @@ fn read_sequence(file_path: &Path) -> Result<Node, String> {
     // Try to open and parse the existing file
     match FileSource::new(&file_path.to_string_lossy()) {
         Ok(mut file) => match parse(&mut file) {
-            Ok(Node::Array(list)) => Ok(Node::Array(list)),
-            Ok(_) => Err("Invalid file format: expected a list".to_string()),
+            Ok(Node::Documents(docs)) if !docs.is_empty() => {
+                if let Node::Array(list) = &docs[0] {
+                    Ok(Node::Array(list.clone()))
+                } else {
+                    Err("Invalid file format: expected a list".to_string())
+                }
+            }
             Err(e) => Err(e),
+            _ => Err("Invalid file format: expected a document".to_string()),
         },
         Err(e) => Err(format!("Failed to open file: {}", e)),
     }
