@@ -69,3 +69,7 @@ pub use parser::default::parse as parse;
 // pub use stringify::xml::stringify as to_xml;
 // /// Converts a Node tree to TOML format
 // pub use stringify::toml::stringify as to_toml;
+
+/// Gets the number of documents in a YAML stream
+pub use parser::default::get_number_of_documents as get_number_of_documents;
+pub use parser::default::get_document_base as get_document;

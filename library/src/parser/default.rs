@@ -567,6 +567,21 @@ pub fn get_number_of_documents(documents: &Node) -> Result<usize, String> {
         _ => Err("Expected Documents node".to_string())
     }
 }
+/// Returns the base node of document number n (0-based), reporting any errors.
+/// If the node is not a Document or index is out of bounds, returns an error message.
+pub fn get_document_base(node: &Node, n: usize) -> Result<&Node, String> {
+    match node {
+        Node::Documents(docs) => {
+            if n < docs.len() {
+                Ok(&docs[n])
+            } else {
+                Err(format!("Document index {} out of bounds ({} documents)", n, docs.len()))
+            }
+        }
+        _ => Err("Node is not a Document or Array of Documents".to_string()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1034,6 +1049,8 @@ mod tests {
         ])])]);
         assert_eq!(result, expected);
     }
+    
+
 }
 
 
