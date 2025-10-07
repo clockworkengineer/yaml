@@ -26,7 +26,8 @@ impl File {
 
 impl ISource for File {
     fn next(&mut self) {
-        let mut byte = [0u8; 1];
+        let mut byte1 = [0u8; 1];
+        let mut byte2 = [0u8; 1];
         if self.current_byte.is_some() {
             self.column += 1;
             if self.current_byte.unwrap() == b'\n' {
@@ -34,18 +35,24 @@ impl ISource for File {
                 self.column = 0;
             }
         }
-        self.current_byte = if self.file.read(&mut byte).unwrap_or(0) == 1 {
-            // Treat \r\n as a single \n
-            if self.current_byte == Some(b'\r') && byte[0] == b'\n' {
-                self.line += 1;
-                self.column = 0;
-                Some(b'\n')
+        if self.file.read(&mut byte1).unwrap_or(0) == 1 {
+            if byte1[0] == b'\r' {
+                self.file.read(&mut byte2).unwrap_or(0);
+                // Treat \r\n as a single \n
+                if byte1[0] == b'\r' && byte2[0] == b'\n' {
+                    self.line += 1;
+                    self.column = 0;
+                    self.current_byte = Some(b'\n');
+                } else {
+                    self.current_byte = Some(byte1[0]);
+                    self.file.seek(SeekFrom::Current(-1)).unwrap();
+                }
             } else {
-                Some(byte[0])
+                self.current_byte = Some(byte1[0]);
             }
         } else {
-            None
-        };
+            self.current_byte = None;
+        }
     }
     fn current(&mut self) -> Option<char> {
         self.current_byte.map(|b| b as char)
@@ -203,9 +210,9 @@ mod tests {
         assert_eq!(file.get_current_indent_level(), 1);
 
         // '\r'
-        file.next();
-        assert_eq!(file.current(), Some('\r'));
-        assert_eq!(file.get_current_indent_level(), 2);
+        // file.next();
+        // assert_eq!(file.current(), Some('\r'));
+        // assert_eq!(file.get_current_indent_level(), 2);
 
         // '\n' (should reset column)
         file.next();
@@ -223,9 +230,9 @@ mod tests {
         assert_eq!(file.get_current_indent_level(), 1);
 
         // '\r'
-        file.next();
-        assert_eq!(file.current(), Some('\r'));
-        assert_eq!(file.get_current_indent_level(), 2);
+        // file.next();
+        // assert_eq!(file.current(), Some('\r'));
+        // assert_eq!(file.get_current_indent_level(), 2);
 
         // '\n'
         file.next();
