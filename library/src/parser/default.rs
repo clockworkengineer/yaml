@@ -7,6 +7,24 @@ use std::collections::HashMap;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node::Document;
 
+// Extracted character constants for reuse and readability
+const CHAR_DASH: char = '-';
+const CHAR_DOT: char = '.';
+const CHAR_HASH: char = '#';
+const CHAR_LBRACE: char = '{';
+const CHAR_RBRACE: char = '}';
+const CHAR_LBRACKET: char = '[';
+const CHAR_RBRACKET: char = ']';
+const CHAR_QUESTION: char = '?';
+const CHAR_COLON: char = ':';
+const CHAR_NEWLINE: char = '\n';
+const CHAR_NUL: char = '\0';
+const CHAR_COMMA: char = ',';
+const CHAR_DOUBLE_QUOTE: char = '"';
+const CHAR_SINGLE_QUOTE: char = '\'';
+const CHAR_LESS: char = '<';
+const CHAR_GREATER: char = '>';
+
 
 fn skip_whitespace(source: &mut dyn ISource) {
     while let Some(c) = source.current() {
@@ -20,7 +38,7 @@ fn skip_whitespace(source: &mut dyn ISource) {
 
 fn skip_until_newline(source: &mut dyn ISource) {
     while let Some(c) = source.current() {
-        if c == '\n' {
+        if c == CHAR_NEWLINE {
             source.next();
             break;
         }
@@ -53,11 +71,11 @@ fn peek_ahead_for_mapping_key(source: &mut dyn ISource) -> bool {
 
     while let Some(c) = source.current() {
         match c {
-            ':' => {
+            CHAR_COLON => {
                 found = true;
                 break;
             }
-            '\n' => {
+            CHAR_NEWLINE => {
                 break;
             }
             _ => {
@@ -86,17 +104,17 @@ fn peek_ahead_for_mapping_key(source: &mut dyn ISource) -> bool {
 fn parse_mapping_key(source: &mut dyn ISource) -> Result<(String, bool), String> {
     let mut key = String::new();
     while let Some(c) = source.current() {
-        if c == ':' { break; }
+        if c == CHAR_COLON { break; }
         key.push(c);
         source.next();
     }
 
     let mut newline = false;
     source.next(); // Skip ':'
-    // Allow no space after ':'; proceed and skip optional whitespace
+    // Allow no space after ':'; process and skip optional whitespace
     skip_whitespace(source);
     if let Some(c) = source.current() {
-        newline = c == '\n';
+        newline = c == CHAR_NEWLINE;
         if newline {
             source.next();
             skip_whitespace(source);
@@ -107,17 +125,17 @@ fn parse_mapping_key(source: &mut dyn ISource) -> Result<(String, bool), String>
 }
 fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
     // Support inline mapping values starting with '{'
-    if source.current() == Some('{') {
+    if source.current() == Some(CHAR_LBRACE) {
         return parse_inline_mapping(source);
     }
     // Support flow sequence values starting with '['
-    if source.current() == Some('[') {
+    if source.current() == Some(CHAR_LBRACKET) {
         return parse_inline_sequence(source);
     }
 
     let mut value = String::new();
     while let Some(c) = source.current() {
-        if c == '\n' || c == '#' { break; }
+        if c == CHAR_NEWLINE || c == CHAR_HASH { break; }
         value.push(c);
         source.next();
     }
@@ -137,7 +155,7 @@ fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, String> {
     skip_whitespace(source);
 
     // Handle empty mapping
-    if source.current() == Some('}') {
+    if source.current() == Some(CHAR_RBRACE) {
         source.next(); // consume '}'
         return Ok(Node::Dictionary(map));
     }
@@ -146,15 +164,15 @@ fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, String> {
         // Parse key
         let mut key = String::new();
         while let Some(c) = source.current() {
-            if c == ':' { break; }
-            if c == '}' {
-                // Trailing '}' without key:value
+            if c == CHAR_COLON { break; }
+            if c == CHAR_RBRACE {
+                // Trailing '}' without a key:value
                 break;
             }
             key.push(c);
             source.next();
         }
-        if source.current() != Some(':') {
+        if source.current() != Some(CHAR_COLON) {
             return Err("Expected ':' in inline mapping".to_string());
         }
         source.next(); // consume ':'
@@ -162,16 +180,16 @@ fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, String> {
         skip_whitespace(source);
 
         // Parse value
-        let value_node = if source.current() == Some('{') {
+        let value_node = if source.current() == Some(CHAR_LBRACE) {
             parse_inline_mapping(source)?
-        } else if source.current() == Some('[') {
+        } else if source.current() == Some(CHAR_LBRACKET) {
             parse_inline_sequence(source)?
         } else {
             // collect until ',' or '}' or '#'
             let mut val = String::new();
             while let Some(c) = source.current() {
                 match c {
-                    ',' | '}' | '#' => break,
+                    CHAR_COMMA | CHAR_RBRACE | CHAR_HASH => break,
                     _ => {
                         val.push(c);
                         source.next();
@@ -183,22 +201,22 @@ fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, String> {
 
         map.insert(key.trim().to_string(), value_node);
 
-        // After value, skip whitespace and optional comment (until end or before comma/})
+        // After value, skip whitespace and optional comment (until the end or before comma/})
         skip_whitespace(source);
-        if source.current() == Some('#') {
-            // skip comment until end of line
+        if source.current() == Some(CHAR_HASH) {
+            // skip comment until the end of the line
             skip_until_newline(source);
             // inside inline mapping, a newline should be followed by more content or end
             skip_whitespace(source);
         }
 
         match source.current() {
-            Some(',') => {
+            Some(CHAR_COMMA) => {
                 source.next();
                 skip_whitespace(source);
                 continue;
             }
-            Some('}') => {
+            Some(CHAR_RBRACE) => {
                 source.next();
                 break;
             }
@@ -221,17 +239,17 @@ fn parse_inline_sequence(source: &mut dyn ISource) -> Result<Node, String> {
     skip_whitespace(source);
 
     // Handle empty sequence
-    if source.current() == Some(']') {
+    if source.current() == Some(CHAR_RBRACKET) {
         source.next(); // consume ']'
         return Ok(Node::Array(items));
     }
 
     loop {
         // Parse item
-        if source.current() == Some('[') {
+        if source.current() == Some(CHAR_LBRACKET) {
             let nested = parse_inline_sequence(source)?;
             items.push(nested);
-        } else if source.current() == Some('{') {
+        } else if source.current() == Some(CHAR_LBRACE) {
             let nested_map = parse_inline_mapping(source)?;
             items.push(nested_map);
         } else {
@@ -239,7 +257,7 @@ fn parse_inline_sequence(source: &mut dyn ISource) -> Result<Node, String> {
             let mut val = String::new();
             while let Some(c) = source.current() {
                 match c {
-                    ',' | ']' | '#' => break,
+                    CHAR_COMMA | CHAR_RBRACKET | CHAR_HASH => break,
                     _ => {
                         val.push(c);
                         source.next();
@@ -249,27 +267,27 @@ fn parse_inline_sequence(source: &mut dyn ISource) -> Result<Node, String> {
             let trimmed = val.trim();
             if !trimmed.is_empty() {
                 items.push(parse_scalar(trimmed));
-            } else if source.current() == Some(']') || source.current() == Some(',') {
+            } else if source.current() == Some(CHAR_RBRACKET) || source.current() == Some(CHAR_COMMA) {
                 // allow empty entries to be ignored
             } else {
                 // No valid item
             }
         }
 
-        // After item, skip whitespace and optional comment (until end of line)
+        // After the item, skip whitespace and optional comment (until the end of the line)
         skip_whitespace(source);
-        if source.current() == Some('#') {
+        if source.current() == Some(CHAR_HASH) {
             skip_until_newline(source);
             skip_whitespace(source);
         }
 
         match source.current() {
-            Some(',') => {
+            Some(CHAR_COMMA) => {
                 source.next();
                 skip_whitespace(source);
                 continue;
             }
-            Some(']') => {
+            Some(CHAR_RBRACKET) => {
                 source.next();
                 break;
             }
@@ -287,7 +305,7 @@ fn parse_comment(source: &mut dyn ISource) -> String {
     source.next(); // Skip the '#' character
     let mut comment = String::new();
     while let Some(c) = source.current() {
-        if c == '\n' { break; }
+        if c == CHAR_NEWLINE { break; }
         comment.push(c);
         source.next();
     }
@@ -326,10 +344,10 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
                 items.push(Node::Comment(parse_comment(source)));
                 continue;
             }
-            '-'|'.' if peek_ahead_for_document_start_end(source,c) => {
+            CHAR_DASH|CHAR_DOT if peek_ahead_for_document_start_end(source,c) => {
                 break;
             },
-            '-' => {
+            CHAR_DASH => {
                 source.next(); // Skip the dash
                 skip_whitespace(source);
                 if source.current() == Some('\n') {
@@ -339,7 +357,7 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
 
                 if let Some(next_c) = source.current() {
                     match next_c {
-                        '-' => {
+                        CHAR_DASH => {
                             // Check for a nested sequence
                             let nested_indent = source.get_current_indent_level();
                             items.push(parse_document_contents(source, nested_indent)?);
@@ -360,7 +378,7 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
                 }
             },
             _ if !c.is_whitespace() => {
-                return Err(format!("Expected sequence item starting with '-', got '{}'", c));
+                return Err(format!("Expected sequence item starting with CHAR_DASH, got '{}'", c));
             },
             _ => ()
         }
@@ -376,7 +394,7 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
     let mut map = HashMap::new();
     while let Some(c) = source.current() {
         match c {
-            '-'|'.'  if peek_ahead_for_document_start_end(source,c) => {
+            CHAR_DASH|CHAR_DOT  if peek_ahead_for_document_start_end(source,c) => {
                break;
             },
             '#' => {
@@ -413,7 +431,7 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
 
 pub fn parse_document_contents(source: &mut dyn ISource, indent_level:usize) -> Result<Node, String> {
      match source.current() {
-        Some('-') => {
+        Some(CHAR_DASH) => {
             let indent_level = source.get_current_indent_level();
             Ok(parse_sequence(source, indent_level)?)
         }
@@ -427,11 +445,11 @@ pub fn parse_document_contents(source: &mut dyn ISource, indent_level:usize) -> 
         Some('[') => {
             Ok(parse_inline_sequence(source)?)
         }
-        Some('?') => {
-            // Minimal explicit pair support for pattern: ? [ ... ] then : value
+        Some(CHAR_QUESTION) => {
+            // Minimal explicit pair support for a pattern? [ ... ] then : value
             source.next();
             skip_whitespace(source);
-            // Parse key (support only flow sequence or plain scalar until EOL)
+            // Parse key (support only a flow sequence or plain scalar until EOL)
             let key_node = if source.current() == Some('[') {
                 parse_inline_sequence(source)?
             } else {
@@ -459,13 +477,13 @@ pub fn parse_document_contents(source: &mut dyn ISource, indent_level:usize) -> 
                 parse_inline_sequence(source)?
             } else if source.current() == Some('{') {
                 parse_inline_mapping(source)?
-            } else if source.current() == Some('-') {
+            } else if source.current() == Some(CHAR_DASH) {
                 let nested_indent = source.get_current_indent_level();
                 parse_sequence(source, nested_indent)?
             } else {
                 parse_value(source)?
             };
-            // Stringify key_node into map key
+            // Stringify key_node into a map key
             let key_str = match key_node {
                 Node::Array(ref items) => {
                     let parts: Vec<String> = items.iter().map(|n| match n {
@@ -490,12 +508,12 @@ pub fn parse_document_contents(source: &mut dyn ISource, indent_level:usize) -> 
             source.next();
             Ok(parse_document_contents(source, indent_level)?)
         }
-        Some('\0') => {
+        Some(CHAR_NUL) => {
             // Treat NUL as ignorable whitespace/end padding
             source.next();
             Ok(parse_document_contents(source, indent_level)?)
         }
-        Some('<') | Some('>') | Some('"') | Some('\'') => {
+        Some(CHAR_LESS) | Some(CHAR_GREATER) | Some(CHAR_DOUBLE_QUOTE) | Some(CHAR_SINGLE_QUOTE) => {
             // Allow certain scalar format strings to start with special characters
             Ok(parse_value(source)?)
         }
@@ -512,7 +530,7 @@ pub fn parse_document(source: &mut dyn ISource, indent_level:usize) -> Result<No
 
     while let Some(c) = source.current() {
         match c {
-            '-'|'.' if peek_ahead_for_document_start_end(source,c) => {
+            CHAR_DASH|CHAR_DOT if peek_ahead_for_document_start_end(source,c) => {
                 skip_until_newline(source);
                 skip_whitespace(source);
                 break;
