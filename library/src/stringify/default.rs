@@ -1,22 +1,13 @@
 use crate::nodes::node::*;
 use crate::io::traits::IDestination;
 
-pub fn stringify(node: &Node, destination: &mut dyn IDestination)-> Result<(), String> {
+pub fn stringify_document(node: &Node, destination: &mut dyn IDestination)-> Result<(), String> {
     match node {
         Node::None => destination.add_bytes("null"),
         // Node::Value(value) => destination.add_bytes(&format!("\"{}\"", value))?,
         Node::Boolean(b) => destination.add_bytes(&b.to_string()),
         Node::Str(s) => destination.add_bytes(&format!("\"{}\"", s)),
         Node::Comment(c) => destination.add_bytes(&format!("# {}", c)),
-        Node::Documents(docs) => {
-            destination.add_bytes("---\n");
-            for (i, doc) in docs.iter().enumerate() {
-                if i > 0 {
-                    destination.add_bytes("\n---\n");
-                }
-                stringify(doc, destination)?;
-            }
-        },
         Node::Number(num) => match num {
             Numeric::Integer(i) => destination.add_bytes(&i.to_string()),
             Numeric::Float(f) => destination.add_bytes(&f.to_string()),
@@ -25,22 +16,38 @@ pub fn stringify(node: &Node, destination: &mut dyn IDestination)-> Result<(), S
         Node::Array(items) => {
             for (_i, item) in items.iter().enumerate() {
                 destination.add_bytes("- ");
-                stringify(item, destination)?;
+                stringify_document(item, destination)?;
                 destination.add_bytes("\n");
             }
         },
         Node::Dictionary(items) => {
             for (key, value) in items {
                 destination.add_bytes(&format!("\"{}\": ", key));
-                stringify(value, destination)?;
+                stringify_document(value, destination)?;
                 destination.add_bytes("\n");
             }
         },
         Node::Document(nodes) => {
             for node in nodes {
-                stringify(node, destination)?;
+                stringify_document(node, destination)?;
             }
         }
+        _ => { return Err("Unsupported node type".to_string()); }
+    }
+    Ok(())  
+}
+
+pub fn stringify(node: &Node, destination: &mut dyn IDestination)-> Result<(), String> {
+    match node {
+        Node::Documents(docs) => {
+            for doc in docs {
+                destination.add_bytes("---\n");
+                stringify_document(doc, destination)?;
+                destination.add_bytes("...\n");
+            }
+          
+        },
+        _ => { return Err("Unsupported node type".to_string()); }
     }
     Ok(())
 }
