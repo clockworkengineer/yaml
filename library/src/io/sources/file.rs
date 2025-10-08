@@ -195,7 +195,7 @@ mod tests {
         assert!(!file.more());
     }
 
-        #[test]
+    #[test]
     fn test_file_handles_crlf_newlines() {
         let test_file = TestFile::new(b"ab\r\ncd\r\nef");
         let mut file = File::new(&test_file.path).unwrap();
@@ -208,11 +208,6 @@ mod tests {
         file.next();
         assert_eq!(file.current(), Some('b'));
         assert_eq!(file.get_current_indent_level(), 1);
-
-        // '\r'
-        // file.next();
-        // assert_eq!(file.current(), Some('\r'));
-        // assert_eq!(file.get_current_indent_level(), 2);
 
         // '\n' (should reset column)
         file.next();
@@ -228,11 +223,6 @@ mod tests {
         file.next();
         assert_eq!(file.current(), Some('d'));
         assert_eq!(file.get_current_indent_level(), 1);
-
-        // '\r'
-        // file.next();
-        // assert_eq!(file.current(), Some('\r'));
-        // assert_eq!(file.get_current_indent_level(), 2);
 
         // '\n'
         file.next();
@@ -253,5 +243,7 @@ mod tests {
         file.next();
         assert_eq!(file.current(), None);
     }
+
+
     
 }
