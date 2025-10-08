@@ -547,6 +547,10 @@ pub fn parse_document(source: &mut dyn ISource, indent_level:usize) -> Result<No
 }
 pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
     let mut docs: Vec<Node> = Vec::new();
+    if peek_ahead_for_document_start_end(source,CHAR_DASH) {
+        skip_until_newline(source);
+        skip_whitespace(source);
+    }
     while source.more() {
         let document = parse_document(source, 0);
         match document {
@@ -557,6 +561,9 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
                 return Err(err);
             }
         };
+    }
+    if docs.is_empty() {
+        docs.push(Node::Document(Vec::new()))
     }
     Ok(Node::Documents(docs))
 }
@@ -671,7 +678,7 @@ mod tests {
     fn test_parse_empty() {
         let mut source = Buffer::new(b"");
         let result = parse(&mut source).unwrap();
-        assert_eq!(result, Node::Documents(vec![]));
+        assert_eq!(result, Node::Documents(vec![Node::Document(vec![])]));
     }
 
     #[test]
@@ -1049,7 +1056,14 @@ mod tests {
         ])])]);
         assert_eq!(result, expected);
     }
-    
+    #[test]
+
+    fn test_parse_empty_document_end_marker() {
+        let mut source = Buffer::new(b"...");
+        let result = parse(&mut source).unwrap();
+        assert_eq!(result, Node::Documents(vec![Node::Document(vec![])]));
+    }
+
 
 }
 

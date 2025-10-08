@@ -47,13 +47,14 @@ pub fn stringify(node: &Node, destination: &mut dyn IDestination)-> Result<(), S
             }
           
         },
-        _ => { return Err("Unsupported node type".to_string()); }
+        _ => { stringify_document(node, destination)?; }
     }
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::{parse, BufferSource};
     use super::*;
     use crate::io::destinations::buffer::Buffer;
 
@@ -118,7 +119,16 @@ mod tests {
         let mut dest = Buffer::new();
         let docs = vec![Node::Str("doc1".to_string()), Node::Str("doc2".to_string())];
         stringify(&Node::Documents(docs), &mut dest).unwrap();
-        assert_eq!(dest.to_string(), "---\n\"doc1\"\n---\n\"doc2\"");
+        assert_eq!(dest.to_string(), "---\n\"doc1\"...\n---\n\"doc2\"...\n");
+    }
+
+    #[test]
+    fn test_stringify_integer_sequence() {
+        let mut dest = Buffer::new();
+        let mut source  = BufferSource::new("---\n- 1\n- 2\n- 3\n...\n".as_bytes());
+        let  node  = parse(&mut source).unwrap();
+        stringify(&node, &mut dest).unwrap();
+        assert_eq!(dest.to_string(), "---\n- 1\n- 2\n- 3\n...\n");
     }
 
 }
