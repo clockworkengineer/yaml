@@ -1,0 +1,8 @@
+[package]
+name = "yaml_parse_and_stringify"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+yaml_lib= { path =  "../../library/" }
+yaml_utility_lib= { path = "../yaml_utility_lib" }
