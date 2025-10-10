@@ -212,7 +212,7 @@ mod tests {
         assert!(!file.more());
     }
 
-        #[test]
+    #[test]
     fn test_file_handles_crlf_newlines() {
         let test_file = TestFile::new(b"ab\r\ncd\r\nef");
         let mut file = File::new(&test_file.path).unwrap();
@@ -260,5 +260,7 @@ mod tests {
         file.next();
         assert_eq!(file.current(), None);
     }
+
+
     
 }
