@@ -328,7 +328,7 @@ fn parse_scalar(value: &str) -> Node {
             } else if let Ok(f) = v.parse::<f64>() {
                 Node::Number(Numeric::Float(f))
             } else {
-                // Determine quote type based on surrounding characters and strip quotes
+                // Determine a quote type based on surrounding characters and strip quotes
                 // For double-quoted scalars also unescape common escape sequences
                 fn unescape_double_quoted(s: &str) -> String {
                     let mut out = String::with_capacity(s.len());
@@ -653,7 +653,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
         };
     }
     if docs.is_empty() {
-        docs.push(Node::Document(Vec::new()))
+        docs.push(Document(Vec::new()))
     }
     Ok(Node::Documents(docs))
 }
@@ -665,7 +665,7 @@ pub fn get_number_of_documents(documents: &Node) -> Result<usize, String> {
     }
 }
 /// Returns the base node of document number n (0-based), reporting any errors.
-/// If the node is not a Document or index is out of bounds, returns an error message.
+/// If the node is not a Document or the index is out of bounds, returns an error message.
 pub fn get_document_base(node: &Node, n: usize) -> Result<&Node, String> {
     match node {
         Node::Documents(docs) => {
@@ -793,7 +793,7 @@ mod tests {
     fn test_parse_empty() {
         let mut source = Buffer::new(b"");
         let result = parse(&mut source).unwrap();
-        assert_eq!(result, Node::Documents(vec![Node::Document(vec![])]));
+        assert_eq!(result, Node::Documents(vec![Document(vec![])]));
     }
 
     #[test]
@@ -1305,6 +1305,6 @@ mod tests {
     fn test_parse_empty_document_end_marker() {
         let mut source = Buffer::new(b"...");
         let result = parse(&mut source).unwrap();
-        assert_eq!(result, Node::Documents(vec![Node::Document(vec![])]));
+        assert_eq!(result, Node::Documents(vec![Document(vec![])]));
     }
 }
