@@ -1,43 +1,69 @@
-use crate::nodes::node::*;
 use crate::io::traits::IDestination;
+use crate::nodes::node::*;
 
-pub fn stringify_document(node: &Node, destination: &mut dyn IDestination)-> Result<(), String> {
+fn stringify_document_with_indent(
+    node: &Node,
+    destination: &mut dyn IDestination,
+    indent: usize,
+) -> Result<(), String> {
+    let indent_str = "  ".repeat(indent);
     match node {
-        Node::None => destination.add_bytes("null"),
-        // Node::Value(value) => destination.add_bytes(&format!("\"{}\"", value))?,
-        Node::Boolean(b) => destination.add_bytes(&b.to_string()),
-        Node::Str(s) => destination.add_bytes(&format!("\"{}\"", s)),
-        Node::Comment(c) => destination.add_bytes(&format!("# {}", c)),
+        Node::None => destination.add_bytes(&format!("{}null", indent_str)),
+        Node::Boolean(b) => destination.add_bytes(&format!("{}{}", indent_str, b)),
+        Node::Str(s) => destination.add_bytes(&format!("{}\"{}\"", indent_str, s)),
+        Node::Comment(c) => destination.add_bytes(&format!("{}# {}", indent_str, c)),
         Node::Number(num) => match num {
-            Numeric::Integer(i) => destination.add_bytes(&i.to_string()),
-            Numeric::Float(f) => destination.add_bytes(&f.to_string()),
-            _ => destination.add_bytes(&format!("{:?}", num)),
+            Numeric::Integer(i) => destination.add_bytes(&format!("{}{}", indent_str, i)),
+            Numeric::Float(f) => destination.add_bytes(&format!("{}{}", indent_str, f)),
+            _ => destination.add_bytes(&format!("{}{:?}", indent_str, num)),
         },
         Node::Array(items) => {
-            for (_i, item) in items.iter().enumerate() {
-                destination.add_bytes("- ");
-                stringify_document(item, destination)?;
-                destination.add_bytes("\n");
-            }
-        },
-        Node::Dictionary(items) => {
-            for (key, value) in items {
-                destination.add_bytes(&format!("\"{}\": ", key));
-                stringify_document(value, destination)?;
-                destination.add_bytes("\n");
-            }
-        },
-        Node::Document(nodes) => {
-            for node in nodes {
-                stringify_document(node, destination)?;
+            for item in items {
+                destination.add_bytes(&format!("{}- ", indent_str));
+                match item {
+                    Node::Array(_) | Node::Dictionary(_) => {
+                        destination.add_bytes("\n");
+                        stringify_document_with_indent(item, destination, indent + 1)?;
+                    }
+                    _ => {
+                        stringify_document_with_indent(item, destination, 0)?;
+                        destination.add_bytes("\n");
+                    }
+                }
             }
         }
-        _ => { return Err("Unsupported node type".to_string()); }
+        Node::Dictionary(items) => {
+            for (key, value) in items {
+                destination.add_bytes(&format!("{}\"{}\": ", indent_str, key));
+                match value {
+                    Node::Array(_) | Node::Dictionary(_) => {
+                        destination.add_bytes("\n");
+                        stringify_document_with_indent(value, destination, indent + 1)?;
+                    }
+                    _ => {
+                        stringify_document_with_indent(value, destination, 0)?;
+                        destination.add_bytes("\n");
+                    }
+                }
+            }
+        }
+        Node::Document(nodes) => {
+            for node in nodes {
+                stringify_document_with_indent(node, destination, indent)?;
+            }
+        }
+        _ => {
+            return Err("Unsupported node type".to_string());
+        }
     }
-    Ok(())  
+    Ok(())
 }
 
-pub fn stringify(node: &Node, destination: &mut dyn IDestination)-> Result<(), String> {
+pub fn stringify_document(node: &Node, destination: &mut dyn IDestination) -> Result<(), String> {
+    stringify_document_with_indent(node, destination, 0)
+}
+
+pub fn stringify(node: &Node, destination: &mut dyn IDestination) -> Result<(), String> {
     match node {
         Node::Documents(docs) => {
             for doc in docs {
@@ -45,18 +71,19 @@ pub fn stringify(node: &Node, destination: &mut dyn IDestination)-> Result<(), S
                 stringify_document(doc, destination)?;
                 destination.add_bytes("...\n");
             }
-          
-        },
-        _ => { stringify_document(node, destination)?; }
+        }
+        _ => {
+            stringify_document(node, destination)?;
+        }
     }
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{parse, BufferSource};
     use super::*;
     use crate::io::destinations::buffer::Buffer;
+    use crate::{BufferSource, parse};
 
     #[test]
     fn test_stringify_none() {
@@ -100,7 +127,10 @@ mod tests {
     #[test]
     fn test_stringify_array() {
         let mut dest = Buffer::new();
-        let arr = vec![Node::Number(Numeric::Integer(1)), Node::Str("test".to_string())];
+        let arr = vec![
+            Node::Number(Numeric::Integer(1)),
+            Node::Str("test".to_string()),
+        ];
         stringify(&Node::Array(arr), &mut dest).unwrap();
         assert_eq!(dest.to_string(), "- 1\n- \"test\"\n");
     }
@@ -125,10 +155,9 @@ mod tests {
     #[test]
     fn test_stringify_integer_sequence() {
         let mut dest = Buffer::new();
-        let mut source  = BufferSource::new("---\n- 1\n- 2\n- 3\n...\n".as_bytes());
-        let  node  = parse(&mut source).unwrap();
+        let mut source = BufferSource::new("---\n- 1\n- 2\n- 3\n...\n".as_bytes());
+        let node = parse(&mut source).unwrap();
         stringify(&node, &mut dest).unwrap();
         assert_eq!(dest.to_string(), "---\n- 1\n- 2\n- 3\n...\n");
     }
-
 }
