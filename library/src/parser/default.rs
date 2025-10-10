@@ -2,10 +2,10 @@
 //! Provides functions for parsing different YAML data types including mappings,
 //! sequences, strings, numbers, boolean and null values.
 
-use crate::nodes::node::{Node, Numeric};
-use std::collections::HashMap;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node::Document;
+use crate::nodes::node::{Node, Numeric, QuoteType};
+use std::collections::HashMap;
 
 // Extracted character constants for reuse and readability
 const CHAR_DASH: char = '-';
@@ -24,7 +24,6 @@ const CHAR_DOUBLE_QUOTE: char = '"';
 const CHAR_SINGLE_QUOTE: char = '\'';
 const CHAR_LESS: char = '<';
 const CHAR_GREATER: char = '>';
-
 
 fn skip_whitespace(source: &mut dyn ISource) {
     while let Some(c) = source.current() {
@@ -88,19 +87,19 @@ fn peek_ahead_for_mapping_key(source: &mut dyn ISource) -> bool {
     }
 
     // Restore position
-    for _ in 0..backup_count  {
+    for _ in 0..backup_count {
         source.backup();
     }
 
     found
 }
 
-
-
 fn parse_mapping_key(source: &mut dyn ISource) -> Result<(String, bool), String> {
     let mut key = String::new();
     while let Some(c) = source.current() {
-        if c == CHAR_COLON { break; }
+        if c == CHAR_COLON {
+            break;
+        }
         key.push(c);
         source.next();
     }
@@ -131,7 +130,9 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
 
     let mut value = String::new();
     while let Some(c) = source.current() {
-        if c == CHAR_NEWLINE || c == CHAR_HASH { break; }
+        if c == CHAR_NEWLINE || c == CHAR_HASH {
+            break;
+        }
         value.push(c);
         source.next();
     }
@@ -160,7 +161,9 @@ fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, String> {
         // Parse key
         let mut key = String::new();
         while let Some(c) = source.current() {
-            if c == CHAR_COLON { break; }
+            if c == CHAR_COLON {
+                break;
+            }
             if c == CHAR_RBRACE {
                 // Trailing '}' without a key:value
                 break;
@@ -263,7 +266,9 @@ fn parse_inline_sequence(source: &mut dyn ISource) -> Result<Node, String> {
             let trimmed = val.trim();
             if !trimmed.is_empty() {
                 items.push(parse_scalar(trimmed));
-            } else if source.current() == Some(CHAR_RBRACKET) || source.current() == Some(CHAR_COMMA) {
+            } else if source.current() == Some(CHAR_RBRACKET)
+                || source.current() == Some(CHAR_COMMA)
+            {
                 // allow empty entries to be ignored
             } else {
                 // No valid item
@@ -301,7 +306,9 @@ fn parse_comment(source: &mut dyn ISource) -> String {
     source.next(); // Skip the '#' character
     let mut comment = String::new();
     while let Some(c) = source.current() {
-        if c == CHAR_NEWLINE { break; }
+        if c == CHAR_NEWLINE {
+            break;
+        }
         comment.push(c);
         source.next();
     }
@@ -321,7 +328,83 @@ fn parse_scalar(value: &str) -> Node {
             } else if let Ok(f) = v.parse::<f64>() {
                 Node::Number(Numeric::Float(f))
             } else {
-                Node::Str(v.to_string())
+                // Determine quote type based on surrounding characters and strip quotes
+                // For double-quoted scalars also unescape common escape sequences
+                fn unescape_double_quoted(s: &str) -> String {
+                    let mut out = String::with_capacity(s.len());
+                    let mut chars = s.chars();
+                    while let Some(c) = chars.next() {
+                        if c != '\\' {
+                            out.push(c);
+                            continue;
+                        }
+                        // handle escape
+                        match chars.next() {
+                            Some('n') => out.push('\n'),
+                            Some('r') => out.push('\r'),
+                            Some('t') => out.push('\t'),
+                            Some('\\') => out.push('\\'),
+                            Some('"') => out.push('"'),
+                            Some('u') => {
+                                // \uXXXX
+                                let mut hex = String::new();
+                                for _ in 0..4 {
+                                    if let Some(h) = chars.next() {
+                                        hex.push(h);
+                                    } else {
+                                        break;
+                                    }
+                                }
+                                if let Ok(code) = u32::from_str_radix(&hex, 16) {
+                                    if let Some(ch) = std::char::from_u32(code) {
+                                        out.push(ch);
+                                    }
+                                }
+                            }
+                            Some('U') => {
+                                // \UXXXXXXXX
+                                let mut hex = String::new();
+                                for _ in 0..8 {
+                                    if let Some(h) = chars.next() {
+                                        hex.push(h);
+                                    } else {
+                                        break;
+                                    }
+                                }
+                                if let Ok(code) = u32::from_str_radix(&hex, 16) {
+                                    if let Some(ch) = std::char::from_u32(code) {
+                                        out.push(ch);
+                                    }
+                                }
+                            }
+                            Some(other) => {
+                                // Unknown escape, keep the character as-is (e.g., \x -> x)
+                                out.push(other);
+                            }
+                            None => break,
+                        }
+                    }
+                    out
+                }
+
+                let (content, qt) = if v.len() >= 2 {
+                    let first = v.chars().next().unwrap();
+                    let last = v.chars().rev().next().unwrap();
+                    if first == CHAR_SINGLE_QUOTE && last == CHAR_SINGLE_QUOTE {
+                        // Strip surrounding single quotes
+                        let stripped = v[1..v.len() - 1].to_string();
+                        (stripped, QuoteType::Single)
+                    } else if first == CHAR_DOUBLE_QUOTE && last == CHAR_DOUBLE_QUOTE {
+                        // Strip surrounding double quotes and unescape
+                        let inner = &v[1..v.len() - 1];
+                        (unescape_double_quoted(inner), QuoteType::Double)
+                    } else {
+                        (v.to_string(), QuoteType::Unquoted)
+                    }
+                } else {
+                    (v.to_string(), QuoteType::Unquoted)
+                };
+                Node::Str(content, qt)
             }
         }
     }
@@ -330,7 +413,6 @@ fn parse_scalar(value: &str) -> Node {
 fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node, String> {
     let mut items = Vec::new();
     while let Some(c) = source.current() {
-
         if source.get_current_indent_level() < indent_level {
             break;
         }
@@ -340,9 +422,9 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
                 items.push(Node::Comment(parse_comment(source)));
                 continue;
             }
-            CHAR_DASH|CHAR_DOT if peek_ahead_for_document_start_end(source,c) => {
+            CHAR_DASH | CHAR_DOT if peek_ahead_for_document_start_end(source, c) => {
                 break;
-            },
+            }
             CHAR_DASH => {
                 source.next(); // Skip the dash
                 skip_whitespace(source);
@@ -358,7 +440,7 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
                             let nested_indent = source.get_current_indent_level();
                             items.push(parse_document_contents(source, nested_indent)?);
                             continue;
-                        },
+                        }
                         _ => {
                             if peek_ahead_for_mapping_key(source) {
                                 let nested_indent = source.get_current_indent_level();
@@ -372,16 +454,18 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
                         }
                     }
                 }
-            },
+            }
             _ if !c.is_whitespace() => {
-                return Err(format!("Expected sequence item starting with CHAR_DASH, got '{}'", c));
-            },
-            _ => ()
+                return Err(format!(
+                    "Expected sequence item starting with CHAR_DASH, got '{}'",
+                    c
+                ));
+            }
+            _ => (),
         }
 
         skip_until_newline(source);
         skip_whitespace(source);
-
     }
     Ok(Node::Array(items))
 }
@@ -390,15 +474,14 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
     let mut map = HashMap::new();
     while let Some(c) = source.current() {
         match c {
-            CHAR_DASH|CHAR_DOT  if peek_ahead_for_document_start_end(source,c) => {
-               break;
-            },
+            CHAR_DASH | CHAR_DOT if peek_ahead_for_document_start_end(source, c) => {
+                break;
+            }
             '#' => {
                 parse_comment(source);
             }
             c if c.is_alphanumeric() => {
-
-                if  source.get_current_indent_level() < indent_level {
+                if source.get_current_indent_level() < indent_level {
                     break;
                 }
 
@@ -406,7 +489,10 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
 
                 let next_indent = source.get_current_indent_level();
                 if next_indent > indent_level && newline {
-                    map.insert(key.trim().to_string(), parse_document_contents(source, next_indent)?);
+                    map.insert(
+                        key.trim().to_string(),
+                        parse_document_contents(source, next_indent)?,
+                    );
                     continue;
                 } else {
                     map.insert(key.trim().to_string(), parse_value(source)?);
@@ -424,9 +510,11 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
     Ok(Node::Dictionary(map))
 }
 
-
-pub fn parse_document_contents(source: &mut dyn ISource, indent_level:usize) -> Result<Node, String> {
-     match source.current() {
+pub fn parse_document_contents(
+    source: &mut dyn ISource,
+    indent_level: usize,
+) -> Result<Node, String> {
+    match source.current() {
         Some(CHAR_DASH) => {
             let indent_level = source.get_current_indent_level();
             Ok(parse_sequence(source, indent_level)?)
@@ -435,12 +523,8 @@ pub fn parse_document_contents(source: &mut dyn ISource, indent_level:usize) -> 
             let comment = parse_comment(source);
             Ok(Node::Comment(comment.trim().to_string()))
         }
-        Some('{') => {
-            Ok(parse_inline_mapping(source)?)
-        }
-        Some('[') => {
-            Ok(parse_inline_sequence(source)?)
-        }
+        Some('{') => Ok(parse_inline_mapping(source)?),
+        Some('[') => Ok(parse_inline_sequence(source)?),
         Some(CHAR_QUESTION) => {
             // Minimal explicit pair support for a pattern? [ ... ] then : value
             source.next();
@@ -451,23 +535,33 @@ pub fn parse_document_contents(source: &mut dyn ISource, indent_level:usize) -> 
             } else {
                 let mut k = String::new();
                 while let Some(c) = source.current() {
-                    if c == '\n' { break; }
+                    if c == '\n' {
+                        break;
+                    }
                     k.push(c);
                     source.next();
                 }
-                Node::Str(k.trim().to_string())
+                Node::Str(k.trim().to_string(), QuoteType::Unquoted)
             };
             if source.current() == Some('\n') {
                 source.next();
             }
             loop {
                 skip_whitespace(source);
-                if source.current() == Some(':') { break; }
-                if source.current().is_none() { break; }
+                if source.current() == Some(':') {
+                    break;
+                }
+                if source.current().is_none() {
+                    break;
+                }
                 skip_until_newline(source);
-                if source.current().is_none() { break; }
+                if source.current().is_none() {
+                    break;
+                }
             }
-            if source.current() == Some(':') { source.next(); }
+            if source.current() == Some(':') {
+                source.next();
+            }
             skip_whitespace(source);
             let value_node = if source.current() == Some('[') {
                 parse_inline_sequence(source)?
@@ -482,24 +576,25 @@ pub fn parse_document_contents(source: &mut dyn ISource, indent_level:usize) -> 
             // Stringify key_node into a map key
             let key_str = match key_node {
                 Node::Array(ref items) => {
-                    let parts: Vec<String> = items.iter().map(|n| match n {
-                        Node::Str(s) => s.clone(),
-                        Node::Number(num) => format!("{:?}", num),
-                        Node::Boolean(b) => b.to_string(),
-                        _ => format!("{:?}", n),
-                    }).collect();
+                    let parts: Vec<String> = items
+                        .iter()
+                        .map(|n| match n {
+                            Node::Str(s, _qt) => s.clone(),
+                            Node::Number(num) => format!("{:?}", num),
+                            Node::Boolean(b) => b.to_string(),
+                            _ => format!("{:?}", n),
+                        })
+                        .collect();
                     format!("[{}]", parts.join(", "))
                 }
-                Node::Str(s) => s,
+                Node::Str(s, _qt) => s,
                 _ => format!("{:?}", key_node),
             };
             let mut map = HashMap::new();
             map.insert(key_str, value_node);
             Ok(Node::Dictionary(map))
         }
-        Some(c) if c.is_alphanumeric() => {
-            Ok(parse_mapping(source, indent_level)?)
-        }
+        Some(c) if c.is_alphanumeric() => Ok(parse_mapping(source, indent_level)?),
         Some(c) if c.is_whitespace() => {
             source.next();
             Ok(parse_document_contents(source, indent_level)?)
@@ -509,41 +604,40 @@ pub fn parse_document_contents(source: &mut dyn ISource, indent_level:usize) -> 
             source.next();
             Ok(parse_document_contents(source, indent_level)?)
         }
-        Some(CHAR_LESS) | Some(CHAR_GREATER) | Some(CHAR_DOUBLE_QUOTE) | Some(CHAR_SINGLE_QUOTE) => {
+        Some(CHAR_LESS)
+        | Some(CHAR_GREATER)
+        | Some(CHAR_DOUBLE_QUOTE)
+        | Some(CHAR_SINGLE_QUOTE) => {
             // Allow certain scalar format strings to start with special characters
             Ok(parse_value(source)?)
         }
         Some(c) => Err(format!("Unexpected character: {}", c)),
-        None => Ok(Node::None)
+        None => Ok(Node::None),
     }
-
 }
-pub fn parse_document(source: &mut dyn ISource, indent_level:usize) -> Result<Node, String> {
-
+pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<Node, String> {
     skip_whitespace(source);
 
     let mut document_nodes = Vec::new();
 
     while let Some(c) = source.current() {
         match c {
-            CHAR_DASH|CHAR_DOT if peek_ahead_for_document_start_end(source,c) => {
+            CHAR_DASH | CHAR_DOT if peek_ahead_for_document_start_end(source, c) => {
                 skip_until_newline(source);
                 skip_whitespace(source);
                 break;
-                
             }
             _ => {
                 document_nodes.push(parse_document_contents(source, indent_level)?);
             }
-       }
+        }
     }
 
     Ok(Document(document_nodes))
-
 }
 pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
     let mut docs: Vec<Node> = Vec::new();
-    if peek_ahead_for_document_start_end(source,CHAR_DASH) {
+    if peek_ahead_for_document_start_end(source, CHAR_DASH) {
         skip_until_newline(source);
         skip_whitespace(source);
     }
@@ -567,7 +661,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
 pub fn get_number_of_documents(documents: &Node) -> Result<usize, String> {
     match documents {
         Node::Documents(docs) => Ok(docs.len()),
-        _ => Err("Expected Documents node".to_string())
+        _ => Err("Expected Documents node".to_string()),
     }
 }
 /// Returns the base node of document number n (0-based), reporting any errors.
@@ -578,7 +672,11 @@ pub fn get_document_base(node: &Node, n: usize) -> Result<&Node, String> {
             if n < docs.len() {
                 Ok(&docs[n])
             } else {
-                Err(format!("Document index {} out of bounds ({} documents)", n, docs.len()))
+                Err(format!(
+                    "Document index {} out of bounds ({} documents)",
+                    n,
+                    docs.len()
+                ))
             }
         }
         _ => Err("Node is not a Document or Array of Documents".to_string()),
@@ -616,12 +714,15 @@ mod tests {
             match FileSource::new(&file_path.to_string()) {
                 Ok(mut source) => {
                     let result = parse(&mut source);
-                    assert!(result.is_ok(), "Failed to parse {}: {:?}", file_path, result.err());
-                },
+                    assert!(
+                        result.is_ok(),
+                        "Failed to parse {}: {:?}",
+                        file_path,
+                        result.err()
+                    );
+                }
                 Err(e) => panic!("Failed to open {}: {}", file_path, e),
             }
-
-
         }
     }
 
@@ -633,31 +734,43 @@ mod tests {
         assert_eq!(parse_scalar("false"), Node::Boolean(false));
         assert_eq!(parse_scalar("42"), Node::Number(Numeric::Integer(42)));
         assert_eq!(parse_scalar("3.14"), Node::Number(Numeric::Float(3.14)));
-        assert_eq!(parse_scalar("hello"), Node::Str("hello".to_string()));
-        assert_eq!(parse_scalar("#comment"), Node::Comment("comment".to_string()));
+        assert_eq!(
+            parse_scalar("hello"),
+            Node::Str("hello".to_string(), QuoteType::Unquoted)
+        );
+        assert_eq!(
+            parse_scalar("#comment"),
+            Node::Comment("comment".to_string())
+        );
     }
 
     #[test]
     fn test_parse_sequence() {
         let mut source = Buffer::new(b"- 1\n- 2\n- 3");
         let result = parse(&mut source).unwrap();
-        assert_eq!(result, Node::Documents(vec![Document(vec![Node::Array(vec![
-            Node::Number(Numeric::Integer(1)),
-            Node::Number(Numeric::Integer(2)),
-            Node::Number(Numeric::Integer(3))
-        ])])]));
+        assert_eq!(
+            result,
+            Node::Documents(vec![Document(vec![Node::Array(vec![
+                Node::Number(Numeric::Integer(1)),
+                Node::Number(Numeric::Integer(2)),
+                Node::Number(Numeric::Integer(3))
+            ])])])
+        );
     }
 
     #[test]
     fn test_parse_sequence_with_comments() {
         let mut source = Buffer::new(b"- 1\n# Comment 1\n- 2\n# Comment 2");
         let result = parse(&mut source).unwrap();
-        assert_eq!(result, Node::Documents(vec![Document(vec![Node::Array(vec![
-            Node::Number(Numeric::Integer(1)),
-            Node::Comment("Comment 1".to_string()),
-            Node::Number(Numeric::Integer(2)),
-            Node::Comment("Comment 2".to_string())
-        ])])]));
+        assert_eq!(
+            result,
+            Node::Documents(vec![Document(vec![Node::Array(vec![
+                Node::Number(Numeric::Integer(1)),
+                Node::Comment("Comment 1".to_string()),
+                Node::Number(Numeric::Integer(2)),
+                Node::Comment("Comment 2".to_string())
+            ])])])
+        );
     }
 
     #[test]
@@ -665,9 +778,15 @@ mod tests {
         let mut source = Buffer::new(b"key1: value1\nkey2: 42");
         let result = parse(&mut source).unwrap();
         let mut expected = HashMap::new();
-        expected.insert("key1".to_string(), Node::Str("value1".to_string()));
+        expected.insert(
+            "key1".to_string(),
+            Node::Str("value1".to_string(), QuoteType::Unquoted),
+        );
         expected.insert("key2".to_string(), Node::Number(Numeric::Integer(42)));
-        assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(expected)])]));
+        assert_eq!(
+            result,
+            Node::Documents(vec![Document(vec![Node::Dictionary(expected)])])
+        );
     }
 
     #[test]
@@ -689,57 +808,87 @@ mod tests {
     fn test_parse_comment_only() {
         let mut source = Buffer::new(b"# Just a comment");
         let result = parse(&mut source).unwrap();
-        assert_eq!(result, Node::Documents(vec![Document(vec![Node::Comment("Just a comment".to_string())])]));
+        assert_eq!(
+            result,
+            Node::Documents(vec![Document(vec![Node::Comment(
+                "Just a comment".to_string()
+            )])])
+        );
     }
 
     #[test]
     fn test_parse_multi_document() {
-        let mut source = Buffer::new(b"key1: value1\n---\nkey2: value2\n---\nkey3: value3\nkey4: value4\n");
+        let mut source =
+            Buffer::new(b"key1: value1\n---\nkey2: value2\n---\nkey3: value3\nkey4: value4\n");
         let result = parse(&mut source).unwrap();
         let mut doc1 = HashMap::new();
-        doc1.insert("key1".to_string(), Node::Str("value1".to_string()));
+        doc1.insert(
+            "key1".to_string(),
+            Node::Str("value1".to_string(), QuoteType::Unquoted),
+        );
         let mut doc2 = HashMap::new();
-        doc2.insert("key2".to_string(), Node::Str("value2".to_string()));
+        doc2.insert(
+            "key2".to_string(),
+            Node::Str("value2".to_string(), QuoteType::Unquoted),
+        );
         let mut doc3 = HashMap::new();
-        doc3.insert("key3".to_string(), Node::Str("value3".to_string()));
-        doc3.insert("key4".to_string(), Node::Str("value4".to_string()));
-        assert_eq!(result, Node::Documents(vec![
-            Document(vec![Node::Dictionary(doc1)]),
-            Document(vec![Node::Dictionary(doc2)]),
-            Document(vec![Node::Dictionary(doc3)])
-        ]));
+        doc3.insert(
+            "key3".to_string(),
+            Node::Str("value3".to_string(), QuoteType::Unquoted),
+        );
+        doc3.insert(
+            "key4".to_string(),
+            Node::Str("value4".to_string(), QuoteType::Unquoted),
+        );
+        assert_eq!(
+            result,
+            Node::Documents(vec![
+                Document(vec![Node::Dictionary(doc1)]),
+                Document(vec![Node::Dictionary(doc2)]),
+                Document(vec![Node::Dictionary(doc3)])
+            ])
+        );
     }
 
     #[test]
     fn test_parse_header_comments() {
-        let mut source = Buffer::new(b"# Header comment 1\n# Header comment 2\n# Header comment 3\nkey: value\n");
+        let mut source = Buffer::new(
+            b"# Header comment 1\n# Header comment 2\n# Header comment 3\nkey: value\n",
+        );
         let result = parse(&mut source).unwrap();
-        assert_eq!(result, Node::Documents(vec![
-            Document(vec![
+        assert_eq!(
+            result,
+            Node::Documents(vec![Document(vec![
                 Node::Comment("Header comment 1".to_string()),
                 Node::Comment("Header comment 2".to_string()),
                 Node::Comment("Header comment 3".to_string()),
                 Node::Dictionary({
                     let mut map = HashMap::new();
-                    map.insert("key".to_string(), Node::Str("value".to_string()));
+                    map.insert(
+                        "key".to_string(),
+                        Node::Str("value".to_string(), QuoteType::Unquoted),
+                    );
                     map
                 })
-            ])
-        ]));
+            ])])
+        );
     }
 
     #[test]
     fn test_parse_nested_sequence() {
         let mut source = Buffer::new(b"- item1\n- - nested1\n  - nested2\n- item2");
         let result = parse(&mut source).unwrap();
-        assert_eq!(result, Node::Documents(vec![Document(vec![Node::Array(vec![
-            Node::Str("item1".to_string()),
-            Node::Array(vec![
-                Node::Str("nested1".to_string()),
-                Node::Str("nested2".to_string())
-            ]),
-            Node::Str("item2".to_string())
-        ])])]));
+        assert_eq!(
+            result,
+            Node::Documents(vec![Document(vec![Node::Array(vec![
+                Node::Str("item1".to_string(), QuoteType::Unquoted),
+                Node::Array(vec![
+                    Node::Str("nested1".to_string(), QuoteType::Unquoted),
+                    Node::Str("nested2".to_string(), QuoteType::Unquoted)
+                ]),
+                Node::Str("item2".to_string(), QuoteType::Unquoted)
+            ])])])
+        );
     }
 
     #[test]
@@ -749,7 +898,7 @@ mod tests {
         assert_eq!(get_number_of_documents(&result).unwrap(), 3);
 
         // Test error case with non-Documents node
-        let non_docs_node = Node::Str("test".to_string());
+        let non_docs_node = Node::Str("test".to_string(), QuoteType::Unquoted);
         assert!(get_number_of_documents(&non_docs_node).is_err());
     }
     #[test]
@@ -757,9 +906,15 @@ mod tests {
         let mut source = Buffer::new(b"key1: value1\n# Comment 1\nkey2: 42\n# Comment 2");
         let result = parse(&mut source).unwrap();
         let mut expected = HashMap::new();
-        expected.insert("key1".to_string(), Node::Str("value1".to_string()));
+        expected.insert(
+            "key1".to_string(),
+            Node::Str("value1".to_string(), QuoteType::Unquoted),
+        );
         expected.insert("key2".to_string(), Node::Number(Numeric::Integer(42)));
-        assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(expected)])]));
+        assert_eq!(
+            result,
+            Node::Documents(vec![Document(vec![Node::Dictionary(expected)])])
+        );
     }
 
     #[test]
@@ -768,28 +923,50 @@ mod tests {
         let result = parse(&mut source).unwrap();
 
         let mut inner_map = HashMap::new();
-        inner_map.insert("inner1".to_string(), Node::Str("value1".to_string()));
-        inner_map.insert("inner2".to_string(), Node::Str("value2".to_string()));
+        inner_map.insert(
+            "inner1".to_string(),
+            Node::Str("value1".to_string(), QuoteType::Unquoted),
+        );
+        inner_map.insert(
+            "inner2".to_string(),
+            Node::Str("value2".to_string(), QuoteType::Unquoted),
+        );
 
         let mut outer_map = HashMap::new();
         outer_map.insert("outer".to_string(), Node::Dictionary(inner_map));
 
-        assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(outer_map)])]));
+        assert_eq!(
+            result,
+            Node::Documents(vec![Document(vec![Node::Dictionary(outer_map)])])
+        );
     }
     #[test]
     fn test_parse_nested_mapping_with_key_after_nested() {
-        let mut source = Buffer::new(b"outer1:\n  inner1: value1\n  inner2: value2\nouter2: value3");
+        let mut source =
+            Buffer::new(b"outer1:\n  inner1: value1\n  inner2: value2\nouter2: value3");
         let result = parse(&mut source).unwrap();
 
         let mut inner_map = HashMap::new();
-        inner_map.insert("inner1".to_string(), Node::Str("value1".to_string()));
-        inner_map.insert("inner2".to_string(), Node::Str("value2".to_string()));
+        inner_map.insert(
+            "inner1".to_string(),
+            Node::Str("value1".to_string(), QuoteType::Unquoted),
+        );
+        inner_map.insert(
+            "inner2".to_string(),
+            Node::Str("value2".to_string(), QuoteType::Unquoted),
+        );
 
         let mut outer_map = HashMap::new();
         outer_map.insert("outer1".to_string(), Node::Dictionary(inner_map));
-        outer_map.insert("outer2".to_string(), Node::Str("value3".to_string()));
+        outer_map.insert(
+            "outer2".to_string(),
+            Node::Str("value3".to_string(), QuoteType::Unquoted),
+        );
 
-        assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(outer_map)])]));
+        assert_eq!(
+            result,
+            Node::Documents(vec![Document(vec![Node::Dictionary(outer_map)])])
+        );
     }
 
     #[test]
@@ -798,45 +975,62 @@ mod tests {
         let result = parse(&mut source).unwrap();
 
         let sequence = Node::Array(vec![
-            Node::Str("item1".to_string()),
-            Node::Str("item2".to_string())
+            Node::Str("item1".to_string(), QuoteType::Unquoted),
+            Node::Str("item2".to_string(), QuoteType::Unquoted),
         ]);
 
         let mut map = HashMap::new();
         map.insert("key1".to_string(), sequence);
-        map.insert("key2".to_string(), Node::Str("value2".to_string()));
+        map.insert(
+            "key2".to_string(),
+            Node::Str("value2".to_string(), QuoteType::Unquoted),
+        );
 
-        assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(map)])]));
+        assert_eq!(
+            result,
+            Node::Documents(vec![Document(vec![Node::Dictionary(map)])])
+        );
     }
     #[test]
     fn test_parse_mapping_with_nested_sequence_and_comments() {
-        let mut source = Buffer::new(b"key1:\n  - item1\n  - item2\n# Comment 1\nkey2: value2\n# Comment 2");
+        let mut source =
+            Buffer::new(b"key1:\n  - item1\n  - item2\n# Comment 1\nkey2: value2\n# Comment 2");
         let result = parse(&mut source).unwrap();
         let sequence = Node::Array(vec![
-            Node::Str("item1".to_string()),
-            Node::Str("item2".to_string())
+            Node::Str("item1".to_string(), QuoteType::Unquoted),
+            Node::Str("item2".to_string(), QuoteType::Unquoted),
         ]);
         let mut map = HashMap::new();
         map.insert("key1".to_string(), sequence);
-        map.insert("key2".to_string(), Node::Str("value2".to_string()));
-        assert_eq!(result, Node::Documents(vec![Document(vec![
-            // Node::Comment("Comment 1".to_string()),
-            Node::Dictionary(map),
-            // Node::Comment("Comment 2".to_string())
-        ])]));
+        map.insert(
+            "key2".to_string(),
+            Node::Str("value2".to_string(), QuoteType::Unquoted),
+        );
+        assert_eq!(
+            result,
+            Node::Documents(vec![Document(vec![
+                // Node::Comment("Comment 1".to_string()),
+                Node::Dictionary(map),
+                // Node::Comment("Comment 2".to_string())
+            ])])
+        );
     }
 
     #[test]
     fn test_parse_sequence_with_nested_comments() {
-        let mut source = Buffer::new(b"- item1\n# Comment between items\n- item2\n# Final comment\n- item3");
+        let mut source =
+            Buffer::new(b"- item1\n# Comment between items\n- item2\n# Final comment\n- item3");
         let result = parse(&mut source).unwrap();
-        assert_eq!(result, Node::Documents(vec![Document(vec![Node::Array(vec![
-            Node::Str("item1".to_string()),
-            Node::Comment("Comment between items".to_string()),
-            Node::Str("item2".to_string()),
-            Node::Comment("Final comment".to_string()),
-            Node::Str("item3".to_string())
-        ])])]));
+        assert_eq!(
+            result,
+            Node::Documents(vec![Document(vec![Node::Array(vec![
+                Node::Str("item1".to_string(), QuoteType::Unquoted),
+                Node::Comment("Comment between items".to_string()),
+                Node::Str("item2".to_string(), QuoteType::Unquoted),
+                Node::Comment("Final comment".to_string()),
+                Node::Str("item3".to_string(), QuoteType::Unquoted)
+            ])])])
+        );
     }
 
     #[test]
@@ -844,8 +1038,14 @@ mod tests {
         let mut source = Buffer::new(b"key: value\n---");
         let result = parse(&mut source).unwrap();
         let mut expected = HashMap::new();
-        expected.insert("key".to_string(), Node::Str("value".to_string()));
-        assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(expected)])]));
+        expected.insert(
+            "key".to_string(),
+            Node::Str("value".to_string(), QuoteType::Unquoted),
+        );
+        assert_eq!(
+            result,
+            Node::Documents(vec![Document(vec![Node::Dictionary(expected)])])
+        );
     }
 
     #[test]
@@ -853,13 +1053,19 @@ mod tests {
         let mut source = Buffer::new(b"key: value\n---\nother: 123");
         let result = parse(&mut source).unwrap();
         let mut doc1 = HashMap::new();
-        doc1.insert("key".to_string(), Node::Str("value".to_string()));
+        doc1.insert(
+            "key".to_string(),
+            Node::Str("value".to_string(), QuoteType::Unquoted),
+        );
         let mut doc2 = HashMap::new();
         doc2.insert("other".to_string(), Node::Number(Numeric::Integer(123)));
-        assert_eq!(result, Node::Documents(vec![
-            Document(vec![Node::Dictionary(doc1)]),
-            Document(vec![Node::Dictionary(doc2)])
-        ]));
+        assert_eq!(
+            result,
+            Node::Documents(vec![
+                Document(vec![Node::Dictionary(doc1)]),
+                Document(vec![Node::Dictionary(doc2)])
+            ])
+        );
     }
 
     #[test]
@@ -867,19 +1073,25 @@ mod tests {
         let mut source = Buffer::new(b"# Comment before\nkey: value\n---\n# After doc\nother: 1");
         let result = parse(&mut source).unwrap();
         let mut doc1 = HashMap::new();
-        doc1.insert("key".to_string(), Node::Str("value".to_string()));
+        doc1.insert(
+            "key".to_string(),
+            Node::Str("value".to_string(), QuoteType::Unquoted),
+        );
         let mut doc2 = HashMap::new();
         doc2.insert("other".to_string(), Node::Number(Numeric::Integer(1)));
-        assert_eq!(result, Node::Documents(vec![
-            Document(vec![
-                Node::Comment("Comment before".to_string()),
-                Node::Dictionary(doc1)
-            ]),
-            Document(vec![
-                Node::Comment("After doc".to_string()),
-                Node::Dictionary(doc2)
+        assert_eq!(
+            result,
+            Node::Documents(vec![
+                Document(vec![
+                    Node::Comment("Comment before".to_string()),
+                    Node::Dictionary(doc1)
+                ]),
+                Document(vec![
+                    Node::Comment("After doc".to_string()),
+                    Node::Dictionary(doc2)
+                ])
             ])
-        ]));
+        );
     }
 
     #[test]
@@ -894,28 +1106,36 @@ mod tests {
         let mut source = Buffer::new(b"key: value\n---\n---\nother: 1");
         let result = parse(&mut source).unwrap();
         let mut doc1 = HashMap::new();
-        doc1.insert("key".to_string(), Node::Str("value".to_string()));
+        doc1.insert(
+            "key".to_string(),
+            Node::Str("value".to_string(), QuoteType::Unquoted),
+        );
         let mut doc3 = HashMap::new();
         doc3.insert("other".to_string(), Node::Number(Numeric::Integer(1)));
-        assert_eq!(result, Node::Documents(vec![
-            Document(vec![Node::Dictionary(doc1)]),
-            Document(vec![]),
-            Document(vec![Node::Dictionary(doc3)])
-        ]));
+        assert_eq!(
+            result,
+            Node::Documents(vec![
+                Document(vec![Node::Dictionary(doc1)]),
+                Document(vec![]),
+                Document(vec![Node::Dictionary(doc3)])
+            ])
+        );
     }
     #[test]
     fn test_parse_nested_mapping_within_sequence() {
-        let mut source = Buffer::new(
-            b"people:\n  - name: John\n    likes:\n      - apples\n      - bananas\n"
-        );
+        let mut source =
+            Buffer::new(b"people:\n  - name: John\n    likes:\n      - apples\n      - bananas\n");
         let result = parse(&mut source).unwrap();
 
         let mut likes = Vec::new();
-        likes.push(Node::Str("apples".to_string()));
-        likes.push(Node::Str("bananas".to_string()));
+        likes.push(Node::Str("apples".to_string(), QuoteType::Unquoted));
+        likes.push(Node::Str("bananas".to_string(), QuoteType::Unquoted));
 
         let mut john_map = HashMap::new();
-        john_map.insert("name".to_string(), Node::Str("John".to_string()));
+        john_map.insert(
+            "name".to_string(),
+            Node::Str("John".to_string(), QuoteType::Unquoted),
+        );
         john_map.insert("likes".to_string(), Node::Array(likes));
 
         let mut people_seq = Vec::new();
@@ -928,8 +1148,6 @@ mod tests {
             result,
             Node::Documents(vec![Document(vec![Node::Dictionary(outer_map)])])
         );
-
-
     }
 
     #[test]
@@ -939,12 +1157,18 @@ mod tests {
         let result = parse(&mut source).unwrap();
 
         let mut mark_map = HashMap::new();
-        mark_map.insert("name".to_string(), Node::Str("Mark Joseph".to_string()));
+        mark_map.insert(
+            "name".to_string(),
+            Node::Str("Mark Joseph".to_string(), QuoteType::Unquoted),
+        );
         mark_map.insert("hr".to_string(), Node::Number(Numeric::Integer(87)));
         mark_map.insert("avg".to_string(), Node::Number(Numeric::Float(0.278)));
 
         let mut james_map = HashMap::new();
-        james_map.insert("name".to_string(), Node::Str("James Stephen".to_string()));
+        james_map.insert(
+            "name".to_string(),
+            Node::Str("James Stephen".to_string(), QuoteType::Unquoted),
+        );
         james_map.insert("hr".to_string(), Node::Number(Numeric::Integer(63)));
         james_map.insert("avg".to_string(), Node::Number(Numeric::Float(0.288)));
 
@@ -995,7 +1219,10 @@ mod tests {
         let mut map = HashMap::new();
         map.insert("a".to_string(), Node::Number(Numeric::Integer(1)));
         map.insert("b".to_string(), Node::Number(Numeric::Integer(2)));
-        assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(map)])]));
+        assert_eq!(
+            result,
+            Node::Documents(vec![Document(vec![Node::Dictionary(map)])])
+        );
     }
 
     #[test]
@@ -1003,7 +1230,10 @@ mod tests {
         let mut source = Buffer::new(b"{}");
         let result = parse(&mut source).unwrap();
         let map: HashMap<String, Node> = HashMap::new();
-        assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(map)])]));
+        assert_eq!(
+            result,
+            Node::Documents(vec![Document(vec![Node::Dictionary(map)])])
+        );
     }
 
     #[test]
@@ -1012,10 +1242,16 @@ mod tests {
         let result = parse(&mut source).unwrap();
         let mut child = HashMap::new();
         child.insert("a".to_string(), Node::Number(Numeric::Integer(1)));
-        child.insert("b".to_string(), Node::Str("test".to_string()));
+        child.insert(
+            "b".to_string(),
+            Node::Str("test".to_string(), QuoteType::Unquoted),
+        );
         let mut parent = HashMap::new();
         parent.insert("parent".to_string(), Node::Dictionary(child));
-        assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(parent)])]));
+        assert_eq!(
+            result,
+            Node::Documents(vec![Document(vec![Node::Dictionary(parent)])])
+        );
     }
 
     // New tests for block and flow scalar format strings
@@ -1025,8 +1261,14 @@ mod tests {
         let mut source = Buffer::new(b"key: > hello world");
         let result = parse(&mut source).unwrap();
         let mut expected = HashMap::new();
-        expected.insert("key".to_string(), Node::Str("> hello world".to_string()));
-        assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(expected)])]));
+        expected.insert(
+            "key".to_string(),
+            Node::Str("> hello world".to_string(), QuoteType::Unquoted),
+        );
+        assert_eq!(
+            result,
+            Node::Documents(vec![Document(vec![Node::Dictionary(expected)])])
+        );
     }
 
     #[test]
@@ -1035,8 +1277,14 @@ mod tests {
         let mut source = Buffer::new(b"key:\n  > multi line");
         let result = parse(&mut source).unwrap();
         let mut expected = HashMap::new();
-        expected.insert("key".to_string(), Node::Str("> multi line".to_string()));
-        assert_eq!(result, Node::Documents(vec![Document(vec![Node::Dictionary(expected)])]));
+        expected.insert(
+            "key".to_string(),
+            Node::Str("> multi line".to_string(), QuoteType::Unquoted),
+        );
+        assert_eq!(
+            result,
+            Node::Documents(vec![Document(vec![Node::Dictionary(expected)])])
+        );
     }
 
     #[test]
@@ -1045,10 +1293,10 @@ mod tests {
         let mut source = Buffer::new(b"[<tag, 'quoted', \"double\", >folded]");
         let result = parse(&mut source).unwrap();
         let expected = Node::Documents(vec![Document(vec![Node::Array(vec![
-            Node::Str("<tag".to_string()),
-            Node::Str("'quoted'".to_string()),
-            Node::Str("\"double\"".to_string()),
-            Node::Str(">folded".to_string()),
+            Node::Str("<tag".to_string(), QuoteType::Unquoted),
+            Node::Str("quoted".to_string(), QuoteType::Single),
+            Node::Str("double".to_string(), QuoteType::Double),
+            Node::Str(">folded".to_string(), QuoteType::Unquoted),
         ])])]);
         assert_eq!(result, expected);
     }
@@ -1059,8 +1307,4 @@ mod tests {
         let result = parse(&mut source).unwrap();
         assert_eq!(result, Node::Documents(vec![Node::Document(vec![])]));
     }
-
-
 }
-
-

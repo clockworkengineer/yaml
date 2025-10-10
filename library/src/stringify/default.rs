@@ -10,7 +10,35 @@ fn stringify_document_with_indent(
     match node {
         Node::None => destination.add_bytes(&format!("{}null", indent_str)),
         Node::Boolean(b) => destination.add_bytes(&format!("{}{}", indent_str, b)),
-        Node::Str(s) => destination.add_bytes(&format!("{}\"{}\"", indent_str, s)),
+        Node::Str(s, qt) => match qt {
+            crate::nodes::node::QuoteType::Double => {
+                // escape common sequences for double-quoted output
+                fn escape_double(s: &str) -> String {
+                    let mut out = String::with_capacity(s.len());
+                    for c in s.chars() {
+                        match c {
+                            '\n' => out.push_str("\\n"),
+                            '\r' => out.push_str("\\r"),
+                            '\t' => out.push_str("\\t"),
+                            '\\' => out.push_str("\\\\"),
+                            '"' => out.push_str("\\\""),
+                            c if (c as u32) < 0x20 || (c as u32) == 0x7f => {
+                                out.push_str(&format!("\\u{:04x}", c as u32));
+                            }
+                            other => out.push(other),
+                        }
+                    }
+                    out
+                }
+                destination.add_bytes(&format!("{}\"{}\"", indent_str, escape_double(s)))
+            }
+            crate::nodes::node::QuoteType::Single => {
+                destination.add_bytes(&format!("{}'{}'", indent_str, s))
+            }
+            crate::nodes::node::QuoteType::Unquoted => {
+                destination.add_bytes(&format!("{}{}", indent_str, s))
+            }
+        },
         Node::Comment(c) => destination.add_bytes(&format!("{}# {}", indent_str, c)),
         Node::Number(num) => match num {
             Numeric::Integer(i) => destination.add_bytes(&format!("{}{}", indent_str, i)),
@@ -102,7 +130,11 @@ mod tests {
     #[test]
     fn test_stringify_string() {
         let mut dest = Buffer::new();
-        stringify(&Node::Str("test".to_string()), &mut dest).unwrap();
+        stringify(
+            &Node::Str("test".to_string(), crate::nodes::node::QuoteType::Double),
+            &mut dest,
+        )
+        .unwrap();
         assert_eq!(dest.to_string(), "\"test\"");
     }
 
@@ -129,7 +161,7 @@ mod tests {
         let mut dest = Buffer::new();
         let arr = vec![
             Node::Number(Numeric::Integer(1)),
-            Node::Str("test".to_string()),
+            Node::Str("test".to_string(), crate::nodes::node::QuoteType::Double),
         ];
         stringify(&Node::Array(arr), &mut dest).unwrap();
         assert_eq!(dest.to_string(), "- 1\n- \"test\"\n");
@@ -139,7 +171,10 @@ mod tests {
     fn test_stringify_dictionary() {
         let mut dest = Buffer::new();
         let mut dict = std::collections::HashMap::new();
-        dict.insert("key".to_string(), Node::Str("value".to_string()));
+        dict.insert(
+            "key".to_string(),
+            Node::Str("value".to_string(), crate::nodes::node::QuoteType::Double),
+        );
         stringify(&Node::Dictionary(dict), &mut dest).unwrap();
         assert_eq!(dest.to_string(), "\"key\": \"value\"\n");
     }
@@ -147,7 +182,10 @@ mod tests {
     #[test]
     fn test_stringify_documents() {
         let mut dest = Buffer::new();
-        let docs = vec![Node::Str("doc1".to_string()), Node::Str("doc2".to_string())];
+        let docs = vec![
+            Node::Str("doc1".to_string(), crate::nodes::node::QuoteType::Double),
+            Node::Str("doc2".to_string(), crate::nodes::node::QuoteType::Double),
+        ];
         stringify(&Node::Documents(docs), &mut dest).unwrap();
         assert_eq!(dest.to_string(), "---\n\"doc1\"...\n---\n\"doc2\"...\n");
     }

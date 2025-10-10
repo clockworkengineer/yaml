@@ -4,15 +4,23 @@ use std::ops::{Index, IndexMut};
 /// Represents different numeric types that can be stored in a YAML node
 #[derive(Clone, Debug, PartialEq)]
 pub enum Numeric {
-    Integer(i64),    // 64-bit signed integer
-    Float(f64),      // 64-bit floating point
-    UInteger(u64),   // 64-bit unsigned integer
-    Byte(u8),        // 8-bit unsigned integer
-    Int32(i32),      // 32-bit signed integer
-    UInt32(u32),     // 32-bit unsigned integer
-    Int16(i16),      // 16-bit signed integer
-    UInt16(u16),     // 16-bit unsigned integer
-    Int8(i8),        // 8-bit signed integer
+    Integer(i64),  // 64-bit signed integer
+    Float(f64),    // 64-bit floating point
+    UInteger(u64), // 64-bit unsigned integer
+    Byte(u8),      // 8-bit unsigned integer
+    Int32(i32),    // 32-bit signed integer
+    UInt32(u32),   // 32-bit unsigned integer
+    Int16(i16),    // 16-bit signed integer
+    UInt16(u16),   // 16-bit unsigned integer
+    Int8(i8),      // 8-bit signed integer
+}
+
+/// Represents how a string was quoted in the source YAML
+#[derive(Clone, Debug, PartialEq)]
+pub enum QuoteType {
+    Unquoted,
+    Single,
+    Double,
 }
 
 /// A node in the YAML data structure that can represent different types of values.
@@ -24,9 +32,9 @@ pub enum Node {
     /// Represents a numeric value (various integer and float types)
     /// Stores numbers using the most appropriate numeric type from the Numeric enum
     Number(Numeric),
-    /// Represents a string value 
+    /// Represents a string value and how it was quoted in the source
     /// Used for text content in YAML including multi-line strings
-    Str(String),
+    Str(String, QuoteType),
     /// Represents an array of other nodes
     /// Used for YAML sequences/lists where order matters
     Array(Vec<Node>),
@@ -162,7 +170,7 @@ impl From<i64> for Node {
 
 impl From<&str> for Node {
     fn from(value: &str) -> Self {
-        Node::Str(String::from(value))
+        Node::Str(String::from(value), QuoteType::Unquoted)
     }
 }
 
@@ -222,7 +230,7 @@ impl From<bool> for Node {
 
 impl From<String> for Node {
     fn from(value: String) -> Self {
-        Node::Str(value)
+        Node::Str(value, QuoteType::Unquoted)
     }
 }
 
@@ -266,8 +274,14 @@ mod tests {
 
     #[test]
     fn test_node_string_conversions() {
-        assert_eq!(Node::from("test"), Node::Str("test".to_string()));
-        assert_eq!(Node::from("test".to_string()), Node::Str("test".to_string()));
+        assert_eq!(
+            Node::from("test"),
+            Node::Str("test".to_string(), QuoteType::Unquoted)
+        );
+        assert_eq!(
+            Node::from("test".to_string()),
+            Node::Str("test".to_string(), QuoteType::Unquoted)
+        );
     }
 
     #[test]
@@ -360,13 +374,23 @@ mod tests {
     #[test]
     fn test_make_node() {
         assert_eq!(make_node(42), Node::Number(Numeric::Int32(42)));
-        assert_eq!(make_node("test"), Node::Str("test".to_string()));
+        assert_eq!(
+            make_node("test"),
+            Node::Str("test".to_string(), QuoteType::Unquoted)
+        );
         assert_eq!(make_node(true), Node::Boolean(true));
     }
     #[test]
     fn test_make_node_vec() {
         let vec = vec![1, 2, 3];
-        assert_eq!(make_node(vec), Node::Array(vec![Node::Number(Numeric::Int32(1)), Node::Number(Numeric::Int32(2)), Node::Number(Numeric::Int32(3))]));
+        assert_eq!(
+            make_node(vec),
+            Node::Array(vec![
+                Node::Number(Numeric::Int32(1)),
+                Node::Number(Numeric::Int32(2)),
+                Node::Number(Numeric::Int32(3))
+            ])
+        );
     }
 
     #[test]
@@ -376,7 +400,7 @@ mod tests {
             Node::Documents(nodes) => {
                 assert_eq!(nodes.len(), 2);
                 assert_eq!(nodes[0], Node::Number(Numeric::Int32(1)));
-                assert_eq!(nodes[1], Node::Str("test".to_string()));
+                assert_eq!(nodes[1], Node::Str("test".to_string(), QuoteType::Unquoted));
             }
             _ => panic!("Expected Document node"),
         }
