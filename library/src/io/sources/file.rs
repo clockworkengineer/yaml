@@ -79,6 +79,13 @@ impl ISource for File {
         if let Ok(_) = self.file.seek(SeekFrom::Current(-2)) {
             let mut byte = [0u8; 1];
             self.current_byte = if self.file.read(&mut byte).unwrap_or(0) == 1 {
+                if byte[0] == b'\r' {
+                    // If we see a '\r', try to seek back one more to check for '\n'
+                    if let Ok(_) = self.file.seek(SeekFrom::Current(-2)) {
+                        if self.file.read(&mut byte).unwrap_or(0) == 1 {
+                        }
+                    }
+                }
                 Some(byte[0])
             } else {
                 None
@@ -86,8 +93,7 @@ impl ISource for File {
             if self.column > 0 {
                 self.column -= 1;
             }
-        }
-    }
+        }    }
 
     fn get_current_indent_level(&self) -> usize {
         self.column
@@ -161,7 +167,7 @@ mod tests {
 
     #[test]
     fn test_file_backup() {
-        let test_file = TestFile::new(b"123");
+        let test_file = TestFile::new(b"123\r\n456");
         let mut file = File::new(&test_file.path).unwrap();
         file.next(); // move to '2'
         file.next(); // move to '3'
@@ -170,6 +176,17 @@ mod tests {
         assert_eq!(file.current(), Some('2'));
         file.backup(); // should go back to '1'
         assert_eq!(file.current(), Some('1'));
+        file.next(); // move to '2'
+        file.next(); // move to '3'
+        file.next(); // move to '\n'
+        assert_eq!(file.current(), Some('\n'));
+        file.next(); // move to '4'
+        assert_eq!(file.current(), Some('4'));
+        file.backup(); // should go back to '\n'
+        assert_eq!(file.current(), Some('\n'));
+        file.backup(); // should go back to '3'
+        assert_eq!(file.current(), Some('3'));
+        assert_eq!(file.get_current_indent_level(), 0);
     }
 
     #[test]
@@ -209,11 +226,6 @@ mod tests {
         assert_eq!(file.current(), Some('b'));
         assert_eq!(file.get_current_indent_level(), 1);
 
-        // '\r'
-        // file.next();
-        // assert_eq!(file.current(), Some('\r'));
-        // assert_eq!(file.get_current_indent_level(), 2);
-
         // '\n' (should reset column)
         file.next();
         assert_eq!(file.current(), Some('\n'));
@@ -228,11 +240,6 @@ mod tests {
         file.next();
         assert_eq!(file.current(), Some('d'));
         assert_eq!(file.get_current_indent_level(), 1);
-
-        // '\r'
-        // file.next();
-        // assert_eq!(file.current(), Some('\r'));
-        // assert_eq!(file.get_current_indent_level(), 2);
 
         // '\n'
         file.next();

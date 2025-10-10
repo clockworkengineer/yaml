@@ -88,11 +88,7 @@ fn peek_ahead_for_mapping_key(source: &mut dyn ISource) -> bool {
     }
 
     // Restore position
-    for _ in 0..backup_count - 1 {
-        source.backup();
-    }
-
-    if source.get_current_indent_level() > 0 {
+    for _ in 0..backup_count  {
         source.backup();
     }
 

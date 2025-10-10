@@ -71,7 +71,9 @@ impl ISource for Buffer {
     /// Moves the position back to the previous character
     fn backup(&mut self) {
         self.position -= 1;
-        self.column -= 1;
+        if self.column > 0 {
+            self.column -= 1;
+        }
     }
 
     fn get_current_indent_level(&self) -> usize {
