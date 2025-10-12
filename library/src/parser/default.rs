@@ -318,7 +318,7 @@ fn parse_comment(source: &mut dyn ISource) -> String {
 fn parse_scalar(value: &str) -> Node {
     // Check if the value is a comment (starts with #)
     match value {
-        v if v.starts_with('#') => Node::Comment(v[1..].trim().to_string()),
+        v if v.starts_with(CHAR_HASH) => Node::Comment(v[1..].trim().to_string()),
         "null" | "~" => Node::None,
         "true" => Node::Boolean(true),
         "false" => Node::Boolean(false),
@@ -340,11 +340,11 @@ fn parse_scalar(value: &str) -> Node {
                         }
                         // handle escape
                         match chars.next() {
-                            Some('n') => out.push('\n'),
+                            Some('n') => out.push(CHAR_NEWLINE),
                             Some('r') => out.push('\r'),
                             Some('t') => out.push('\t'),
                             Some('\\') => out.push('\\'),
-                            Some('"') => out.push('"'),
+                            Some(CHAR_DOUBLE_QUOTE) => out.push(CHAR_DOUBLE_QUOTE),
                             Some('u') => {
                                 // \uXXXX
                                 let mut hex = String::new();
@@ -418,7 +418,7 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
         }
 
         match c {
-            '#' => {
+            CHAR_HASH => {
                 items.push(Node::Comment(parse_comment(source)));
                 continue;
             }
@@ -428,7 +428,7 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
             CHAR_DASH => {
                 source.next(); // Skip the dash
                 skip_whitespace(source);
-                if source.current() == Some('\n') {
+                if source.current() == Some(CHAR_NEWLINE) {
                     source.next();
                     skip_whitespace(source);
                 }
@@ -477,7 +477,7 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
             CHAR_DASH | CHAR_DOT if peek_ahead_for_document_start_end(source, c) => {
                 break;
             }
-            '#' => {
+            CHAR_HASH => {
                 parse_comment(source);
             }
             c if c.is_alphanumeric() => {
@@ -519,23 +519,23 @@ pub fn parse_document_contents(
             let indent_level = source.get_current_indent_level();
             Ok(parse_sequence(source, indent_level)?)
         }
-        Some('#') => {
+        Some(CHAR_HASH) => {
             let comment = parse_comment(source);
             Ok(Node::Comment(comment.trim().to_string()))
         }
-        Some('{') => Ok(parse_inline_mapping(source)?),
-        Some('[') => Ok(parse_inline_sequence(source)?),
+        Some(CHAR_LBRACE) => Ok(parse_inline_mapping(source)?),
+        Some(CHAR_LBRACKET) => Ok(parse_inline_sequence(source)?),
         Some(CHAR_QUESTION) => {
             // Minimal explicit pair support for a pattern? [ ... ] then : value
             source.next();
             skip_whitespace(source);
             // Parse key (support only a flow sequence or plain scalar until EOL)
-            let key_node = if source.current() == Some('[') {
+            let key_node = if source.current() == Some(CHAR_LBRACKET) {
                 parse_inline_sequence(source)?
             } else {
                 let mut k = String::new();
                 while let Some(c) = source.current() {
-                    if c == '\n' {
+                    if c == CHAR_NEWLINE {
                         break;
                     }
                     k.push(c);
@@ -543,12 +543,12 @@ pub fn parse_document_contents(
                 }
                 Node::Str(k.trim().to_string(), QuoteType::Unquoted)
             };
-            if source.current() == Some('\n') {
+            if source.current() == Some(CHAR_NEWLINE) {
                 source.next();
             }
             loop {
                 skip_whitespace(source);
-                if source.current() == Some(':') {
+                if source.current() == Some(CHAR_COLON) {
                     break;
                 }
                 if source.current().is_none() {
@@ -559,13 +559,13 @@ pub fn parse_document_contents(
                     break;
                 }
             }
-            if source.current() == Some(':') {
+            if source.current() == Some(CHAR_COLON) {
                 source.next();
             }
             skip_whitespace(source);
-            let value_node = if source.current() == Some('[') {
+            let value_node = if source.current() == Some(CHAR_LBRACKET) {
                 parse_inline_sequence(source)?
-            } else if source.current() == Some('{') {
+            } else if source.current() == Some(CHAR_LBRACE) {
                 parse_inline_mapping(source)?
             } else if source.current() == Some(CHAR_DASH) {
                 let nested_indent = source.get_current_indent_level();
