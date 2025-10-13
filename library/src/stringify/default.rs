@@ -49,7 +49,7 @@ fn stringify_document_with_indent(
             for item in items {
                 destination.add_bytes(&format!("{}- ", indent_str));
                 match item {
-                    Node::Array(_) | Node::Dictionary(_) => {
+                    Node::Array(_) | Node::Mapping(_) => {
                         destination.add_bytes("\n");
                         stringify_document_with_indent(item, destination, indent + 1)?;
                     }
@@ -60,11 +60,19 @@ fn stringify_document_with_indent(
                 }
             }
         }
-        Node::Dictionary(items) => {
-            for (key, value) in items {
-                destination.add_bytes(&format!("{}\"{}\": ", indent_str, key));
+
+        Node::Mapping(pairs) => {
+            // Mapping keys are Nodes; stringify each key Node into a temporary buffer
+            for (key_node, value) in pairs {
+                // Use a temporary buffer to stringify the key Node
+                let mut key_buf = crate::io::destinations::buffer::Buffer::new();
+                stringify_document_with_indent(key_node, &mut key_buf, 0)?;
+                let key_str = key_buf.to_string();
+
+                destination.add_bytes(&format!("{}{}: ", indent_str, key_str));
+
                 match value {
-                    Node::Array(_) | Node::Dictionary(_) => {
+                    Node::Array(_) | Node::Mapping(_) => {
                         destination.add_bytes("\n");
                         stringify_document_with_indent(value, destination, indent + 1)?;
                     }
@@ -168,14 +176,13 @@ mod tests {
     }
 
     #[test]
-    fn test_stringify_dictionary() {
+    fn test_stringify_mapping() {
         let mut dest = Buffer::new();
-        let mut dict = std::collections::HashMap::new();
-        dict.insert(
-            "key".to_string(),
+        let mapping = Node::Mapping(vec![(
+            Node::Str("key".to_string(), crate::nodes::node::QuoteType::Double),
             Node::Str("value".to_string(), crate::nodes::node::QuoteType::Double),
-        );
-        stringify(&Node::Dictionary(dict), &mut dest).unwrap();
+        )]);
+        stringify(&mapping, &mut dest).unwrap();
         assert_eq!(dest.to_string(), "\"key\": \"value\"\n");
     }
 

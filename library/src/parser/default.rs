@@ -9,7 +9,6 @@ use crate::parser::constants::*;
 use crate::parser::utils::{
     collect_until, node_to_map_key, read_line_trimmed_into_string, skip_whitespace_and_comments,
 };
-use std::collections::HashMap;
 
 // Character constants imported from `crate::parser::constants`
 
@@ -111,6 +110,7 @@ fn peek_ahead_for_document_start_end(source: &mut dyn ISource, c: char) -> bool 
     source.backup();
     true
 }
+
 fn peek_ahead_for_mapping_key(source: &mut dyn ISource) -> bool {
     let mut found = false;
     let mut backup_count = 0;
@@ -141,9 +141,9 @@ fn peek_ahead_for_mapping_key(source: &mut dyn ISource) -> bool {
     found
 }
 
-fn parse_mapping_key(source: &mut dyn ISource) -> Result<(String, bool), String> {
+fn parse_mapping_key(source: &mut dyn ISource) -> Result<(Node, bool), String> {
     // collect until ':' or newline
-    let key = collect_until(source, |c| c == CHAR_COLON || c == CHAR_NEWLINE);
+    let raw = collect_until(source, |c| c == CHAR_COLON || c == CHAR_NEWLINE);
 
     let mut newline = false;
     source.next(); // Skip ':'
@@ -157,7 +157,11 @@ fn parse_mapping_key(source: &mut dyn ISource) -> Result<(String, bool), String>
         }
     }
 
-    Ok((key, newline))
+    // parse_scalar expects a &str and returns Node; ensure keys are Str nodes
+    match raw.trim() {
+        v if v.starts_with(CHAR_HASH) => Ok((Node::Comment(v[1..].trim().to_string()), newline)),
+        v => Ok((parse_scalar(v), newline)),
+    }
 }
 fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
     match source.current() {
@@ -178,7 +182,7 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
 
 fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, String> {
     // Assumes current char is '{'
-    let mut map = HashMap::new();
+    let mut pairs: Vec<(Node, Node)> = Vec::new();
     // consume '{'
     source.next();
     // skip whitespace
@@ -187,27 +191,23 @@ fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, String> {
     // Handle empty mapping
     if source.current() == Some(CHAR_RBRACE) {
         source.next(); // consume '}'
-        return Ok(Node::Dictionary(map));
+        return Ok(Node::Mapping(pairs));
     }
 
     loop {
-        // Parse key
-        let mut key = String::new();
-        while let Some(c) = source.current() {
-            if c == CHAR_COLON {
-                break;
+        // Parse key as Node
+        let key_node = {
+            // collect until ':' or '}'
+            let raw = collect_until(source, |c| c == CHAR_COLON || c == CHAR_RBRACE);
+            if source.current() != Some(CHAR_COLON) {
+                return Err("Expected ':' in inline mapping".to_string());
             }
-            if c == CHAR_RBRACE {
-                // Trailing '}' without a key:value
-                break;
-            }
-            key.push(c);
+            // consume ':'
             source.next();
-        }
-        if source.current() != Some(CHAR_COLON) {
-            return Err("Expected ':' in inline mapping".to_string());
-        }
-        source.next(); // consume ':'
+            let trimmed = raw.trim();
+            parse_scalar(trimmed)
+        };
+
         // value may start with space
         skip_whitespace(source);
 
@@ -225,7 +225,7 @@ fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, String> {
             None => return Err("Unexpected end of input in inline mapping".to_string()),
         };
 
-        map.insert(key.trim().to_string(), value_node);
+        pairs.push((key_node, value_node));
 
         // After value, skip whitespace and optional comment (until the end or before comma/})
         skip_whitespace_and_comments(source);
@@ -247,7 +247,9 @@ fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, String> {
         }
     }
 
-    Ok(Node::Dictionary(map))
+    // Ensure deterministic ordering of mapping pairs by key string
+    pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+    Ok(Node::Mapping(pairs))
 }
 
 fn parse_inline_sequence(source: &mut dyn ISource) -> Result<Node, String> {
@@ -424,7 +426,7 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
 }
 
 fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, String> {
-    let mut map = HashMap::new();
+    let mut pairs: Vec<(Node, Node)> = Vec::new();
     while let Some(c) = source.current() {
         match c {
             CHAR_DASH | CHAR_DOT if peek_ahead_for_document_start_end(source, c) => {
@@ -438,17 +440,14 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
                     break;
                 }
 
-                let (key, newline) = parse_mapping_key(source)?;
+                let (key_node, newline) = parse_mapping_key(source)?;
 
                 let next_indent = source.get_current_indent_level();
                 if next_indent > indent_level && newline {
-                    map.insert(
-                        key.trim().to_string(),
-                        parse_document_contents(source, next_indent)?,
-                    );
+                    pairs.push((key_node, parse_document_contents(source, next_indent)?));
                     continue;
                 } else {
-                    map.insert(key.trim().to_string(), parse_value(source)?);
+                    pairs.push((key_node, parse_value(source)?));
                 }
             }
             c if c.is_whitespace() => {
@@ -460,7 +459,9 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
         skip_until_newline(source);
         skip_whitespace(source);
     }
-    Ok(Node::Dictionary(map))
+    // Sort pairs by key for deterministic output
+    pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+    Ok(Node::Mapping(pairs))
 }
 
 pub fn parse_document_contents(
@@ -522,11 +523,10 @@ pub fn parse_document_contents(
                     );
                 }
             };
-            // Stringify key_node into a map key
-            let key_str = node_to_map_key(&key_node);
-            let mut map = HashMap::new();
-            map.insert(key_str, value_node);
-            Ok(Node::Dictionary(map))
+            // Build a mapping where the key is a Node (preserving quote metadata)
+            let mut pairs: Vec<(Node, Node)> = Vec::new();
+            pairs.push((key_node, value_node));
+            Ok(Node::Mapping(pairs))
         }
         Some(c) if c.is_alphanumeric() => Ok(parse_mapping(source, indent_level)?),
         Some(c) if c.is_whitespace() => {
@@ -597,7 +597,11 @@ mod tests {
     use super::*;
     use crate::io::sources::buffer::Buffer;
     use crate::io::sources::file::File as FileSource;
+    use std::collections::HashMap;
     use std::fs;
+
+    // (Removed) helper: map_from_hashmap_inline
+
     fn get_json_file_paths(directory: &str) -> Vec<String> {
         let mut paths = Vec::new();
         if let Ok(entries) = fs::read_dir(directory) {
@@ -694,7 +698,18 @@ mod tests {
         expected.insert("key2".to_string(), Node::Number(Numeric::Integer(42)));
         assert_eq!(
             result,
-            Node::Documents(vec![Document(vec![Node::Dictionary(expected)])])
+            Node::Documents(vec![Document(vec![{
+                let mut pairs = Vec::new();
+                for (k, v) in expected.into_iter() {
+                    let value = match v {
+                        Node::Mapping(p) => Node::Mapping(p),
+                        other => other,
+                    };
+                    pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                }
+                pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+                Node::Mapping(pairs)
+            }])])
         );
     }
 
@@ -752,9 +767,42 @@ mod tests {
         assert_eq!(
             result,
             Node::Documents(vec![
-                Document(vec![Node::Dictionary(doc1)]),
-                Document(vec![Node::Dictionary(doc2)]),
-                Document(vec![Node::Dictionary(doc3)])
+                Document(vec![{
+                    let mut pairs = Vec::new();
+                    for (k, v) in doc1.into_iter() {
+                        let value = match v {
+                            Node::Mapping(p) => Node::Mapping(p),
+                            other => other,
+                        };
+                        pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                    }
+                    pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+                    Node::Mapping(pairs)
+                }]),
+                Document(vec![{
+                    let mut pairs = Vec::new();
+                    for (k, v) in doc2.into_iter() {
+                        let value = match v {
+                            Node::Mapping(p) => Node::Mapping(p),
+                            other => other,
+                        };
+                        pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                    }
+                    pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+                    Node::Mapping(pairs)
+                }]),
+                Document(vec![{
+                    let mut pairs = Vec::new();
+                    for (k, v) in doc3.into_iter() {
+                        let value = match v {
+                            Node::Mapping(p) => Node::Mapping(p),
+                            other => other,
+                        };
+                        pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                    }
+                    pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+                    Node::Mapping(pairs)
+                }])
             ])
         );
     }
@@ -771,14 +819,23 @@ mod tests {
                 Node::Comment("Header comment 1".to_string()),
                 Node::Comment("Header comment 2".to_string()),
                 Node::Comment("Header comment 3".to_string()),
-                Node::Dictionary({
+                {
                     let mut map = HashMap::new();
                     map.insert(
                         "key".to_string(),
                         Node::Str("value".to_string(), QuoteType::Unquoted),
                     );
-                    map
-                })
+                    let mut pairs = Vec::new();
+                    for (k, v) in map.into_iter() {
+                        let value = match v {
+                            Node::Mapping(p) => Node::Mapping(p),
+                            other => other,
+                        };
+                        pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                    }
+                    pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+                    Node::Mapping(pairs)
+                }
             ])])
         );
     }
@@ -812,7 +869,18 @@ mod tests {
         expected.insert("key2".to_string(), Node::Number(Numeric::Integer(42)));
         assert_eq!(
             result,
-            Node::Documents(vec![Document(vec![Node::Dictionary(expected)])])
+            Node::Documents(vec![Document(vec![{
+                let mut pairs = Vec::new();
+                for (k, v) in expected.into_iter() {
+                    let value = match v {
+                        Node::Mapping(p) => Node::Mapping(p),
+                        other => other,
+                    };
+                    pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                }
+                pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+                Node::Mapping(pairs)
+            }])])
         );
     }
 
@@ -832,11 +900,33 @@ mod tests {
         );
 
         let mut outer_map = HashMap::new();
-        outer_map.insert("outer".to_string(), Node::Dictionary(inner_map));
+        outer_map.insert("outer".to_string(), {
+            let mut pairs = Vec::new();
+            for (k, v) in inner_map.into_iter() {
+                let value = match v {
+                    Node::Mapping(p) => Node::Mapping(p),
+                    other => other,
+                };
+                pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+            }
+            pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+            Node::Mapping(pairs)
+        });
 
         assert_eq!(
             result,
-            Node::Documents(vec![Document(vec![Node::Dictionary(outer_map)])])
+            Node::Documents(vec![Document(vec![{
+                let mut pairs = Vec::new();
+                for (k, v) in outer_map.into_iter() {
+                    let value = match v {
+                        Node::Mapping(p) => Node::Mapping(p),
+                        other => other,
+                    };
+                    pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                }
+                pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+                Node::Mapping(pairs)
+            }])])
         );
     }
     #[test]
@@ -856,7 +946,18 @@ mod tests {
         );
 
         let mut outer_map = HashMap::new();
-        outer_map.insert("outer1".to_string(), Node::Dictionary(inner_map));
+        outer_map.insert("outer1".to_string(), {
+            let mut pairs = Vec::new();
+            for (k, v) in inner_map.into_iter() {
+                let value = match v {
+                    Node::Mapping(p) => Node::Mapping(p),
+                    other => other,
+                };
+                pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+            }
+            pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+            Node::Mapping(pairs)
+        });
         outer_map.insert(
             "outer2".to_string(),
             Node::Str("value3".to_string(), QuoteType::Unquoted),
@@ -864,7 +965,18 @@ mod tests {
 
         assert_eq!(
             result,
-            Node::Documents(vec![Document(vec![Node::Dictionary(outer_map)])])
+            Node::Documents(vec![Document(vec![{
+                let mut pairs = Vec::new();
+                for (k, v) in outer_map.into_iter() {
+                    let value = match v {
+                        Node::Mapping(p) => Node::Mapping(p),
+                        other => other,
+                    };
+                    pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                }
+                pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+                Node::Mapping(pairs)
+            }])])
         );
     }
 
@@ -887,7 +999,18 @@ mod tests {
 
         assert_eq!(
             result,
-            Node::Documents(vec![Document(vec![Node::Dictionary(map)])])
+            Node::Documents(vec![Document(vec![{
+                let mut pairs = Vec::new();
+                for (k, v) in map.into_iter() {
+                    let value = match v {
+                        Node::Mapping(p) => Node::Mapping(p),
+                        other => other,
+                    };
+                    pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                }
+                pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+                Node::Mapping(pairs)
+            }])])
         );
     }
     #[test]
@@ -909,7 +1032,18 @@ mod tests {
             result,
             Node::Documents(vec![Document(vec![
                 // Node::Comment("Comment 1".to_string()),
-                Node::Dictionary(map),
+                {
+                    let mut pairs = Vec::new();
+                    for (k, v) in map.into_iter() {
+                        let value = match v {
+                            Node::Mapping(p) => Node::Mapping(p),
+                            other => other,
+                        };
+                        pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                    }
+                    pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+                    Node::Mapping(pairs)
+                },
                 // Node::Comment("Comment 2".to_string())
             ])])
         );
@@ -943,7 +1077,18 @@ mod tests {
         );
         assert_eq!(
             result,
-            Node::Documents(vec![Document(vec![Node::Dictionary(expected)])])
+            Node::Documents(vec![Document(vec![{
+                let mut pairs = Vec::new();
+                for (k, v) in expected.into_iter() {
+                    let value = match v {
+                        Node::Mapping(p) => Node::Mapping(p),
+                        other => other,
+                    };
+                    pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                }
+                pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+                Node::Mapping(pairs)
+            }])])
         );
     }
 
@@ -961,8 +1106,30 @@ mod tests {
         assert_eq!(
             result,
             Node::Documents(vec![
-                Document(vec![Node::Dictionary(doc1)]),
-                Document(vec![Node::Dictionary(doc2)])
+                Document(vec![{
+                    let mut pairs = Vec::new();
+                    for (k, v) in doc1.into_iter() {
+                        let value = match v {
+                            Node::Mapping(p) => Node::Mapping(p),
+                            other => other,
+                        };
+                        pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                    }
+                    pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+                    Node::Mapping(pairs)
+                }]),
+                Document(vec![{
+                    let mut pairs = Vec::new();
+                    for (k, v) in doc2.into_iter() {
+                        let value = match v {
+                            Node::Mapping(p) => Node::Mapping(p),
+                            other => other,
+                        };
+                        pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                    }
+                    pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+                    Node::Mapping(pairs)
+                }])
             ])
         );
     }
@@ -981,14 +1148,30 @@ mod tests {
         assert_eq!(
             result,
             Node::Documents(vec![
-                Document(vec![
-                    Node::Comment("Comment before".to_string()),
-                    Node::Dictionary(doc1)
-                ]),
-                Document(vec![
-                    Node::Comment("After doc".to_string()),
-                    Node::Dictionary(doc2)
-                ])
+                Document(vec![Node::Comment("Comment before".to_string()), {
+                    let mut pairs = Vec::new();
+                    for (k, v) in doc1.into_iter() {
+                        let value = match v {
+                            Node::Mapping(p) => Node::Mapping(p),
+                            other => other,
+                        };
+                        pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                    }
+                    pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+                    Node::Mapping(pairs)
+                }]),
+                Document(vec![Node::Comment("After doc".to_string()), {
+                    let mut pairs = Vec::new();
+                    for (k, v) in doc2.into_iter() {
+                        let value = match v {
+                            Node::Mapping(p) => Node::Mapping(p),
+                            other => other,
+                        };
+                        pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                    }
+                    pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+                    Node::Mapping(pairs)
+                }])
             ])
         );
     }
@@ -1014,9 +1197,31 @@ mod tests {
         assert_eq!(
             result,
             Node::Documents(vec![
-                Document(vec![Node::Dictionary(doc1)]),
+                Document(vec![{
+                    let mut pairs = Vec::new();
+                    for (k, v) in doc1.into_iter() {
+                        let value = match v {
+                            Node::Mapping(p) => Node::Mapping(p),
+                            other => other,
+                        };
+                        pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                    }
+                    pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+                    Node::Mapping(pairs)
+                }]),
                 Document(vec![]),
-                Document(vec![Node::Dictionary(doc3)])
+                Document(vec![{
+                    let mut pairs = Vec::new();
+                    for (k, v) in doc3.into_iter() {
+                        let value = match v {
+                            Node::Mapping(p) => Node::Mapping(p),
+                            other => other,
+                        };
+                        pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                    }
+                    pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+                    Node::Mapping(pairs)
+                }])
             ])
         );
     }
@@ -1038,14 +1243,36 @@ mod tests {
         john_map.insert("likes".to_string(), Node::Array(likes));
 
         let mut people_seq = Vec::new();
-        people_seq.push(Node::Dictionary(john_map));
+        people_seq.push({
+            let mut pairs = Vec::new();
+            for (k, v) in john_map.into_iter() {
+                let value = match v {
+                    Node::Mapping(p) => Node::Mapping(p),
+                    other => other,
+                };
+                pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+            }
+            pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+            Node::Mapping(pairs)
+        });
 
         let mut outer_map = HashMap::new();
         outer_map.insert("people".to_string(), Node::Array(people_seq));
 
         assert_eq!(
             result,
-            Node::Documents(vec![Document(vec![Node::Dictionary(outer_map)])])
+            Node::Documents(vec![Document(vec![{
+                let mut pairs = Vec::new();
+                for (k, v) in outer_map.into_iter() {
+                    let value = match v {
+                        Node::Mapping(p) => Node::Mapping(p),
+                        other => other,
+                    };
+                    pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                }
+                pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+                Node::Mapping(pairs)
+            }])])
         );
     }
 
@@ -1072,8 +1299,30 @@ mod tests {
         james_map.insert("avg".to_string(), Node::Number(Numeric::Float(0.288)));
 
         let expected = Node::Documents(vec![Document(vec![Node::Array(vec![
-            Node::Dictionary(mark_map),
-            Node::Dictionary(james_map),
+            {
+                let mut pairs = Vec::new();
+                for (k, v) in mark_map.into_iter() {
+                    let value = match v {
+                        Node::Mapping(p) => Node::Mapping(p),
+                        other => other,
+                    };
+                    pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                }
+                pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+                Node::Mapping(pairs)
+            },
+            {
+                let mut pairs = Vec::new();
+                for (k, v) in james_map.into_iter() {
+                    let value = match v {
+                        Node::Mapping(p) => Node::Mapping(p),
+                        other => other,
+                    };
+                    pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                }
+                pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+                Node::Mapping(pairs)
+            },
         ])])]);
 
         assert_eq!(result, expected);
@@ -1120,7 +1369,18 @@ mod tests {
         map.insert("b".to_string(), Node::Number(Numeric::Integer(2)));
         assert_eq!(
             result,
-            Node::Documents(vec![Document(vec![Node::Dictionary(map)])])
+            Node::Documents(vec![Document(vec![{
+                let mut pairs = Vec::new();
+                for (k, v) in map.into_iter() {
+                    let value = match v {
+                        Node::Mapping(p) => Node::Mapping(p),
+                        other => other,
+                    };
+                    pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                }
+                pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+                Node::Mapping(pairs)
+            }])])
         );
     }
 
@@ -1131,7 +1391,18 @@ mod tests {
         let map: HashMap<String, Node> = HashMap::new();
         assert_eq!(
             result,
-            Node::Documents(vec![Document(vec![Node::Dictionary(map)])])
+            Node::Documents(vec![Document(vec![{
+                let mut pairs = Vec::new();
+                for (k, v) in map.into_iter() {
+                    let value = match v {
+                        Node::Mapping(p) => Node::Mapping(p),
+                        other => other,
+                    };
+                    pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                }
+                pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+                Node::Mapping(pairs)
+            }])])
         );
     }
 
@@ -1146,10 +1417,32 @@ mod tests {
             Node::Str("test".to_string(), QuoteType::Unquoted),
         );
         let mut parent = HashMap::new();
-        parent.insert("parent".to_string(), Node::Dictionary(child));
+        parent.insert("parent".to_string(), {
+            let mut pairs = Vec::new();
+            for (k, v) in child.into_iter() {
+                let value = match v {
+                    Node::Mapping(p) => Node::Mapping(p),
+                    other => other,
+                };
+                pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+            }
+            pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+            Node::Mapping(pairs)
+        });
         assert_eq!(
             result,
-            Node::Documents(vec![Document(vec![Node::Dictionary(parent)])])
+            Node::Documents(vec![Document(vec![{
+                let mut pairs = Vec::new();
+                for (k, v) in parent.into_iter() {
+                    let value = match v {
+                        Node::Mapping(p) => Node::Mapping(p),
+                        other => other,
+                    };
+                    pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                }
+                pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+                Node::Mapping(pairs)
+            }])])
         );
     }
 
@@ -1166,7 +1459,18 @@ mod tests {
         );
         assert_eq!(
             result,
-            Node::Documents(vec![Document(vec![Node::Dictionary(expected)])])
+            Node::Documents(vec![Document(vec![{
+                let mut pairs = Vec::new();
+                for (k, v) in expected.into_iter() {
+                    let value = match v {
+                        Node::Mapping(p) => Node::Mapping(p),
+                        other => other,
+                    };
+                    pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                }
+                pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+                Node::Mapping(pairs)
+            }])])
         );
     }
 
@@ -1182,7 +1486,18 @@ mod tests {
         );
         assert_eq!(
             result,
-            Node::Documents(vec![Document(vec![Node::Dictionary(expected)])])
+            Node::Documents(vec![Document(vec![{
+                let mut pairs = Vec::new();
+                for (k, v) in expected.into_iter() {
+                    let value = match v {
+                        Node::Mapping(p) => Node::Mapping(p),
+                        other => other,
+                    };
+                    pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                }
+                pairs.sort_by(|a, b| node_to_map_key(&a.0).cmp(&node_to_map_key(&b.0)));
+                Node::Mapping(pairs)
+            }])])
         );
     }
 

@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::ops::{Index, IndexMut};
 
 /// Represents different numeric types that can be stored in a YAML node
@@ -38,9 +37,9 @@ pub enum Node {
     /// Represents an array of other nodes
     /// Used for YAML sequences/lists where order matters
     Array(Vec<Node>),
-    /// Represents a dictionary/map of string keys to node values
-    /// Used for YAML mappings where keys map to values
-    Dictionary(HashMap<String, Node>),
+    /// Represents a mapping where keys are Nodes (allowing quoted metadata)
+    /// Stores an ordered sequence of (key, value) node pairs
+    Mapping(Vec<(Node, Node)>),
     /// Represents a comment
     /// Stores documentation and descriptive text that doesn't affect the data structure
     Comment(String),
@@ -66,15 +65,24 @@ impl Index<usize> for Node {
     }
 }
 
-/// Implements dictionary-style indexing for Node using string keys
+/// Implements mapping-style indexing for Node using string keys
 impl Index<&str> for Node {
     type Output = Node;
 
-    /// Allows accessing dictionary properties using dictionary["key"] syntax
+    /// Allows accessing mapping properties using mapping["key"] syntax
     fn index(&self, key: &str) -> &Self::Output {
         match self {
-            Node::Dictionary(map) => &map[key],
-            _ => panic!("Cannot index non-dictionary node with string"),
+            Node::Mapping(pairs) => {
+                for (k, v) in pairs {
+                    if let Node::Str(s, _) = k {
+                        if s == key {
+                            return v;
+                        }
+                    }
+                }
+                panic!("No such key exists");
+            }
+            _ => panic!("Cannot index non-mapping node with string"),
         }
     }
 }
@@ -90,13 +98,22 @@ impl IndexMut<usize> for Node {
     }
 }
 
-/// Implements mutable dictionary-style indexing for Node
+/// Implements mutable mapping-style indexing for Node
 impl IndexMut<&str> for Node {
-    /// Allows modifying dictionary properties using dictionary["key"] = value syntax
+    /// Allows modifying mapping properties using mapping["key"] = value syntax
     fn index_mut(&mut self, key: &str) -> &mut Self::Output {
         match self {
-            Node::Dictionary(map) => map.get_mut(key).expect("No such key exists"),
-            _ => panic!("Cannot index non-dictionary node with string"),
+            Node::Mapping(pairs) => {
+                for (k, v) in pairs.iter_mut() {
+                    if let Node::Str(s, _) = k {
+                        if s == key {
+                            return v;
+                        }
+                    }
+                }
+                panic!("No such key exists");
+            }
+            _ => panic!("Cannot index non-mapping node with string"),
         }
     }
 }
@@ -320,16 +337,17 @@ mod tests {
     }
 
     #[test]
-    fn test_dictionary_indexing() {
-        let mut map = HashMap::new();
-        map.insert("key".to_string(), Node::from(42));
-        let obj = Node::Dictionary(map);
+    fn test_mapping_indexing() {
+        let obj = Node::Mapping(vec![(
+            Node::Str("key".to_string(), QuoteType::Unquoted),
+            Node::from(42),
+        )]);
         assert_eq!(obj["key"], Node::Number(Numeric::Int32(42)));
     }
 
     #[test]
-    #[should_panic(expected = "Cannot index non-dictionary node with string")]
-    fn test_invalid_dictionary_indexing() {
+    #[should_panic(expected = "Cannot index non-mapping node with string")]
+    fn test_invalid_mapping_indexing() {
         let node = Node::Boolean(true);
         let _value = &node["key"];
     }
@@ -349,25 +367,26 @@ mod tests {
     }
 
     #[test]
-    fn test_dictionary_mut_indexing() {
-        let mut map = HashMap::new();
-        map.insert("key".to_string(), Node::from(42));
-        let mut obj = Node::Dictionary(map);
+    fn test_mapping_mut_indexing() {
+        let mut obj = Node::Mapping(vec![(
+            Node::Str("key".to_string(), QuoteType::Unquoted),
+            Node::from(42),
+        )]);
         obj["key"] = Node::from(100);
         assert_eq!(obj["key"], Node::Number(Numeric::Int32(100)));
     }
 
     #[test]
-    #[should_panic(expected = "Cannot index non-dictionary node with string")]
-    fn test_invalid_dictionary_mut_indexing() {
+    #[should_panic(expected = "Cannot index non-mapping node with string")]
+    fn test_invalid_mapping_mut_indexing() {
         let mut node = Node::Boolean(true);
         node["key"] = Node::from(42);
     }
 
     #[test]
     #[should_panic(expected = "No such key exists")]
-    fn test_dictionary_mut_indexing_nonexistent_key() {
-        let mut obj = Node::Dictionary(HashMap::new());
+    fn test_mapping_mut_indexing_nonexistent_key() {
+        let mut obj = Node::Mapping(Vec::new());
         obj["nonexistent"] = Node::from(42);
     }
 
