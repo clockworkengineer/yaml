@@ -1,5 +1,4 @@
 use crate::io::traits::ISource;
-use crate::nodes::node::Node;
 use crate::parser::constants::{CHAR_HASH, CHAR_NEWLINE};
 
 // Collect characters until a stop predicate triggers; does not consume the stop char
@@ -49,31 +48,10 @@ pub fn read_line_trimmed_into_string(source: &mut dyn ISource) -> String {
     s.trim().to_string()
 }
 
-// Convert a small Node into a string suitable for a map key
-pub fn node_to_map_key(node: &Node) -> String {
-    match node {
-        Node::Array(items) => {
-            let parts: Vec<String> = items
-                .iter()
-                .map(|n| match n {
-                    Node::Str(s, _qt) => s.clone(),
-                    Node::Number(num) => format!("{:?}", num),
-                    Node::Boolean(b) => b.to_string(),
-                    _ => format!("{:?}", n),
-                })
-                .collect();
-            format!("[{}]", parts.join(", "))
-        }
-        Node::Str(s, _qt) => s.clone(),
-        _ => format!("{:?}", node),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::io::sources::buffer::Buffer;
-    use crate::nodes::node::{Node, Numeric, QuoteType};
 
     #[test]
     fn test_collect_until_and_read_line() {
@@ -85,17 +63,5 @@ mod tests {
         let line = read_line_trimmed_into_string(&mut buf);
         // read_line_trimmed_into_string trims whitespace
         assert_eq!(line, "world");
-    }
-
-    #[test]
-    fn test_node_to_map_key() {
-        let items = vec![
-            Node::Str("a".to_string(), QuoteType::Unquoted),
-            Node::Number(Numeric::Integer(1)),
-            Node::Boolean(true),
-        ];
-        let key = node_to_map_key(&Node::Array(items));
-        // node_to_map_key uses Debug formatting for Numeric variants
-        assert_eq!(key, "[a, Integer(1), true]");
     }
 }
