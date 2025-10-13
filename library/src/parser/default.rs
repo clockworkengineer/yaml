@@ -176,27 +176,25 @@ fn parse_mapping_key(source: &mut dyn ISource) -> Result<(String, bool), String>
     Ok((key, newline))
 }
 fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
-    // Support inline mapping values starting with '{'
-    if source.current() == Some(CHAR_LBRACE) {
-        return parse_inline_mapping(source);
-    }
-    // Support flow sequence values starting with '['
-    if source.current() == Some(CHAR_LBRACKET) {
-        return parse_inline_sequence(source);
-    }
-
-    let mut value = String::new();
-    while let Some(c) = source.current() {
-        if c == CHAR_NEWLINE || c == CHAR_HASH {
-            break;
+    match source.current() {
+        Some(CHAR_LBRACE) => parse_inline_mapping(source),
+        Some(CHAR_LBRACKET) => parse_inline_sequence(source),
+        Some(_) => {
+            let mut value = String::new();
+            while let Some(c) = source.current() {
+                if c == CHAR_NEWLINE || c == CHAR_HASH {
+                    break;
+                }
+                value.push(c);
+                source.next();
+            }
+            if !value.trim().is_empty() {
+                Ok(parse_scalar(value.trim()))
+            } else {
+                Ok(Node::None)
+            }
         }
-        value.push(c);
-        source.next();
-    }
-    if !value.trim().is_empty() {
-        Ok(parse_scalar(value.trim()))
-    } else {
-        Ok(Node::None)
+        None => Ok(Node::None),
     }
 }
 
@@ -236,23 +234,24 @@ fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, String> {
         skip_whitespace(source);
 
         // Parse value
-        let value_node = if source.current() == Some(CHAR_LBRACE) {
-            parse_inline_mapping(source)?
-        } else if source.current() == Some(CHAR_LBRACKET) {
-            parse_inline_sequence(source)?
-        } else {
-            // collect until ',' or '}' or '#'
-            let mut val = String::new();
-            while let Some(c) = source.current() {
-                match c {
-                    CHAR_COMMA | CHAR_RBRACE | CHAR_HASH => break,
-                    _ => {
-                        val.push(c);
-                        source.next();
+        let value_node = match source.current() {
+            Some(CHAR_LBRACE) => parse_inline_mapping(source)?,
+            Some(CHAR_LBRACKET) => parse_inline_sequence(source)?,
+            Some(_) => {
+                // collect until ',' or '}' or '#'
+                let mut val = String::new();
+                while let Some(c) = source.current() {
+                    match c {
+                        CHAR_COMMA | CHAR_RBRACE | CHAR_HASH => break,
+                        _ => {
+                            val.push(c);
+                            source.next();
+                        }
                     }
                 }
+                parse_scalar(val.trim())
             }
-            parse_scalar(val.trim())
+            None => return Err("Unexpected end of input in inline mapping".to_string()),
         };
 
         map.insert(key.trim().to_string(), value_node);
@@ -302,34 +301,39 @@ fn parse_inline_sequence(source: &mut dyn ISource) -> Result<Node, String> {
 
     loop {
         // Parse item
-        if source.current() == Some(CHAR_LBRACKET) {
-            let nested = parse_inline_sequence(source)?;
-            items.push(nested);
-        } else if source.current() == Some(CHAR_LBRACE) {
-            let nested_map = parse_inline_mapping(source)?;
-            items.push(nested_map);
-        } else {
-            // collect until ',' or ']' or '#'
-            let mut val = String::new();
-            while let Some(c) = source.current() {
-                match c {
-                    CHAR_COMMA | CHAR_RBRACKET | CHAR_HASH => break,
-                    _ => {
-                        val.push(c);
-                        source.next();
+        match source.current() {
+            Some(CHAR_LBRACKET) => {
+                let nested = parse_inline_sequence(source)?;
+                items.push(nested);
+            }
+            Some(CHAR_LBRACE) => {
+                let nested_map = parse_inline_mapping(source)?;
+                items.push(nested_map);
+            }
+            Some(_) => {
+                // collect until ',' or ']' or '#'
+                let mut val = String::new();
+                while let Some(c) = source.current() {
+                    match c {
+                        CHAR_COMMA | CHAR_RBRACKET | CHAR_HASH => break,
+                        _ => {
+                            val.push(c);
+                            source.next();
+                        }
                     }
                 }
+                let trimmed = val.trim();
+                if !trimmed.is_empty() {
+                    items.push(parse_scalar(trimmed));
+                } else if source.current() == Some(CHAR_RBRACKET)
+                    || source.current() == Some(CHAR_COMMA)
+                {
+                    // allow empty entries to be ignored
+                } else {
+                    // No valid item
+                }
             }
-            let trimmed = val.trim();
-            if !trimmed.is_empty() {
-                items.push(parse_scalar(trimmed));
-            } else if source.current() == Some(CHAR_RBRACKET)
-                || source.current() == Some(CHAR_COMMA)
-            {
-                // allow empty entries to be ignored
-            } else {
-                // No valid item
-            }
+            None => return Err("Unexpected end of input in inline sequence".to_string()),
         }
 
         // After the item, skip whitespace and optional comment (until the end of the line)
@@ -531,18 +535,20 @@ pub fn parse_document_contents(
             source.next();
             skip_whitespace(source);
             // Parse key (support only a flow sequence or plain scalar until EOL)
-            let key_node = if source.current() == Some(CHAR_LBRACKET) {
-                parse_inline_sequence(source)?
-            } else {
-                let mut k = String::new();
-                while let Some(c) = source.current() {
-                    if c == CHAR_NEWLINE {
-                        break;
+            let key_node = match source.current() {
+                Some(CHAR_LBRACKET) => parse_inline_sequence(source)?,
+                Some(_) => {
+                    let mut k = String::new();
+                    while let Some(c) = source.current() {
+                        if c == CHAR_NEWLINE {
+                            break;
+                        }
+                        k.push(c);
+                        source.next();
                     }
-                    k.push(c);
-                    source.next();
+                    Node::Str(k.trim().to_string(), QuoteType::Unquoted)
                 }
-                Node::Str(k.trim().to_string(), QuoteType::Unquoted)
+                None => Node::Str(String::new(), QuoteType::Unquoted),
             };
             if source.current() == Some(CHAR_NEWLINE) {
                 source.next();
@@ -564,15 +570,19 @@ pub fn parse_document_contents(
                 source.next();
             }
             skip_whitespace(source);
-            let value_node = if source.current() == Some(CHAR_LBRACKET) {
-                parse_inline_sequence(source)?
-            } else if source.current() == Some(CHAR_LBRACE) {
-                parse_inline_mapping(source)?
-            } else if source.current() == Some(CHAR_DASH) {
-                let nested_indent = source.get_current_indent_level();
-                parse_sequence(source, nested_indent)?
-            } else {
-                parse_value(source)?
+            let value_node = match source.current() {
+                Some(CHAR_LBRACKET) => parse_inline_sequence(source)?,
+                Some(CHAR_LBRACE) => parse_inline_mapping(source)?,
+                Some(CHAR_DASH) => {
+                    let nested_indent = source.get_current_indent_level();
+                    parse_sequence(source, nested_indent)?
+                }
+                Some(_) => parse_value(source)?,
+                None => {
+                    return Err(
+                        "Unexpected end of input while parsing explicit pair value".to_string()
+                    );
+                }
             };
             // Stringify key_node into a map key
             let key_str = match key_node {
@@ -658,7 +668,6 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
     }
     Ok(Node::Documents(docs))
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -867,7 +876,6 @@ mod tests {
             ])])])
         );
     }
-
 
     #[test]
     fn test_parse_mapping_with_comments() {
