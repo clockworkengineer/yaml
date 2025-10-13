@@ -25,6 +25,63 @@ const CHAR_SINGLE_QUOTE: char = '\'';
 const CHAR_LESS: char = '<';
 const CHAR_GREATER: char = '>';
 
+fn unescape_double_quoted(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars();
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            out.push(c);
+            continue;
+        }
+        // handle escape
+        match chars.next() {
+            Some('n') => out.push(CHAR_NEWLINE),
+            Some('r') => out.push('\r'),
+            Some('t') => out.push('\t'),
+            Some('\\') => out.push('\\'),
+            Some(CHAR_DOUBLE_QUOTE) => out.push(CHAR_DOUBLE_QUOTE),
+            Some('u') => {
+                // \uXXXX
+                let mut hex = String::new();
+                for _ in 0..4 {
+                    if let Some(h) = chars.next() {
+                        hex.push(h);
+                    } else {
+                        break;
+                    }
+                }
+                if let Ok(code) = u32::from_str_radix(&hex, 16) {
+                    if let Some(ch) = std::char::from_u32(code) {
+                        out.push(ch);
+                    }
+                }
+            }
+            Some('U') => {
+                // \UXXXXXXXX
+                let mut hex = String::new();
+                for _ in 0..8 {
+                    if let Some(h) = chars.next() {
+                        hex.push(h);
+                    } else {
+                        break;
+                    }
+                }
+                if let Ok(code) = u32::from_str_radix(&hex, 16) {
+                    if let Some(ch) = std::char::from_u32(code) {
+                        out.push(ch);
+                    }
+                }
+            }
+            Some(other) => {
+                // Unknown escape, keep the character as-is (e.g., \x -> x)
+                out.push(other);
+            }
+            None => break,
+        }
+    }
+    out
+}
+
 fn skip_whitespace(source: &mut dyn ISource) {
     while let Some(c) = source.current() {
         if source.is_whitespace(c) {
@@ -330,62 +387,6 @@ fn parse_scalar(value: &str) -> Node {
             } else {
                 // Determine a quote type based on surrounding characters and strip quotes
                 // For double-quoted scalars also unescape common escape sequences
-                fn unescape_double_quoted(s: &str) -> String {
-                    let mut out = String::with_capacity(s.len());
-                    let mut chars = s.chars();
-                    while let Some(c) = chars.next() {
-                        if c != '\\' {
-                            out.push(c);
-                            continue;
-                        }
-                        // handle escape
-                        match chars.next() {
-                            Some('n') => out.push(CHAR_NEWLINE),
-                            Some('r') => out.push('\r'),
-                            Some('t') => out.push('\t'),
-                            Some('\\') => out.push('\\'),
-                            Some(CHAR_DOUBLE_QUOTE) => out.push(CHAR_DOUBLE_QUOTE),
-                            Some('u') => {
-                                // \uXXXX
-                                let mut hex = String::new();
-                                for _ in 0..4 {
-                                    if let Some(h) = chars.next() {
-                                        hex.push(h);
-                                    } else {
-                                        break;
-                                    }
-                                }
-                                if let Ok(code) = u32::from_str_radix(&hex, 16) {
-                                    if let Some(ch) = std::char::from_u32(code) {
-                                        out.push(ch);
-                                    }
-                                }
-                            }
-                            Some('U') => {
-                                // \UXXXXXXXX
-                                let mut hex = String::new();
-                                for _ in 0..8 {
-                                    if let Some(h) = chars.next() {
-                                        hex.push(h);
-                                    } else {
-                                        break;
-                                    }
-                                }
-                                if let Ok(code) = u32::from_str_radix(&hex, 16) {
-                                    if let Some(ch) = std::char::from_u32(code) {
-                                        out.push(ch);
-                                    }
-                                }
-                            }
-                            Some(other) => {
-                                // Unknown escape, keep the character as-is (e.g., \x -> x)
-                                out.push(other);
-                            }
-                            None => break,
-                        }
-                    }
-                    out
-                }
 
                 let (content, qt) = if v.len() >= 2 {
                     let first = v.chars().next().unwrap();
