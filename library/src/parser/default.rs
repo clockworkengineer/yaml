@@ -5,25 +5,13 @@
 use crate::io::traits::ISource;
 use crate::nodes::node::Node::Document;
 use crate::nodes::node::{Node, Numeric, QuoteType};
+use crate::parser::constants::*;
+use crate::parser::utils::{
+    collect_until, node_to_map_key, read_line_trimmed_into_string, skip_whitespace_and_comments,
+};
 use std::collections::HashMap;
 
-// Extracted character constants for reuse and readability
-const CHAR_DASH: char = '-';
-const CHAR_DOT: char = '.';
-const CHAR_HASH: char = '#';
-const CHAR_LBRACE: char = '{';
-const CHAR_RBRACE: char = '}';
-const CHAR_LBRACKET: char = '[';
-const CHAR_RBRACKET: char = ']';
-const CHAR_QUESTION: char = '?';
-const CHAR_COLON: char = ':';
-const CHAR_NEWLINE: char = '\n';
-const CHAR_NUL: char = '\0';
-const CHAR_COMMA: char = ',';
-const CHAR_DOUBLE_QUOTE: char = '"';
-const CHAR_SINGLE_QUOTE: char = '\'';
-const CHAR_LESS: char = '<';
-const CHAR_GREATER: char = '>';
+// Character constants imported from `crate::parser::constants`
 
 fn unescape_double_quoted(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
@@ -92,6 +80,8 @@ fn skip_whitespace(source: &mut dyn ISource) {
     }
 }
 
+// Helper functions moved to `crate::parser::utils`
+
 fn skip_until_newline(source: &mut dyn ISource) {
     while let Some(c) = source.current() {
         if c == CHAR_NEWLINE {
@@ -152,14 +142,8 @@ fn peek_ahead_for_mapping_key(source: &mut dyn ISource) -> bool {
 }
 
 fn parse_mapping_key(source: &mut dyn ISource) -> Result<(String, bool), String> {
-    let mut key = String::new();
-    while let Some(c) = source.current() {
-        if c == CHAR_COLON {
-            break;
-        }
-        key.push(c);
-        source.next();
-    }
+    // collect until ':' or newline
+    let key = collect_until(source, |c| c == CHAR_COLON || c == CHAR_NEWLINE);
 
     let mut newline = false;
     source.next(); // Skip ':'
@@ -180,16 +164,10 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
         Some(CHAR_LBRACE) => parse_inline_mapping(source),
         Some(CHAR_LBRACKET) => parse_inline_sequence(source),
         Some(_) => {
-            let mut value = String::new();
-            while let Some(c) = source.current() {
-                if c == CHAR_NEWLINE || c == CHAR_HASH {
-                    break;
-                }
-                value.push(c);
-                source.next();
-            }
-            if !value.trim().is_empty() {
-                Ok(parse_scalar(value.trim()))
+            let value = collect_until(source, |c| c == CHAR_NEWLINE || c == CHAR_HASH);
+            let trimmed = value.trim();
+            if !trimmed.is_empty() {
+                Ok(parse_scalar(trimmed))
             } else {
                 Ok(Node::None)
             }
@@ -239,16 +217,9 @@ fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, String> {
             Some(CHAR_LBRACKET) => parse_inline_sequence(source)?,
             Some(_) => {
                 // collect until ',' or '}' or '#'
-                let mut val = String::new();
-                while let Some(c) = source.current() {
-                    match c {
-                        CHAR_COMMA | CHAR_RBRACE | CHAR_HASH => break,
-                        _ => {
-                            val.push(c);
-                            source.next();
-                        }
-                    }
-                }
+                let val = collect_until(source, |c| {
+                    c == CHAR_COMMA || c == CHAR_RBRACE || c == CHAR_HASH
+                });
                 parse_scalar(val.trim())
             }
             None => return Err("Unexpected end of input in inline mapping".to_string()),
@@ -257,13 +228,7 @@ fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, String> {
         map.insert(key.trim().to_string(), value_node);
 
         // After value, skip whitespace and optional comment (until the end or before comma/})
-        skip_whitespace(source);
-        if source.current() == Some(CHAR_HASH) {
-            // skip comment until the end of the line
-            skip_until_newline(source);
-            // inside inline mapping, a newline should be followed by more content or end
-            skip_whitespace(source);
-        }
+        skip_whitespace_and_comments(source);
 
         match source.current() {
             Some(CHAR_COMMA) => {
@@ -312,16 +277,9 @@ fn parse_inline_sequence(source: &mut dyn ISource) -> Result<Node, String> {
             }
             Some(_) => {
                 // collect until ',' or ']' or '#'
-                let mut val = String::new();
-                while let Some(c) = source.current() {
-                    match c {
-                        CHAR_COMMA | CHAR_RBRACKET | CHAR_HASH => break,
-                        _ => {
-                            val.push(c);
-                            source.next();
-                        }
-                    }
-                }
+                let val = collect_until(source, |c| {
+                    c == CHAR_COMMA || c == CHAR_RBRACKET || c == CHAR_HASH
+                });
                 let trimmed = val.trim();
                 if !trimmed.is_empty() {
                     items.push(parse_scalar(trimmed));
@@ -337,11 +295,7 @@ fn parse_inline_sequence(source: &mut dyn ISource) -> Result<Node, String> {
         }
 
         // After the item, skip whitespace and optional comment (until the end of the line)
-        skip_whitespace(source);
-        if source.current() == Some(CHAR_HASH) {
-            skip_until_newline(source);
-            skip_whitespace(source);
-        }
+        skip_whitespace_and_comments(source);
 
         match source.current() {
             Some(CHAR_COMMA) => {
@@ -365,16 +319,10 @@ fn parse_inline_sequence(source: &mut dyn ISource) -> Result<Node, String> {
 
 fn parse_comment(source: &mut dyn ISource) -> String {
     source.next(); // Skip the '#' character
-    let mut comment = String::new();
-    while let Some(c) = source.current() {
-        if c == CHAR_NEWLINE {
-            break;
-        }
-        comment.push(c);
-        source.next();
-    }
-    comment.trim().to_string()
+    read_line_trimmed_into_string(source)
 }
+
+// node_to_map_key is provided by `crate::parser::utils`
 
 fn parse_scalar(value: &str) -> Node {
     // Check if the value is a comment (starts with #)
@@ -537,17 +485,7 @@ pub fn parse_document_contents(
             // Parse key (support only a flow sequence or plain scalar until EOL)
             let key_node = match source.current() {
                 Some(CHAR_LBRACKET) => parse_inline_sequence(source)?,
-                Some(_) => {
-                    let mut k = String::new();
-                    while let Some(c) = source.current() {
-                        if c == CHAR_NEWLINE {
-                            break;
-                        }
-                        k.push(c);
-                        source.next();
-                    }
-                    Node::Str(k.trim().to_string(), QuoteType::Unquoted)
-                }
+                Some(_) => Node::Str(read_line_trimmed_into_string(source), QuoteType::Unquoted),
                 None => Node::Str(String::new(), QuoteType::Unquoted),
             };
             if source.current() == Some(CHAR_NEWLINE) {
@@ -585,22 +523,7 @@ pub fn parse_document_contents(
                 }
             };
             // Stringify key_node into a map key
-            let key_str = match key_node {
-                Node::Array(ref items) => {
-                    let parts: Vec<String> = items
-                        .iter()
-                        .map(|n| match n {
-                            Node::Str(s, _qt) => s.clone(),
-                            Node::Number(num) => format!("{:?}", num),
-                            Node::Boolean(b) => b.to_string(),
-                            _ => format!("{:?}", n),
-                        })
-                        .collect();
-                    format!("[{}]", parts.join(", "))
-                }
-                Node::Str(s, _qt) => s,
-                _ => format!("{:?}", key_node),
-            };
+            let key_str = node_to_map_key(&key_node);
             let mut map = HashMap::new();
             map.insert(key_str, value_node);
             Ok(Node::Dictionary(map))
