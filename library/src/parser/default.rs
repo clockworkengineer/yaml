@@ -255,7 +255,10 @@ fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, String> {
                 break;
             }
             Some(c) => {
-                return Err(parse_error(source, &format!("{}{}", ERR_UNEXPECTED_CHAR_INLINE_MAPPING_PREFIX, c)));
+                return Err(parse_error(
+                    source,
+                    &format!("{}{}", ERR_UNEXPECTED_CHAR_INLINE_MAPPING_PREFIX, c),
+                ));
             }
             None => return Err(parse_error(source, ERR_EOF_INLINE_MAPPING)),
         }
@@ -322,7 +325,10 @@ fn parse_inline_sequence(source: &mut dyn ISource) -> Result<Node, String> {
                 break;
             }
             Some(c) => {
-                return Err(parse_error(source, &format!("{}{}", ERR_UNEXPECTED_CHAR_INLINE_SEQUENCE_PREFIX, c)));
+                return Err(parse_error(
+                    source,
+                    &format!("{}{}", ERR_UNEXPECTED_CHAR_INLINE_SEQUENCE_PREFIX, c),
+                ));
             }
             None => return Err(parse_error(source, ERR_EOF_INLINE_SEQUENCE)),
         }
