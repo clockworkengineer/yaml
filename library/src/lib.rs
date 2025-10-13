@@ -19,13 +19,17 @@ pub mod nodes;
 pub mod parser;
 // /// Module defining error types and handling for YAML operations.
 // pub mod error;
-// /// Module for converting YAML structures to formatted strings
+/// Module for converting YAML structures to formatted strings
 pub mod stringify;
+/// Module containing utility functions and helpers for YAML processing
+pub mod misc;
+
+/// Gets the number of documents in a YAML stream
+pub use misc::get_number_of_documents as get_number_of_documents;
+pub use misc::get_document_base as get_document;
+
 // /// Module handling YAML file reading and writing operations
 // pub mod file;
-// /// Module containing utility functions and helpers for YAML processing
-// pub mod misc;
-// 
 ///
 /// YAML_lib API
 ///
@@ -70,6 +74,4 @@ pub use parser::default::parse as parse;
 // /// Converts a Node tree to TOML format
 // pub use stringify::toml::stringify as to_toml;
 
-/// Gets the number of documents in a YAML stream
-pub use parser::default::get_number_of_documents as get_number_of_documents;
-pub use parser::default::get_document_base as get_document;
+
