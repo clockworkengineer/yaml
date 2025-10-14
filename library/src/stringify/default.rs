@@ -231,7 +231,7 @@ mod tests {
             "---\n- name: Mark Joseph\n  hr: 87\n  avg: 0.278\n- name: James Stephen\n  hr: 63\n  avg: 0.288\n...\n"
         );
     }
-<<<<<<< HEAD
+
     #[test]
     fn test_stringify_sequence_with_nested_sequence() {
         let mut dest = Buffer::new();
@@ -243,7 +243,5 @@ mod tests {
             "---\n- - Sammy Sosa\n  - 63\n  - 0.288\n...\n"
         );
     }
-=======
 
->>>>>>> 14937c3eda1cf66e2e5879049a6d1b9f183cc602
 }
