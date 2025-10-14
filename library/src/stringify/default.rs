@@ -230,4 +230,5 @@ mod tests {
             "---\n- name: Mark Joseph\n  hr: 87\n  avg: 0.278\n- name: James Stephen\n  hr: 63\n  avg: 0.288\n...\n"
         );
     }
+
 }
