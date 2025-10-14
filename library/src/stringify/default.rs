@@ -32,12 +32,8 @@ fn stringify_document_with_indent(
                 }
                 destination.add_bytes(&format!("{}\"{}\"", indent_str, escape_double(s)))
             }
-            QuoteType::Single => {
-                destination.add_bytes(&format!("{}'{}'", indent_str, s))
-            }
-            QuoteType::Unquoted => {
-                destination.add_bytes(&format!("{}{}", indent_str, s))
-            }
+            QuoteType::Single => destination.add_bytes(&format!("{}'{}'", indent_str, s)),
+            QuoteType::Unquoted => destination.add_bytes(&format!("{}{}", indent_str, s)),
         },
         Node::Comment(c) => destination.add_bytes(&format!("{}# {}", indent_str, c)),
         Node::Number(num) => match num {
@@ -64,8 +60,17 @@ fn stringify_document_with_indent(
                         destination.add_bytes(&out);
                     }
                     Node::Array(_) => {
-                        destination.add_bytes("\n");
-                        stringify_document_with_indent(item, destination, indent + 1)?;
+                        // Serialize nested sequence into a temporary buffer at
+                        // child indent and strip the leading child indent once
+                        // so the first inner item follows the outer "- ".
+                        let mut buf = crate::io::destinations::buffer::Buffer::new();
+                        stringify_document_with_indent(item, &mut buf, indent + 1)?;
+                        let mut out = buf.to_string();
+                        let child_indent = "  ".repeat(indent + 1);
+                        if out.starts_with(&child_indent) {
+                            out = out.split_off(child_indent.len());
+                        }
+                        destination.add_bytes(&out);
                     }
                     _ => {
                         stringify_document_with_indent(item, destination, 0)?;
@@ -152,11 +157,7 @@ mod tests {
     #[test]
     fn test_stringify_string() {
         let mut dest = Buffer::new();
-        stringify(
-            &Node::Str("test".to_string(), QuoteType::Double),
-            &mut dest,
-        )
-        .unwrap();
+        stringify(&Node::Str("test".to_string(), QuoteType::Double), &mut dest).unwrap();
         assert_eq!(dest.to_string(), "\"test\"");
     }
 
@@ -228,6 +229,17 @@ mod tests {
         assert_eq!(
             dest.to_string(),
             "---\n- name: Mark Joseph\n  hr: 87\n  avg: 0.278\n- name: James Stephen\n  hr: 63\n  avg: 0.288\n...\n"
+        );
+    }
+    #[test]
+    fn test_stringify_sequence_with_nested_sequence() {
+        let mut dest = Buffer::new();
+        let mut source = BufferSource::new("- [Sammy Sosa, 63, 0.288]".as_bytes());
+        let node = parse(&mut source).unwrap();
+        stringify(&node, &mut dest).unwrap();
+        assert_eq!(
+            dest.to_string(),
+            "---\n- - Sammy Sosa\n  - 63\n  - 0.288\n...\n"
         );
     }
 }
