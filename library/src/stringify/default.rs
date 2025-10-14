@@ -11,7 +11,7 @@ fn stringify_document_with_indent(
         Node::None => destination.add_bytes(&format!("{}null", indent_str)),
         Node::Boolean(b) => destination.add_bytes(&format!("{}{}", indent_str, b)),
         Node::Str(s, qt) => match qt {
-            crate::nodes::node::QuoteType::Double => {
+            QuoteType::Double => {
                 // escape common sequences for double-quoted output
                 fn escape_double(s: &str) -> String {
                     let mut out = String::with_capacity(s.len());
@@ -32,10 +32,10 @@ fn stringify_document_with_indent(
                 }
                 destination.add_bytes(&format!("{}\"{}\"", indent_str, escape_double(s)))
             }
-            crate::nodes::node::QuoteType::Single => {
+            QuoteType::Single => {
                 destination.add_bytes(&format!("{}'{}'", indent_str, s))
             }
-            crate::nodes::node::QuoteType::Unquoted => {
+            QuoteType::Unquoted => {
                 destination.add_bytes(&format!("{}{}", indent_str, s))
             }
         },
@@ -153,7 +153,7 @@ mod tests {
     fn test_stringify_string() {
         let mut dest = Buffer::new();
         stringify(
-            &Node::Str("test".to_string(), crate::nodes::node::QuoteType::Double),
+            &Node::Str("test".to_string(), QuoteType::Double),
             &mut dest,
         )
         .unwrap();
@@ -183,7 +183,7 @@ mod tests {
         let mut dest = Buffer::new();
         let arr = vec![
             Node::Number(Numeric::Integer(1)),
-            Node::Str("test".to_string(), crate::nodes::node::QuoteType::Double),
+            Node::Str("test".to_string(), QuoteType::Double),
         ];
         stringify(&Node::Array(arr), &mut dest).unwrap();
         assert_eq!(dest.to_string(), "- 1\n- \"test\"\n");
@@ -193,8 +193,8 @@ mod tests {
     fn test_stringify_mapping() {
         let mut dest = Buffer::new();
         let mapping = Node::Mapping(vec![(
-            Node::Str("key".to_string(), crate::nodes::node::QuoteType::Double),
-            Node::Str("value".to_string(), crate::nodes::node::QuoteType::Double),
+            Node::Str("key".to_string(), QuoteType::Double),
+            Node::Str("value".to_string(), QuoteType::Double),
         )]);
         stringify(&mapping, &mut dest).unwrap();
         assert_eq!(dest.to_string(), "\"key\": \"value\"\n");
@@ -204,8 +204,8 @@ mod tests {
     fn test_stringify_documents() {
         let mut dest = Buffer::new();
         let docs = vec![
-            Node::Str("doc1".to_string(), crate::nodes::node::QuoteType::Double),
-            Node::Str("doc2".to_string(), crate::nodes::node::QuoteType::Double),
+            Node::Str("doc1".to_string(), QuoteType::Double),
+            Node::Str("doc2".to_string(), QuoteType::Double),
         ];
         stringify(&Node::Documents(docs), &mut dest).unwrap();
         assert_eq!(dest.to_string(), "---\n\"doc1\"...\n---\n\"doc2\"...\n");

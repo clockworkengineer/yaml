@@ -618,7 +618,7 @@ mod tests {
     use std::collections::HashMap;
     use std::fs;
 
-    // NOTE: Mappings preserve insertion order in the parser. Tests below therefore
+    // NOTE: Mappings preserve insertion order in the parser. The tests below therefore
     // explicitly construct expected `Node::Mapping(Vec<(Node, Node)>)` values in the
     // source order (instead of building expectations from a `HashMap`) to avoid
     // nondeterministic iteration order causing test failures.
