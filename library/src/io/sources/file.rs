@@ -334,11 +334,11 @@ mod tests {
         let node = parse(&mut file).unwrap();
         assert_eq!(
             node,
-            Node::Documents(vec![Node::Document(vec![Node::Array(vec![
+            Node::Documents(vec![Node::Document(vec![Node::Array(vec![Node::Array(vec![
                 Node::Str("Sammy Sosa".to_string(), QuoteType::Unquoted),
                 Node::Number(Numeric::Integer(63)),
                 Node::Number(Numeric::Float(0.288))
-            ])])])
+            ])])])])
         );
     }
 }
