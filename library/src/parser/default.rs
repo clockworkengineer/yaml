@@ -69,6 +69,20 @@ fn unescape_double_quoted(s: &str) -> String {
     out
 }
 
+// Helper to create richer parse error messages with current character and indent
+fn parse_error(source: &mut dyn ISource, msg: &str) -> String {
+    let current = match source.current() {
+        Some(c) => c.to_string(),
+        None => "<EOF>".to_string(),
+    };
+    format!(
+        "{} (current: '{}', indent: {})",
+        msg,
+        current,
+        source.get_current_indent_level()
+    )
+}
+
 fn skip_whitespace(source: &mut dyn ISource) {
     while let Some(c) = source.current() {
         if source.is_whitespace(c) {
@@ -200,7 +214,7 @@ fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, String> {
             // collect until ':' or '}'
             let raw = collect_until(source, |c| c == CHAR_COLON || c == CHAR_RBRACE);
             if source.current() != Some(CHAR_COLON) {
-                return Err("Expected ':' in inline mapping".to_string());
+                return Err(parse_error(source, ERR_EXPECT_COLON_INLINE_MAPPING));
             }
             // consume ':'
             source.next();
@@ -222,7 +236,7 @@ fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, String> {
                 });
                 parse_scalar(val.trim())
             }
-            None => return Err("Unexpected end of input in inline mapping".to_string()),
+            None => return Err(parse_error(source, ERR_EOF_INLINE_MAPPING)),
         };
 
         pairs.push((key_node, value_node));
@@ -241,13 +255,15 @@ fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, String> {
                 break;
             }
             Some(c) => {
-                return Err(format!("Unexpected character in inline mapping: {}", c));
+                return Err(parse_error(
+                    source,
+                    &format!("{}{}", ERR_UNEXPECTED_CHAR_INLINE_MAPPING_PREFIX, c),
+                ));
             }
-            None => return Err("Unexpected end of input in inline mapping".to_string()),
+            None => return Err(parse_error(source, ERR_EOF_INLINE_MAPPING)),
         }
     }
 
-    // Ensure deterministic ordering of mapping pairs by key string
     Ok(Node::Mapping(pairs))
 }
 
@@ -292,7 +308,7 @@ fn parse_inline_sequence(source: &mut dyn ISource) -> Result<Node, String> {
                     // No valid item
                 }
             }
-            None => return Err("Unexpected end of input in inline sequence".to_string()),
+            None => return Err(parse_error(source, ERR_EOF_INLINE_SEQUENCE)),
         }
 
         // After the item, skip whitespace and optional comment (until the end of the line)
@@ -309,9 +325,12 @@ fn parse_inline_sequence(source: &mut dyn ISource) -> Result<Node, String> {
                 break;
             }
             Some(c) => {
-                return Err(format!("Unexpected character in inline sequence: {}", c));
+                return Err(parse_error(
+                    source,
+                    &format!("{}{}", ERR_UNEXPECTED_CHAR_INLINE_SEQUENCE_PREFIX, c),
+                ));
             }
-            None => return Err("Unexpected end of input in inline sequence".to_string()),
+            None => return Err(parse_error(source, ERR_EOF_INLINE_SEQUENCE)),
         }
     }
 
@@ -516,9 +535,10 @@ pub fn parse_document_contents(
                 }
                 Some(_) => parse_value(source)?,
                 None => {
-                    return Err(
-                        "Unexpected end of input while parsing explicit pair value".to_string()
-                    );
+                    return Err(parse_error(
+                        source,
+                        "Unexpected end of input while parsing explicit pair value",
+                    ));
                 }
             };
             // Build a mapping where the key is a Node (preserving quote metadata)
@@ -543,7 +563,7 @@ pub fn parse_document_contents(
             // Allow certain scalar format strings to start with special characters
             Ok(parse_value(source)?)
         }
-        Some(c) => Err(format!("Unexpected character: {}", c)),
+        Some(c) => Err(parse_error(source, &format!("Unexpected character: {}", c))),
         None => Ok(Node::None),
     }
 }
@@ -719,7 +739,12 @@ mod tests {
         let mut source = Buffer::new(b"@invalid");
         let result = parse(&mut source);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Unexpected character: @");
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("Unexpected character: @"),
+            "unexpected error: {}",
+            err
+        );
     }
 
     #[test]
