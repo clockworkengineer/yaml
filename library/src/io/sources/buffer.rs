@@ -28,7 +28,12 @@ impl Buffer {
     /// # Returns
     /// A new Buffer containing the provided bytes
     pub fn new(to_add: &[u8]) -> Self {
-        Self { buffer: to_add.to_vec(), position: 0 , column: 0, line: 0 }
+        Self {
+            buffer: to_add.to_vec(),
+            position: 0,
+            column: 0,
+            line: 0,
+        }
     }
     /// Converts the buffer content to a String.
     ///
@@ -50,7 +55,6 @@ impl ISource for Buffer {
                 self.column = 0;
             }
         }
-
     }
     /// Returns the current character at the buffer position
     fn current(&mut self) -> Option<char> {
@@ -77,7 +81,7 @@ impl ISource for Buffer {
     }
 
     fn get_current_indent_level(&self) -> usize {
-        return self.column
+        return self.column;
     }
 }
 #[cfg(test)]
@@ -85,32 +89,48 @@ mod tests {
     use super::*;
     #[test]
     fn create_source_buffer_works() {
-        let  source = Buffer::new(String::from("i32e").as_bytes());
+        let source = Buffer::new(String::from("i32e").as_bytes());
         assert_eq!(source.to_string(), "i32e");
     }
     #[test]
     fn read_character_from_source_buffer_works() {
-        let  mut source = Buffer::new(String::from("i32e").as_bytes());
-        match source.current() { Some('i') => assert!(true), _ => assert!(false)}
+        let mut source = Buffer::new(String::from("i32e").as_bytes());
+        match source.current() {
+            Some('i') => assert!(true),
+            _ => assert!(false),
+        }
     }
     #[test]
     fn move_to_next_character_in_source_buffer_works() {
-        let  mut source = Buffer::new(String::from("i32e").as_bytes());
+        let mut source = Buffer::new(String::from("i32e").as_bytes());
         source.next();
-        match source.current() { Some('3') => assert!(true), _ => assert!(false)}
+        match source.current() {
+            Some('3') => assert!(true),
+            _ => assert!(false),
+        }
     }
     #[test]
     fn move_to_last_character_in_source_buffer_works() {
-        let  mut source = Buffer::new(String::from("i32e").as_bytes());
-        while source.more() { source.next()}
-        match source.current() { None => assert!(true), _ => assert!(false)}
+        let mut source = Buffer::new(String::from("i32e").as_bytes());
+        while source.more() {
+            source.next()
+        }
+        match source.current() {
+            None => assert!(true),
+            _ => assert!(false),
+        }
     }
     #[test]
     fn reset_in_source_buffer_works() {
-        let  mut source = Buffer::new(String::from("i32e").as_bytes());
-        while source.more() { source.next()}
+        let mut source = Buffer::new(String::from("i32e").as_bytes());
+        while source.more() {
+            source.next()
+        }
         source.reset();
-        match source.current() { Some('i') => assert!(true), _ => assert!(false)}
+        match source.current() {
+            Some('i') => assert!(true),
+            _ => assert!(false),
+        }
     }
     #[test]
     fn create_empty_buffer_works() {
@@ -136,7 +156,7 @@ mod tests {
         source.next();
         match source.current() {
             Some('c') => assert!(true),
-            _ => assert!(false)
+            _ => assert!(false),
         }
     }
 
@@ -147,7 +167,7 @@ mod tests {
         source.backup();
         match source.current() {
             Some('a') => assert!(true),
-            _ => assert!(false)
+            _ => assert!(false),
         }
     }
     #[test]
@@ -156,5 +176,37 @@ mod tests {
         source.next();
         source.next();
         assert_eq!(source.get_current_indent_level(), 2);
+    }
+
+    #[test]
+    fn buffer_eof_after_consumption() {
+        let mut source = Buffer::new(String::from("xy").as_bytes());
+        // consume all bytes
+        source.next(); // to 'y'
+        source.next(); // to EOF
+        assert_eq!(source.current(), None);
+        assert!(!source.more());
+    }
+
+    #[test]
+    fn buffer_next_safe_at_eof() {
+        let mut source = Buffer::new(String::from("a").as_bytes());
+        assert_eq!(source.current(), Some('a'));
+        source.next(); // EOF
+        assert_eq!(source.current(), None);
+        source.next(); // should remain at EOF and not panic
+        assert_eq!(source.current(), None);
+        assert!(!source.more());
+    }
+
+    #[test]
+    fn buffer_reset_restores_after_eof() {
+        let mut source = Buffer::new(String::from("z").as_bytes());
+        assert_eq!(source.current(), Some('z'));
+        source.next(); // EOF
+        assert_eq!(source.current(), None);
+        source.reset();
+        assert_eq!(source.current(), Some('z'));
+        assert!(source.more());
     }
 }

@@ -1,6 +1,6 @@
+use crate::io::traits::ISource;
 use std::fs::File as StdFile;
 use std::io::{Read, Seek, SeekFrom};
-use crate::io::traits::ISource;
 
 pub struct File {
     file: StdFile,
@@ -17,7 +17,11 @@ impl File {
 
         Ok(Self {
             file,
-            current_byte: if has_byte { Some(current_byte[0]) } else { None },
+            current_byte: if has_byte {
+                Some(current_byte[0])
+            } else {
+                None
+            },
             column: 0,
             line: 0,
         })
@@ -82,8 +86,7 @@ impl ISource for File {
                 if byte[0] == b'\r' {
                     // If we see a '\r', try to seek back one more to check for '\n'
                     if let Ok(_) = self.file.seek(SeekFrom::Current(-2)) {
-                        if self.file.read(&mut byte).unwrap_or(0) == 1 {
-                        }
+                        if self.file.read(&mut byte).unwrap_or(0) == 1 {}
                     }
                 }
                 Some(byte[0])
@@ -93,7 +96,8 @@ impl ISource for File {
             if self.column > 0 {
                 self.column -= 1;
             }
-        }    }
+        }
+    }
 
     fn get_current_indent_level(&self) -> usize {
         self.column
@@ -103,8 +107,8 @@ impl ISource for File {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
     use std::fs::OpenOptions;
+    use std::io::Write;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     static TEST_FILE_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -261,6 +265,39 @@ mod tests {
         assert_eq!(file.current(), None);
     }
 
+    #[test]
+    fn test_file_eof_after_consumption() {
+        let test_file = TestFile::new(b"xy");
+        let mut file = File::new(&test_file.path).unwrap();
+        // consume all bytes
+        file.next(); // to 'y'
+        file.next(); // to EOF
+        assert_eq!(file.current(), None);
+        assert!(!file.more());
+    }
 
-    
+    #[test]
+    fn test_file_next_safe_at_eof() {
+        let test_file = TestFile::new(b"a");
+        let mut file = File::new(&test_file.path).unwrap();
+        assert_eq!(file.current(), Some('a'));
+        file.next(); // move to EOF
+        assert_eq!(file.current(), None);
+        // calling next again should be safe and leave us at EOF
+        file.next();
+        assert_eq!(file.current(), None);
+        assert!(!file.more());
+    }
+
+    #[test]
+    fn test_file_reset_restores_after_eof() {
+        let test_file = TestFile::new(b"z");
+        let mut file = File::new(&test_file.path).unwrap();
+        assert_eq!(file.current(), Some('z'));
+        file.next(); // EOF
+        assert_eq!(file.current(), None);
+        file.reset();
+        assert_eq!(file.current(), Some('z'));
+        assert!(file.more());
+    }
 }
