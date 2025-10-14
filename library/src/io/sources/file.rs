@@ -106,7 +106,9 @@ impl ISource for File {
 
 #[cfg(test)]
 mod tests {
+    use crate::parse;
     use super::*;
+    use crate::nodes::node::{Node, QuoteType, Numeric};
     use std::fs::OpenOptions;
     use std::io::Write;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -324,5 +326,19 @@ mod tests {
         file.reset();
         assert_eq!(file.current(), Some('-'));
         assert!(file.more());
+    }
+    #[test]
+       fn test_file_parse_nested_sequences() {
+        let test_file = TestFile::new(b"- [Sammy Sosa, 63, 0.288]");
+        let mut file = File::new(&test_file.path).unwrap();
+        let node = parse(&mut file).unwrap();
+        assert_eq!(
+            node,
+            Node::Documents(vec![Node::Document(vec![Node::Array(vec![
+                Node::Str("Sammy Sosa".to_string(), QuoteType::Unquoted),
+                Node::Number(Numeric::Integer(63)),
+                Node::Number(Numeric::Float(0.288))
+            ])])])
+        );
     }
 }
