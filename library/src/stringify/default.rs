@@ -49,7 +49,21 @@ fn stringify_document_with_indent(
             for item in items {
                 destination.add_bytes(&format!("{}- ", indent_str));
                 match item {
-                    Node::Array(_) | Node::Mapping(_) => {
+                    Node::Mapping(_) => {
+                        // Serialize mapping into a temporary buffer at child
+                        // indent and strip that leading indent once so the
+                        // first line appears after the "- ". Subsequent lines
+                        // remain indented.
+                        let mut buf = crate::io::destinations::buffer::Buffer::new();
+                        stringify_document_with_indent(item, &mut buf, indent + 1)?;
+                        let mut out = buf.to_string();
+                        let child_indent = "  ".repeat(indent + 1);
+                        if out.starts_with(&child_indent) {
+                            out = out.split_off(child_indent.len());
+                        }
+                        destination.add_bytes(&out);
+                    }
+                    Node::Array(_) => {
                         destination.add_bytes("\n");
                         stringify_document_with_indent(item, destination, indent + 1)?;
                     }
@@ -204,5 +218,16 @@ mod tests {
         let node = parse(&mut source).unwrap();
         stringify(&node, &mut dest).unwrap();
         assert_eq!(dest.to_string(), "---\n- 1\n- 2\n- 3\n...\n");
+    }
+    #[test]
+    fn test_stringify_sequence_with_nested_mapping() {
+        let mut dest = Buffer::new();
+        let mut source = BufferSource::new("---\n- \n  name: Mark Joseph\n  hr: 87\n  avg: 0.278\n- \n  name: James Stephen\n  hr: 63\n  avg: 0.288\n...\n".as_bytes());
+        let node = parse(&mut source).unwrap();
+        stringify(&node, &mut dest).unwrap();
+        assert_eq!(
+            dest.to_string(),
+            "---\n- name: Mark Joseph\n  hr: 87\n  avg: 0.278\n- name: James Stephen\n  hr: 63\n  avg: 0.288\n...\n"
+        );
     }
 }
