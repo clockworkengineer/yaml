@@ -291,13 +291,38 @@ mod tests {
 
     #[test]
     fn test_file_reset_restores_after_eof() {
-        let test_file = TestFile::new(b"z");
+        let test_file = TestFile::new(b"- [Sammy Sosa, 63, 0.288]");
         let mut file = File::new(&test_file.path).unwrap();
-        assert_eq!(file.current(), Some('z'));
-        file.next(); // EOF
+        assert_eq!(file.current(), Some('-'));
+        file.next(); // move to ' '
+        file.next(); // move to '['
+        assert_eq!(file.current(), Some('['));
+        file.next(); // move to 'S'
+        file.next(); // move to 'a'
+        file.next(); // move to 'm'
+        file.next(); // move to 'm'
+        file.next(); // move to 'y'
+        file.next(); // move to ' '
+        file.next(); // move to 'S'
+        file.next(); // move to 'o'
+        file.next(); // move to 's'
+        file.next(); // move to 'a'
+        file.next(); // move to ','
+        file.next(); // move to ' '
+        file.next(); // move to '6'
+        file.next(); // move to '3'
+        file.next(); // move to ','
+        file.next(); // move to ' '
+        file.next(); // move to '0'
+        file.next(); // move to '.'
+        file.next(); // move to '2'
+        file.next(); // move to '8'
+        file.next(); // move to '8'
+        file.next(); // move to ']'
+        file.next(); // move to EOF
         assert_eq!(file.current(), None);
         file.reset();
-        assert_eq!(file.current(), Some('z'));
+        assert_eq!(file.current(), Some('-'));
         assert!(file.more());
     }
 }
