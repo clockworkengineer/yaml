@@ -22,7 +22,6 @@ impl Buffer {
     pub fn to_string(&self) -> String {
         String::from_utf8_lossy(&self.buffer).into_owned()
     }
-
 }
 
 impl IDestination for Buffer {
@@ -96,5 +95,4 @@ mod tests {
         buffer.add_byte(0xFF);
         assert_eq!(buffer.to_string(), "�");
     }
-    
 }

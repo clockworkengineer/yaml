@@ -1,9 +1,8 @@
-
 //! YAML_lib - A lightweight, modular YAML toolkit for Rust
 //!
 //! This library provides a flexible YAML implementation with:
 //! - Core Node type for representing YAML structures
-//! - Parser to build Node trees from streams 
+//! - Parser to build Node trees from streams
 //! - Multiple format serializers (YAML, YAML, XML, Bencode)
 //! - File and buffer I/O abstractions
 //! - Pretty-printing utilities
@@ -19,17 +18,21 @@ pub mod nodes;
 pub mod parser;
 // /// Module defining error types and handling for YAML operations.
 // pub mod error;
-/// Module for converting YAML structures to formatted strings
-pub mod stringify;
 /// Module containing utility functions and helpers for YAML processing
 pub mod misc;
+/// Module for converting YAML structures to formatted strings
+pub mod stringify;
 
-/// Gets the number of documents in a YAML stream
-pub use misc::get_number_of_documents as get_number_of_documents;
 pub use misc::get_document_base as get_document;
+/// Gets the number of documents in a YAML stream
+pub use misc::get_number_of_documents;
 
 // /// Module handling YAML file reading and writing operations
 // pub mod file;
+/// Destination implementation for writing YAML data to a memory buffer
+pub use io::destinations::buffer::Buffer as BufferDestination;
+/// Destination implementation for writing YAML data to a file
+pub use io::destinations::file::File as FileDestination;
 ///
 /// YAML_lib API
 ///
@@ -48,23 +51,19 @@ pub use misc::get_document_base as get_document;
 // pub use file::file::read_file_to_string as read_file_to_string;
 // /// This function writes a string to a file in the specified Unicode format
 // pub use file::file::write_file_from_string as write_file_from_string;
-// 
+//
 /// Source implementation for reading YAML data from a memory buffer
 pub use io::sources::buffer::Buffer as BufferSource;
-/// Destination implementation for writing YAML data to a memory buffer
-pub use io::destinations::buffer::Buffer as BufferDestination;
 /// Source implementation for reading YAML data from a file
 pub use io::sources::file::File as FileSource;
-/// Destination implementation for writing YAML data to a file
-pub use io::destinations::file::File as FileDestination;
 /// Core data structure representing a YAML node and numerical node in the parsed tree
-pub use nodes::node::Node as Node;
+pub use nodes::node::Node;
 /// Core data structure representing a numeric value node in the parsed tree
-pub use nodes::node::Numeric as Numeric;
-/// Converts a Node tree back to YAML format
-pub use stringify::default::stringify as stringify;
+pub use nodes::node::Numeric;
 /// Parses YAML data into a Node tree structure
-pub use parser::default::parse as parse;
+pub use parser::default::parse;
+/// Converts a Node tree back to YAML format
+pub use stringify::default::stringify;
 // /// Converts a Node tree to YAML format
 // pub use stringify::bencode::stringify as to_bencode;
 // /// Converts a Node tree to YAML format
@@ -73,5 +72,3 @@ pub use parser::default::parse as parse;
 // pub use stringify::xml::stringify as to_xml;
 // /// Converts a Node tree to TOML format
 // pub use stringify::toml::stringify as to_toml;
-
-

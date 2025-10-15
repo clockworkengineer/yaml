@@ -1,5 +1,5 @@
 use std::path::Path;
-use yaml_lib::{FileSource, parse, FileDestination, stringify};
+use yaml_lib::{FileDestination, FileSource, parse, stringify};
 use yaml_utility_lib::get_yaml_file_list;
 
 /// Processes a single yaml file by converting it to bencode format
@@ -21,8 +21,9 @@ fn process_yaml_file(file_path: &str) -> Result<(), String> {
         Path::new(file_path)
             .with_extension("yaml.stringify")
             .to_string_lossy()
-            .as_ref()
-    ).map_err(|e| e.to_string())?;
+            .as_ref(),
+    )
+    .map_err(|e| e.to_string())?;
 
     // Convert and write the parsed yaml to bencode format
     stringify(&node, &mut destination)?;

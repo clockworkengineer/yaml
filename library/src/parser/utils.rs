@@ -64,5 +64,4 @@ mod tests {
         // read_line_trimmed_into_string trims whitespace
         assert_eq!(line, "world");
     }
-    
 }

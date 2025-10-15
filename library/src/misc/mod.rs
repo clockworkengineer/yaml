@@ -1,5 +1,4 @@
-use crate::{ Node};
-
+use crate::Node;
 
 pub fn get_number_of_documents(documents: &Node) -> Result<usize, String> {
     match documents {
@@ -29,10 +28,10 @@ pub fn get_document_base(node: &Node, n: usize) -> Result<&Node, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::nodes::node::Node;
     use crate::io::sources::buffer::Buffer;
-    use crate::{parse};
+    use crate::nodes::node::Node;
     use crate::nodes::node::QuoteType;
+    use crate::parse;
     #[test]
     fn test_get_number_of_documents() {
         let mut source = Buffer::new(b"doc1: value1\n---\ndoc2: value2\n---\ndoc3: value3");
@@ -43,4 +42,4 @@ mod tests {
         let non_docs_node = Node::Str("test".to_string(), QuoteType::Unquoted);
         assert!(get_number_of_documents(&non_docs_node).is_err());
     }
-    }
+}

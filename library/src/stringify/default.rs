@@ -242,5 +242,4 @@ mod tests {
             "---\n- - Sammy Sosa\n  - 63\n  - 0.288\n...\n"
         );
     }
-
 }

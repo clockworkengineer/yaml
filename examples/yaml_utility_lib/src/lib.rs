@@ -1,4 +1,3 @@
-
 //! Utility library for handling yaml files and related operations.
 //! Provides functionality for file system operations specific to yaml files.
 
@@ -39,5 +38,3 @@ pub fn get_yaml_file_list(file_path: &str) -> Vec<String> {
         })
         .collect()
 }
-
-

@@ -1,6 +1,6 @@
-use std::fs::File as StdFile;
-use std::io::{Write, Read, Seek};
 use crate::io::traits::IDestination;
+use std::fs::File as StdFile;
+use std::io::{Read, Seek, Write};
 
 /// A file-based destination for writing JSON data to disk.
 /// Implements file operations for storing and manipulating encoded data.
@@ -41,7 +41,6 @@ impl File {
     pub fn close(&self) -> std::io::Result<()> {
         Ok(())
     }
-
 }
 
 impl IDestination for File {
@@ -233,6 +232,4 @@ mod tests {
         fs::remove_file(path)?;
         Ok(())
     }
-    
 }
-
