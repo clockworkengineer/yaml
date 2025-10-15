@@ -170,7 +170,9 @@ fn parse_mapping_key(source: &mut dyn ISource) -> Result<(Node, bool), String> {
 
     // parse_scalar expects a &str and returns Node; ensure keys are Str nodes
     match raw.trim() {
-        v if v.starts_with(CHAR_HASH) => Ok((Node::Comment(v[1..].trim().to_string()), newline)),
+        v if v.starts_with(CHAR_HASH) => {
+            Ok((Node::Str(v.to_string(), QuoteType::Unquoted), newline))
+        }
         v => Ok((parse_scalar(v), newline)),
     }
 }
@@ -344,7 +346,8 @@ fn parse_comment(source: &mut dyn ISource) -> String {
 fn parse_scalar(value: &str) -> Node {
     // Check if the value is a comment (starts with #)
     match value {
-        v if v.starts_with(CHAR_HASH) => Node::Comment(v[1..].trim().to_string()),
+        // Treat leading '#' in a scalar as a plain string. Parser consumes comment lines elsewhere.
+        v if v.starts_with(CHAR_HASH) => Node::Str(v.to_string(), QuoteType::Unquoted),
         "null" | "~" => Node::None,
         "true" => Node::Boolean(true),
         "false" => Node::Boolean(false),
@@ -389,7 +392,8 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
 
         match c {
             CHAR_HASH => {
-                items.push(Node::Comment(parse_comment(source)));
+                // Consume comment lines inside sequences; do not emit comment nodes
+                parse_comment(source);
                 continue;
             }
             CHAR_DASH | CHAR_DOT if peek_ahead_for_document_start_end(source, c) => {
@@ -493,8 +497,10 @@ pub fn parse_document_contents(
             Ok(parse_sequence(source, indent_level)?)
         }
         Some(CHAR_HASH) => {
-            let comment = parse_comment(source);
-            Ok(Node::Comment(comment.trim().to_string()))
+            // Consume the comment line and continue parsing the next content
+            parse_comment(source);
+            skip_whitespace(source);
+            return parse_document_contents(source, indent_level);
         }
         Some(CHAR_LBRACE) => Ok(parse_inline_mapping(source)?),
         Some(CHAR_LBRACKET) => Ok(parse_inline_sequence(source)?),
@@ -580,6 +586,12 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
                 skip_until_newline(source);
                 skip_whitespace(source);
                 break;
+            }
+            CHAR_HASH => {
+                // Skip top-level comment lines
+                parse_comment(source);
+                skip_whitespace(source);
+                continue;
             }
             _ => {
                 document_nodes.push(parse_document_contents(source, indent_level)?);
@@ -678,7 +690,7 @@ mod tests {
         );
         assert_eq!(
             parse_scalar("#comment"),
-            Node::Comment("comment".to_string())
+            Node::Str("#comment".to_string(), QuoteType::Unquoted)
         );
     }
 
@@ -700,13 +712,12 @@ mod tests {
     fn test_parse_sequence_with_comments() {
         let mut source = Buffer::new(b"- 1\n# Comment 1\n- 2\n# Comment 2");
         let result = parse(&mut source).unwrap();
+        // Comments are stripped; sequence should contain only the items
         assert_eq!(
             result,
             Node::Documents(vec![Document(vec![Node::Array(vec![
                 Node::Number(Numeric::Integer(1)),
-                Node::Comment("Comment 1".to_string()),
-                Node::Number(Numeric::Integer(2)),
-                Node::Comment("Comment 2".to_string())
+                Node::Number(Numeric::Integer(2))
             ])])])
         );
     }
@@ -753,12 +764,8 @@ mod tests {
     fn test_parse_comment_only() {
         let mut source = Buffer::new(b"# Just a comment");
         let result = parse(&mut source).unwrap();
-        assert_eq!(
-            result,
-            Node::Documents(vec![Document(vec![Node::Comment(
-                "Just a comment".to_string()
-            )])])
-        );
+        // Comments are stripped by the parser; comment-only content yields an empty document
+        assert_eq!(result, Node::Documents(vec![Document(vec![])]));
     }
 
     #[test]
@@ -796,29 +803,25 @@ mod tests {
             b"# Header comment 1\n# Header comment 2\n# Header comment 3\nkey: value\n",
         );
         let result = parse(&mut source).unwrap();
+        // Header comments are stripped; only the mapping should remain
         assert_eq!(
             result,
-            Node::Documents(vec![Document(vec![
-                Node::Comment("Header comment 1".to_string()),
-                Node::Comment("Header comment 2".to_string()),
-                Node::Comment("Header comment 3".to_string()),
-                {
-                    let mut map = HashMap::new();
-                    map.insert(
-                        "key".to_string(),
-                        Node::Str("value".to_string(), QuoteType::Unquoted),
-                    );
-                    let mut pairs = Vec::new();
-                    for (k, v) in map.into_iter() {
-                        let value = match v {
-                            Node::Mapping(p) => Node::Mapping(p),
-                            other => other,
-                        };
-                        pairs.push((Node::Str(k, QuoteType::Unquoted), value));
-                    }
-                    Node::Mapping(pairs)
+            Node::Documents(vec![Document(vec![{
+                let mut map = HashMap::new();
+                map.insert(
+                    "key".to_string(),
+                    Node::Str("value".to_string(), QuoteType::Unquoted),
+                );
+                let mut pairs = Vec::new();
+                for (k, v) in map.into_iter() {
+                    let value = match v {
+                        Node::Mapping(p) => Node::Mapping(p),
+                        other => other,
+                    };
+                    pairs.push((Node::Str(k, QuoteType::Unquoted), value));
                 }
-            ])])
+                Node::Mapping(pairs)
+            }])])
         );
     }
 
@@ -959,9 +962,7 @@ mod tests {
             result,
             Node::Documents(vec![Document(vec![Node::Array(vec![
                 Node::Str("item1".to_string(), QuoteType::Unquoted),
-                Node::Comment("Comment between items".to_string()),
                 Node::Str("item2".to_string(), QuoteType::Unquoted),
-                Node::Comment("Final comment".to_string()),
                 Node::Str("item3".to_string(), QuoteType::Unquoted)
             ])])])
         );
@@ -1046,7 +1047,7 @@ mod tests {
         assert_eq!(
             result,
             Node::Documents(vec![
-                Document(vec![Node::Comment("Comment before".to_string()), {
+                Document(vec![{
                     let mut pairs = Vec::new();
                     for (k, v) in doc1.into_iter() {
                         let value = match v {
@@ -1057,7 +1058,7 @@ mod tests {
                     }
                     Node::Mapping(pairs)
                 }]),
-                Document(vec![Node::Comment("After doc".to_string()), {
+                Document(vec![{
                     let mut pairs = Vec::new();
                     for (k, v) in doc2.into_iter() {
                         let value = match v {
