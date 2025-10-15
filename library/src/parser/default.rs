@@ -602,6 +602,18 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
     Ok(Document(document_nodes))
 }
 pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
+    fn node_is_blank(node: &Node) -> bool {
+        match node {
+            Node::None => true,
+            Node::Array(items) => items.is_empty(),
+            // An empty mapping is meaningful ({}), so do not treat it as blank
+            Node::Mapping(_pairs) => false,
+            Node::Document(nodes) => nodes.iter().all(|n| node_is_blank(n)),
+            Node::Str(s, _) => s.is_empty(),
+            Node::Comment(_) => true,
+            _ => false,
+        }
+    }
     let mut docs: Vec<Node> = Vec::new();
     if peek_ahead_for_document_start_end(source, CHAR_DASH) {
         skip_until_newline(source);
@@ -611,7 +623,16 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
         let document = parse_document(source, 0);
         match document {
             Ok(doc) => {
-                docs.push(doc.into());
+                // Only add non-empty Document nodes. This strips out
+                // comment-only documents that would otherwise appear
+                // between explicit document markers.
+                let is_blank_doc = match &doc {
+                    Node::Document(nodes) => nodes.iter().all(|n| node_is_blank(n)),
+                    _ => false,
+                };
+                if !is_blank_doc {
+                    docs.push(doc.into())
+                }
             }
             Err(err) => {
                 return Err(err);
@@ -1105,7 +1126,6 @@ mod tests {
                     }
                     Node::Mapping(pairs)
                 }]),
-                Document(vec![]),
                 Document(vec![{
                     let mut pairs = Vec::new();
                     for (k, v) in doc3.into_iter() {

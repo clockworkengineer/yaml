@@ -121,11 +121,22 @@ pub fn stringify_document(node: &Node, destination: &mut dyn IDestination) -> Re
 pub fn stringify(node: &Node, destination: &mut dyn IDestination) -> Result<(), String> {
     match node {
         Node::Documents(docs) => {
+            // Helper to determine whether a node contains any meaningful content
+            fn node_is_blank(node: &Node) -> bool {
+                match node {
+                    Node::None => true,
+                    Node::Comment(_) => true,
+                    Node::Str(s, _) => s.is_empty(),
+                    Node::Array(items) => items.iter().all(|n| node_is_blank(n)),
+                    Node::Mapping(pairs) => pairs.is_empty(),
+                    Node::Document(nodes) => nodes.iter().all(|n| node_is_blank(n)),
+                    _ => false,
+                }
+            }
+
             for doc in docs {
-                // If this is an explicit Document node with no content,
-                // skip emitting it (don't output --- ... for empty docs).
                 let emit = match doc {
-                    Node::Document(nodes) => !nodes.is_empty(),
+                    Node::Document(nodes) => !nodes.iter().all(|n| node_is_blank(n)),
                     _ => true,
                 };
                 if !emit {
@@ -255,12 +266,15 @@ mod tests {
     #[test]
     fn test_with_comment_header() {
         let mut dest = Buffer::new();
-        let mut source = BufferSource::new("# Ranking of 1998 home runs\n---\n- Mark Joseph\n- James Stephen\n- Ken Griffey\n".as_bytes());
+        let mut source = BufferSource::new(
+            "# Ranking of 1998 home runs\n---\n- Mark Joseph\n- James Stephen\n- Ken Griffey\n"
+                .as_bytes(),
+        );
         let node = parse(&mut source).unwrap();
         stringify(&node, &mut dest).unwrap();
         assert_eq!(
             dest.to_string(),
-            "---\n- Mark Joseph\n- James Stephen\n- Ken Griffey\n"
+            "---\n- Mark Joseph\n- James Stephen\n- Ken Griffey\n...\n"
         );
     }
 }
