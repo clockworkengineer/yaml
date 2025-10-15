@@ -109,25 +109,25 @@ fn peek_ahead_for_document_start_end(source: &mut dyn ISource, c: char) -> bool 
     if source.current() != Some(c) {
         return false;
     }
+    // Save and restore the state; prefer save_state/restore_state for speculative reads
+    let state = source.save_state();
     source.next();
     if source.current() != Some(c) {
-        source.backup();
+        source.restore_state(state);
         return false;
     }
     source.next();
     if source.current() != Some(c) {
-        source.backup();
-        source.backup();
+        source.restore_state(state);
         return false;
     }
-    source.backup();
-    source.backup();
+    source.restore_state(state);
     true
 }
 
 fn peek_ahead_for_mapping_key(source: &mut dyn ISource) -> bool {
     let mut found = false;
-    let mut backup_count = 0;
+    let state = source.save_state();
 
     while let Some(c) = source.current() {
         match c {
@@ -141,16 +141,13 @@ fn peek_ahead_for_mapping_key(source: &mut dyn ISource) -> bool {
             _ => {
                 if source.more() {
                     source.next();
-                    backup_count += 1;
                 }
             }
         }
     }
 
-    // Restore position
-    for _ in 0..backup_count {
-        source.backup();
-    }
+    // Restore original read position
+    source.restore_state(state);
 
     found
 }
@@ -414,13 +411,18 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
                             items.push(parse_document_contents(source, nested_indent)?);
                             continue;
                         }
+                        CHAR_LBRACKET | CHAR_LBRACE => {
+                            // Inline collection (flow sequence or mapping) — parse directly
+                            items.push(parse_value(source)?);
+                            continue;
+                        }
                         _ => {
                             if peek_ahead_for_mapping_key(source) {
                                 let nested_indent = source.get_current_indent_level();
                                 items.push(parse_document_contents(source, nested_indent)?);
                                 continue;
                             }
-                            // Parse scalar value
+                            // Parse scalar or plain value
                             else {
                                 items.push(parse_value(source)?);
                             }

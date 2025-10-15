@@ -72,16 +72,29 @@ impl ISource for Buffer {
     fn reset(&mut self) {
         self.position = 0;
     }
-    /// Moves the position back to the previous character
-    fn backup(&mut self) {
-        self.position -= 1;
-        if self.column > 0 {
-            self.column -= 1;
-        }
-    }
+    // Use save_state/restore_state for restoring positions
 
     fn get_current_indent_level(&self) -> usize {
         return self.column;
+    }
+
+    fn save_state(&mut self) -> crate::io::traits::SaveState {
+        crate::io::traits::SaveState {
+            pos: self.position as u64,
+            current_byte: if self.more() {
+                Some(self.buffer[self.position])
+            } else {
+                None
+            },
+            column: self.column,
+            line: self.line,
+        }
+    }
+
+    fn restore_state(&mut self, state: crate::io::traits::SaveState) {
+        self.position = state.pos as usize;
+        self.column = state.column;
+        self.line = state.line;
     }
 }
 #[cfg(test)]
@@ -161,14 +174,24 @@ mod tests {
     }
 
     #[test]
-    fn backup_works() {
+    fn save_restore_works() {
         let mut source = Buffer::new(String::from("abc").as_bytes());
+        // single-step behavior using save_state/restore_state
+        let s0 = source.save_state();
         source.next();
-        source.backup();
+        source.restore_state(s0);
         match source.current() {
             Some('a') => assert!(true),
             _ => assert!(false),
         }
+
+        // save/restore round-trip
+        source.next(); // move to 'b'
+        let s = source.save_state();
+        source.next(); // move to 'c'
+        assert_eq!(source.current(), Some('c'));
+        source.restore_state(s);
+        assert_eq!(source.current(), Some('b'));
     }
     #[test]
     fn get_current_indent_level_works() {

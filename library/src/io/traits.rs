@@ -9,14 +9,35 @@ pub trait ISource {
     fn more(&mut self) -> bool;
     /// Resets the reading position to the beginning of the source.
     fn reset(&mut self);
-    /// Moves the reading position back one character.
-    fn backup(&mut self);
+    /// Resets are supported; prefer `save_state`/`restore_state` for speculative reads.
+
+    /// Opaque, concrete snapshot of a source read position and metadata.
+    /// Using a concrete struct avoids associated-type issues with dyn ISource.
+    fn save_state(&mut self) -> SaveState;
+
+    /// Restore a previously-saved state.
+    fn restore_state(&mut self, state: SaveState);
+
+    // (previous object-safe save/restore removed in favor of concrete SaveState)
 
     fn is_whitespace(&self, c: char) -> bool {
         c == ' ' || c == '\t'
     }
 
     fn get_current_indent_level(&self) -> usize;
+}
+
+/// Concrete save/restore snapshot used by all ISource implementations.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SaveState {
+    /// Absolute byte position in the underlying source (file cursor or buffer index).
+    pub pos: u64,
+    /// The current byte at that position when the snapshot was taken (if any).
+    pub current_byte: Option<u8>,
+    /// Column (indent) at the snapshot.
+    pub column: usize,
+    /// Line number at the snapshot.
+    pub line: usize,
 }
 
 /// Trait defining the interface for writing YAML data to a destination.
@@ -30,5 +51,4 @@ pub trait IDestination {
     fn clear(&mut self);
     /// Returns the last byte in the destination, if any.
     fn last(&self) -> Option<u8>;
-    
 }

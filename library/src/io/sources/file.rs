@@ -79,36 +79,35 @@ impl ISource for File {
         }
     }
 
-    fn backup(&mut self) {
-        if let Ok(_) = self.file.seek(SeekFrom::Current(-2)) {
-            let mut byte = [0u8; 1];
-            self.current_byte = if self.file.read(&mut byte).unwrap_or(0) == 1 {
-                if byte[0] == b'\r' {
-                    // If we see a '\r', try to seek back one more to check for '\n'
-                    if let Ok(_) = self.file.seek(SeekFrom::Current(-2)) {
-                        if self.file.read(&mut byte).unwrap_or(0) == 1 {}
-                    }
-                }
-                Some(byte[0])
-            } else {
-                None
-            };
-            if self.column > 0 {
-                self.column -= 1;
-            }
+    // Use save_state/restore_state for restoring positions
+    fn get_current_indent_level(&self) -> usize {
+        self.column
+    }
+
+    fn save_state(&mut self) -> crate::io::traits::SaveState {
+        let pos = self.file.seek(SeekFrom::Current(0)).unwrap_or(0);
+        crate::io::traits::SaveState {
+            pos,
+            current_byte: self.current_byte,
+            column: self.column,
+            line: self.line,
         }
     }
 
-    fn get_current_indent_level(&self) -> usize {
-        self.column
+    fn restore_state(&mut self, state: crate::io::traits::SaveState) {
+        // Restore underlying file cursor to the saved next-read position
+        let _ = self.file.seek(SeekFrom::Start(state.pos));
+        self.current_byte = state.current_byte;
+        self.column = state.column;
+        self.line = state.line;
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::parse;
     use super::*;
-    use crate::nodes::node::{Node, QuoteType, Numeric};
+    use crate::nodes::node::{Node, Numeric, QuoteType};
+    use crate::parse;
     use std::fs::OpenOptions;
     use std::io::Write;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -172,26 +171,30 @@ mod tests {
     }
 
     #[test]
-    fn test_file_backup() {
+    fn test_file_save_restore() {
         let test_file = TestFile::new(b"123\r\n456");
         let mut file = File::new(&test_file.path).unwrap();
-        file.next(); // move to '2'
-        file.next(); // move to '3'
-        assert_eq!(file.current(), Some('3'));
-        file.backup(); // should go back to '2'
-        assert_eq!(file.current(), Some('2'));
-        file.backup(); // should go back to '1'
+        // Validate save/restore works for multiple positions
         assert_eq!(file.current(), Some('1'));
+        let s1 = file.save_state(); // at '1'
         file.next(); // move to '2'
+        let s2 = file.save_state(); // at '2'
         file.next(); // move to '3'
-        file.next(); // move to '\n'
-        assert_eq!(file.current(), Some('\n'));
+        let s3 = file.save_state(); // at '3'
+        file.next(); // move to '\n' (CRLF treated as single '\n')
+        let s_newline = file.save_state(); // at '\n'
         file.next(); // move to '4'
         assert_eq!(file.current(), Some('4'));
-        file.backup(); // should go back to '\n'
+
+        // restore to various saved positions
+        file.restore_state(s_newline);
         assert_eq!(file.current(), Some('\n'));
-        file.backup(); // should go back to '3'
+        file.restore_state(s3);
         assert_eq!(file.current(), Some('3'));
+        file.restore_state(s2);
+        assert_eq!(file.current(), Some('2'));
+        file.restore_state(s1);
+        assert_eq!(file.current(), Some('1'));
         assert_eq!(file.get_current_indent_level(), 0);
     }
 
@@ -328,17 +331,19 @@ mod tests {
         assert!(file.more());
     }
     #[test]
-       fn test_file_parse_nested_sequences() {
+    fn test_file_parse_nested_sequences() {
         let test_file = TestFile::new(b"- [Sammy Sosa, 63, 0.288]");
         let mut file = File::new(&test_file.path).unwrap();
         let node = parse(&mut file).unwrap();
         assert_eq!(
             node,
-            Node::Documents(vec![Node::Document(vec![Node::Array(vec![Node::Array(vec![
-                Node::Str("Sammy Sosa".to_string(), QuoteType::Unquoted),
-                Node::Number(Numeric::Integer(63)),
-                Node::Number(Numeric::Float(0.288))
-            ])])])])
+            Node::Documents(vec![Node::Document(vec![Node::Array(vec![Node::Array(
+                vec![
+                    Node::Str("Sammy Sosa".to_string(), QuoteType::Unquoted),
+                    Node::Number(Numeric::Integer(63)),
+                    Node::Number(Numeric::Float(0.288))
+                ]
+            )])])])
         );
     }
 }
