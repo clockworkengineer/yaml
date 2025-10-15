@@ -122,6 +122,16 @@ pub fn stringify(node: &Node, destination: &mut dyn IDestination) -> Result<(), 
     match node {
         Node::Documents(docs) => {
             for doc in docs {
+                // If this is an explicit Document node with no content,
+                // skip emitting it (don't output --- ... for empty docs).
+                let emit = match doc {
+                    Node::Document(nodes) => !nodes.is_empty(),
+                    _ => true,
+                };
+                if !emit {
+                    continue;
+                }
+
                 destination.add_bytes("---\n");
                 stringify_document(doc, destination)?;
                 destination.add_bytes("...\n");
@@ -240,6 +250,17 @@ mod tests {
         assert_eq!(
             dest.to_string(),
             "---\n- - Sammy Sosa\n  - 63\n  - 0.288\n...\n"
+        );
+    }
+    #[test]
+    fn test_with_comment_header() {
+        let mut dest = Buffer::new();
+        let mut source = BufferSource::new("# Ranking of 1998 home runs\n---\n- Mark Joseph\n- James Stephen\n- Ken Griffey\n".as_bytes());
+        let node = parse(&mut source).unwrap();
+        stringify(&node, &mut dest).unwrap();
+        assert_eq!(
+            dest.to_string(),
+            "---\n- Mark Joseph\n- James Stephen\n- Ken Griffey\n"
         );
     }
 }
