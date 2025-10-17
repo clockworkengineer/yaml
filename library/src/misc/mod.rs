@@ -29,7 +29,7 @@ pub fn get_document_base(node: &Node, n: usize) -> Result<&Node, String> {
 mod tests {
     use super::*;
     use crate::io::sources::buffer::Buffer;
-    use crate::nodes::node::Node;
+    use crate::nodes::node::{BlockStyle, Node};
     use crate::nodes::node::QuoteType;
     use crate::parse;
     #[test]
@@ -39,7 +39,7 @@ mod tests {
         assert_eq!(get_number_of_documents(&result).unwrap(), 3);
 
         // Test error case with non-Documents node
-        let non_docs_node = Node::Str("test".to_string(), QuoteType::Unquoted);
+        let non_docs_node = Node::Str("test".to_string(), QuoteType::Unquoted, BlockStyle::None);
         assert!(get_number_of_documents(&non_docs_node).is_err());
     }
 }

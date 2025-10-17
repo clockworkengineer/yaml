@@ -22,6 +22,14 @@ pub enum QuoteType {
     Double,
 }
 
+/// Represents whether a string originated from a block scalar and its style
+#[derive(Clone, Debug, PartialEq)]
+pub enum BlockStyle {
+    None,
+    Literal,
+    Folded,
+}
+
 /// A node in the YAML data structure that can represent different types of values.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Node {
@@ -33,7 +41,7 @@ pub enum Node {
     Number(Numeric),
     /// Represents a string value and how it was quoted in the source
     /// Used for text content in YAML including multi-line strings
-    Str(String, QuoteType),
+    Str(String, QuoteType, BlockStyle),
     /// Represents an array of other nodes
     /// Used for YAML sequences/lists where order matters
     Array(Vec<Node>),
@@ -74,7 +82,7 @@ impl Index<&str> for Node {
         match self {
             Node::Mapping(pairs) => {
                 for (k, v) in pairs {
-                    if let Node::Str(s, _) = k {
+                    if let Node::Str(s, _, _) = k {
                         if s == key {
                             return v;
                         }
@@ -105,7 +113,7 @@ impl IndexMut<&str> for Node {
         match self {
             Node::Mapping(pairs) => {
                 for (k, v) in pairs.iter_mut() {
-                    if let Node::Str(s, _) = k {
+                    if let Node::Str(s, _, _) = k {
                         if s == key {
                             return v;
                         }
@@ -187,7 +195,7 @@ impl From<i64> for Node {
 
 impl From<&str> for Node {
     fn from(value: &str) -> Self {
-        Node::Str(String::from(value), QuoteType::Unquoted)
+        Node::Str(String::from(value), QuoteType::Unquoted, BlockStyle::None)
     }
 }
 
@@ -247,7 +255,7 @@ impl From<bool> for Node {
 
 impl From<String> for Node {
     fn from(value: String) -> Self {
-        Node::Str(value, QuoteType::Unquoted)
+        Node::Str(value, QuoteType::Unquoted, BlockStyle::None)
     }
 }
 
@@ -293,11 +301,11 @@ mod tests {
     fn test_node_string_conversions() {
         assert_eq!(
             Node::from("test"),
-            Node::Str("test".to_string(), QuoteType::Unquoted)
+            Node::Str("test".to_string(), QuoteType::Unquoted, BlockStyle::None)
         );
         assert_eq!(
             Node::from("test".to_string()),
-            Node::Str("test".to_string(), QuoteType::Unquoted)
+            Node::Str("test".to_string(), QuoteType::Unquoted, BlockStyle::None)
         );
     }
 
@@ -339,7 +347,7 @@ mod tests {
     #[test]
     fn test_mapping_indexing() {
         let obj = Node::Mapping(vec![(
-            Node::Str("key".to_string(), QuoteType::Unquoted),
+            Node::Str("key".to_string(), QuoteType::Unquoted, BlockStyle::None),
             Node::from(42),
         )]);
         assert_eq!(obj["key"], Node::Number(Numeric::Int32(42)));
@@ -369,7 +377,7 @@ mod tests {
     #[test]
     fn test_mapping_mut_indexing() {
         let mut obj = Node::Mapping(vec![(
-            Node::Str("key".to_string(), QuoteType::Unquoted),
+            Node::Str("key".to_string(), QuoteType::Unquoted, BlockStyle::None),
             Node::from(42),
         )]);
         obj["key"] = Node::from(100);
@@ -395,7 +403,7 @@ mod tests {
         assert_eq!(make_node(42), Node::Number(Numeric::Int32(42)));
         assert_eq!(
             make_node("test"),
-            Node::Str("test".to_string(), QuoteType::Unquoted)
+            Node::Str("test".to_string(), QuoteType::Unquoted, BlockStyle::None)
         );
         assert_eq!(make_node(true), Node::Boolean(true));
     }
@@ -419,7 +427,7 @@ mod tests {
             Node::Documents(nodes) => {
                 assert_eq!(nodes.len(), 2);
                 assert_eq!(nodes[0], Node::Number(Numeric::Int32(1)));
-                assert_eq!(nodes[1], Node::Str("test".to_string(), QuoteType::Unquoted));
+                assert_eq!(nodes[1], Node::Str("test".to_string(), QuoteType::Unquoted, BlockStyle::None));
             }
             _ => panic!("Expected Document node"),
         }

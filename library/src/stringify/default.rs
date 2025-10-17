@@ -10,7 +10,7 @@ fn stringify_document_with_indent(
     match node {
         Node::None => destination.add_bytes(&format!("{}null", indent_str)),
         Node::Boolean(b) => destination.add_bytes(&format!("{}{}", indent_str, b)),
-        Node::Str(s, qt) => match qt {
+        Node::Str(s, qt, _style) => match qt {
             QuoteType::Double => {
                 // escape common sequences for double-quoted output
                 fn escape_double(s: &str) -> String {
@@ -142,7 +142,7 @@ pub fn stringify(node: &Node, destination: &mut dyn IDestination) -> Result<(), 
                 match node {
                     Node::None => true,
                     Node::Comment(_) => true,
-                    Node::Str(s, _) => s.is_empty(),
+                    Node::Str(s, _, _) => s.is_empty(),
                     Node::Array(items) => items.iter().all(|n| node_is_blank(n)),
                     Node::Mapping(pairs) => pairs.is_empty(),
                     Node::Document(nodes) => nodes.iter().all(|n| node_is_blank(n)),
@@ -194,7 +194,7 @@ mod tests {
     #[test]
     fn test_stringify_string() {
         let mut dest = Buffer::new();
-        stringify(&Node::Str("test".to_string(), QuoteType::Double), &mut dest).unwrap();
+        stringify(&Node::Str("test".to_string(), QuoteType::Double, BlockStyle::None), &mut dest).unwrap();
         assert_eq!(dest.to_string(), "\"test\"");
     }
 
@@ -221,7 +221,7 @@ mod tests {
         let mut dest = Buffer::new();
         let arr = vec![
             Node::Number(Numeric::Integer(1)),
-            Node::Str("test".to_string(), QuoteType::Double),
+            Node::Str("test".to_string(), QuoteType::Double, BlockStyle::None),
         ];
         stringify(&Node::Array(arr), &mut dest).unwrap();
         assert_eq!(dest.to_string(), "- 1\n- \"test\"\n");
@@ -231,8 +231,8 @@ mod tests {
     fn test_stringify_mapping() {
         let mut dest = Buffer::new();
         let mapping = Node::Mapping(vec![(
-            Node::Str("key".to_string(), QuoteType::Double),
-            Node::Str("value".to_string(), QuoteType::Double),
+            Node::Str("key".to_string(), QuoteType::Double, BlockStyle::None),
+            Node::Str("value".to_string(), QuoteType::Double, BlockStyle::None),
         )]);
         stringify(&mapping, &mut dest).unwrap();
         assert_eq!(dest.to_string(), "\"key\": \"value\"\n");
@@ -242,8 +242,8 @@ mod tests {
     fn test_stringify_documents() {
         let mut dest = Buffer::new();
         let docs = vec![
-            Node::Str("doc1".to_string(), QuoteType::Double),
-            Node::Str("doc2".to_string(), QuoteType::Double),
+            Node::Str("doc1".to_string(), QuoteType::Double, BlockStyle::None),
+            Node::Str("doc2".to_string(), QuoteType::Double, BlockStyle::None),
         ];
         stringify(&Node::Documents(docs), &mut dest).unwrap();
         assert_eq!(dest.to_string(), "---\n\"doc1\"...\n---\n\"doc2\"...\n");
@@ -297,7 +297,7 @@ mod tests {
     #[test]
     fn test_stringify_double_quoted_multiline_scalar() {
         let mut dest = Buffer::new();
-        let node = Node::Str("line1\nline2".to_string(), QuoteType::Double);
+        let node = Node::Str("line1\nline2".to_string(), QuoteType::Double, BlockStyle::None);
         stringify(&node, &mut dest).unwrap();
         assert_eq!(dest.to_string(), "\"line1\nline2\"");
     }
@@ -305,7 +305,7 @@ mod tests {
     #[test]
     fn test_stringify_single_quoted_multiline_and_escaping() {
         let mut dest = Buffer::new();
-        let node = Node::Str("O'Reilly\nBooks".to_string(), QuoteType::Single);
+        let node = Node::Str("O'Reilly\nBooks".to_string(), QuoteType::Single, BlockStyle::None);
         stringify(&node, &mut dest).unwrap();
         assert_eq!(dest.to_string(), "'O''Reilly\nBooks'");
     }
@@ -314,7 +314,7 @@ mod tests {
     fn test_stringify_mapping_with_multiline_value() {
         let mut dest = Buffer::new();
         let mapping = Node::Mapping(vec![
-            (Node::Str("key".to_string(), QuoteType::Unquoted), Node::Str("a\nb".to_string(), QuoteType::Double)),
+            (Node::Str("key".to_string(), QuoteType::Unquoted, BlockStyle::None), Node::Str("a\nb".to_string(), QuoteType::Double, BlockStyle::None)),
         ]);
         stringify(&mapping, &mut dest).unwrap();
         assert_eq!(dest.to_string(), "key: \"a\nb\"\n");
@@ -323,7 +323,7 @@ mod tests {
     #[test]
     fn test_stringify_sequence_with_multiline_item() {
         let mut dest = Buffer::new();
-        let seq = Node::Array(vec![Node::Str("a\nb".to_string(), QuoteType::Double)]);
+        let seq = Node::Array(vec![Node::Str("a\nb".to_string(), QuoteType::Double, BlockStyle::None)]);
         stringify(&seq, &mut dest).unwrap();
         assert_eq!(dest.to_string(), "- \"a\nb\"\n");
     }

@@ -106,7 +106,7 @@ impl ISource for File {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::nodes::node::{Node, Numeric, QuoteType};
+    use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
     use crate::parse;
     use std::fs::OpenOptions;
     use std::io::Write;
@@ -339,7 +339,7 @@ mod tests {
             node,
             Node::Documents(vec![Node::Document(vec![Node::Array(vec![Node::Array(
                 vec![
-                    Node::Str("Sammy Sosa".to_string(), QuoteType::Unquoted),
+                    Node::Str("Sammy Sosa".to_string(), QuoteType::Unquoted, BlockStyle::None),
                     Node::Number(Numeric::Integer(63)),
                     Node::Number(Numeric::Float(0.288))
                 ]

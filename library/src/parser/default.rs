@@ -4,7 +4,7 @@
 
 use crate::io::traits::ISource;
 use crate::nodes::node::Node::Document;
-use crate::nodes::node::{Node, Numeric, QuoteType};
+use crate::nodes::node::{Node, Numeric, QuoteType, BlockStyle};
 use crate::parser::constants::*;
 use crate::parser::utils::{
     collect_until, read_line_trimmed_into_string, skip_whitespace_and_comments,
@@ -236,7 +236,7 @@ fn parse_mapping_key(source: &mut dyn ISource) -> Result<(Node, bool), String> {
     // parse_scalar expects a &str and returns Node; ensure keys are Str nodes
     match raw.trim() {
         v if v.starts_with(CHAR_HASH) => {
-            Ok((Node::Str(v.to_string(), QuoteType::Unquoted), newline))
+            Ok((Node::Str(v.to_string(), QuoteType::Unquoted, BlockStyle::None), newline))
         }
         v => Ok((parse_scalar(v), newline)),
     }
@@ -253,9 +253,10 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
         Some(_) => {
             let value = collect_until(source, |c| c == CHAR_NEWLINE || c == CHAR_HASH);
             let trimmed = value.trim();
-            if trimmed == "|" {
-                // Minimal literal block scalar support: collect indented lines following the '|'
-                // Consume the newline after '|'
+            if trimmed == "|" || trimmed == ">" {
+                // Minimal block scalar support: collect indented lines following the '|' (literal) or '>' (folded)
+                let folded = trimmed == ">";
+                // Consume the newline after the block style indicator
                 if source.current() == Some(CHAR_NEWLINE) { source.next(); }
                 let mut out = String::new();
                 let mut base_indent: Option<usize> = None;
@@ -293,7 +294,8 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
                     // Consume newline if present and continue looping
                     if source.current() == Some(CHAR_NEWLINE) { source.next(); } else { break; }
                 }
-                Ok(Node::Str(out, QuoteType::Unquoted))
+                let style = if folded { BlockStyle::Folded } else { BlockStyle::Literal };
+                Ok(Node::Str(out, QuoteType::Unquoted, style))
             } else if !trimmed.is_empty() {
                 Ok(parse_scalar(trimmed))
             } else {
@@ -472,7 +474,7 @@ fn parse_scalar(value: &str) -> Node {
     // Check if the value is a comment (starts with #)
     match value {
         // Treat leading '#' in a scalar as a plain string. Parser consumes comment lines elsewhere.
-        v if v.starts_with(CHAR_HASH) => Node::Str(v.to_string(), QuoteType::Unquoted),
+        v if v.starts_with(CHAR_HASH) => Node::Str(v.to_string(), QuoteType::Unquoted, BlockStyle::None),
         "null" | "~" => Node::None,
         "true" => Node::Boolean(true),
         "false" => Node::Boolean(false),
@@ -502,7 +504,7 @@ fn parse_scalar(value: &str) -> Node {
                 } else {
                     (v.to_string(), QuoteType::Unquoted)
                 };
-                Node::Str(content, qt)
+                Node::Str(content, qt, BlockStyle::None)
             }
         }
     }
@@ -636,8 +638,8 @@ pub fn parse_document_contents(
             // Parse key (support only a flow sequence or plain scalar until EOL)
             let key_node = match source.current() {
                 Some(CHAR_LBRACKET) => parse_inline_sequence(source)?,
-                Some(_) => Node::Str(read_line_trimmed_into_string(source), QuoteType::Unquoted),
-                None => Node::Str(String::new(), QuoteType::Unquoted),
+                Some(_) => Node::Str(read_line_trimmed_into_string(source), QuoteType::Unquoted, BlockStyle::None),
+                None => Node::Str(String::new(), QuoteType::Unquoted, BlockStyle::None),
             };
             if source.current() == Some(CHAR_NEWLINE) {
                 source.next();
@@ -734,7 +736,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
             // An empty mapping is meaningful ({}), so do not treat it as blank
             Node::Mapping(_pairs) => false,
             Node::Document(nodes) => nodes.iter().all(|n| node_is_blank(n)),
-            Node::Str(s, _) => s.is_empty(),
+            Node::Str(s, _, _) => s.is_empty(),
             Node::Comment(_) => true,
             _ => false,
         }
@@ -832,11 +834,11 @@ mod tests {
         assert_eq!(parse_scalar("3.14"), Node::Number(Numeric::Float(3.14)));
         assert_eq!(
             parse_scalar("hello"),
-            Node::Str("hello".to_string(), QuoteType::Unquoted)
+            Node::Str("hello".to_string(), QuoteType::Unquoted, BlockStyle::None)
         );
         assert_eq!(
             parse_scalar("#comment"),
-            Node::Str("#comment".to_string(), QuoteType::Unquoted)
+            Node::Str("#comment".to_string(), QuoteType::Unquoted, BlockStyle::None)
         );
     }
 
@@ -874,11 +876,11 @@ mod tests {
         let result = parse(&mut source).unwrap();
         let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![
             (
-                Node::Str("key1".to_string(), QuoteType::Unquoted),
-                Node::Str("value1".to_string(), QuoteType::Unquoted),
+                Node::Str("key1".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Str("value1".to_string(), QuoteType::Unquoted, BlockStyle::None),
             ),
             (
-                Node::Str("key2".to_string(), QuoteType::Unquoted),
+                Node::Str("key2".to_string(), QuoteType::Unquoted, BlockStyle::None),
                 Node::Number(Numeric::Integer(42)),
             ),
         ])])]);
@@ -921,21 +923,21 @@ mod tests {
         let result = parse(&mut source).unwrap();
         let expected = Node::Documents(vec![
             Document(vec![Node::Mapping(vec![(
-                Node::Str("key1".to_string(), QuoteType::Unquoted),
-                Node::Str("value1".to_string(), QuoteType::Unquoted),
+                Node::Str("key1".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Str("value1".to_string(), QuoteType::Unquoted, BlockStyle::None),
             )])]),
             Document(vec![Node::Mapping(vec![(
-                Node::Str("key2".to_string(), QuoteType::Unquoted),
-                Node::Str("value2".to_string(), QuoteType::Unquoted),
+                Node::Str("key2".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Str("value2".to_string(), QuoteType::Unquoted, BlockStyle::None),
             )])]),
             Document(vec![Node::Mapping(vec![
                 (
-                    Node::Str("key3".to_string(), QuoteType::Unquoted),
-                    Node::Str("value3".to_string(), QuoteType::Unquoted),
+                    Node::Str("key3".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                    Node::Str("value3".to_string(), QuoteType::Unquoted, BlockStyle::None),
                 ),
                 (
-                    Node::Str("key4".to_string(), QuoteType::Unquoted),
-                    Node::Str("value4".to_string(), QuoteType::Unquoted),
+                    Node::Str("key4".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                    Node::Str("value4".to_string(), QuoteType::Unquoted, BlockStyle::None),
                 ),
             ])]),
         ]);
@@ -956,7 +958,7 @@ mod tests {
                 let mut map = HashMap::new();
                 map.insert(
                     "key".to_string(),
-                    Node::Str("value".to_string(), QuoteType::Unquoted),
+                    Node::Str("value".to_string(), QuoteType::Unquoted, BlockStyle::None),
                 );
                 let mut pairs = Vec::new();
                 for (k, v) in map.into_iter() {
@@ -964,7 +966,7 @@ mod tests {
                         Node::Mapping(p) => Node::Mapping(p),
                         other => other,
                     };
-                    pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                    pairs.push((Node::Str(k, QuoteType::Unquoted, BlockStyle::None), value));
                 }
                 Node::Mapping(pairs)
             }])])
@@ -978,12 +980,12 @@ mod tests {
         assert_eq!(
             result,
             Node::Documents(vec![Document(vec![Node::Array(vec![
-                Node::Str("item1".to_string(), QuoteType::Unquoted),
+                Node::Str("item1".to_string(), QuoteType::Unquoted, BlockStyle::None),
                 Node::Array(vec![
-                    Node::Str("nested1".to_string(), QuoteType::Unquoted),
-                    Node::Str("nested2".to_string(), QuoteType::Unquoted)
+                    Node::Str("nested1".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                    Node::Str("nested2".to_string(), QuoteType::Unquoted, BlockStyle::None)
                 ]),
-                Node::Str("item2".to_string(), QuoteType::Unquoted)
+                Node::Str("item2".to_string(), QuoteType::Unquoted, BlockStyle::None)
             ])])])
         );
     }
@@ -994,11 +996,11 @@ mod tests {
         let result = parse(&mut source).unwrap();
         let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![
             (
-                Node::Str("key1".to_string(), QuoteType::Unquoted),
-                Node::Str("value1".to_string(), QuoteType::Unquoted),
+                Node::Str("key1".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Str("value1".to_string(), QuoteType::Unquoted, BlockStyle::None),
             ),
             (
-                Node::Str("key2".to_string(), QuoteType::Unquoted),
+                Node::Str("key2".to_string(), QuoteType::Unquoted, BlockStyle::None),
                 Node::Number(Numeric::Integer(42)),
             ),
         ])])]);
@@ -1011,15 +1013,15 @@ mod tests {
         let mut source = Buffer::new(b"outer:\n  inner1: value1\n  inner2: value2");
         let result = parse(&mut source).unwrap();
         let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![(
-            Node::Str("outer".to_string(), QuoteType::Unquoted),
+            Node::Str("outer".to_string(), QuoteType::Unquoted, BlockStyle::None),
             Node::Mapping(vec![
                 (
-                    Node::Str("inner1".to_string(), QuoteType::Unquoted),
-                    Node::Str("value1".to_string(), QuoteType::Unquoted),
+                    Node::Str("inner1".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                    Node::Str("value1".to_string(), QuoteType::Unquoted, BlockStyle::None),
                 ),
                 (
-                    Node::Str("inner2".to_string(), QuoteType::Unquoted),
-                    Node::Str("value2".to_string(), QuoteType::Unquoted),
+                    Node::Str("inner2".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                    Node::Str("value2".to_string(), QuoteType::Unquoted, BlockStyle::None),
                 ),
             ]),
         )])])]);
@@ -1034,21 +1036,21 @@ mod tests {
 
         let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![
             (
-                Node::Str("outer1".to_string(), QuoteType::Unquoted),
+                Node::Str("outer1".to_string(), QuoteType::Unquoted, BlockStyle::None),
                 Node::Mapping(vec![
                     (
-                        Node::Str("inner1".to_string(), QuoteType::Unquoted),
-                        Node::Str("value1".to_string(), QuoteType::Unquoted),
+                        Node::Str("inner1".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                        Node::Str("value1".to_string(), QuoteType::Unquoted, BlockStyle::None),
                     ),
                     (
-                        Node::Str("inner2".to_string(), QuoteType::Unquoted),
-                        Node::Str("value2".to_string(), QuoteType::Unquoted),
+                        Node::Str("inner2".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                        Node::Str("value2".to_string(), QuoteType::Unquoted, BlockStyle::None),
                     ),
                 ]),
             ),
             (
-                Node::Str("outer2".to_string(), QuoteType::Unquoted),
-                Node::Str("value3".to_string(), QuoteType::Unquoted),
+                Node::Str("outer2".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Str("value3".to_string(), QuoteType::Unquoted, BlockStyle::None),
             ),
         ])])]);
 
@@ -1061,15 +1063,15 @@ mod tests {
         let result = parse(&mut source).unwrap();
 
         let sequence = Node::Array(vec![
-            Node::Str("item1".to_string(), QuoteType::Unquoted),
-            Node::Str("item2".to_string(), QuoteType::Unquoted),
+            Node::Str("item1".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            Node::Str("item2".to_string(), QuoteType::Unquoted, BlockStyle::None),
         ]);
 
         let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![
-            (Node::Str("key1".to_string(), QuoteType::Unquoted), sequence),
+            (Node::Str("key1".to_string(), QuoteType::Unquoted, BlockStyle::None), sequence),
             (
-                Node::Str("key2".to_string(), QuoteType::Unquoted),
-                Node::Str("value2".to_string(), QuoteType::Unquoted),
+                Node::Str("key2".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Str("value2".to_string(), QuoteType::Unquoted, BlockStyle::None),
             ),
         ])])]);
 
@@ -1081,16 +1083,16 @@ mod tests {
             Buffer::new(b"key1:\n  - item1\n  - item2\n# Comment 1\nkey2: value2\n# Comment 2");
         let result = parse(&mut source).unwrap();
         let sequence = Node::Array(vec![
-            Node::Str("item1".to_string(), QuoteType::Unquoted),
-            Node::Str("item2".to_string(), QuoteType::Unquoted),
+            Node::Str("item1".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            Node::Str("item2".to_string(), QuoteType::Unquoted, BlockStyle::None),
         ]);
         let expected = Node::Documents(vec![Document(vec![
             // Node::Comment("Comment 1".to_string()),
             Node::Mapping(vec![
-                (Node::Str("key1".to_string(), QuoteType::Unquoted), sequence),
+                (Node::Str("key1".to_string(), QuoteType::Unquoted, BlockStyle::None), sequence),
                 (
-                    Node::Str("key2".to_string(), QuoteType::Unquoted),
-                    Node::Str("value2".to_string(), QuoteType::Unquoted),
+                    Node::Str("key2".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                    Node::Str("value2".to_string(), QuoteType::Unquoted, BlockStyle::None),
                 ),
             ]),
             // Node::Comment("Comment 2".to_string())
@@ -1107,9 +1109,9 @@ mod tests {
         assert_eq!(
             result,
             Node::Documents(vec![Document(vec![Node::Array(vec![
-                Node::Str("item1".to_string(), QuoteType::Unquoted),
-                Node::Str("item2".to_string(), QuoteType::Unquoted),
-                Node::Str("item3".to_string(), QuoteType::Unquoted)
+                Node::Str("item1".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Str("item2".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Str("item3".to_string(), QuoteType::Unquoted, BlockStyle::None)
             ])])])
         );
     }
@@ -1121,7 +1123,7 @@ mod tests {
         let mut expected = HashMap::new();
         expected.insert(
             "key".to_string(),
-            Node::Str("value".to_string(), QuoteType::Unquoted),
+            Node::Str("value".to_string(), QuoteType::Unquoted, BlockStyle::None),
         );
         assert_eq!(
             result,
@@ -1132,7 +1134,7 @@ mod tests {
                         Node::Mapping(p) => Node::Mapping(p),
                         other => other,
                     };
-                    pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                    pairs.push((Node::Str(k, QuoteType::Unquoted, BlockStyle::None), value));
                 }
                 Node::Mapping(pairs)
             }])])
@@ -1146,7 +1148,7 @@ mod tests {
         let mut doc1 = HashMap::new();
         doc1.insert(
             "key".to_string(),
-            Node::Str("value".to_string(), QuoteType::Unquoted),
+            Node::Str("value".to_string(), QuoteType::Unquoted, BlockStyle::None),
         );
         let mut doc2 = HashMap::new();
         doc2.insert("other".to_string(), Node::Number(Numeric::Integer(123)));
@@ -1160,7 +1162,7 @@ mod tests {
                             Node::Mapping(p) => Node::Mapping(p),
                             other => other,
                         };
-                        pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                        pairs.push((Node::Str(k, QuoteType::Unquoted, BlockStyle::None), value));
                     }
                     Node::Mapping(pairs)
                 }]),
@@ -1171,7 +1173,7 @@ mod tests {
                             Node::Mapping(p) => Node::Mapping(p),
                             other => other,
                         };
-                        pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                        pairs.push((Node::Str(k, QuoteType::Unquoted, BlockStyle::None), value));
                     }
                     Node::Mapping(pairs)
                 }])
@@ -1186,7 +1188,7 @@ mod tests {
         let mut doc1 = HashMap::new();
         doc1.insert(
             "key".to_string(),
-            Node::Str("value".to_string(), QuoteType::Unquoted),
+            Node::Str("value".to_string(), QuoteType::Unquoted, BlockStyle::None),
         );
         let mut doc2 = HashMap::new();
         doc2.insert("other".to_string(), Node::Number(Numeric::Integer(1)));
@@ -1200,7 +1202,7 @@ mod tests {
                             Node::Mapping(p) => Node::Mapping(p),
                             other => other,
                         };
-                        pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                        pairs.push((Node::Str(k, QuoteType::Unquoted, BlockStyle::None), value));
                     }
                     Node::Mapping(pairs)
                 }]),
@@ -1211,7 +1213,7 @@ mod tests {
                             Node::Mapping(p) => Node::Mapping(p),
                             other => other,
                         };
-                        pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                        pairs.push((Node::Str(k, QuoteType::Unquoted, BlockStyle::None), value));
                     }
                     Node::Mapping(pairs)
                 }])
@@ -1233,7 +1235,7 @@ mod tests {
         let mut doc1 = HashMap::new();
         doc1.insert(
             "key".to_string(),
-            Node::Str("value".to_string(), QuoteType::Unquoted),
+            Node::Str("value".to_string(), QuoteType::Unquoted, BlockStyle::None),
         );
         let mut doc3 = HashMap::new();
         doc3.insert("other".to_string(), Node::Number(Numeric::Integer(1)));
@@ -1247,7 +1249,7 @@ mod tests {
                             Node::Mapping(p) => Node::Mapping(p),
                             other => other,
                         };
-                        pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                        pairs.push((Node::Str(k, QuoteType::Unquoted, BlockStyle::None), value));
                     }
                     Node::Mapping(pairs)
                 }]),
@@ -1258,7 +1260,7 @@ mod tests {
                             Node::Mapping(p) => Node::Mapping(p),
                             other => other,
                         };
-                        pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                        pairs.push((Node::Str(k, QuoteType::Unquoted, BlockStyle::None), value));
                     }
 
                     Node::Mapping(pairs)
@@ -1274,17 +1276,17 @@ mod tests {
 
         // Expected: people -> [ { name: "John", likes: ["apples", "bananas"] } ]
         let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![(
-            Node::Str("people".to_string(), QuoteType::Unquoted),
+            Node::Str("people".to_string(), QuoteType::Unquoted, BlockStyle::None),
             Node::Array(vec![Node::Mapping(vec![
                 (
-                    Node::Str("name".to_string(), QuoteType::Unquoted),
-                    Node::Str("John".to_string(), QuoteType::Unquoted),
+                    Node::Str("name".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                    Node::Str("John".to_string(), QuoteType::Unquoted, BlockStyle::None),
                 ),
                 (
-                    Node::Str("likes".to_string(), QuoteType::Unquoted),
+                    Node::Str("likes".to_string(), QuoteType::Unquoted, BlockStyle::None),
                     Node::Array(vec![
-                        Node::Str("apples".to_string(), QuoteType::Unquoted),
-                        Node::Str("bananas".to_string(), QuoteType::Unquoted),
+                        Node::Str("apples".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                        Node::Str("bananas".to_string(), QuoteType::Unquoted, BlockStyle::None),
                     ]),
                 ),
             ])]),
@@ -1302,7 +1304,7 @@ mod tests {
         let mut mark_map = HashMap::new();
         mark_map.insert(
             "name".to_string(),
-            Node::Str("Mark Joseph".to_string(), QuoteType::Unquoted),
+            Node::Str("Mark Joseph".to_string(), QuoteType::Unquoted, BlockStyle::None),
         );
         mark_map.insert("hr".to_string(), Node::Number(Numeric::Integer(87)));
         mark_map.insert("avg".to_string(), Node::Number(Numeric::Float(0.278)));
@@ -1310,7 +1312,7 @@ mod tests {
         let mut james_map = HashMap::new();
         james_map.insert(
             "name".to_string(),
-            Node::Str("James Stephen".to_string(), QuoteType::Unquoted),
+            Node::Str("James Stephen".to_string(), QuoteType::Unquoted, BlockStyle::None),
         );
         james_map.insert("hr".to_string(), Node::Number(Numeric::Integer(63)));
         james_map.insert("avg".to_string(), Node::Number(Numeric::Float(0.288)));
@@ -1318,29 +1320,29 @@ mod tests {
         let expected = Node::Documents(vec![Document(vec![Node::Array(vec![
             Node::Mapping(vec![
                 (
-                    Node::Str("name".to_string(), QuoteType::Unquoted),
-                    Node::Str("Mark Joseph".to_string(), QuoteType::Unquoted),
+                    Node::Str("name".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                    Node::Str("Mark Joseph".to_string(), QuoteType::Unquoted, BlockStyle::None),
                 ),
                 (
-                    Node::Str("hr".to_string(), QuoteType::Unquoted),
+                    Node::Str("hr".to_string(), QuoteType::Unquoted, BlockStyle::None),
                     Node::Number(Numeric::Integer(87)),
                 ),
                 (
-                    Node::Str("avg".to_string(), QuoteType::Unquoted),
+                    Node::Str("avg".to_string(), QuoteType::Unquoted, BlockStyle::None),
                     Node::Number(Numeric::Float(0.278)),
                 ),
             ]),
             Node::Mapping(vec![
                 (
-                    Node::Str("name".to_string(), QuoteType::Unquoted),
-                    Node::Str("James Stephen".to_string(), QuoteType::Unquoted),
+                    Node::Str("name".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                    Node::Str("James Stephen".to_string(), QuoteType::Unquoted, BlockStyle::None),
                 ),
                 (
-                    Node::Str("hr".to_string(), QuoteType::Unquoted),
+                    Node::Str("hr".to_string(), QuoteType::Unquoted, BlockStyle::None),
                     Node::Number(Numeric::Integer(63)),
                 ),
                 (
-                    Node::Str("avg".to_string(), QuoteType::Unquoted),
+                    Node::Str("avg".to_string(), QuoteType::Unquoted, BlockStyle::None),
                     Node::Number(Numeric::Float(0.288)),
                 ),
             ]),
@@ -1387,11 +1389,11 @@ mod tests {
         let result = parse(&mut source).unwrap();
         let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![
             (
-                Node::Str("a".to_string(), QuoteType::Unquoted),
+                Node::Str("a".to_string(), QuoteType::Unquoted, BlockStyle::None),
                 Node::Number(Numeric::Integer(1)),
             ),
             (
-                Node::Str("b".to_string(), QuoteType::Unquoted),
+                Node::Str("b".to_string(), QuoteType::Unquoted, BlockStyle::None),
                 Node::Number(Numeric::Integer(2)),
             ),
         ])])]);
@@ -1413,7 +1415,7 @@ mod tests {
                         Node::Mapping(p) => Node::Mapping(p),
                         other => other,
                     };
-                    pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                    pairs.push((Node::Str(k, QuoteType::Unquoted, BlockStyle::None), value));
                 }
 
                 Node::Mapping(pairs)
@@ -1426,15 +1428,15 @@ mod tests {
         let mut source = Buffer::new(b"parent: {a: 1, b: test}");
         let result = parse(&mut source).unwrap();
         let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![(
-            Node::Str("parent".to_string(), QuoteType::Unquoted),
+            Node::Str("parent".to_string(), QuoteType::Unquoted, BlockStyle::None),
             Node::Mapping(vec![
                 (
-                    Node::Str("a".to_string(), QuoteType::Unquoted),
+                    Node::Str("a".to_string(), QuoteType::Unquoted, BlockStyle::None),
                     Node::Number(Numeric::Integer(1)),
                 ),
                 (
-                    Node::Str("b".to_string(), QuoteType::Unquoted),
-                    Node::Str("test".to_string(), QuoteType::Unquoted),
+                    Node::Str("b".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                    Node::Str("test".to_string(), QuoteType::Unquoted, BlockStyle::None),
                 ),
             ]),
         )])])]);
@@ -1451,7 +1453,7 @@ mod tests {
         let mut expected = HashMap::new();
         expected.insert(
             "key".to_string(),
-            Node::Str("> hello world".to_string(), QuoteType::Unquoted),
+            Node::Str("> hello world".to_string(), QuoteType::Unquoted, BlockStyle::None),
         );
         assert_eq!(
             result,
@@ -1462,7 +1464,7 @@ mod tests {
                         Node::Mapping(p) => Node::Mapping(p),
                         other => other,
                     };
-                    pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                    pairs.push((Node::Str(k, QuoteType::Unquoted, BlockStyle::None), value));
                 }
 
                 Node::Mapping(pairs)
@@ -1478,7 +1480,7 @@ mod tests {
         let mut expected = HashMap::new();
         expected.insert(
             "key".to_string(),
-            Node::Str("> multi line".to_string(), QuoteType::Unquoted),
+            Node::Str("> multi line".to_string(), QuoteType::Unquoted, BlockStyle::None),
         );
         assert_eq!(
             result,
@@ -1489,7 +1491,7 @@ mod tests {
                         Node::Mapping(p) => Node::Mapping(p),
                         other => other,
                     };
-                    pairs.push((Node::Str(k, QuoteType::Unquoted), value));
+                    pairs.push((Node::Str(k, QuoteType::Unquoted, BlockStyle::None), value));
                 }
 
                 Node::Mapping(pairs)
@@ -1503,10 +1505,10 @@ mod tests {
         let mut source = Buffer::new(b"[<tag, 'quoted', \"double\", >folded]");
         let result = parse(&mut source).unwrap();
         let expected = Node::Documents(vec![Document(vec![Node::Array(vec![
-            Node::Str("<tag".to_string(), QuoteType::Unquoted),
-            Node::Str("quoted".to_string(), QuoteType::Single),
-            Node::Str("double".to_string(), QuoteType::Double),
-            Node::Str(">folded".to_string(), QuoteType::Unquoted),
+            Node::Str("<tag".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            Node::Str("quoted".to_string(), QuoteType::Single, BlockStyle::None),
+            Node::Str("double".to_string(), QuoteType::Double, BlockStyle::None),
+            Node::Str(">folded".to_string(), QuoteType::Unquoted, BlockStyle::None),
         ])])]);
         assert_eq!(result, expected);
     }
@@ -1517,7 +1519,7 @@ mod tests {
         let mut source = Buffer::new(yaml);
         let result = parse(&mut source).unwrap();
         let expected = Node::Documents(vec![Document(vec![Node::Array(vec![
-            Node::Str("line1\nline2".to_string(), QuoteType::Double),
+            Node::Str("line1\nline2".to_string(), QuoteType::Double, BlockStyle::None),
             Node::Number(Numeric::Integer(2)),
         ])])]);
         assert_eq!(result, expected);
@@ -1530,8 +1532,8 @@ mod tests {
         let result = parse(&mut source).unwrap();
         let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![
             (
-                Node::Str("a".to_string(), QuoteType::Unquoted),
-                Node::Str("hello\nworld".to_string(), QuoteType::Single),
+                Node::Str("a".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Str("hello\nworld".to_string(), QuoteType::Single, BlockStyle::None),
             ),
         ])])]);
         assert_eq!(result, expected);
@@ -1544,7 +1546,7 @@ mod tests {
         let result = parse(&mut source).unwrap();
         let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![
             (
-                Node::Str("multi\nline".to_string(), QuoteType::Double),
+                Node::Str("multi\nline".to_string(), QuoteType::Double, BlockStyle::None),
                 Node::Number(Numeric::Integer(1)),
             ),
         ])])]);
@@ -1565,8 +1567,8 @@ mod tests {
         let result = parse(&mut source).unwrap();
         let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![
             (
-                Node::Str("string1".to_string(), QuoteType::Unquoted),
-                Node::Str("  Line1\n  line2".to_string(), QuoteType::Unquoted),
+                Node::Str("string1".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Str("  Line1\n  line2".to_string(), QuoteType::Unquoted, BlockStyle::Literal),
             ),
         ])])]);
         assert_eq!(result, expected);
@@ -1579,8 +1581,8 @@ mod tests {
         let result = parse(&mut source).unwrap();
         let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![
             (
-                Node::Str("string1".to_string(), QuoteType::Unquoted),
-                Node::Str("  Line1\n  line2".to_string(), QuoteType::Unquoted),
+                Node::Str("string1".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Str("  Line1\n  line2".to_string(), QuoteType::Unquoted, BlockStyle::Folded),
             ),
         ])])]);
         assert_eq!(result, expected);
