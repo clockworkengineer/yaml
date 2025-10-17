@@ -49,7 +49,20 @@ fn stringify_document_with_indent(
                 }
                 destination.add_bytes(&format!("{}'{}'", indent_str, escape_single(s)))
             }
-            QuoteType::Unquoted => destination.add_bytes(&format!("{}{}", indent_str, s)),
+            QuoteType::Unquoted => {
+                // Emit multiline unquoted strings as literal block scalars '|' so they round-trip.
+                if s.contains('\n') {
+                    // choose an explicit indent equal to current indentation + 1 (two spaces per indent level)
+                    let content_indent = "  ".repeat(indent + 1);
+                    // write header with explicit indent level (number of spaces)
+                    destination.add_bytes(&format!("{}|{}\n", indent_str, ""));
+                    for line in s.split('\n') {
+                        destination.add_bytes(&format!("{}{}\n", content_indent, line));
+                    }
+                } else {
+                    destination.add_bytes(&format!("{}{}", indent_str, s))
+                }
+            }
         },
         Node::Comment(c) => destination.add_bytes(&format!("{}# {}", indent_str, c)),
         Node::Number(num) => match num {
@@ -194,7 +207,11 @@ mod tests {
     #[test]
     fn test_stringify_string() {
         let mut dest = Buffer::new();
-        stringify(&Node::Str("test".to_string(), QuoteType::Double, BlockStyle::None), &mut dest).unwrap();
+        stringify(
+            &Node::Str("test".to_string(), QuoteType::Double, BlockStyle::None),
+            &mut dest,
+        )
+        .unwrap();
         assert_eq!(dest.to_string(), "\"test\"");
     }
 
@@ -297,7 +314,11 @@ mod tests {
     #[test]
     fn test_stringify_double_quoted_multiline_scalar() {
         let mut dest = Buffer::new();
-        let node = Node::Str("line1\nline2".to_string(), QuoteType::Double, BlockStyle::None);
+        let node = Node::Str(
+            "line1\nline2".to_string(),
+            QuoteType::Double,
+            BlockStyle::None,
+        );
         stringify(&node, &mut dest).unwrap();
         assert_eq!(dest.to_string(), "\"line1\nline2\"");
     }
@@ -305,7 +326,11 @@ mod tests {
     #[test]
     fn test_stringify_single_quoted_multiline_and_escaping() {
         let mut dest = Buffer::new();
-        let node = Node::Str("O'Reilly\nBooks".to_string(), QuoteType::Single, BlockStyle::None);
+        let node = Node::Str(
+            "O'Reilly\nBooks".to_string(),
+            QuoteType::Single,
+            BlockStyle::None,
+        );
         stringify(&node, &mut dest).unwrap();
         assert_eq!(dest.to_string(), "'O''Reilly\nBooks'");
     }
@@ -313,9 +338,10 @@ mod tests {
     #[test]
     fn test_stringify_mapping_with_multiline_value() {
         let mut dest = Buffer::new();
-        let mapping = Node::Mapping(vec![
-            (Node::Str("key".to_string(), QuoteType::Unquoted, BlockStyle::None), Node::Str("a\nb".to_string(), QuoteType::Double, BlockStyle::None)),
-        ]);
+        let mapping = Node::Mapping(vec![(
+            Node::Str("key".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            Node::Str("a\nb".to_string(), QuoteType::Double, BlockStyle::None),
+        )]);
         stringify(&mapping, &mut dest).unwrap();
         assert_eq!(dest.to_string(), "key: \"a\nb\"\n");
     }
@@ -323,7 +349,11 @@ mod tests {
     #[test]
     fn test_stringify_sequence_with_multiline_item() {
         let mut dest = Buffer::new();
-        let seq = Node::Array(vec![Node::Str("a\nb".to_string(), QuoteType::Double, BlockStyle::None)]);
+        let seq = Node::Array(vec![Node::Str(
+            "a\nb".to_string(),
+            QuoteType::Double,
+            BlockStyle::None,
+        )]);
         stringify(&seq, &mut dest).unwrap();
         assert_eq!(dest.to_string(), "- \"a\nb\"\n");
     }

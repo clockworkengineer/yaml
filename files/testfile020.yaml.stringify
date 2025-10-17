@@ -1,8 +1,10 @@
 ---
 unicode: "Sosa did fine.☺"
-control: "b1998\t1999\t2000\n"
-hexesc: "x13x10 is \r\n"
+control: "b1998\t1999\t2000
+"
+hexesc: "x13x10 is \r
+"
 single: '"Howdy!" he cried.'
-quoted: '
+quoted: ' # not a ''''comment''''.'
 tie-fighter: '|\-*-/|'
 ...

@@ -4,7 +4,7 @@
 
 use crate::io::traits::ISource;
 use crate::nodes::node::Node::Document;
-use crate::nodes::node::{Node, Numeric, QuoteType, BlockStyle};
+use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
 use crate::parser::constants::*;
 use crate::parser::utils::{
     collect_until, read_line_trimmed_into_string, skip_whitespace_and_comments,
@@ -113,7 +113,7 @@ fn read_quoted_flow_scalar(source: &mut dyn ISource) -> Result<String, String> {
             return Err(format!(
                 "{}",
                 parse_error(source, &format!("Expected quote, found '{}'", other))
-            ))
+            ));
         }
         None => return Err(parse_error(source, "Unexpected EOF while expecting quote")),
     };
@@ -162,7 +162,7 @@ fn read_quoted_flow_scalar(source: &mut dyn ISource) -> Result<String, String> {
                 return Err(parse_error(
                     source,
                     "Unterminated quoted scalar in flow context",
-                ))
+                ));
             }
         }
     }
@@ -235,9 +235,10 @@ fn parse_mapping_key(source: &mut dyn ISource) -> Result<(Node, bool), String> {
 
     // parse_scalar expects a &str and returns Node; ensure keys are Str nodes
     match raw.trim() {
-        v if v.starts_with(CHAR_HASH) => {
-            Ok((Node::Str(v.to_string(), QuoteType::Unquoted, BlockStyle::None), newline))
-        }
+        v if v.starts_with(CHAR_HASH) => Ok((
+            Node::Str(v.to_string(), QuoteType::Unquoted, BlockStyle::None),
+            newline,
+        )),
         v => Ok((parse_scalar(v), newline)),
     }
 }
@@ -255,17 +256,24 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
             let trimmed = value.trim();
             if trimmed == "|" || trimmed == ">" {
                 // Minimal block scalar support: collect indented lines following the '|' (literal) or '>' (folded)
-                let folded = trimmed == ">";
+                // NOTE: convert folded ('>') into literal content (preserve newlines) per requested behavior
+                let _folded = trimmed == ">";
                 // Consume the newline after the block style indicator
-                if source.current() == Some(CHAR_NEWLINE) { source.next(); }
+                if source.current() == Some(CHAR_NEWLINE) {
+                    source.next();
+                }
                 let mut out = String::new();
                 let mut base_indent: Option<usize> = None;
                 let mut first = true;
                 loop {
-                    if source.current().is_none() { break; }
+                    if source.current().is_none() {
+                        break;
+                    }
                     // Establish base indent on first content line by counting leading spaces without consuming
                     if base_indent.is_none() {
-                        if source.current() == Some(CHAR_NEWLINE) { break; }
+                        if source.current() == Some(CHAR_NEWLINE) {
+                            break;
+                        }
                         let st = source.save_state();
                         let mut count = 0usize;
                         while let Some(' ') = source.current() {
@@ -285,17 +293,27 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
                         source.next();
                     }
                     source.restore_state(st_line);
-                    if cur_indent < bi { break; }
+                    if cur_indent < bi {
+                        break;
+                    }
 
                     // Do not strip indentation for literal block scalars; keep lines as-is
                     let line = collect_until(source, |c| c == CHAR_NEWLINE);
-                    if !first { out.push('\n'); } else { first = false; }
+                    if !first {
+                        out.push('\n');
+                    } else {
+                        first = false;
+                    }
                     out.push_str(&line);
                     // Consume newline if present and continue looping
-                    if source.current() == Some(CHAR_NEWLINE) { source.next(); } else { break; }
+                    if source.current() == Some(CHAR_NEWLINE) {
+                        source.next();
+                    } else {
+                        break;
+                    }
                 }
-                let style = if folded { BlockStyle::Folded } else { BlockStyle::Literal };
-                Ok(Node::Str(out, QuoteType::Unquoted, style))
+                // Always store as Literal (preserve raw newlines). Stringify will emit '|' for multiline strings.
+                Ok(Node::Str(out, QuoteType::Unquoted, BlockStyle::Literal))
             } else if !trimmed.is_empty() {
                 Ok(parse_scalar(trimmed))
             } else {
@@ -324,7 +342,9 @@ fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, String> {
         // Parse key as Node
         let key_node = {
             let raw = match source.current() {
-                Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => read_quoted_flow_scalar(source)?,
+                Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
+                    read_quoted_flow_scalar(source)?
+                }
                 _ => collect_until(source, |c| c == CHAR_COLON || c == CHAR_RBRACE),
             };
             if source.current() != Some(CHAR_COLON) {
@@ -474,7 +494,9 @@ fn parse_scalar(value: &str) -> Node {
     // Check if the value is a comment (starts with #)
     match value {
         // Treat leading '#' in a scalar as a plain string. Parser consumes comment lines elsewhere.
-        v if v.starts_with(CHAR_HASH) => Node::Str(v.to_string(), QuoteType::Unquoted, BlockStyle::None),
+        v if v.starts_with(CHAR_HASH) => {
+            Node::Str(v.to_string(), QuoteType::Unquoted, BlockStyle::None)
+        }
         "null" | "~" => Node::None,
         "true" => Node::Boolean(true),
         "false" => Node::Boolean(false),
@@ -638,7 +660,11 @@ pub fn parse_document_contents(
             // Parse key (support only a flow sequence or plain scalar until EOL)
             let key_node = match source.current() {
                 Some(CHAR_LBRACKET) => parse_inline_sequence(source)?,
-                Some(_) => Node::Str(read_line_trimmed_into_string(source), QuoteType::Unquoted, BlockStyle::None),
+                Some(_) => Node::Str(
+                    read_line_trimmed_into_string(source),
+                    QuoteType::Unquoted,
+                    BlockStyle::None,
+                ),
                 None => Node::Str(String::new(), QuoteType::Unquoted, BlockStyle::None),
             };
             if source.current() == Some(CHAR_NEWLINE) {
@@ -838,7 +864,11 @@ mod tests {
         );
         assert_eq!(
             parse_scalar("#comment"),
-            Node::Str("#comment".to_string(), QuoteType::Unquoted, BlockStyle::None)
+            Node::Str(
+                "#comment".to_string(),
+                QuoteType::Unquoted,
+                BlockStyle::None
+            )
         );
     }
 
@@ -1068,7 +1098,10 @@ mod tests {
         ]);
 
         let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![
-            (Node::Str("key1".to_string(), QuoteType::Unquoted, BlockStyle::None), sequence),
+            (
+                Node::Str("key1".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                sequence,
+            ),
             (
                 Node::Str("key2".to_string(), QuoteType::Unquoted, BlockStyle::None),
                 Node::Str("value2".to_string(), QuoteType::Unquoted, BlockStyle::None),
@@ -1089,7 +1122,10 @@ mod tests {
         let expected = Node::Documents(vec![Document(vec![
             // Node::Comment("Comment 1".to_string()),
             Node::Mapping(vec![
-                (Node::Str("key1".to_string(), QuoteType::Unquoted, BlockStyle::None), sequence),
+                (
+                    Node::Str("key1".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                    sequence,
+                ),
                 (
                     Node::Str("key2".to_string(), QuoteType::Unquoted, BlockStyle::None),
                     Node::Str("value2".to_string(), QuoteType::Unquoted, BlockStyle::None),
@@ -1304,7 +1340,11 @@ mod tests {
         let mut mark_map = HashMap::new();
         mark_map.insert(
             "name".to_string(),
-            Node::Str("Mark Joseph".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            Node::Str(
+                "Mark Joseph".to_string(),
+                QuoteType::Unquoted,
+                BlockStyle::None,
+            ),
         );
         mark_map.insert("hr".to_string(), Node::Number(Numeric::Integer(87)));
         mark_map.insert("avg".to_string(), Node::Number(Numeric::Float(0.278)));
@@ -1312,7 +1352,11 @@ mod tests {
         let mut james_map = HashMap::new();
         james_map.insert(
             "name".to_string(),
-            Node::Str("James Stephen".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            Node::Str(
+                "James Stephen".to_string(),
+                QuoteType::Unquoted,
+                BlockStyle::None,
+            ),
         );
         james_map.insert("hr".to_string(), Node::Number(Numeric::Integer(63)));
         james_map.insert("avg".to_string(), Node::Number(Numeric::Float(0.288)));
@@ -1321,7 +1365,11 @@ mod tests {
             Node::Mapping(vec![
                 (
                     Node::Str("name".to_string(), QuoteType::Unquoted, BlockStyle::None),
-                    Node::Str("Mark Joseph".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                    Node::Str(
+                        "Mark Joseph".to_string(),
+                        QuoteType::Unquoted,
+                        BlockStyle::None,
+                    ),
                 ),
                 (
                     Node::Str("hr".to_string(), QuoteType::Unquoted, BlockStyle::None),
@@ -1335,7 +1383,11 @@ mod tests {
             Node::Mapping(vec![
                 (
                     Node::Str("name".to_string(), QuoteType::Unquoted, BlockStyle::None),
-                    Node::Str("James Stephen".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                    Node::Str(
+                        "James Stephen".to_string(),
+                        QuoteType::Unquoted,
+                        BlockStyle::None,
+                    ),
                 ),
                 (
                     Node::Str("hr".to_string(), QuoteType::Unquoted, BlockStyle::None),
@@ -1453,7 +1505,11 @@ mod tests {
         let mut expected = HashMap::new();
         expected.insert(
             "key".to_string(),
-            Node::Str("> hello world".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            Node::Str(
+                "> hello world".to_string(),
+                QuoteType::Unquoted,
+                BlockStyle::None,
+            ),
         );
         assert_eq!(
             result,
@@ -1480,7 +1536,11 @@ mod tests {
         let mut expected = HashMap::new();
         expected.insert(
             "key".to_string(),
-            Node::Str("> multi line".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            Node::Str(
+                "> multi line".to_string(),
+                QuoteType::Unquoted,
+                BlockStyle::None,
+            ),
         );
         assert_eq!(
             result,
@@ -1519,7 +1579,11 @@ mod tests {
         let mut source = Buffer::new(yaml);
         let result = parse(&mut source).unwrap();
         let expected = Node::Documents(vec![Document(vec![Node::Array(vec![
-            Node::Str("line1\nline2".to_string(), QuoteType::Double, BlockStyle::None),
+            Node::Str(
+                "line1\nline2".to_string(),
+                QuoteType::Double,
+                BlockStyle::None,
+            ),
             Node::Number(Numeric::Integer(2)),
         ])])]);
         assert_eq!(result, expected);
@@ -1530,12 +1594,14 @@ mod tests {
         let yaml = b"{a: 'hello\nworld'}";
         let mut source = Buffer::new(yaml);
         let result = parse(&mut source).unwrap();
-        let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![
-            (
-                Node::Str("a".to_string(), QuoteType::Unquoted, BlockStyle::None),
-                Node::Str("hello\nworld".to_string(), QuoteType::Single, BlockStyle::None),
+        let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![(
+            Node::Str("a".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            Node::Str(
+                "hello\nworld".to_string(),
+                QuoteType::Single,
+                BlockStyle::None,
             ),
-        ])])]);
+        )])])]);
         assert_eq!(result, expected);
     }
 
@@ -1544,12 +1610,14 @@ mod tests {
         let yaml = b"{\"multi\nline\": 1}";
         let mut source = Buffer::new(yaml);
         let result = parse(&mut source).unwrap();
-        let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![
-            (
-                Node::Str("multi\nline".to_string(), QuoteType::Double, BlockStyle::None),
-                Node::Number(Numeric::Integer(1)),
+        let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![(
+            Node::Str(
+                "multi\nline".to_string(),
+                QuoteType::Double,
+                BlockStyle::None,
             ),
-        ])])]);
+            Node::Number(Numeric::Integer(1)),
+        )])])]);
         assert_eq!(result, expected);
     }
 
@@ -1565,12 +1633,14 @@ mod tests {
         let yaml = b"---\nstring1: |\n  Line1\n  line2\n";
         let mut source = Buffer::new(yaml);
         let result = parse(&mut source).unwrap();
-        let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![
-            (
-                Node::Str("string1".to_string(), QuoteType::Unquoted, BlockStyle::None),
-                Node::Str("  Line1\n  line2".to_string(), QuoteType::Unquoted, BlockStyle::Literal),
+        let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![(
+            Node::Str("string1".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            Node::Str(
+                "  Line1\n  line2".to_string(),
+                QuoteType::Unquoted,
+                BlockStyle::Literal,
             ),
-        ])])]);
+        )])])]);
         assert_eq!(result, expected);
     }
 
@@ -1579,15 +1649,14 @@ mod tests {
         let yaml = b"---\nstring1: >\n  Line1\n  line2\n";
         let mut source = Buffer::new(yaml);
         let result = parse(&mut source).unwrap();
-        let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![
-            (
-                Node::Str("string1".to_string(), QuoteType::Unquoted, BlockStyle::None),
-                Node::Str("  Line1\n  line2".to_string(), QuoteType::Unquoted, BlockStyle::Folded),
+        let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![(
+            Node::Str("string1".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            Node::Str(
+                "  Line1\n  line2".to_string(),
+                QuoteType::Unquoted,
+                BlockStyle::Literal,
             ),
-        ])])]);
+        )])])]);
         assert_eq!(result, expected);
     }
-
-
-
 }
