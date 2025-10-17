@@ -10,56 +10,46 @@ fn stringify_document_with_indent(
     match node {
         Node::None => destination.add_bytes(&format!("{}null", indent_str)),
         Node::Boolean(b) => destination.add_bytes(&format!("{}{}", indent_str, b)),
-        Node::Str(s, qt) => {
-            // If the string contains newlines, emit it as a literal block scalar
-            // with the '|' indicator, starting on a new line. Keep the content
-            // unchanged to preserve any existing indentation inside.
-            if s.contains('\n') {
-                destination.add_bytes(&format!("{}|\n", indent_str));
-                destination.add_bytes(s);
-            } else {
-                match qt {
-                    QuoteType::Double => {
-                        // escape common sequences for double-quoted output
-                        fn escape_double(s: &str) -> String {
-                            let mut out = String::with_capacity(s.len());
-                            for c in s.chars() {
-                                match c {
-                                    // Preserve literal newlines to support multi-line flow scalars
-                                    '\n' => out.push('\n'),
-                                    '\r' => out.push_str("\\r"),
-                                    '\t' => out.push_str("\\t"),
-                                    '\\' => out.push_str("\\\\"),
-                                    '"' => out.push_str("\\\""),
-                                    c if (c as u32) < 0x20 || (c as u32) == 0x7f => {
-                                        out.push_str(&format!("\\u{:04x}", c as u32));
-                                    }
-                                    other => out.push(other),
-                                }
+        Node::Str(s, qt) => match qt {
+            QuoteType::Double => {
+                // escape common sequences for double-quoted output
+                fn escape_double(s: &str) -> String {
+                    let mut out = String::with_capacity(s.len());
+                    for c in s.chars() {
+                        match c {
+                            // Preserve literal newlines to support multi-line flow scalars
+                            '\n' => out.push('\n'),
+                            '\r' => out.push_str("\\r"),
+                            '\t' => out.push_str("\\t"),
+                            '\\' => out.push_str("\\\\"),
+                            '"' => out.push_str("\\\""),
+                            c if (c as u32) < 0x20 || (c as u32) == 0x7f => {
+                                out.push_str(&format!("\\u{:04x}", c as u32));
                             }
-                            out
+                            other => out.push(other),
                         }
-                        destination.add_bytes(&format!("{}\"{}\"", indent_str, escape_double(s)))
                     }
-                    QuoteType::Single => {
-                        // In single-quoted YAML scalars, single quotes are represented by doubling them
-                        fn escape_single(s: &str) -> String {
-                            let mut out = String::with_capacity(s.len());
-                            for c in s.chars() {
-                                if c == '\'' {
-                                    out.push('\'');
-                                    out.push('\'');
-                                } else {
-                                    out.push(c);
-                                }
-                            }
-                            out
-                        }
-                        destination.add_bytes(&format!("{}'{}'", indent_str, escape_single(s)))
-                    }
-                    QuoteType::Unquoted => destination.add_bytes(&format!("{}{}", indent_str, s)),
+                    out
                 }
+                destination.add_bytes(&format!("{}\"{}\"", indent_str, escape_double(s)))
             }
+            QuoteType::Single => {
+                // In single-quoted YAML scalars, single quotes are represented by doubling them
+                fn escape_single(s: &str) -> String {
+                    let mut out = String::with_capacity(s.len());
+                    for c in s.chars() {
+                        if c == '\'' {
+                            out.push('\'');
+                            out.push('\'');
+                        } else {
+                            out.push(c);
+                        }
+                    }
+                    out
+                }
+                destination.add_bytes(&format!("{}'{}'", indent_str, escape_single(s)))
+            }
+            QuoteType::Unquoted => destination.add_bytes(&format!("{}{}", indent_str, s)),
         },
         Node::Comment(c) => destination.add_bytes(&format!("{}# {}", indent_str, c)),
         Node::Number(num) => match num {
@@ -71,12 +61,6 @@ fn stringify_document_with_indent(
             for item in items {
                 destination.add_bytes(&format!("{}- ", indent_str));
                 match item {
-                    // If the item is a multi-line string, emit a literal block scalar
-                    Node::Str(s, _) if s.contains('\n') => {
-                        destination.add_bytes("|\n");
-                        destination.add_bytes(s);
-                        destination.add_bytes("\n");
-                    }
                     Node::Mapping(_) => {
                         // Serialize mapping into a temporary buffer at child
                         // indent and strip that leading indent once so the
@@ -123,12 +107,6 @@ fn stringify_document_with_indent(
                 destination.add_bytes(&format!("{}{}: ", indent_str, key_str));
 
                 match value {
-                    // For any multi-line string scalar, emit a literal block indicator and content.
-                    Node::Str(s, _) if s.contains('\n') => {
-                        destination.add_bytes("|\n");
-                        destination.add_bytes(s);
-                        destination.add_bytes("\n");
-                    }
                     Node::Array(_) | Node::Mapping(_) => {
                         destination.add_bytes("\n");
                         stringify_document_with_indent(value, destination, indent + 1)?;

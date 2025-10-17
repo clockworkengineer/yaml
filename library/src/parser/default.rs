@@ -1559,7 +1559,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_literal_block_scalar_simple() {
+    fn test_parse_literal_block_literal_scalar_with_indent() {
         let yaml = b"---\nstring1: |\n  Line1\n  line2\n";
         let mut source = Buffer::new(yaml);
         let result = parse(&mut source).unwrap();
@@ -1571,4 +1571,21 @@ mod tests {
         ])])]);
         assert_eq!(result, expected);
     }
+
+    #[test]
+    fn test_parse_literal_block_folded_scalar_with_indent() {
+        let yaml = b"---\nstring1: >\n  Line1\n  line2\n";
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source).unwrap();
+        let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![
+            (
+                Node::Str("string1".to_string(), QuoteType::Unquoted),
+                Node::Str("  Line1\n  line2".to_string(), QuoteType::Unquoted),
+            ),
+        ])])]);
+        assert_eq!(result, expected);
+    }
+
+
+
 }
