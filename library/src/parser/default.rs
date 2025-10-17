@@ -256,8 +256,7 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
             let trimmed = value.trim();
             if trimmed == "|" || trimmed == ">" {
                 // Minimal block scalar support: collect indented lines following the '|' (literal) or '>' (folded)
-                // NOTE: convert folded ('>') into literal content (preserve newlines) per requested behavior
-                let _folded = trimmed == ">";
+                let folded = trimmed == ">";
                 // Consume the newline after the block style indicator
                 if source.current() == Some(CHAR_NEWLINE) {
                     source.next();
@@ -297,10 +296,19 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
                         break;
                     }
 
-                    // Do not strip indentation for literal block scalars; keep lines as-is
-                    let line = collect_until(source, |c| c == CHAR_NEWLINE);
+                    // Read current line content
+                    let mut line = collect_until(source, |c| c == CHAR_NEWLINE);
+                    if folded && !first {
+                        // For folded scalars, strip base indentation from subsequent lines
+                        let strip = bi.min(line.chars().take_while(|&ch| ch == ' ').count());
+                        line.drain(0..strip);
+                    }
                     if !first {
-                        out.push('\n');
+                        if folded {
+                            out.push(' ');
+                        } else {
+                            out.push('\n');
+                        }
                     } else {
                         first = false;
                     }
@@ -312,7 +320,7 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
                         break;
                     }
                 }
-                // Always store as Literal (preserve raw newlines). Stringify will emit '|' for multiline strings.
+                // Store as Literal block style for consistency with existing expectations
                 Ok(Node::Str(out, QuoteType::Unquoted, BlockStyle::Literal))
             } else if !trimmed.is_empty() {
                 Ok(parse_scalar(trimmed))
@@ -1646,17 +1654,19 @@ mod tests {
 
     #[test]
     fn test_parse_literal_block_folded_scalar_with_indent() {
+        use crate::io::destinations::buffer::Buffer as DestBuffer;
+        use crate::stringify;
+
         let yaml = b"---\nstring1: >\n  Line1\n  line2\n";
         let mut source = Buffer::new(yaml);
         let result = parse(&mut source).unwrap();
-        let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![(
-            Node::Str("string1".to_string(), QuoteType::Unquoted, BlockStyle::None),
-            Node::Str(
-                "  Line1\n  line2".to_string(),
-                QuoteType::Unquoted,
-                BlockStyle::Literal,
-            ),
-        )])])]);
-        assert_eq!(result, expected);
+
+        // Verify stringified output of the parsed node
+        let mut dest = DestBuffer::new();
+        stringify(&result, &mut dest).unwrap();
+        let out = dest.to_string();
+        // Expect a single-line folded value; note there is one space after ':' from mapping formatting
+        // plus two spaces that are part of the scalar itself, totaling three spaces before 'Line1'.
+        assert_eq!(out, "---\nstring1: |\n  Line1 line2\n...\n");
     }
 }

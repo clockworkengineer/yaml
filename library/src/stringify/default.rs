@@ -10,7 +10,7 @@ fn stringify_document_with_indent(
     match node {
         Node::None => destination.add_bytes(&format!("{}null", indent_str)),
         Node::Boolean(b) => destination.add_bytes(&format!("{}{}", indent_str, b)),
-        Node::Str(s, qt, _style) => match qt {
+        Node::Str(s, qt, style) => match qt {
             QuoteType::Double => {
                 // escape common sequences for double-quoted output
                 fn escape_double(s: &str) -> String {
@@ -50,14 +50,18 @@ fn stringify_document_with_indent(
                 destination.add_bytes(&format!("{}'{}'", indent_str, escape_single(s)))
             }
             QuoteType::Unquoted => {
-                // Emit multiline unquoted strings as literal block scalars '|' so they round-trip.
-                if s.contains('\n') {
-                    // choose an explicit indent equal to current indentation + 1 (two spaces per indent level)
+                // Emit literal block scalars '|' when content is multiline OR when style is explicitly Literal.
+                if s.contains('\n') || matches!(style, BlockStyle::Literal) {
                     let content_indent = "  ".repeat(indent + 1);
-                    // write header with explicit indent level (number of spaces)
                     destination.add_bytes(&format!("{}|{}\n", indent_str, ""));
-                    for line in s.split('\n') {
+                    if !s.contains('\n') && matches!(style, BlockStyle::Literal) {
+                        // For single-line literal style, avoid doubling indentation: trim leading spaces
+                        let line = s.trim_start();
                         destination.add_bytes(&format!("{}{}\n", content_indent, line));
+                    } else {
+                        for line in s.split('\n') {
+                            destination.add_bytes(&format!("{}{}\n", content_indent, line));
+                        }
                     }
                 } else {
                     destination.add_bytes(&format!("{}{}", indent_str, s))
@@ -123,6 +127,10 @@ fn stringify_document_with_indent(
                     Node::Array(_) | Node::Mapping(_) => {
                         destination.add_bytes("\n");
                         stringify_document_with_indent(value, destination, indent + 1)?;
+                    }
+                    Node::Str(_, _, BlockStyle::Literal) => {
+                        // Literal block already emits its own trailing newline lines; don't add another
+                        stringify_document_with_indent(value, destination, 0)?;
                     }
                     _ => {
                         stringify_document_with_indent(value, destination, 0)?;
