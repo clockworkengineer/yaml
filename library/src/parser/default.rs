@@ -105,6 +105,71 @@ fn skip_until_newline(source: &mut dyn ISource) {
     }
 }
 
+// Read a quoted flow scalar that may span multiple lines. Returns the raw text including quotes.
+fn read_quoted_flow_scalar(source: &mut dyn ISource) -> Result<String, String> {
+    let quote = match source.current() {
+        Some(c) if c == CHAR_SINGLE_QUOTE || c == CHAR_DOUBLE_QUOTE => c,
+        Some(other) => {
+            return Err(format!(
+                "{}",
+                parse_error(source, &format!("Expected quote, found '{}'", other))
+            ))
+        }
+        None => return Err(parse_error(source, "Unexpected EOF while expecting quote")),
+    };
+    let mut out = String::new();
+    out.push(quote);
+    source.next();
+
+    let mut prev_was_backslash = false;
+    loop {
+        match source.current() {
+            Some(c) => {
+                out.push(c);
+                source.next();
+
+                if c == quote {
+                    if quote == CHAR_SINGLE_QUOTE {
+                        // In single-quoted scalars, doubled single quotes represent a literal single quote
+                        if source.current() == Some(CHAR_SINGLE_QUOTE) {
+                            out.push(CHAR_SINGLE_QUOTE);
+                            source.next();
+                            continue;
+                        } else {
+                            break; // closing quote
+                        }
+                    } else {
+                        // double-quoted: a quote is closing unless escaped by a backslash
+                        if prev_was_backslash {
+                            // it was escaped, keep going
+                            prev_was_backslash = false;
+                            continue;
+                        } else {
+                            break; // closing quote
+                        }
+                    }
+                }
+
+                if quote == CHAR_DOUBLE_QUOTE {
+                    if c == '\\' {
+                        prev_was_backslash = !prev_was_backslash;
+                    } else {
+                        prev_was_backslash = false;
+                    }
+                }
+            }
+            None => {
+                return Err(parse_error(
+                    source,
+                    "Unterminated quoted scalar in flow context",
+                ))
+            }
+        }
+    }
+
+    Ok(out)
+}
+
 fn peek_ahead_for_document_start_end(source: &mut dyn ISource, c: char) -> bool {
     if source.current() != Some(c) {
         return false;
@@ -180,10 +245,56 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
     match source.current() {
         Some(CHAR_LBRACE) => parse_inline_mapping(source),
         Some(CHAR_LBRACKET) => parse_inline_sequence(source),
+        Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
+            let raw = read_quoted_flow_scalar(source)?;
+            let trimmed = raw.trim();
+            Ok(parse_scalar(trimmed))
+        }
         Some(_) => {
             let value = collect_until(source, |c| c == CHAR_NEWLINE || c == CHAR_HASH);
             let trimmed = value.trim();
-            if !trimmed.is_empty() {
+            if trimmed == "|" {
+                // Minimal literal block scalar support: collect indented lines following the '|'
+                // Consume the newline after '|'
+                if source.current() == Some(CHAR_NEWLINE) { source.next(); }
+                let mut out = String::new();
+                let mut base_indent: Option<usize> = None;
+                let mut first = true;
+                loop {
+                    if source.current().is_none() { break; }
+                    // Establish base indent on first content line by counting leading spaces without consuming
+                    if base_indent.is_none() {
+                        if source.current() == Some(CHAR_NEWLINE) { break; }
+                        let st = source.save_state();
+                        let mut count = 0usize;
+                        while let Some(' ') = source.current() {
+                            count += 1;
+                            source.next();
+                        }
+                        base_indent = Some(count);
+                        source.restore_state(st);
+                    }
+                    let bi = base_indent.unwrap_or(0);
+                    // If current line has less indent than base, stop the block
+                    // Count current line's spaces (consuming then restoring)
+                    let st_line = source.save_state();
+                    let mut cur_indent = 0usize;
+                    while let Some(' ') = source.current() {
+                        cur_indent += 1;
+                        source.next();
+                    }
+                    source.restore_state(st_line);
+                    if cur_indent < bi { break; }
+
+                    // Do not strip indentation for literal block scalars; keep lines as-is
+                    let line = collect_until(source, |c| c == CHAR_NEWLINE);
+                    if !first { out.push('\n'); } else { first = false; }
+                    out.push_str(&line);
+                    // Consume newline if present and continue looping
+                    if source.current() == Some(CHAR_NEWLINE) { source.next(); } else { break; }
+                }
+                Ok(Node::Str(out, QuoteType::Unquoted))
+            } else if !trimmed.is_empty() {
                 Ok(parse_scalar(trimmed))
             } else {
                 Ok(Node::None)
@@ -210,8 +321,10 @@ fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, String> {
     loop {
         // Parse key as Node
         let key_node = {
-            // collect until ':' or '}'
-            let raw = collect_until(source, |c| c == CHAR_COLON || c == CHAR_RBRACE);
+            let raw = match source.current() {
+                Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => read_quoted_flow_scalar(source)?,
+                _ => collect_until(source, |c| c == CHAR_COLON || c == CHAR_RBRACE),
+            };
             if source.current() != Some(CHAR_COLON) {
                 return Err(parse_error(source, ERR_EXPECT_COLON_INLINE_MAPPING));
             }
@@ -228,6 +341,10 @@ fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, String> {
         let value_node = match source.current() {
             Some(CHAR_LBRACE) => parse_inline_mapping(source)?,
             Some(CHAR_LBRACKET) => parse_inline_sequence(source)?,
+            Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
+                let raw = read_quoted_flow_scalar(source)?;
+                parse_scalar(raw.trim())
+            }
             Some(_) => {
                 // collect until ',' or '}' or '#'
                 let val = collect_until(source, |c| {
@@ -292,19 +409,27 @@ fn parse_inline_sequence(source: &mut dyn ISource) -> Result<Node, String> {
                 items.push(nested_map);
             }
             Some(_) => {
-                // collect until ',' or ']' or '#'
-                let val = collect_until(source, |c| {
-                    c == CHAR_COMMA || c == CHAR_RBRACKET || c == CHAR_HASH
-                });
-                let trimmed = val.trim();
-                if !trimmed.is_empty() {
-                    items.push(parse_scalar(trimmed));
-                } else if source.current() == Some(CHAR_RBRACKET)
-                    || source.current() == Some(CHAR_COMMA)
-                {
-                    // allow empty entries to be ignored
-                } else {
-                    // No valid item
+                // If the item starts with a quote, read a full quoted scalar (may span lines)
+                let node = match source.current() {
+                    Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
+                        let raw = read_quoted_flow_scalar(source)?;
+                        parse_scalar(raw.trim())
+                    }
+                    _ => {
+                        // collect until ',' or ']' or '#'
+                        let val = collect_until(source, |c| {
+                            c == CHAR_COMMA || c == CHAR_RBRACKET || c == CHAR_HASH
+                        });
+                        let trimmed = val.trim();
+                        if trimmed.is_empty() {
+                            Node::None
+                        } else {
+                            parse_scalar(trimmed)
+                        }
+                    }
+                };
+                if !matches!(node, Node::None) {
+                    items.push(node);
                 }
             }
             None => return Err(parse_error(source, ERR_EOF_INLINE_SEQUENCE)),
@@ -1385,11 +1510,65 @@ mod tests {
         ])])]);
         assert_eq!(result, expected);
     }
-    #[test]
 
+    #[test]
+    fn test_flow_multiline_double_quoted_in_sequence() {
+        let yaml = b"[\n\"line1\nline2\", 2\n]";
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source).unwrap();
+        let expected = Node::Documents(vec![Document(vec![Node::Array(vec![
+            Node::Str("line1\nline2".to_string(), QuoteType::Double),
+            Node::Number(Numeric::Integer(2)),
+        ])])]);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_flow_multiline_single_quoted_mapping_value() {
+        let yaml = b"{a: 'hello\nworld'}";
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source).unwrap();
+        let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![
+            (
+                Node::Str("a".to_string(), QuoteType::Unquoted),
+                Node::Str("hello\nworld".to_string(), QuoteType::Single),
+            ),
+        ])])]);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_flow_multiline_quoted_key_in_inline_mapping() {
+        let yaml = b"{\"multi\nline\": 1}";
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source).unwrap();
+        let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![
+            (
+                Node::Str("multi\nline".to_string(), QuoteType::Double),
+                Node::Number(Numeric::Integer(1)),
+            ),
+        ])])]);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
     fn test_parse_empty_document_end_marker() {
         let mut source = Buffer::new(b"...");
         let result = parse(&mut source).unwrap();
         assert_eq!(result, Node::Documents(vec![Document(vec![])]));
+    }
+
+    #[test]
+    fn test_parse_literal_block_scalar_simple() {
+        let yaml = b"---\nstring1: |\n  Line1\n  line2\n";
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source).unwrap();
+        let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![
+            (
+                Node::Str("string1".to_string(), QuoteType::Unquoted),
+                Node::Str("  Line1\n  line2".to_string(), QuoteType::Unquoted),
+            ),
+        ])])]);
+        assert_eq!(result, expected);
     }
 }

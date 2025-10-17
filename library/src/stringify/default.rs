@@ -10,30 +10,51 @@ fn stringify_document_with_indent(
     match node {
         Node::None => destination.add_bytes(&format!("{}null", indent_str)),
         Node::Boolean(b) => destination.add_bytes(&format!("{}{}", indent_str, b)),
-        Node::Str(s, qt) => match qt {
-            QuoteType::Double => {
-                // escape common sequences for double-quoted output
-                fn escape_double(s: &str) -> String {
-                    let mut out = String::with_capacity(s.len());
-                    for c in s.chars() {
-                        match c {
-                            '\n' => out.push_str("\\n"),
-                            '\r' => out.push_str("\\r"),
-                            '\t' => out.push_str("\\t"),
-                            '\\' => out.push_str("\\\\"),
-                            '"' => out.push_str("\\\""),
-                            c if (c as u32) < 0x20 || (c as u32) == 0x7f => {
-                                out.push_str(&format!("\\u{:04x}", c as u32));
+        Node::Str(s, qt) => {
+            // Serialize strings according to the requested QuoteType, even if they
+            // contain newlines. This preserves flow-style quoted scalars for
+            // multiline content as expected by tests.
+            match qt {
+                QuoteType::Double => {
+                    // escape common sequences for double-quoted output
+                    fn escape_double(s: &str) -> String {
+                        let mut out = String::with_capacity(s.len());
+                        for c in s.chars() {
+                            match c {
+                                // Preserve literal newlines to support multi-line flow scalars
+                                '\n' => out.push('\n'),
+                                '\r' => out.push_str("\\r"),
+                                '\t' => out.push_str("\\t"),
+                                '\\' => out.push_str("\\\\"),
+                                '"' => out.push_str("\\\""),
+                                c if (c as u32) < 0x20 || (c as u32) == 0x7f => {
+                                    out.push_str(&format!("\\u{:04x}", c as u32));
+                                }
+                                other => out.push(other),
                             }
-                            other => out.push(other),
                         }
+                        out
                     }
-                    out
+                    destination.add_bytes(&format!("{}\"{}\"", indent_str, escape_double(s)))
                 }
-                destination.add_bytes(&format!("{}\"{}\"", indent_str, escape_double(s)))
+                QuoteType::Single => {
+                    // In single-quoted YAML scalars, single quotes are represented by doubling them
+                    fn escape_single(s: &str) -> String {
+                        let mut out = String::with_capacity(s.len());
+                        for c in s.chars() {
+                            if c == '\'' {
+                                out.push('\'');
+                                out.push('\'');
+                            } else {
+                                out.push(c);
+                            }
+                        }
+                        out
+                    }
+                    destination.add_bytes(&format!("{}'{}'", indent_str, escape_single(s)))
+                }
+                QuoteType::Unquoted => destination.add_bytes(&format!("{}{}", indent_str, s)),
             }
-            QuoteType::Single => destination.add_bytes(&format!("{}'{}'", indent_str, s)),
-            QuoteType::Unquoted => destination.add_bytes(&format!("{}{}", indent_str, s)),
         },
         Node::Comment(c) => destination.add_bytes(&format!("{}# {}", indent_str, c)),
         Node::Number(num) => match num {
@@ -276,5 +297,39 @@ mod tests {
             dest.to_string(),
             "---\n- Mark Joseph\n- James Stephen\n- Ken Griffey\n...\n"
         );
+    }
+
+    #[test]
+    fn test_stringify_double_quoted_multiline_scalar() {
+        let mut dest = Buffer::new();
+        let node = Node::Str("line1\nline2".to_string(), QuoteType::Double);
+        stringify(&node, &mut dest).unwrap();
+        assert_eq!(dest.to_string(), "\"line1\nline2\"");
+    }
+
+    #[test]
+    fn test_stringify_single_quoted_multiline_and_escaping() {
+        let mut dest = Buffer::new();
+        let node = Node::Str("O'Reilly\nBooks".to_string(), QuoteType::Single);
+        stringify(&node, &mut dest).unwrap();
+        assert_eq!(dest.to_string(), "'O''Reilly\nBooks'");
+    }
+
+    #[test]
+    fn test_stringify_mapping_with_multiline_value() {
+        let mut dest = Buffer::new();
+        let mapping = Node::Mapping(vec![
+            (Node::Str("key".to_string(), QuoteType::Unquoted), Node::Str("a\nb".to_string(), QuoteType::Double)),
+        ]);
+        stringify(&mapping, &mut dest).unwrap();
+        assert_eq!(dest.to_string(), "key: \"a\nb\"\n");
+    }
+
+    #[test]
+    fn test_stringify_sequence_with_multiline_item() {
+        let mut dest = Buffer::new();
+        let seq = Node::Array(vec![Node::Str("a\nb".to_string(), QuoteType::Double)]);
+        stringify(&seq, &mut dest).unwrap();
+        assert_eq!(dest.to_string(), "- \"a\nb\"\n");
     }
 }
