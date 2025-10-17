@@ -211,7 +211,7 @@ fn peek_ahead_for_mapping_key(source: &mut dyn ISource) -> bool {
         }
     }
 
-    // Restore original read position
+    // Restore the original read position
     source.restore_state(state);
 
     found
@@ -268,7 +268,7 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
                     if source.current().is_none() {
                         break;
                     }
-                    // Establish base indent on first content line by counting leading spaces without consuming
+                    // Establish base indent on the first content line by counting leading spaces without consuming
                     if base_indent.is_none() {
                         if source.current() == Some(CHAR_NEWLINE) {
                             break;
@@ -283,7 +283,7 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
                         source.restore_state(st);
                     }
                     let bi = base_indent.unwrap_or(0);
-                    // If current line has less indent than base, stop the block
+                    // If the current line has less indent than base, stop the block
                     // Count current line's spaces (consuming then restoring)
                     let st_line = source.save_state();
                     let mut cur_indent = 0usize;
@@ -299,7 +299,7 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
                     // Read current line content
                     let mut line = collect_until(source, |c| c == CHAR_NEWLINE);
                     if folded && !first {
-                        // For folded scalars, strip base indentation from subsequent lines
+                        // For folded scalars, strip base indentation from later lines
                         let strip = bi.min(line.chars().take_while(|&ch| ch == ' ').count());
                         line.drain(0..strip);
                     }
@@ -313,7 +313,7 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
                         first = false;
                     }
                     out.push_str(&line);
-                    // Consume newline if present and continue looping
+                    // Consume a newline if present and continue looping
                     if source.current() == Some(CHAR_NEWLINE) {
                         source.next();
                     } else {
@@ -657,7 +657,7 @@ pub fn parse_document_contents(
             // Consume the comment line and continue parsing the next content
             parse_comment(source);
             skip_whitespace(source);
-            return parse_document_contents(source, indent_level);
+            parse_document_contents(source, indent_level)
         }
         Some(CHAR_LBRACE) => Ok(parse_inline_mapping(source)?),
         Some(CHAR_LBRACKET) => Ok(parse_inline_sequence(source)?),
@@ -769,7 +769,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
             Node::Array(items) => items.is_empty(),
             // An empty mapping is meaningful ({}), so do not treat it as blank
             Node::Mapping(_pairs) => false,
-            Node::Document(nodes) => nodes.iter().all(|n| node_is_blank(n)),
+            Document(nodes) => nodes.iter().all(|n| node_is_blank(n)),
             Node::Str(s, _, _) => s.is_empty(),
             Node::Comment(_) => true,
             _ => false,
@@ -788,7 +788,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
                 // comment-only documents that would otherwise appear
                 // between explicit document markers.
                 let is_blank_doc = match &doc {
-                    Node::Document(nodes) => nodes.iter().all(|n| node_is_blank(n)),
+                    Document(nodes) => nodes.iter().all(|n| node_is_blank(n)),
                     _ => false,
                 };
                 if !is_blank_doc {
@@ -898,7 +898,7 @@ mod tests {
     fn test_parse_sequence_with_comments() {
         let mut source = Buffer::new(b"- 1\n# Comment 1\n- 2\n# Comment 2");
         let result = parse(&mut source).unwrap();
-        // Comments are stripped; sequence should contain only the items
+        // Comments are stripped; a sequence should contain only the items
         assert_eq!(
             result,
             Node::Documents(vec![Document(vec![Node::Array(vec![
@@ -950,7 +950,7 @@ mod tests {
     fn test_parse_comment_only() {
         let mut source = Buffer::new(b"# Just a comment");
         let result = parse(&mut source).unwrap();
-        // Comments are stripped by the parser; comment-only content yields an empty document
+        // The parser strips comments; comment-only content yields an empty document
         assert_eq!(result, Node::Documents(vec![Document(vec![])]));
     }
 
@@ -1661,7 +1661,7 @@ mod tests {
         let mut source = Buffer::new(yaml);
         let result = parse(&mut source).unwrap();
 
-        // Verify stringified output of the parsed node
+        // Verify stringifier output of the parsed node
         let mut dest = DestBuffer::new();
         stringify(&result, &mut dest).unwrap();
         let out = dest.to_string();

@@ -81,7 +81,7 @@ fn stringify_document_with_indent(
                     Node::Mapping(_) => {
                         // Serialize mapping into a temporary buffer at child
                         // indent and strip that leading indent once so the
-                        // first line appears after the "- ". Subsequent lines
+                        // first line appears after the "-". Later lines
                         // remain indented.
                         let mut buf = crate::io::destinations::buffer::Buffer::new();
                         stringify_document_with_indent(item, &mut buf, indent + 1)?;
@@ -93,9 +93,9 @@ fn stringify_document_with_indent(
                         destination.add_bytes(&out);
                     }
                     Node::Array(_) => {
-                        // Serialize nested sequence into a temporary buffer at
+                        // Serialize a nested sequence into a temporary buffer at
                         // child indent and strip the leading child indent once
-                        // so the first inner item follows the outer "- ".
+                        // so the first inner item follows the outer "-".
                         let mut buf = crate::io::destinations::buffer::Buffer::new();
                         stringify_document_with_indent(item, &mut buf, indent + 1)?;
                         let mut out = buf.to_string();
