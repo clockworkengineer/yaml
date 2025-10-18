@@ -105,6 +105,20 @@ fn skip_until_newline(source: &mut dyn ISource) {
     }
 }
 
+// Helper to determine whether a node (or document) is blank/empty
+fn node_is_blank(node: &Node) -> bool {
+    match node {
+        Node::None => true,
+        Node::Array(items) => items.is_empty(),
+        // An empty mapping is meaningful ({}), so do not treat it as blank
+        Node::Mapping(_pairs) => false,
+        Document(nodes) => nodes.iter().all(|n| node_is_blank(n)),
+        Node::Str(s, _, _) => s.is_empty(),
+        Node::Comment(_) => true,
+        _ => false,
+    }
+}
+
 // Read a quoted flow scalar that may span multiple lines. Returns the raw text including quotes.
 fn read_quoted_flow_scalar(source: &mut dyn ISource) -> Result<String, String> {
     let quote = match source.current() {
@@ -763,18 +777,7 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
     Ok(Document(document_nodes))
 }
 pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
-    fn node_is_blank(node: &Node) -> bool {
-        match node {
-            Node::None => true,
-            Node::Array(items) => items.is_empty(),
-            // An empty mapping is meaningful ({}), so do not treat it as blank
-            Node::Mapping(_pairs) => false,
-            Document(nodes) => nodes.iter().all(|n| node_is_blank(n)),
-            Node::Str(s, _, _) => s.is_empty(),
-            Node::Comment(_) => true,
-            _ => false,
-        }
-    }
+    // Use module-level helper `node_is_blank`
     let mut docs: Vec<Node> = Vec::new();
     if peek_ahead_for_document_start_end(source, CHAR_DASH) {
         skip_until_newline(source);

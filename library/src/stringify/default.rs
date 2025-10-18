@@ -1,6 +1,52 @@
 use crate::io::traits::IDestination;
 use crate::nodes::node::*;
 
+// Escape string for double-quoted YAML scalars.
+fn escape_double(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            // Preserve literal newlines to support multi-line flow scalars
+            '\n' => out.push('\n'),
+            '\r' => {
+                out.push('\\');
+                out.push('r');
+            }
+            '\t' => {
+                out.push('\\');
+                out.push('t');
+            }
+            '\\' => {
+                out.push('\\');
+                out.push('\\');
+            }
+            '"' => {
+                out.push('\\');
+                out.push('"');
+            }
+            c if (c as u32) < 0x20 || (c as u32) == 0x7f => {
+                out.push_str(&format!("\\u{:04x}", c as u32));
+            }
+            other => out.push(other),
+        }
+    }
+    out
+}
+
+// Escape string for single-quoted YAML scalars by doubling single quotes.
+fn escape_single(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        if c == '\'' {
+            out.push('\'');
+            out.push('\'');
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
 fn stringify_document_with_indent(
     node: &Node,
     destination: &mut dyn IDestination,
@@ -13,40 +59,10 @@ fn stringify_document_with_indent(
         Node::Str(s, qt, style) => match qt {
             QuoteType::Double => {
                 // escape common sequences for double-quoted output
-                fn escape_double(s: &str) -> String {
-                    let mut out = String::with_capacity(s.len());
-                    for c in s.chars() {
-                        match c {
-                            // Preserve literal newlines to support multi-line flow scalars
-                            '\n' => out.push('\n'),
-                            '\r' => out.push_str("\\r"),
-                            '\t' => out.push_str("\\t"),
-                            '\\' => out.push_str("\\\\"),
-                            '"' => out.push_str("\\\""),
-                            c if (c as u32) < 0x20 || (c as u32) == 0x7f => {
-                                out.push_str(&format!("\\u{:04x}", c as u32));
-                            }
-                            other => out.push(other),
-                        }
-                    }
-                    out
-                }
                 destination.add_bytes(&format!("{}\"{}\"", indent_str, escape_double(s)))
             }
             QuoteType::Single => {
                 // In single-quoted YAML scalars, single quotes are represented by doubling them
-                fn escape_single(s: &str) -> String {
-                    let mut out = String::with_capacity(s.len());
-                    for c in s.chars() {
-                        if c == '\'' {
-                            out.push('\'');
-                            out.push('\'');
-                        } else {
-                            out.push(c);
-                        }
-                    }
-                    out
-                }
                 destination.add_bytes(&format!("{}'{}'", indent_str, escape_single(s)))
             }
             QuoteType::Unquoted => {
@@ -151,6 +167,19 @@ fn stringify_document_with_indent(
     Ok(())
 }
 
+// Helper to determine whether a node is blank (used when emitting documents)
+fn node_is_blank(node: &Node) -> bool {
+    match node {
+        Node::None => true,
+        Node::Comment(_) => true,
+        Node::Str(s, _, _) => s.is_empty(),
+        Node::Array(items) => items.iter().all(|n| node_is_blank(n)),
+        Node::Mapping(pairs) => pairs.is_empty(),
+        Node::Document(nodes) => nodes.iter().all(|n| node_is_blank(n)),
+        _ => false,
+    }
+}
+
 pub fn stringify_document(node: &Node, destination: &mut dyn IDestination) -> Result<(), String> {
     stringify_document_with_indent(node, destination, 0)
 }
@@ -159,17 +188,7 @@ pub fn stringify(node: &Node, destination: &mut dyn IDestination) -> Result<(), 
     match node {
         Node::Documents(docs) => {
             // Helper to determine whether a node contains any meaningful content
-            fn node_is_blank(node: &Node) -> bool {
-                match node {
-                    Node::None => true,
-                    Node::Comment(_) => true,
-                    Node::Str(s, _, _) => s.is_empty(),
-                    Node::Array(items) => items.iter().all(|n| node_is_blank(n)),
-                    Node::Mapping(pairs) => pairs.is_empty(),
-                    Node::Document(nodes) => nodes.iter().all(|n| node_is_blank(n)),
-                    _ => false,
-                }
-            }
+            // use module-level `node_is_blank`
 
             for doc in docs {
                 let emit = match doc {
