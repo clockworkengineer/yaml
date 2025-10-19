@@ -1641,6 +1641,9 @@ mod tests {
 
     #[test]
     fn test_parse_literal_block_literal_scalar_with_indent() {
+        use crate::io::destinations::buffer::Buffer as DestBuffer;
+        use crate::stringify;
+
         let yaml = b"---\nstring1: |\n  Line1\n  line2\n";
         let mut source = Buffer::new(yaml);
         let result = parse(&mut source).unwrap();
@@ -1653,6 +1656,12 @@ mod tests {
             ),
         )])])]);
         assert_eq!(result, expected);
+
+         // Verify stringifier output of the parsed node
+        let mut dest = DestBuffer::new();
+        stringify(&result, &mut dest).unwrap();
+        let out = dest.to_string();
+        assert_eq!(out, "---\nstring1: |\n  Line1\n  line2\n...\n");
     }
 
     #[test]
@@ -1668,8 +1677,6 @@ mod tests {
         let mut dest = DestBuffer::new();
         stringify(&result, &mut dest).unwrap();
         let out = dest.to_string();
-        // Expect a single-line folded value; note there is one space after ':' from mapping formatting
-        // plus two spaces that are part of the scalar itself, totaling three spaces before 'Line1'.
         assert_eq!(out, "---\nstring1: |\n  Line1 line2\n...\n");
     }
 }

@@ -70,13 +70,26 @@ fn stringify_document_with_indent(
                 if s.contains('\n') || matches!(style, BlockStyle::Literal) {
                     let content_indent = "  ".repeat(indent + 1);
                     destination.add_bytes(&format!("{}|{}\n", indent_str, ""));
+
+                    // Compute minimal leading spaces among non-empty lines so we can
+                    // preserve the original absolute indentation when emitting.
+                    let lines: Vec<&str> = s.split('\n').collect();
+                    let mut min_lead = usize::MAX;
+                    for &line in lines.iter() {
+                        if line.trim().is_empty() { continue; }
+                        let lead = line.chars().take_while(|&ch| ch == ' ').count();
+                        if lead < min_lead { min_lead = lead; }
+                    }
+                    if min_lead == usize::MAX { min_lead = 0; }
+
                     if !s.contains('\n') && matches!(style, BlockStyle::Literal) {
-                        // For single-line literal style, avoid doubling indentation: trim leading spaces
+                        // Single-line literal: trim leading spaces only
                         let line = s.trim_start();
                         destination.add_bytes(&format!("{}{}\n", content_indent, line));
                     } else {
-                        for line in s.split('\n') {
-                            destination.add_bytes(&format!("{}{}\n", content_indent, line));
+                        for line in lines {
+                            let stripped = if line.len() >= min_lead { &line[min_lead..] } else { line };
+                            destination.add_bytes(&format!("{}{}\n", content_indent, stripped));
                         }
                     }
                 } else {
