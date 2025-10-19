@@ -239,6 +239,40 @@ mod tests {
     use super::*;
     use crate::io::destinations::buffer::Buffer;
     use crate::{BufferSource, parse};
+    use std::fs;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    static TEST_FILE_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+    struct TestFile {
+        path: String,
+    }
+
+    impl TestFile {
+        fn new_with_content(content: &[u8]) -> Self {
+            let id = TEST_FILE_COUNTER.fetch_add(1, Ordering::SeqCst);
+            let path = format!("test_stringify_temp_{}.yaml", id);
+            fs::write(&path, content).unwrap();
+            Self { path }
+        }
+
+        fn new_empty() -> Self {
+            let id = TEST_FILE_COUNTER.fetch_add(1, Ordering::SeqCst);
+            let path = format!("test_stringify_temp_{}.yaml", id);
+            fs::write(&path, b"").unwrap();
+            Self { path }
+        }
+
+        fn path(&self) -> &str {
+            &self.path
+        }
+    }
+
+    impl Drop for TestFile {
+        fn drop(&mut self) {
+            let _ = fs::remove_file(&self.path);
+        }
+    }
 
     #[test]
     fn test_stringify_none() {
@@ -406,5 +440,29 @@ mod tests {
         )]);
         stringify(&seq, &mut dest).unwrap();
         assert_eq!(dest.to_string(), "- \"a\nb\"\n");
+    }
+
+    #[test]
+    fn test_stringify_mapping_with_inline_comment_and_indented_sequence_files() {
+        // Mirror parser test: ensure stringifier emits the mapping -> sequence correctly using files
+        use crate::io::destinations::file::File as FileDestination;
+        use crate::io::sources::file::File as FileSource;
+
+        let input = b"---\r\nhr: # 1998 hr ranking\r\n  - Mark McGwire\r\n  - Sammy Sosa\n";
+        let in_file = TestFile::new_with_content(input);
+        let out_file = TestFile::new_empty();
+
+        // parse from file source
+        let mut source = FileSource::new(in_file.path()).unwrap();
+        let node = parse(&mut source).unwrap();
+
+        // stringify to file destination
+        let mut dest = FileDestination::new(out_file.path()).unwrap();
+        stringify(&node, &mut dest).unwrap();
+
+        // read output and compare
+        let out = fs::read_to_string(out_file.path()).unwrap();
+        let expected = "---\nhr: \n  - Mark McGwire\n  - Sammy Sosa\n...\n";
+        assert_eq!(out, expected);
     }
 }

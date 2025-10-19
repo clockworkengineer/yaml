@@ -240,10 +240,24 @@ fn parse_mapping_key(source: &mut dyn ISource) -> Result<(Node, bool), String> {
     // Allow no space after ':'; process and skip optional whitespace
     skip_whitespace(source);
     if let Some(c) = source.current() {
-        newline = c == CHAR_NEWLINE;
-        if newline {
-            source.next();
+        // If there's a comment after the colon, treat it like a newline so that
+        // an indented block following the comment becomes the mapping value.
+        if c == CHAR_HASH {
+            // consume the comment line and advance past the newline so that
+            // get_current_indent_level() reflects the indent of the next line.
+            parse_comment(source);
+            // If there's a newline after the comment, consume it and then skip whitespace
+            if source.current() == Some(CHAR_NEWLINE) {
+                source.next();
+            }
+            newline = true;
             skip_whitespace(source);
+        } else {
+            newline = c == CHAR_NEWLINE;
+            if newline {
+                source.next();
+                skip_whitespace(source);
+            }
         }
     }
 
@@ -1657,7 +1671,7 @@ mod tests {
         )])])]);
         assert_eq!(result, expected);
 
-         // Verify stringifier output of the parsed node
+        // Verify stringifier output of the parsed node
         let mut dest = DestBuffer::new();
         stringify(&result, &mut dest).unwrap();
         let out = dest.to_string();
@@ -1678,5 +1692,30 @@ mod tests {
         stringify(&result, &mut dest).unwrap();
         let out = dest.to_string();
         assert_eq!(out, "---\nstring1: |\n  Line1 line2\n...\n");
+    }
+
+    #[test]
+    fn test_parse_mapping_with_inline_comment_and_indented_sequence() {
+        let yaml = b"---\nhr: # 1998 hr ranking\n  - Mark McGwire\n  - Sammy Sosa\n";
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source).unwrap();
+
+        let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![(
+            Node::Str("hr".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            Node::Array(vec![
+                Node::Str(
+                    "Mark McGwire".to_string(),
+                    QuoteType::Unquoted,
+                    BlockStyle::None,
+                ),
+                Node::Str(
+                    "Sammy Sosa".to_string(),
+                    QuoteType::Unquoted,
+                    BlockStyle::None,
+                ),
+            ]),
+        )])])]);
+
+        assert_eq!(result, expected);
     }
 }

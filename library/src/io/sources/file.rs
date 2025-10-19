@@ -12,16 +12,35 @@ pub struct File {
 impl File {
     pub fn new(path: &str) -> std::io::Result<Self> {
         let mut file = StdFile::open(path)?;
-        let mut current_byte = [0u8; 1];
-        let has_byte = file.read(&mut current_byte)? == 1;
+        // Read first byte and normalize CRLF to a single '\n' like `next()` does.
+        let mut first = [0u8; 1];
+        let has_first = file.read(&mut first)? == 1;
+        let current_byte = if has_first {
+            if first[0] == b'\r' {
+                // Peek the next byte
+                let mut next = [0u8; 1];
+                if file.read(&mut next)? == 1 {
+                    if next[0] == b'\n' {
+                        // CRLF -> treat as single '\n'
+                        Some(b'\n')
+                    } else {
+                        // Not CRLF: seek back one and keep '\r'
+                        file.seek(SeekFrom::Current(-1))?;
+                        Some(first[0])
+                    }
+                } else {
+                    Some(first[0])
+                }
+            } else {
+                Some(first[0])
+            }
+        } else {
+            None
+        };
 
         Ok(Self {
             file,
-            current_byte: if has_byte {
-                Some(current_byte[0])
-            } else {
-                None
-            },
+            current_byte,
             column: 0,
             line: 0,
         })
@@ -43,7 +62,7 @@ impl ISource for File {
             if byte1[0] == b'\r' {
                 self.file.read(&mut byte2).unwrap_or(0);
                 // Treat \r\n as a single \n
-                if byte1[0] == b'\r' && byte2[0] == b'\n' {
+                if byte2[0] == b'\n' {
                     self.line += 1;
                     self.column = 0;
                     self.current_byte = Some(b'\n');
@@ -339,7 +358,11 @@ mod tests {
             node,
             Node::Documents(vec![Node::Document(vec![Node::Array(vec![Node::Array(
                 vec![
-                    Node::Str("Sammy Sosa".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                    Node::Str(
+                        "Sammy Sosa".to_string(),
+                        QuoteType::Unquoted,
+                        BlockStyle::None
+                    ),
                     Node::Number(Numeric::Integer(63)),
                     Node::Number(Numeric::Float(0.288))
                 ]

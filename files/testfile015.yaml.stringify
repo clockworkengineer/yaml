@@ -1,7 +1,7 @@
 ---
-hr: null
-- Mark McGwire
-- Sammy Sosa
+hr: 
+  - Mark McGwire
+  - Sammy Sosa
 rbi: 
   - Sammy Sosa
   - Ken Griffey
