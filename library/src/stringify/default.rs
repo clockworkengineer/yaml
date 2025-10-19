@@ -76,11 +76,17 @@ fn stringify_document_with_indent(
                     let lines: Vec<&str> = s.split('\n').collect();
                     let mut min_lead = usize::MAX;
                     for &line in lines.iter() {
-                        if line.trim().is_empty() { continue; }
+                        if line.trim().is_empty() {
+                            continue;
+                        }
                         let lead = line.chars().take_while(|&ch| ch == ' ').count();
-                        if lead < min_lead { min_lead = lead; }
+                        if lead < min_lead {
+                            min_lead = lead;
+                        }
                     }
-                    if min_lead == usize::MAX { min_lead = 0; }
+                    if min_lead == usize::MAX {
+                        min_lead = 0;
+                    }
 
                     if !s.contains('\n') && matches!(style, BlockStyle::Literal) {
                         // Single-line literal: trim leading spaces only
@@ -88,7 +94,11 @@ fn stringify_document_with_indent(
                         destination.add_bytes(&format!("{}{}\n", content_indent, line));
                     } else {
                         for line in lines {
-                            let stripped = if line.len() >= min_lead { &line[min_lead..] } else { line };
+                            let stripped = if line.len() >= min_lead {
+                                &line[min_lead..]
+                            } else {
+                                line
+                            };
                             destination.add_bytes(&format!("{}{}\n", content_indent, stripped));
                         }
                     }
