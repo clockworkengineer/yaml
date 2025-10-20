@@ -47,6 +47,12 @@ fn escape_single(s: &str) -> String {
     out
 }
 
+// Normalize newlines by removing CR characters so inputs read from files
+// with CRLF line endings don't emit stray '\r' characters when stringified.
+fn normalize_newlines(s: &str) -> String {
+    s.replace('\r', "")
+}
+
 fn stringify_document_with_indent(
     node: &Node,
     destination: &mut dyn IDestination,
@@ -56,58 +62,67 @@ fn stringify_document_with_indent(
     match node {
         Node::None => destination.add_bytes(&format!("{}null", indent_str)),
         Node::Boolean(b) => destination.add_bytes(&format!("{}{}", indent_str, b)),
-        Node::Str(s, qt, style) => match qt {
-            QuoteType::Double => {
-                // escape common sequences for double-quoted output
-                destination.add_bytes(&format!("{}\"{}\"", indent_str, escape_double(s)))
-            }
-            QuoteType::Single => {
-                // In single-quoted YAML scalars, single quotes are represented by doubling them
-                destination.add_bytes(&format!("{}'{}'", indent_str, escape_single(s)))
-            }
-            QuoteType::Unquoted => {
-                // Emit literal block scalars '|' when content is multiline OR when style is explicitly Literal.
-                if s.contains('\n') || matches!(style, BlockStyle::Literal) {
-                    let content_indent = "  ".repeat(indent + 1);
-                    destination.add_bytes(&format!("{}|{}\n", indent_str, ""));
+        Node::Str(s, qt, style) => {
+            // Normalize CRLF -> LF by removing CR so file-based input using
+            // Windows line endings doesn't leak '\r' into the output.
+            let s = normalize_newlines(s);
+            match qt {
+                QuoteType::Double => {
+                    // escape common sequences for double-quoted output
+                    destination.add_bytes(&format!("{}\"{}\"", indent_str, escape_double(&s)))
+                }
+                QuoteType::Single => {
+                    // In single-quoted YAML scalars, single quotes are represented by doubling them
+                    destination.add_bytes(&format!("{}'{}'", indent_str, escape_single(&s)))
+                }
+                QuoteType::Unquoted => {
+                    // Emit literal block scalars '|' when content is multiline OR when style is explicitly Literal.
+                    if s.contains('\n') || matches!(style, BlockStyle::Literal) {
+                        let content_indent = "  ".repeat(indent + 1);
+                        destination.add_bytes(&format!("{}|{}\n", indent_str, ""));
 
-                    // Compute minimal leading spaces among non-empty lines so we can
-                    // preserve the original absolute indentation when emitting.
-                    let lines: Vec<&str> = s.split('\n').collect();
-                    let mut min_lead = usize::MAX;
-                    for &line in lines.iter() {
-                        if line.trim().is_empty() {
-                            continue;
+                        // Compute minimal leading spaces among non-empty lines so we can
+                        // preserve the original absolute indentation when emitting.
+                        let lines: Vec<&str> = s.split('\n').collect();
+                        let mut min_lead = usize::MAX;
+                        for &line in lines.iter() {
+                            if line.trim().is_empty() {
+                                continue;
+                            }
+                            let lead = line.chars().take_while(|&ch| ch == ' ').count();
+                            if lead < min_lead {
+                                min_lead = lead;
+                            }
                         }
-                        let lead = line.chars().take_while(|&ch| ch == ' ').count();
-                        if lead < min_lead {
-                            min_lead = lead;
+                        if min_lead == usize::MAX {
+                            min_lead = 0;
                         }
-                    }
-                    if min_lead == usize::MAX {
-                        min_lead = 0;
-                    }
 
-                    if !s.contains('\n') && matches!(style, BlockStyle::Literal) {
-                        // Single-line literal: trim leading spaces only
-                        let line = s.trim_start();
-                        destination.add_bytes(&format!("{}{}\n", content_indent, line));
+                        if !s.contains('\n') && matches!(style, BlockStyle::Literal) {
+                            // Single-line literal: trim leading spaces only
+                            let line = s.trim_start();
+                            destination.add_bytes(&format!("{}{}\n", content_indent, line));
+                        } else {
+                            for line in lines {
+                                let stripped = if line.len() >= min_lead {
+                                    &line[min_lead..]
+                                } else {
+                                    line
+                                };
+                                destination.add_bytes(&format!("{}{}\n", content_indent, stripped));
+                            }
+                        }
                     } else {
-                        for line in lines {
-                            let stripped = if line.len() >= min_lead {
-                                &line[min_lead..]
-                            } else {
-                                line
-                            };
-                            destination.add_bytes(&format!("{}{}\n", content_indent, stripped));
-                        }
+                        destination.add_bytes(&format!("{}{}", indent_str, s))
                     }
-                } else {
-                    destination.add_bytes(&format!("{}{}", indent_str, s))
                 }
             }
-        },
-        Node::Comment(c) => destination.add_bytes(&format!("{}# {}", indent_str, c)),
+        }
+        Node::Comment(c) => {
+            // Normalize comments as well to avoid CR characters from file sources
+            let c = normalize_newlines(c);
+            destination.add_bytes(&format!("{}# {}", indent_str, c))
+        }
         Node::Number(num) => match num {
             Numeric::Integer(i) => destination.add_bytes(&format!("{}{}", indent_str, i)),
             Numeric::Float(f) => destination.add_bytes(&format!("{}{}", indent_str, f)),
@@ -408,6 +423,41 @@ mod tests {
             "---\n- - Sammy Sosa\n  - 63\n  - 0.288\n...\n"
         );
     }
+
+    #[test]
+    fn test_stringify_anchor_alias_hr_rbi() {
+        use crate::io::sources::buffer::Buffer as SrcBuffer;
+        // YAML from testfile016.yaml
+        let yaml = b"---\nhr:\n  - Mark McGwire\n  # Following node labeled SS\n  - &SS Sammy Sosa\nrbi:\n  - *SS # Subsequent occurance\n  - Ken Griffey\n";
+        let mut source = SrcBuffer::new(yaml);
+        let node = crate::parse(&mut source).unwrap();
+
+        let mut dest = crate::io::destinations::buffer::Buffer::new();
+        stringify(&node, &mut dest).unwrap();
+        let out = dest.to_string();
+        let expected = "---\nhr: \n  - Mark McGwire\n  - Sammy Sosa\nrbi: \n  - Sammy Sosa\n  - Ken Griffey\n...\n";
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn test_stringify_anchor_alias_hr_rbi_from_file() {
+        use crate::io::sources::file::File as FileSource;
+
+        // Create a temporary file with the YAML contents (same as testfile016.yaml)
+        let input = b"---\r\nhr:\r\n  - Mark McGwire\r\n  # Following node labeled SS\r\n  - &SS Sammy Sosa\r\nrbi:\r\n  - *SS # Subsequent occurance\r\n  - Ken Griffey\r\n";
+        let in_file = TestFile::new_with_content(input);
+
+        // parse from file source
+        let mut source = FileSource::new(in_file.path()).unwrap();
+        let node = parse(&mut source).unwrap();
+
+        // stringify to an in-memory buffer and compare
+        let mut dest = crate::io::destinations::buffer::Buffer::new();
+        stringify(&node, &mut dest).unwrap();
+        let out = dest.to_string();
+        let expected = "---\nhr: \n  - Mark McGwire\n  - Sammy Sosa\nrbi: \n  - Sammy Sosa\n  - Ken Griffey\n...\n";
+        assert_eq!(out, expected);
+    }
     #[test]
     fn test_with_comment_header() {
         let mut dest = Buffer::new();
@@ -493,4 +543,6 @@ mod tests {
         let expected = "---\nhr: \n  - Mark McGwire\n  - Sammy Sosa\n...\n";
         assert_eq!(out, expected);
     }
+
+    
 }

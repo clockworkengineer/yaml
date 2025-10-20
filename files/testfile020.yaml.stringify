@@ -2,7 +2,7 @@
 unicode: "Sosa did fine.☺"
 control: "b1998\t1999\t2000
 "
-hexesc: "x13x10 is \r
+hexesc: "x13x10 is 
 "
 single: '"Howdy!" he cried.'
 quoted: ' # not a ''''comment''''.'

@@ -620,8 +620,14 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
 
         match c {
             CHAR_HASH => {
-                // Consume comment lines inside sequences; do not emit comment nodes
+                // Consume comment lines inside sequences; do not emit comment nodes.
+                // Also consume the trailing newline and any following whitespace so
+                // the sequence parsing continues at the next significant item.
                 parse_comment(source);
+                if source.current() == Some(CHAR_NEWLINE) {
+                    source.next();
+                }
+                skip_whitespace(source);
                 continue;
             }
             CHAR_DASH | CHAR_DOT if peek_ahead_for_document_start_end(source, c) => {
@@ -679,7 +685,7 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
 
 fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, String> {
     let mut pairs: Vec<(Node, Node)> = Vec::new();
-    let mut last_was_nested = false;
+    let mut last_was_nested: bool;
     while let Some(c) = source.current() {
         // Reset per-iteration flag
         last_was_nested = false;
@@ -1950,5 +1956,74 @@ mod tests {
         let mut source = Buffer::new(b"---\nvalue: *nope\n");
         let res = parse(&mut source);
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_parse_anchor_alias_sequence_hr_rbi() {
+        // From testfile016.yaml
+        let yaml = b"---\nhr:\n  - Mark McGwire\n  # Following node labeled SS\n  - &SS Sammy Sosa\nrbi:\n  - *SS # Subsequent occurance\n  - Ken Griffey\n";
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(docs) = result {
+            if let Node::Document(nodes) = &docs[0] {
+                if let Node::Mapping(pairs) = &nodes[0] {
+                    // Extract hr and rbi values
+                    let mut found_hr = false;
+                    let mut found_rbi = false;
+                    for (k, v) in pairs {
+                        if let Node::Str(ks, _, _) = k {
+                            if ks == "hr" {
+                                if let Node::Array(items) = v {
+                                    assert_eq!(items.len(), 2);
+                                    assert_eq!(
+                                        items[0],
+                                        Node::Str(
+                                            "Mark McGwire".to_string(),
+                                            QuoteType::Unquoted,
+                                            BlockStyle::None
+                                        )
+                                    );
+                                    assert_eq!(
+                                        items[1],
+                                        Node::Str(
+                                            "Sammy Sosa".to_string(),
+                                            QuoteType::Unquoted,
+                                            BlockStyle::None
+                                        )
+                                    );
+                                    found_hr = true;
+                                }
+                            }
+                            if ks == "rbi" {
+                                if let Node::Array(items) = v {
+                                    assert_eq!(items.len(), 2);
+                                    assert_eq!(
+                                        items[0],
+                                        Node::Str(
+                                            "Sammy Sosa".to_string(),
+                                            QuoteType::Unquoted,
+                                            BlockStyle::None
+                                        )
+                                    );
+                                    assert_eq!(
+                                        items[1],
+                                        Node::Str(
+                                            "Ken Griffey".to_string(),
+                                            QuoteType::Unquoted,
+                                            BlockStyle::None
+                                        )
+                                    );
+                                    found_rbi = true;
+                                }
+                            }
+                        }
+                    }
+                    assert!(found_hr && found_rbi);
+                    return;
+                }
+            }
+        }
+        panic!("Unexpected parse result structure for hr/rbi anchor test");
     }
 }
