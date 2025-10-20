@@ -785,7 +785,7 @@ pub fn parse_document_contents(
             } else {
                 // Could be a comment/blank line followed by an indented block sequence
                 if source.current() == Some(CHAR_HASH) || source.current() == Some(CHAR_NEWLINE) {
-                    // Save state and try to detect a following indented sequence to use as the key
+                    // Save state and try to detect the following indented sequence to use as the key
                     let st = source.save_state();
                     // consume the rest of this line
                     let _ = read_line_trimmed_into_string(source);
@@ -838,7 +838,7 @@ pub fn parse_document_contents(
             // Detect and consume the ':' that separates the explicit key from
             // its value. The colon may appear on the same line, on its own
             // line, or be separated by comments/blank lines. Scan forward
-            // consuming intermediate comments/newlines until we find a ':' or
+            // consuming intermediate comments/newlines until we find an ':' or
             // reach EOF. If we don't find a colon, restore the original
             // read position to avoid consuming unrelated content.
             let st_colon = source.save_state();
@@ -876,7 +876,7 @@ pub fn parse_document_contents(
                 }
             }
             if !found_colon {
-                // Restore and fall back to previous behavior (leave source unchanged)
+                // Restore and fall back to previous behavior (leave the source unchanged)
                 source.restore_state(st_colon);
                 // As a fallback, if the current position is a newline, consume it
                 if source.current() == Some(CHAR_NEWLINE) {
@@ -990,7 +990,7 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
         }
     }
 
-    // Normalize certain parser artifacts before anchor collection:
+    // Normalize certain parser artifacts before an anchor collection:
     // If the document node list contains a Mapping whose single pair has a
     // None value followed immediately by an Array node, merge them into a
     // single Mapping whose value is that Array. This canonicalizes the
@@ -1016,8 +1016,8 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
         normalized_nodes.push(document_nodes[i].clone());
         i += 1;
     }
-    let mut doc_node = Node::Document(normalized_nodes);
-    // Resolve anchors and aliases within the document (collect anchors then replace aliases)
+    let mut doc_node = Document(normalized_nodes);
+    // Resolve anchors and aliases within the document (collect anchors, then replace aliases)
     fn collect_anchors(node: &Node, anchors: &mut HashMap<String, Node>) {
         match node {
             Node::Anchored(inner, name) => {
@@ -1036,7 +1036,7 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
                     collect_anchors(it, anchors);
                 }
             }
-            Node::Document(nodes) => {
+            Document(nodes) => {
                 for n in nodes {
                     collect_anchors(n, anchors);
                 }
@@ -1080,7 +1080,7 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
                 }
                 Ok(())
             }
-            Node::Document(nodes) => {
+            Document(nodes) => {
                 for n in nodes.iter_mut() {
                     replace_aliases(n, anchors)?;
                 }
@@ -1096,7 +1096,7 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
         }
     }
 
-    // initial parsed document before anchor collection
+    // initially parsed document before an anchor collection
     let mut anchors: HashMap<String, Node> = HashMap::new();
     collect_anchors(&doc_node, &mut anchors);
     // Now replace aliases; propagate any undefined-anchor error
@@ -2042,7 +2042,7 @@ mod tests {
         let mut source = Buffer::new(yaml);
         let result = parse(&mut source).unwrap();
 
-        // Expect parsing to succeed; we don't currently resolve aliases to nodes
+        // Expect parsing to succeed; we don't currently resolve aliases to nodes,
         // but we expect Alias/Anchored nodes to be present in the AST
         // A more thorough test will inspect the structure via stringify.
         assert!(matches!(result, Node::Documents(_)));
@@ -2057,7 +2057,7 @@ mod tests {
 
         // After resolution, both items should be the same scalar "hello"
         if let Node::Documents(docs) = result {
-            if let Node::Document(nodes) = &docs[0] {
+            if let Document(nodes) = &docs[0] {
                 if let Node::Array(items) = &nodes[0] {
                     assert_eq!(
                         items[0],
@@ -2086,7 +2086,7 @@ mod tests {
 
         // After resolution, 'ref' should be a mapping containing 'nested' mapping
         if let Node::Documents(docs) = result {
-            if let Node::Document(nodes) = &docs[0] {
+            if let Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
                     // find ref key
                     let mut found = false;
@@ -2095,7 +2095,7 @@ mod tests {
                             if ks == "ref" {
                                 // value should be a mapping with nested->value:1
                                 if let Node::Mapping(inner_pairs) = v {
-                                    // look for nested key
+                                    // look for a a nested key
                                     let mut ok = false;
                                     for (ik, _iv) in inner_pairs {
                                         if let Node::Str(iks, _, _) = ik {
@@ -2133,7 +2133,7 @@ mod tests {
         let result = parse(&mut source).unwrap();
 
         if let Node::Documents(docs) = result {
-            if let Node::Document(nodes) = &docs[0] {
+            if let Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
                     // Extract hr and rbi values
                     let mut found_hr = false;
@@ -2198,7 +2198,7 @@ mod tests {
     fn test_parse_explicit_sequence_keys() {
         // From files/testfile017.yaml (explicit keys that are sequences or commented sequences)
         let yaml = b"? # PLAY SCHEDULE\n  - Detroit Tigers\n  - Chicago Cubs\n:\n  - 2001-07-23\n\n? [ New York Yankees,\n    Atlanta Braves ]\n: [ 2001-07-02, 2001-08-12,\n    2001-08-14 ]\n";
-        let mut source = crate::io::sources::buffer::Buffer::new(yaml);
+        let mut source = Buffer::new(yaml);
         let result = parse(&mut source).unwrap();
 
         // Collect mapping pairs from the document nodes. The parser may return
@@ -2208,7 +2208,7 @@ mod tests {
         let mut collected: Vec<(Node, Node)> = Vec::new();
         if let Node::Documents(docs) = result {
             assert_eq!(docs.len(), 1);
-            if let Node::Document(nodes) = &docs[0] {
+            if let Document(nodes) = &docs[0] {
                 let mut i = 0usize;
                 while i < nodes.len() {
                     match &nodes[i] {
