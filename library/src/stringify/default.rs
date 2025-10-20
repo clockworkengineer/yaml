@@ -543,6 +543,4 @@ mod tests {
         let expected = "---\nhr: \n  - Mark McGwire\n  - Sammy Sosa\n...\n";
         assert_eq!(out, expected);
     }
-
-    
 }
