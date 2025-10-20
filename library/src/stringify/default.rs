@@ -545,13 +545,13 @@ mod tests {
     }
 
     #[test]
-    fn test_stringify_testfile017_from_file() {
+    fn test_stringify_explicit_sequence_keys() {
         // Hardcoded YAML input (from files/testfile017.yaml)
         let yaml = b"? # PLAY SCHEDULE\n  - Detroit Tigers\n  - Chicago Cubs\n:\n  - 2001-07-23\n\n? [ New York Yankees,\n    Atlanta Braves ]\n: [ 2001-07-02, 2001-08-12,\n    2001-08-14 ]\n";
         let mut src = BufferSource::new(yaml.as_ref());
         let node = parse(&mut src).expect("parse");
 
-        // stringify to buffer using the sanitized node
+        // stringify to buffer using the parser-produced node
         let mut dest = crate::io::destinations::buffer::Buffer::new();
         stringify(&node, &mut dest).expect("");
         let out = normalize_newlines(&dest.to_string());

@@ -2200,7 +2200,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_explicit_sequence_keys_testfile017() {
+    fn test_parse_explicit_sequence_keys() {
         // From files/testfile017.yaml (explicit keys that are sequences or commented sequences)
         let yaml = b"? # PLAY SCHEDULE\n  - Detroit Tigers\n  - Chicago Cubs\n:\n  - 2001-07-23\n\n? [ New York Yankees,\n    Atlanta Braves ]\n: [ 2001-07-02, 2001-08-12,\n    2001-08-14 ]\n";
         let mut source = crate::io::sources::buffer::Buffer::new(yaml);
