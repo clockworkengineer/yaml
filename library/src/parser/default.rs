@@ -8,6 +8,7 @@ use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
 use crate::parser::constants::*;
 use crate::parser::utils::{
     collect_until, read_line_trimmed_into_string, skip_whitespace_and_comments,
+    consume_inline_comment_and_newline,
 };
 use std::collections::HashMap;
 
@@ -40,16 +41,16 @@ fn unescape_double_quoted(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut chars = s.chars();
     while let Some(c) = chars.next() {
-        if c != '\\' {
+        if c != CHAR_BACKSLASH {
             out.push(c);
             continue;
         }
         // handle escape
         match chars.next() {
             Some('n') => out.push(CHAR_NEWLINE),
-            Some('r') => out.push('\r'),
-            Some('t') => out.push('\t'),
-            Some('\\') => out.push('\\'),
+            Some('r') => out.push(CHAR_CARRIAGE_RETURN),
+            Some('t') => out.push(CHAR_TAB),
+            Some(CHAR_BACKSLASH) => out.push(CHAR_BACKSLASH),
             Some(CHAR_DOUBLE_QUOTE) => out.push(CHAR_DOUBLE_QUOTE),
             Some('u') => {
                 // \uXXXX
@@ -97,7 +98,7 @@ fn unescape_double_quoted(s: &str) -> String {
 fn parse_error(source: &mut dyn ISource, msg: &str) -> String {
     let current = match source.current() {
         Some(c) => c.to_string(),
-        None => "<EOF>".to_string(),
+        None => STR_EOF.to_string(),
     };
     format!(
         "{} (current: '{}', indent: {})",
@@ -191,7 +192,7 @@ fn read_quoted_flow_scalar(source: &mut dyn ISource) -> Result<String, String> {
                 }
 
                 if quote == CHAR_DOUBLE_QUOTE {
-                    if c == '\\' {
+                    if c == CHAR_BACKSLASH {
                         prev_was_backslash = !prev_was_backslash;
                     } else {
                         prev_was_backslash = false;
@@ -265,19 +266,13 @@ fn parse_mapping_key(source: &mut dyn ISource) -> Result<(Node, bool), String> {
     source.next(); // Skip ':'
     // Allow no space after ':'; process and skip optional whitespace
     skip_whitespace(source);
-    if let Some(c) = source.current() {
+if let Some(c) = source.current() {
         // If there's a comment after the colon, treat it like a newline so that
         // an indented block following the comment becomes the mapping value.
         if c == CHAR_HASH {
-            // consume the comment line and advance past the newline so that
-            // get_current_indent_level() reflects the indent of the next line.
-            parse_comment(source);
-            // If there's a newline after the comment, consume it and then skip whitespace
-            if source.current() == Some(CHAR_NEWLINE) {
-                source.next();
-            }
+            // Use shared helper to consume comment, optional newline, and trailing whitespace
+            consume_inline_comment_and_newline(source);
             newline = true;
-            skip_whitespace(source);
         } else {
             newline = c == CHAR_NEWLINE;
             if newline {
@@ -298,7 +293,7 @@ fn parse_mapping_key(source: &mut dyn ISource) -> Result<(Node, bool), String> {
 }
 fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
     // Handle alias as a standalone value: '*name'
-    if source.current() == Some('*') {
+    if source.current() == Some(CHAR_ASTERISK) {
         // consume '*'
         source.next();
         let name = collect_until(source, |c| {
@@ -308,10 +303,10 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
     }
 
     // Handle inline anchor before a value: '&name' followed by a value
-    if source.current() == Some('&') {
+    if source.current() == Some(CHAR_AMPERSAND) {
         // consume '&'
         source.next();
-        let name = collect_until(source, |c| c == ' ' || c == CHAR_NEWLINE || c == CHAR_HASH);
+        let name = collect_until(source, |c| c == CHAR_SPACE || c == CHAR_NEWLINE || c == CHAR_HASH);
         // Skip optional whitespace after the anchor name. If anchor is (only)
         // followed by whitespace and then a newline, the anchored value is
         // an indented block that follows on the next line.
@@ -348,9 +343,9 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
         Some(_) => {
             let value = collect_until(source, |c| c == CHAR_NEWLINE || c == CHAR_HASH);
             let trimmed = value.trim();
-            if trimmed == "|" || trimmed == ">" {
+            if trimmed == STR_LITERAL_BLOCK || trimmed == STR_FOLDED_BLOCK {
                 // Minimal block scalar support: collect indented lines following the '|' (literal) or '>' (folded)
-                let folded = trimmed == ">";
+                let folded = trimmed == STR_FOLDED_BLOCK;
                 // Consume the newline after the block style indicator
                 if source.current() == Some(CHAR_NEWLINE) {
                     source.next();
@@ -369,7 +364,7 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
                         }
                         let st = source.save_state();
                         let mut count = 0usize;
-                        while let Some(' ') = source.current() {
+                        while let Some(CHAR_SPACE) = source.current() {
                             count += 1;
                             source.next();
                         }
@@ -381,7 +376,7 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
                     // Count current line's spaces (consuming then restoring)
                     let st_line = source.save_state();
                     let mut cur_indent = 0usize;
-                    while let Some(' ') = source.current() {
+                    while let Some(CHAR_SPACE) = source.current() {
                         cur_indent += 1;
                         source.next();
                     }
@@ -394,14 +389,14 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
                     let mut line = collect_until(source, |c| c == CHAR_NEWLINE);
                     if folded && !first {
                         // For folded scalars, strip base indentation from later lines
-                        let strip = bi.min(line.chars().take_while(|&ch| ch == ' ').count());
+                        let strip = bi.min(line.chars().take_while(|&ch| ch == CHAR_SPACE).count());
                         line.drain(0..strip);
                     }
                     if !first {
                         if folded {
-                            out.push(' ');
+                            out.push(CHAR_SPACE);
                         } else {
-                            out.push('\n');
+                            out.push(CHAR_NEWLINE);
                         }
                     } else {
                         first = false;

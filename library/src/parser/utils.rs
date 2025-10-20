@@ -42,6 +42,35 @@ pub fn skip_whitespace_and_comments(source: &mut dyn ISource) {
     }
 }
 
+// Consume an inline '#' comment to end-of-line, then consume a single newline if present,
+// and finally skip any following whitespace. Leaves the cursor positioned at the first
+// non-whitespace character after the newline, or at EOF. If the current character is
+// not '#', this function is a no-op.
+pub fn consume_inline_comment_and_newline(source: &mut dyn ISource) {
+    if source.current() != Some(CHAR_HASH) {
+        return;
+    }
+    // Consume the comment to the end of line
+    while let Some(c) = source.current() {
+        if c == CHAR_NEWLINE {
+            break;
+        }
+        source.next();
+    }
+    // Consume a single newline if present
+    if source.current() == Some(CHAR_NEWLINE) {
+        source.next();
+    }
+    // Skip trailing whitespace
+    while let Some(c) = source.current() {
+        if source.is_whitespace(c) {
+            source.next();
+        } else {
+            break;
+        }
+    }
+}
+
 // Read characters until newline (or end) and return trimmed string; leaves cursor at the newline (not consumed)
 pub fn read_line_trimmed_into_string(source: &mut dyn ISource) -> String {
     let s = collect_until(source, |c| c == CHAR_NEWLINE);
