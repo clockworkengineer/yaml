@@ -11,6 +11,29 @@ use crate::parser::utils::{
 };
 use std::collections::HashMap;
 
+// Helper: produce a compact inline representation of a Node suitable for
+// turning into a string key. Handles sequences and mappings recursively.
+fn node_to_inline_string(node: &Node) -> String {
+    match node {
+        Node::Str(s, _, _) => s.clone(),
+        Node::Number(Numeric::Integer(i)) => i.to_string(),
+        Node::Number(Numeric::Float(f)) => f.to_string(),
+        Node::Boolean(b) => b.to_string(),
+        Node::Array(items) => {
+            let parts: Vec<String> = items.iter().map(|it| node_to_inline_string(it)).collect();
+            format!("[{}]", parts.join(", "))
+        }
+        Node::Mapping(pairs) => {
+            let parts: Vec<String> = pairs
+                .iter()
+                .map(|(k, v)| format!("{}: {}", node_to_inline_string(k), node_to_inline_string(v)))
+                .collect();
+            format!("{{{}}}", parts.join(", "))
+        }
+        _ => format!("{:?}", node),
+    }
+}
+
 // Character constants imported from `crate::parser::constants`
 
 fn unescape_double_quoted(s: &str) -> String {
@@ -755,7 +778,7 @@ pub fn parse_document_contents(
             source.next();
             skip_whitespace(source);
             // Parse key (support only a flow sequence or plain scalar until EOL)
-            let key_node = match source.current() {
+            let mut key_node = match source.current() {
                 Some(CHAR_LBRACKET) => parse_inline_sequence(source)?,
                 Some(_) => Node::Str(
                     read_line_trimmed_into_string(source),
@@ -764,6 +787,25 @@ pub fn parse_document_contents(
                 ),
                 None => Node::Str(String::new(), QuoteType::Unquoted, BlockStyle::None),
             };
+
+            // Convert explicit keys that are collections or other node types
+            // into a compact inline string representation and mark them
+            // as double-quoted so their literal form is preserved on stringify.
+            match key_node {
+                Node::Array(_) | Node::Mapping(_) => {
+                    let inline = node_to_inline_string(&key_node);
+                    key_node = Node::Str(inline, QuoteType::Double, BlockStyle::None);
+                }
+                Node::Str(s, _qt, _style) => {
+                    // Preserve the string content but ensure it's double-quoted
+                    key_node = Node::Str(s, QuoteType::Double, BlockStyle::None);
+                }
+                other => {
+                    // Fallback: render any other node into an inline string
+                    let inline = node_to_inline_string(&other);
+                    key_node = Node::Str(inline, QuoteType::Double, BlockStyle::None);
+                }
+            }
             if source.current() == Some(CHAR_NEWLINE) {
                 source.next();
             }

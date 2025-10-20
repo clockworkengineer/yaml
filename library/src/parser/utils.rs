@@ -45,6 +45,12 @@ pub fn skip_whitespace_and_comments(source: &mut dyn ISource) {
 // Read characters until newline (or end) and return trimmed string; leaves cursor at the newline (not consumed)
 pub fn read_line_trimmed_into_string(source: &mut dyn ISource) -> String {
     let s = collect_until(source, |c| c == CHAR_NEWLINE);
+    // If there's an inline comment starting with '#', strip it and return the
+    // part before it. This ensures callers that want the line content without
+    // trailing comments get a clean string.
+    if let Some(pos) = s.find(CHAR_HASH) {
+        return s[..pos].trim().to_string();
+    }
     s.trim().to_string()
 }
 
