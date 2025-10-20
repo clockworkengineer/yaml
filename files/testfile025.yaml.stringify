@@ -1,8 +1,8 @@
 ---
-languages: null
-- YAML
-- JAVA
-- XML
-- Python
-- C
+languages: 
+  - YAML
+  - JAVA
+  - XML
+  - Python
+  - C
 ...

@@ -840,29 +840,54 @@ pub fn parse_document_contents(
                     key_node = Node::Str(inline, QuoteType::Double, BlockStyle::None);
                 }
             }
-            // Detect a colon that may be on its own line after the explicit key
-            // (e.g., a line containing only ':'). First, peek at the rest of the
-            // current line and check if it equals ':' after trimming. If so,
-            // consume the colon. Otherwise, fall back to scanning forward for
-            // the next ':' token while skipping intervening lines.
+            // Detect and consume the ':' that separates the explicit key from
+            // its value. The colon may appear on the same line, on its own
+            // line, or be separated by comments/blank lines. Scan forward
+            // consuming intermediate comments/newlines until we find a ':' or
+            // reach EOF. If we don't find a colon, restore the original
+            // read position to avoid consuming unrelated content.
             let st_colon = source.save_state();
-            let rest = collect_until(source, |c| c == CHAR_NEWLINE);
-            if rest.trim() == ":" {
-                // restore and consume up to and including the ':'
-                source.restore_state(st_colon);
-                while let Some(c) = source.current() {
-                    if c == CHAR_COLON {
+            let mut found_colon = false;
+            loop {
+                // Skip spaces/tabs only (do not skip newlines here so we can
+                // observe blank lines and comments)
+                skip_whitespace(source);
+
+                match source.current() {
+                    Some(CHAR_COLON) => {
+                        // consume the colon and stop scanning
                         source.next();
+                        found_colon = true;
                         break;
                     }
-                    source.next();
+                    Some(CHAR_HASH) => {
+                        // consume the comment line and continue scanning
+                        parse_comment(source);
+                        // If there's a newline after the comment, consume it
+                        if source.current() == Some(CHAR_NEWLINE) {
+                            source.next();
+                        }
+                        continue;
+                    }
+                    Some(CHAR_NEWLINE) => {
+                        // blank line: consume and continue
+                        source.next();
+                        continue;
+                    }
+                    Some(_) | None => {
+                        // No colon found on this scan
+                        break;
+                    }
                 }
-            } else {
-                // Restore and perform the previous scanning behavior
+            }
+            if !found_colon {
+                // Restore and fall back to previous behavior (leave source unchanged)
                 source.restore_state(st_colon);
+                // As a fallback, if the current position is a newline, consume it
                 if source.current() == Some(CHAR_NEWLINE) {
                     source.next();
                 }
+                // Attempt to locate the next ':' by skipping to line ends
                 loop {
                     skip_whitespace(source);
                     if source.current() == Some(CHAR_COLON) {
@@ -877,11 +902,12 @@ pub fn parse_document_contents(
                     }
                 }
             }
+            // If a colon is present now, consume it
             if source.current() == Some(CHAR_COLON) {
                 source.next();
             }
             skip_whitespace(source);
-            let value_node = match source.current() {
+            let mut value_node = match source.current() {
                 Some(CHAR_LBRACKET) => parse_inline_sequence(source)?,
                 Some(CHAR_LBRACE) => parse_inline_mapping(source)?,
                 Some(CHAR_DASH) => {
@@ -896,6 +922,23 @@ pub fn parse_document_contents(
                     ));
                 }
             };
+
+            // Heuristic: If the parsed value is None (empty) but the next
+            // non-whitespace/comment content is a sequence, treat that
+            // following sequence as the value. This handles cases where the
+            // ':' was on its own line and the sequence exists on the next
+            // indented line; it prevents producing a Mapping with a None
+            // value followed by a separate Array node in the Document.
+            if matches!(value_node, Node::None) {
+                let st_peek = source.save_state();
+                skip_whitespace_and_comments(source);
+                if source.current() == Some(CHAR_DASH) {
+                    let nested_indent = source.get_current_indent_level();
+                    value_node = parse_sequence(source, nested_indent)?;
+                } else {
+                    source.restore_state(st_peek);
+                }
+            }
             // Build a mapping where the key is a Node (preserving quote metadata)
             let mut pairs: Vec<(Node, Node)> = Vec::new();
             pairs.push((key_node, value_node));
@@ -941,12 +984,44 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
                 continue;
             }
             _ => {
-                document_nodes.push(parse_document_contents(source, indent_level)?);
+                let node = parse_document_contents(source, indent_level)?;
+                // Only record non-blank nodes; blank nodes (None or empty
+                // sequences) are not meaningful document entries and would
+                // otherwise cause stray 'null' emissions during stringify.
+                if !node_is_blank(&node) {
+                    document_nodes.push(node);
+                }
             }
         }
     }
 
-    let mut doc_node = Node::Document(document_nodes);
+    // Normalize certain parser artifacts before anchor collection:
+    // If the document node list contains a Mapping whose single pair has a
+    // None value followed immediately by an Array node, merge them into a
+    // single Mapping whose value is that Array. This canonicalizes the
+    // AST so later consumers (stringifier/tests) don't need to special-case
+    // this parser layout.
+    let mut normalized_nodes: Vec<Node> = Vec::new();
+    let mut i = 0usize;
+    while i < document_nodes.len() {
+        if i + 1 < document_nodes.len() {
+            // Check for Mapping with one pair whose value is None followed by Array
+            if let Node::Mapping(pairs) = &document_nodes[i] {
+                if pairs.len() == 1 && matches!(pairs[0].1, Node::None) {
+                    if let Node::Array(arr) = &document_nodes[i + 1] {
+                        // Build a new mapping with the array as the value
+                        let key = pairs[0].0.clone();
+                        normalized_nodes.push(Node::Mapping(vec![(key, Node::Array(arr.clone()))]));
+                        i += 2;
+                        continue;
+                    }
+                }
+            }
+        }
+        normalized_nodes.push(document_nodes[i].clone());
+        i += 1;
+    }
+    let mut doc_node = Node::Document(normalized_nodes);
     // Resolve anchors and aliases within the document (collect anchors then replace aliases)
     fn collect_anchors(node: &Node, anchors: &mut HashMap<String, Node>) {
         match node {

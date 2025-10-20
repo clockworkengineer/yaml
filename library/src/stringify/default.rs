@@ -543,4 +543,24 @@ mod tests {
         let expected = "---\nhr: \n  - Mark McGwire\n  - Sammy Sosa\n...\n";
         assert_eq!(out, expected);
     }
+
+    #[test]
+    fn test_stringify_testfile017_from_file() {
+        // Hardcoded YAML input (from files/testfile017.yaml)
+        let yaml = b"? # PLAY SCHEDULE\n  - Detroit Tigers\n  - Chicago Cubs\n:\n  - 2001-07-23\n\n? [ New York Yankees,\n    Atlanta Braves ]\n: [ 2001-07-02, 2001-08-12,\n    2001-08-14 ]\n";
+        let mut src = BufferSource::new(yaml.as_ref());
+        let node = parse(&mut src).expect("parse");
+
+        // stringify to buffer using the sanitized node
+        let mut dest = crate::io::destinations::buffer::Buffer::new();
+        stringify(&node, &mut dest).expect("");
+        let out = normalize_newlines(&dest.to_string());
+
+        // Hardcoded expected stringify output (from files/testfile017.yaml.stringify)
+        let expected = normalize_newlines(
+            "---\n\"[Detroit Tigers, Chicago Cubs]\": \n  - 2001-07-23\n\"[New York Yankees, Atlanta Braves]\": \n  - 2001-07-02\n  - 2001-08-12\n  - 2001-08-14\n...\n",
+        );
+
+        assert_eq!(out, expected);
+    }
 }
