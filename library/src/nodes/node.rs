@@ -54,6 +54,12 @@ pub enum Node {
     /// Represents a document node
     /// Contains a sequence of top-level nodes making up a YAML document
     Document(Vec<Node>),
+    /// Represents an anchored node: a node with an associated anchor name
+    /// Stores the inner node and the anchor name (e.g., &anchor)
+    Anchored(Box<Node>, String),
+    /// Represents an alias node that references a previously anchored node
+    /// Stores the anchor name (e.g., *alias)
+    Alias(String),
     Documents(Vec<Node>),
     /// Represents a null value or uninitialized node
     /// Used for explicit null values in YAML or missing/undefined values
@@ -427,7 +433,10 @@ mod tests {
             Node::Documents(nodes) => {
                 assert_eq!(nodes.len(), 2);
                 assert_eq!(nodes[0], Node::Number(Numeric::Int32(1)));
-                assert_eq!(nodes[1], Node::Str("test".to_string(), QuoteType::Unquoted, BlockStyle::None));
+                assert_eq!(
+                    nodes[1],
+                    Node::Str("test".to_string(), QuoteType::Unquoted, BlockStyle::None)
+                );
             }
             _ => panic!("Expected Document node"),
         }

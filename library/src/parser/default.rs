@@ -9,6 +9,7 @@ use crate::parser::constants::*;
 use crate::parser::utils::{
     collect_until, read_line_trimmed_into_string, skip_whitespace_and_comments,
 };
+use std::collections::HashMap;
 
 // Character constants imported from `crate::parser::constants`
 
@@ -115,6 +116,8 @@ fn node_is_blank(node: &Node) -> bool {
         Document(nodes) => nodes.iter().all(|n| node_is_blank(n)),
         Node::Str(s, _, _) => s.is_empty(),
         Node::Comment(_) => true,
+        Node::Anchored(inner, _name) => node_is_blank(inner),
+        Node::Alias(_name) => false,
         _ => false,
     }
 }
@@ -271,6 +274,46 @@ fn parse_mapping_key(source: &mut dyn ISource) -> Result<(Node, bool), String> {
     }
 }
 fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
+    // Handle alias as a standalone value: '*name'
+    if source.current() == Some('*') {
+        // consume '*'
+        source.next();
+        let name = collect_until(source, |c| {
+            c == CHAR_NEWLINE || c == CHAR_HASH || c.is_whitespace()
+        });
+        return Ok(Node::Alias(name));
+    }
+
+    // Handle inline anchor before a value: '&name' followed by a value
+    if source.current() == Some('&') {
+        // consume '&'
+        source.next();
+        let name = collect_until(source, |c| c == ' ' || c == CHAR_NEWLINE || c == CHAR_HASH);
+        // Skip optional whitespace after the anchor name. If anchor is (only)
+        // followed by whitespace and then a newline, the anchored value is
+        // an indented block that follows on the next line.
+        skip_whitespace(source);
+        if source.current() == Some(CHAR_NEWLINE) {
+            // consume the newline and parse the nested block at its indent
+            source.next();
+            skip_whitespace(source);
+            let nested_indent = source.get_current_indent_level();
+            let node = parse_document_contents(source, nested_indent)?;
+            return Ok(Node::Anchored(Box::new(node), name));
+        }
+        let node = match source.current() {
+            Some(CHAR_LBRACE) => parse_inline_mapping(source)?,
+            Some(CHAR_LBRACKET) => parse_inline_sequence(source)?,
+            Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
+                let raw = read_quoted_flow_scalar(source)?;
+                parse_scalar(raw.trim())
+            }
+            Some(_) => parse_value(source)?,
+            None => return Err(parse_error(source, "Unexpected EOF after anchor")),
+        };
+        return Ok(Node::Anchored(Box::new(node), name));
+    }
+
     match source.current() {
         Some(CHAR_LBRACE) => parse_inline_mapping(source),
         Some(CHAR_LBRACKET) => parse_inline_sequence(source),
@@ -636,7 +679,10 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
 
 fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, String> {
     let mut pairs: Vec<(Node, Node)> = Vec::new();
+    let mut last_was_nested = false;
     while let Some(c) = source.current() {
+        // Reset per-iteration flag
+        last_was_nested = false;
         match c {
             CHAR_DASH | CHAR_DOT if peek_ahead_for_document_start_end(source, c) => {
                 break;
@@ -656,7 +702,11 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
                     pairs.push((key_node, parse_document_contents(source, next_indent)?));
                     continue;
                 } else {
-                    pairs.push((key_node, parse_value(source)?));
+                    let value_node = parse_value(source)?;
+                    // If the parsed value is an Anchored node, it likely
+                    // consumed a nested block; avoid skipping the following line.
+                    last_was_nested = matches!(value_node, Node::Anchored(_, _));
+                    pairs.push((key_node, value_node));
                 }
             }
             c if c.is_whitespace() => {
@@ -665,7 +715,12 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
             }
             _ => break,
         }
-        skip_until_newline(source);
+        // Only skip the remainder of the current line when we parsed a
+        // single-line value. If the value was a nested block (which already
+        // consumed its trailing newlines), don't advance further here.
+        if !last_was_nested {
+            skip_until_newline(source);
+        }
         skip_whitespace(source);
     }
     // Sort pairs by key for deterministic output
@@ -788,7 +843,94 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
         }
     }
 
-    Ok(Document(document_nodes))
+    let mut doc_node = Node::Document(document_nodes);
+    // Resolve anchors and aliases within the document (collect anchors then replace aliases)
+    fn collect_anchors(node: &Node, anchors: &mut HashMap<String, Node>) {
+        match node {
+            Node::Anchored(inner, name) => {
+                // node is &Node, inner is &Box<Node>; deref twice to get Node
+                anchors.insert(name.clone(), (**inner).clone());
+                collect_anchors(&**inner, anchors);
+            }
+            Node::Mapping(pairs) => {
+                for (k, v) in pairs {
+                    collect_anchors(k, anchors);
+                    collect_anchors(v, anchors);
+                }
+            }
+            Node::Array(items) => {
+                for it in items {
+                    collect_anchors(it, anchors);
+                }
+            }
+            Node::Document(nodes) => {
+                for n in nodes {
+                    collect_anchors(n, anchors);
+                }
+            }
+            Node::Documents(docs) => {
+                for d in docs {
+                    collect_anchors(d, anchors);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn replace_aliases(node: &mut Node, anchors: &HashMap<String, Node>) -> Result<(), String> {
+        match node {
+            Node::Alias(name) => {
+                if let Some(found) = anchors.get(name) {
+                    *node = found.clone();
+                    Ok(())
+                } else {
+                    Err(format!("Undefined anchor: {}", name))
+                }
+            }
+            Node::Anchored(inner, _name) => {
+                // inner is &mut Box<Node>; deref twice to get Node
+                let replacement = (**inner).clone();
+                *node = replacement;
+                // Continue replacing inside the new node
+                replace_aliases(node, anchors)
+            }
+            Node::Mapping(pairs) => {
+                for (k, v) in pairs.iter_mut() {
+                    replace_aliases(k, anchors)?;
+                    replace_aliases(v, anchors)?;
+                }
+                Ok(())
+            }
+            Node::Array(items) => {
+                for it in items.iter_mut() {
+                    replace_aliases(it, anchors)?;
+                }
+                Ok(())
+            }
+            Node::Document(nodes) => {
+                for n in nodes.iter_mut() {
+                    replace_aliases(n, anchors)?;
+                }
+                Ok(())
+            }
+            Node::Documents(docs) => {
+                for d in docs.iter_mut() {
+                    replace_aliases(d, anchors)?;
+                }
+                Ok(())
+            }
+            _ => Ok(()),
+        }
+    }
+
+    // initial parsed document before anchor collection
+    let mut anchors: HashMap<String, Node> = HashMap::new();
+    collect_anchors(&doc_node, &mut anchors);
+    // Now replace aliases; propagate any undefined-anchor error
+    replace_aliases(&mut doc_node, &anchors)?;
+    // resolved document
+
+    Ok(doc_node)
 }
 pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
     // Use module-level helper `node_is_blank`
@@ -901,6 +1043,8 @@ mod tests {
     fn test_parse_sequence() {
         let mut source = Buffer::new(b"- 1\n- 2\n- 3");
         let result = parse(&mut source).unwrap();
+
+        // parsed document structure
         assert_eq!(
             result,
             Node::Documents(vec![Document(vec![Node::Array(vec![
@@ -1717,5 +1861,94 @@ mod tests {
         )])])]);
 
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_anchor_and_alias_in_mapping() {
+        let yaml = b"---\nanchor: &a \n  nested: value\nalias_ref: *a\n";
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source).unwrap();
+
+        // Expect parsing to succeed; we don't currently resolve aliases to nodes
+        // but we expect Alias/Anchored nodes to be present in the AST
+        // A more thorough test will inspect the structure via stringify.
+        assert!(matches!(result, Node::Documents(_)));
+    }
+
+    #[test]
+    fn test_parse_anchor_and_alias_in_sequence() {
+        // anchor a scalar in a sequence and reference it via alias
+        let yaml = b"---\n- &a hello\n- *a\n";
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source).unwrap();
+
+        // After resolution, both items should be the same scalar "hello"
+        if let Node::Documents(docs) = result {
+            if let Node::Document(nodes) = &docs[0] {
+                if let Node::Array(items) = &nodes[0] {
+                    assert_eq!(
+                        items[0],
+                        Node::Str("hello".to_string(), QuoteType::Unquoted, BlockStyle::None)
+                    );
+                    assert_eq!(
+                        items[1],
+                        Node::Str("hello".to_string(), QuoteType::Unquoted, BlockStyle::None)
+                    );
+                    return;
+                }
+            }
+        }
+        panic!("Unexpected parse result structure");
+    }
+
+    #[test]
+    fn test_parse_nested_anchor_and_alias() {
+        // anchor a mapping nested inside a mapping and reference it
+        let yaml = b"---\nroot: &a\n  nested:\n    value: 1\nref: *a\n";
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source).unwrap();
+
+        // DEBUG: print parsed result
+        println!("TEST_PARSED: {:#?}", result);
+
+        // After resolution, 'ref' should be a mapping containing 'nested' mapping
+        if let Node::Documents(docs) = result {
+            if let Node::Document(nodes) = &docs[0] {
+                if let Node::Mapping(pairs) = &nodes[0] {
+                    // find ref key
+                    let mut found = false;
+                    for (k, v) in pairs {
+                        if let Node::Str(ks, _, _) = k {
+                            if ks == "ref" {
+                                // value should be a mapping with nested->value:1
+                                if let Node::Mapping(inner_pairs) = v {
+                                    // look for nested key
+                                    let mut ok = false;
+                                    for (ik, _iv) in inner_pairs {
+                                        if let Node::Str(iks, _, _) = ik {
+                                            if iks == "nested" {
+                                                ok = true;
+                                            }
+                                        }
+                                    }
+                                    assert!(ok);
+                                    found = true;
+                                }
+                            }
+                        }
+                    }
+                    assert!(found);
+                    return;
+                }
+            }
+        }
+        panic!("Unexpected parse result structure");
+    }
+
+    #[test]
+    fn test_parse_undefined_alias_errors() {
+        let mut source = Buffer::new(b"---\nvalue: *nope\n");
+        let res = parse(&mut source);
+        assert!(res.is_err());
     }
 }

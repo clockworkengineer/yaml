@@ -183,6 +183,14 @@ fn stringify_document_with_indent(
                 stringify_document_with_indent(node, destination, indent)?;
             }
         }
+        Node::Anchored(inner, name) => {
+            // Emit an anchor before the node
+            destination.add_bytes(&format!("&{} ", name));
+            stringify_document_with_indent(inner, destination, indent)?;
+        }
+        Node::Alias(name) => {
+            destination.add_bytes(&format!("*{}", name));
+        }
         _ => {
             return Err("Unsupported node type".to_string());
         }
@@ -348,6 +356,26 @@ mod tests {
         ];
         stringify(&Node::Documents(docs), &mut dest).unwrap();
         assert_eq!(dest.to_string(), "---\n\"doc1\"...\n---\n\"doc2\"...\n");
+    }
+
+    #[test]
+    fn test_stringify_anchor_and_alias() {
+        let mut dest = Buffer::new();
+        // Build an anchored mapping value and an alias node
+        let anchored = Node::Anchored(
+            Box::new(Node::Mapping(vec![(
+                Node::Str("nested".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Str("value".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            )])),
+            "a".to_string(),
+        );
+
+        let docs = vec![anchored, Node::Alias("a".to_string())];
+        stringify(&Node::Documents(docs), &mut dest).unwrap();
+        // Expect anchors and aliases to be emitted
+        let out = dest.to_string();
+        assert!(out.contains("&a"));
+        assert!(out.contains("*a"));
     }
 
     #[test]
