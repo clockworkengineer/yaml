@@ -6,93 +6,9 @@ use crate::io::traits::ISource;
 use crate::nodes::node::Node::Document;
 use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
 use crate::parser::constants::*;
-use crate::parser::utils::{
-    collect_until, read_line_trimmed_into_string, skip_whitespace_and_comments,
-    consume_inline_comment_and_newline,
-};
+use crate::parser::utils::*;
 use std::collections::HashMap;
 
-// Helper: produce a compact inline representation of a Node suitable for
-// turning into a string key. Handles sequences and mappings recursively.
-fn node_to_inline_string(node: &Node) -> String {
-    match node {
-        Node::Str(s, _, _) => s.clone(),
-        Node::Number(Numeric::Integer(i)) => i.to_string(),
-        Node::Number(Numeric::Float(f)) => f.to_string(),
-        Node::Boolean(b) => b.to_string(),
-        Node::Array(items) => {
-            let parts: Vec<String> = items.iter().map(|it| node_to_inline_string(it)).collect();
-            format!("[{}]", parts.join(", "))
-        }
-        Node::Mapping(pairs) => {
-            let parts: Vec<String> = pairs
-                .iter()
-                .map(|(k, v)| format!("{}: {}", node_to_inline_string(k), node_to_inline_string(v)))
-                .collect();
-            format!("{{{}}}", parts.join(", "))
-        }
-        _ => format!("{:?}", node),
-    }
-}
-
-// Character constants imported from `crate::parser::constants`
-
-fn unescape_double_quoted(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    let mut chars = s.chars();
-    while let Some(c) = chars.next() {
-        if c != CHAR_BACKSLASH {
-            out.push(c);
-            continue;
-        }
-        // handle escape
-        match chars.next() {
-            Some('n') => out.push(CHAR_NEWLINE),
-            Some('r') => out.push(CHAR_CARRIAGE_RETURN),
-            Some('t') => out.push(CHAR_TAB),
-            Some(CHAR_BACKSLASH) => out.push(CHAR_BACKSLASH),
-            Some(CHAR_DOUBLE_QUOTE) => out.push(CHAR_DOUBLE_QUOTE),
-            Some('u') => {
-                // \uXXXX
-                let mut hex = String::new();
-                for _ in 0..4 {
-                    if let Some(h) = chars.next() {
-                        hex.push(h);
-                    } else {
-                        break;
-                    }
-                }
-                if let Ok(code) = u32::from_str_radix(&hex, 16) {
-                    if let Some(ch) = std::char::from_u32(code) {
-                        out.push(ch);
-                    }
-                }
-            }
-            Some('U') => {
-                // \UXXXXXXXX
-                let mut hex = String::new();
-                for _ in 0..8 {
-                    if let Some(h) = chars.next() {
-                        hex.push(h);
-                    } else {
-                        break;
-                    }
-                }
-                if let Ok(code) = u32::from_str_radix(&hex, 16) {
-                    if let Some(ch) = std::char::from_u32(code) {
-                        out.push(ch);
-                    }
-                }
-            }
-            Some(other) => {
-                // Unknown escape, keep the character as-is (e.g., \x -> x)
-                out.push(other);
-            }
-            None => break,
-        }
-    }
-    out
-}
 
 // Helper to create richer parse error messages with current character and indent
 fn parse_error(source: &mut dyn ISource, msg: &str) -> String {
@@ -119,16 +35,6 @@ fn skip_whitespace(source: &mut dyn ISource) {
 }
 
 // Helper functions moved to `crate::parser::utils`
-
-fn skip_until_newline(source: &mut dyn ISource) {
-    while let Some(c) = source.current() {
-        if c == CHAR_NEWLINE {
-            source.next();
-            break;
-        }
-        source.next();
-    }
-}
 
 // Helper to determine whether a node (or document) is blank/empty
 fn node_is_blank(node: &Node) -> bool {
@@ -266,7 +172,7 @@ fn parse_mapping_key(source: &mut dyn ISource) -> Result<(Node, bool), String> {
     source.next(); // Skip ':'
     // Allow no space after ':'; process and skip optional whitespace
     skip_whitespace(source);
-if let Some(c) = source.current() {
+    if let Some(c) = source.current() {
         // If there's a comment after the colon, treat it like a newline so that
         // an indented block following the comment becomes the mapping value.
         if c == CHAR_HASH {
@@ -586,6 +492,8 @@ fn parse_comment(source: &mut dyn ISource) -> String {
 }
 
 // node_to_map_key is provided by `crate::parser::utils`
+
+
 
 fn parse_scalar(value: &str) -> Node {
     // Check if the value is a comment (starts with #)
