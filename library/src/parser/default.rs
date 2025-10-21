@@ -524,7 +524,41 @@ fn parse_scalar(value: &str) -> Node {
                     } else if first == CHAR_DOUBLE_QUOTE && last == CHAR_DOUBLE_QUOTE {
                         // Strip surrounding double quotes and unescape
                         let inner = &v[1..v.len() - 1];
-                        (unescape_double_quoted(inner), QuoteType::Double)
+                        let unescaped = unescape_double_quoted(inner);
+                        // Fold any embedded newlines (including those introduced by multiline
+                        // double-quoted scalars and escaped \n sequences) into single spaces,
+                        // and trim trailing spaces to keep output compact and single-line.
+                        let mut folded = String::with_capacity(unescaped.len());
+                        let mut chars = unescaped.chars().peekable();
+                        while let Some(ch) = chars.next() {
+                            if ch == '\n' {
+                                // Count following spaces (indentation)
+                                let mut space_count = 0usize;
+                                while let Some(' ') = chars.peek().copied() {
+                                    space_count += 1;
+                                    chars.next();
+                                }
+                                if space_count > 0 {
+                                    // Newline followed by spaces: fold to a single space
+                                    if !folded.ends_with(' ') && !folded.is_empty() {
+                                        folded.push(' ');
+                                    }
+                                    // If folded is empty, avoid leading space
+                                } else {
+                                    // No spaces after newline: preserve newline unless it's the terminal char
+                                    if chars.peek().is_some() {
+                                        folded.push('\n');
+                                    } else {
+                                        // trailing newline at the very end: drop it
+                                    }
+                                }
+                            } else {
+                                folded.push(ch);
+                            }
+                        }
+                        // Trim any trailing whitespace introduced by folding
+                        let folded = folded.trim_end().to_string();
+                        (folded, QuoteType::Double)
                     } else {
                         (v.to_string(), QuoteType::Unquoted)
                     }
@@ -2266,5 +2300,18 @@ mod tests {
         let mut dest = DestBuffer::new();
         stringify(&result, &mut dest).unwrap();
         assert_eq!(dest.to_string(), "---\nplain: This unquoted scalar spans many lines.\n...\n")
+    }
+
+    #[test]
+    fn test_parse_block_double_quoted_block_scalar_with_indent() {
+        // anchor a scalar in a sequence and reference it via alias
+        use crate::stringify;
+        let yaml = b"---\nquoted: \"So does this\n  quoted scalar.\\n\"";
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source).unwrap();
+        use crate::io::destinations::buffer::Buffer as DestBuffer;
+        let mut dest = DestBuffer::new();
+        stringify(&result, &mut dest).unwrap();
+        assert_eq!(dest.to_string(), "---\nquoted: \"So does this quoted scalar.\"\n...\n")
     }
 }
