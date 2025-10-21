@@ -2386,7 +2386,7 @@ mod tests {
         use crate::io::destinations::buffer::Buffer as DestBuffer;
         let mut dest = DestBuffer::new();
         stringify(&result, &mut dest).unwrap();
-        assert_eq!(dest.to_string(), "---\nquoted: \"So does this quoted scalar.\"\n...\n")
+        assert_eq!(dest.to_string(), "---\nquoted: |\n  So does this quoted scalar.\n...\n")
     }
     #[test]
     fn test_parse_block_unquoted_block_multiline_scalar_with_indent() {
