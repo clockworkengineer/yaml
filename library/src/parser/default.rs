@@ -687,12 +687,17 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
                             if !trimmed.is_empty() {
                                 parts.push(trimmed.to_string());
                             }
-                            if source.current().is_none() || source.get_current_indent_level() < next_indent {
+                            if source.current().is_none()
+                                || source.get_current_indent_level() < next_indent
+                            {
                                 break;
                             }
                         }
                         let joined = parts.join(" ");
-                        pairs.push((key_node, Node::Str(joined, QuoteType::Unquoted, BlockStyle::None)));
+                        pairs.push((
+                            key_node,
+                            Node::Str(joined, QuoteType::Unquoted, BlockStyle::None),
+                        ));
                         continue;
                     } else {
                         pairs.push((key_node, parse_document_contents(source, next_indent)?));
