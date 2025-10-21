@@ -289,7 +289,7 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
                     }
 
                     // Read the raw line up to (but not including) newline
-                    let mut raw_line = collect_until(source, |c| c == CHAR_NEWLINE);
+                    let raw_line = collect_until(source, |c| c == CHAR_NEWLINE);
 
                     // Determine indent for non-empty lines and update base indent (minimal across non-empty)
                     if !raw_line.is_empty() {
