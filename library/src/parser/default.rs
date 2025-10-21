@@ -9,7 +9,6 @@ use crate::parser::constants::*;
 use crate::parser::utils::*;
 use std::collections::HashMap;
 
-
 // Helper to create richer parse error messages with current character and indent
 fn parse_error(source: &mut dyn ISource, msg: &str) -> String {
     let current = match source.current() {
@@ -212,7 +211,9 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
     if source.current() == Some(CHAR_AMPERSAND) {
         // consume '&'
         source.next();
-        let name = collect_until(source, |c| c == CHAR_SPACE || c == CHAR_NEWLINE || c == CHAR_HASH);
+        let name = collect_until(source, |c| {
+            c == CHAR_SPACE || c == CHAR_NEWLINE || c == CHAR_HASH
+        });
         // Skip optional whitespace after the anchor name. If anchor is (only)
         // followed by whitespace and then a newline, the anchored value is
         // an indented block that follows on the next line.
@@ -316,7 +317,7 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
                     }
                 }
                 // Store as Literal block style for consistency with existing expectations
-                Ok(Node::Str(out, QuoteType::Unquoted, BlockStyle::Literal))
+                Ok(Node::Str(out, QuoteType::Unquoted, BlockStyle::None))
             } else if !trimmed.is_empty() {
                 Ok(parse_scalar(trimmed))
             } else {
@@ -493,8 +494,6 @@ fn parse_comment(source: &mut dyn ISource) -> String {
 
 // node_to_map_key is provided by `crate::parser::utils`
 
-
-
 fn parse_scalar(value: &str) -> Node {
     // Check if the value is a comment (starts with #)
     match value {
@@ -627,12 +626,78 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
                     break;
                 }
 
+                // Only treat this line as a mapping entry if there is a ':' on the same line.
+                if !peek_ahead_for_mapping_key(source) {
+                    // Not a mapping key - end of this mapping block
+                    break;
+                }
+
                 let (key_node, newline) = parse_mapping_key(source)?;
 
                 let next_indent = source.get_current_indent_level();
                 if next_indent > indent_level && newline {
-                    pairs.push((key_node, parse_document_contents(source, next_indent)?));
-                    continue;
+                    // Heuristic: if the nested block appears to be plain
+                    // unquoted lines (no mapping keys), collect them into a
+                    // single inline scalar. Otherwise delegate to
+                    // parse_document_contents to handle nested mappings/sequences.
+                    let st_nested = source.save_state();
+                    skip_whitespace(source);
+                    // If the next non-whitespace char starts an alphanumeric
+                    // line and that line does not contain a ':' before newline,
+                    // treat as plain lines block.
+                    let mut is_plain_block = false;
+                    if let Some(c) = source.current() {
+                        if c.is_alphanumeric() {
+                            // Look ahead for ':' on the same line
+                            let st_look = source.save_state();
+                            let mut found_colon = false;
+                            while let Some(ch) = source.current() {
+                                if ch == CHAR_COLON {
+                                    found_colon = true;
+                                    break;
+                                }
+                                if ch == CHAR_NEWLINE {
+                                    break;
+                                }
+                                source.next();
+                            }
+                            source.restore_state(st_look);
+                            if !found_colon {
+                                is_plain_block = true;
+                            }
+                        }
+                    }
+                    source.restore_state(st_nested);
+
+                    if is_plain_block {
+                        // Collect contiguous lines at indent >= next_indent
+                        let mut parts: Vec<String> = Vec::new();
+                        loop {
+                            if source.current().is_none() {
+                                break;
+                            }
+                            if source.get_current_indent_level() < next_indent {
+                                break;
+                            }
+                            let line = collect_until(source, |c| c == CHAR_NEWLINE);
+                            if source.current() == Some(CHAR_NEWLINE) {
+                                source.next();
+                            }
+                            let trimmed = line.trim();
+                            if !trimmed.is_empty() {
+                                parts.push(trimmed.to_string());
+                            }
+                            if source.current().is_none() || source.get_current_indent_level() < next_indent {
+                                break;
+                            }
+                        }
+                        let joined = parts.join(" ");
+                        pairs.push((key_node, Node::Str(joined, QuoteType::Unquoted, BlockStyle::None)));
+                        continue;
+                    } else {
+                        pairs.push((key_node, parse_document_contents(source, next_indent)?));
+                        continue;
+                    }
                 } else {
                     let value_node = parse_value(source)?;
                     // If the parsed value is an Anchored node, it likely
@@ -2224,6 +2289,9 @@ mod tests {
         use crate::io::destinations::buffer::Buffer as DestBuffer;
         let mut dest = DestBuffer::new();
         stringify(&result, &mut dest).unwrap();
-        assert_eq!(dest.to_string(), "---\nplain: |\n  This unquoted scalar\n  spans many lines.\n...\n")
+        assert_eq!(
+            dest.to_string(),
+            "---\nplain: This unquoted scalar spans many lines.\n...\n"
+        )
     }
 }
