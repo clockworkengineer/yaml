@@ -2214,4 +2214,16 @@ mod tests {
         }
         panic!("Unexpected parse result structure for testfile017 explicit keys");
     }
+    #[test]
+    fn test_parse_block_unquoted_block_scalar_with_indent() {
+        // anchor a scalar in a sequence and reference it via alias
+        use crate::stringify;
+        let yaml = b"---\nplain:\n  This unquoted scalar\n  spans many lines.";
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source).unwrap();
+        use crate::io::destinations::buffer::Buffer as DestBuffer;
+        let mut dest = DestBuffer::new();
+        stringify(&result, &mut dest).unwrap();
+        assert_eq!(dest.to_string(), "---\nplain: |\n  This unquoted scalar\n  spans many lines.\n...\n")
+    }
 }
