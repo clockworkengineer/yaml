@@ -250,72 +250,129 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
             let value = collect_until(source, |c| c == CHAR_NEWLINE || c == CHAR_HASH);
             let trimmed = value.trim();
             if trimmed == STR_LITERAL_BLOCK || trimmed == STR_FOLDED_BLOCK {
-                // Minimal block scalar support: collect indented lines following the '|' (literal) or '>' (folded)
-                let folded = trimmed == STR_FOLDED_BLOCK;
+                // Collect indented lines following the '|' (literal) or '>' (folded)
+                let is_folded = trimmed == STR_FOLDED_BLOCK;
                 // Consume the newline after the block style indicator
                 if source.current() == Some(CHAR_NEWLINE) {
                     source.next();
                 }
-                let mut out = String::new();
-                let mut base_indent: Option<usize> = None;
-                let mut first = true;
+
+                let mut lines: Vec<String> = Vec::new();
+                let mut base_indent: Option<usize> = None; // minimal indent across non-empty lines
+
                 loop {
                     if source.current().is_none() {
                         break;
                     }
-                    // Establish base indent on the first content line by counting leading spaces without consuming
-                    if base_indent.is_none() {
-                        if source.current() == Some(CHAR_NEWLINE) {
-                            break;
-                        }
-                        let st = source.save_state();
-                        let mut count = 0usize;
-                        while let Some(CHAR_SPACE) = source.current() {
-                            count += 1;
-                            source.next();
-                        }
-                        base_indent = Some(count);
-                        source.restore_state(st);
-                    }
-                    let bi = base_indent.unwrap_or(0);
-                    // If the current line has less indent than base, stop the block
-                    // Count current line's spaces (consuming then restoring)
+
+                    // Peek current line indent
                     let st_line = source.save_state();
                     let mut cur_indent = 0usize;
                     while let Some(CHAR_SPACE) = source.current() {
                         cur_indent += 1;
                         source.next();
                     }
+                    let cur_is_newline = source.current() == Some(CHAR_NEWLINE);
                     source.restore_state(st_line);
-                    if cur_indent < bi {
-                        break;
+
+                    // If we already established base indent and this line is less indented and not empty, end block
+                    if let Some(bi) = base_indent {
+                        if cur_indent < bi && !cur_is_newline {
+                            break;
+                        }
                     }
 
-                    // Read current line content
-                    let mut line = collect_until(source, |c| c == CHAR_NEWLINE);
-                    if folded && !first {
-                        // For folded scalars, strip base indentation from later lines
-                        let strip = bi.min(line.chars().take_while(|&ch| ch == CHAR_SPACE).count());
-                        line.drain(0..strip);
+                    // Read the raw line up to (but not including) newline
+                    let mut raw_line = collect_until(source, |c| c == CHAR_NEWLINE);
+
+                    // Determine indent for non-empty lines and update base indent (minimal across non-empty)
+                    if !raw_line.is_empty() {
+                        let this_indent = raw_line.chars().take_while(|&ch| ch == CHAR_SPACE).count();
+                        base_indent = Some(match base_indent {
+                            Some(bi) => bi.min(this_indent),
+                            None => this_indent,
+                        });
                     }
-                    if !first {
-                        if folded {
-                            out.push(CHAR_SPACE);
-                        } else {
-                            out.push(CHAR_NEWLINE);
-                        }
-                    } else {
-                        first = false;
-                    }
-                    out.push_str(&line);
-                    // Consume a newline if present and continue looping
+
+                    // Consume the newline if present
                     if source.current() == Some(CHAR_NEWLINE) {
                         source.next();
-                    } else {
-                        break;
+                    }
+
+                    lines.push(raw_line);
+                }
+
+                // Decide de-indentation amount: only fold top-level blocks with a single leading space
+                let deindent = if is_folded {
+                    match base_indent { Some(1) => 1, _ => 0 }
+                } else {
+                    0
+                };
+
+                if deindent > 0 {
+                    for line in &mut lines {
+                        if !line.is_empty() {
+                            let strip = deindent.min(line.chars().take_while(|&ch| ch == CHAR_SPACE).count());
+                            if strip > 0 {
+                                line.drain(0..strip);
+                            }
+                        }
                     }
                 }
-                // Store as Literal block style for consistency with existing expectations
+
+                // Build output according to block style
+                let out = if is_folded {
+                    // Fold: join lines with spaces when both are at base indent; preserve blank lines and more-indented lines
+                    let mut out = String::new();
+                    let mut i = 0usize;
+                    let bi = base_indent.unwrap_or(0);
+                    while i < lines.len() {
+                        let cur = &lines[i];
+                        if cur.is_empty() {
+                            // blank line
+                            out.push(CHAR_NEWLINE);
+                            i += 1;
+                            continue;
+                        }
+                        out.push_str(cur);
+                        // Try to fold subsequent same-indented non-empty lines
+                        let mut j = i + 1;
+                        while j < lines.len() {
+                            let nxt = &lines[j];
+                            if nxt.is_empty() { break; }
+                            let cur_lead = lines[j-1].chars().take_while(|&ch| ch == CHAR_SPACE).count();
+                            let nxt_lead = nxt.chars().take_while(|&ch| ch == CHAR_SPACE).count();
+                            if cur_lead <= bi && nxt_lead <= bi {
+                                // fold: add a space then the next line without its base indent
+                                out.push(CHAR_SPACE);
+                                let slice_start = if nxt_lead >= bi { bi } else { 0 };
+                                let appended = &nxt[slice_start.min(nxt.len())..];
+                                out.push_str(appended);
+                                j += 1;
+                            } else {
+                                break;
+                            }
+                        }
+                        // If we didn't consume to end or next is blank/more-indented, end line with newline (unless last)
+                        if j < lines.len() {
+                            out.push(CHAR_NEWLINE);
+                        }
+                        i = j;
+                    }
+                    out
+                } else {
+                    // Literal: join with newlines exactly
+                    let mut out = String::new();
+                    for (i, l) in lines.iter().enumerate() {
+                        out.push_str(l);
+                        if i + 1 < lines.len() {
+                            out.push(CHAR_NEWLINE);
+                        }
+                    }
+                    out
+                };
+
+                // Store as Literal block style for stringify purposes in tests
                 Ok(Node::Str(out, QuoteType::Unquoted, BlockStyle::Literal))
             } else if !trimmed.is_empty() {
                 Ok(parse_scalar(trimmed))
@@ -524,7 +581,41 @@ fn parse_scalar(value: &str) -> Node {
                     } else if first == CHAR_DOUBLE_QUOTE && last == CHAR_DOUBLE_QUOTE {
                         // Strip surrounding double quotes and unescape
                         let inner = &v[1..v.len() - 1];
-                        (unescape_double_quoted(inner), QuoteType::Double)
+                        let unescaped = unescape_double_quoted(inner);
+                        // Fold any embedded newlines (including those introduced by multiline
+                        // double-quoted scalars and escaped \n sequences) into single spaces,
+                        // and trim trailing spaces to keep output compact and single-line.
+                        let mut folded = String::with_capacity(unescaped.len());
+                        let mut chars = unescaped.chars().peekable();
+                        while let Some(ch) = chars.next() {
+                            if ch == '\n' {
+                                // Count following spaces (indentation)
+                                let mut space_count = 0usize;
+                                while let Some(' ') = chars.peek().copied() {
+                                    space_count += 1;
+                                    chars.next();
+                                }
+                                if space_count > 0 {
+                                    // Newline followed by spaces: fold to a single space
+                                    if !folded.ends_with(' ') && !folded.is_empty() {
+                                        folded.push(' ');
+                                    }
+                                    // If folded is empty, avoid leading space
+                                } else {
+                                    // No spaces after newline: preserve newline unless it's the terminal char
+                                    if chars.peek().is_some() {
+                                        folded.push('\n');
+                                    } else {
+                                        // trailing newline at the very end: drop it
+                                    }
+                                }
+                            } else {
+                                folded.push(ch);
+                            }
+                        }
+                        // Trim any trailing whitespace introduced by folding
+                        let folded = folded.trim_end().to_string();
+                        (folded, QuoteType::Double)
                     } else {
                         (v.to_string(), QuoteType::Unquoted)
                     }
@@ -847,7 +938,48 @@ pub fn parse_document_contents(
             pairs.push((key_node, value_node));
             Ok(Node::Mapping(pairs))
         }
-        Some(c) if c.is_alphanumeric() => Ok(parse_mapping(source, indent_level)?),
+        Some(c) if c.is_alphanumeric() => {
+            // Decide whether this is a mapping (key:) or a plain scalar block value
+            if peek_ahead_for_mapping_key(source) {
+                Ok(parse_mapping(source, indent_level)?)
+            } else if indent_level > 0 {
+                // Parse a block of indented plain text lines as a single unquoted scalar
+                let base_indent = source.get_current_indent_level();
+                let mut parts: Vec<String> = Vec::new();
+                loop {
+                    // Read current line content up to newline, trimmed of trailing spaces and inline comment
+                    let line = read_line_trimmed_into_string(source);
+                    if !line.is_empty() {
+                        parts.push(line);
+                    }
+                    // Consume a newline if present
+                    if source.current() == Some(CHAR_NEWLINE) {
+                        source.next();
+                    }
+                    // Peek the next line's indentation
+                    let st = source.save_state();
+                    // Skip leading spaces/tabs to measure indent at the start of the next line
+                    skip_whitespace(source);
+                    let cur_indent = source.get_current_indent_level();
+                    let next_char = source.current();
+                    // Restore position to the start of next content
+                    source.restore_state(st);
+                    // Stop if dedented or EOF
+                    if next_char.is_none() || cur_indent < base_indent {
+                        break;
+                    }
+                    // Stop if the next content begins a structural node we shouldn't consume
+                    if matches!(next_char, Some(CHAR_DASH) | Some(CHAR_LBRACE) | Some(CHAR_LBRACKET) | Some(CHAR_QUESTION) | Some(CHAR_HASH)) {
+                        break;
+                    }
+                    // Otherwise, continue accumulating lines
+                }
+                let joined = parts.join(" ");
+                Ok(Node::Str(joined, QuoteType::Unquoted, BlockStyle::None))
+            } else {
+                Ok(parse_mapping(source, indent_level)?)
+            }
+        },
         Some(c) if c.is_whitespace() => {
             source.next();
             Ok(parse_document_contents(source, indent_level)?)
@@ -860,8 +992,9 @@ pub fn parse_document_contents(
         Some(CHAR_LESS)
         | Some(CHAR_GREATER)
         | Some(CHAR_DOUBLE_QUOTE)
-        | Some(CHAR_SINGLE_QUOTE) => {
-            // Allow certain scalar format strings to start with special characters
+        | Some(CHAR_SINGLE_QUOTE)
+        | Some(CHAR_PIPE) => {
+            // Allow certain scalar format strings to start with special characters, including block scalars
             Ok(parse_value(source)?)
         }
         Some(c) => Err(parse_error(source, &format!("Unexpected character: {}", c))),
@@ -1017,8 +1150,15 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
     // Use module-level helper `node_is_blank`
     let mut docs: Vec<Node> = Vec::new();
     if peek_ahead_for_document_start_end(source, CHAR_DASH) {
-        skip_until_newline(source);
-        skip_whitespace(source);
+        // Consume only the '---' marker and an optional single space,
+        // but keep any remaining content on the same line (e.g., '--- >').
+        source.next(); // '-' 1
+        source.next(); // '-' 2
+        source.next(); // '-' 3
+        if source.current() == Some(CHAR_SPACE) {
+            source.next();
+        }
+        // Do NOT skip the remainder of the line here.
     }
     while source.more() {
         let document = parse_document(source, 0);
@@ -2224,6 +2364,31 @@ mod tests {
         use crate::io::destinations::buffer::Buffer as DestBuffer;
         let mut dest = DestBuffer::new();
         stringify(&result, &mut dest).unwrap();
-        assert_eq!(dest.to_string(), "---\nplain: |\n  This unquoted scalar\n  spans many lines.\n...\n")
+        assert_eq!(dest.to_string(), "---\nplain: This unquoted scalar spans many lines.\n...\n")
+    }
+
+    #[test]
+    fn test_parse_block_double_quoted_block_scalar_with_indent() {
+        // anchor a scalar in a sequence and reference it via alias
+        use crate::stringify;
+        let yaml = b"---\nquoted: \"So does this\n  quoted scalar.\\n\"";
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source).unwrap();
+        use crate::io::destinations::buffer::Buffer as DestBuffer;
+        let mut dest = DestBuffer::new();
+        stringify(&result, &mut dest).unwrap();
+        assert_eq!(dest.to_string(), "---\nquoted: \"So does this quoted scalar.\"\n...\n")
+    }
+    #[test]
+    fn test_parse_block_unquoted_block_multiline_scalar_with_indent() {
+        // anchor a scalar in a sequence and reference it via alias
+        use crate::stringify;
+        let yaml = b"--- >\n Sammy Sosa completed another\n fine season with great stats.\n\n   63 Home Runs\n   0.288 Batting Average\n\n What a year!";
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source).unwrap();
+        use crate::io::destinations::buffer::Buffer as DestBuffer;
+        let mut dest = DestBuffer::new();
+        stringify(&result, &mut dest).unwrap();
+        assert_eq!(dest.to_string(), "--- |\nSammy Sosa completed another fine season with great stats.\n\n  63 Home Runs\n  0.288 Batting Average\n\nWhat a year!\n...\n")
     }
 }

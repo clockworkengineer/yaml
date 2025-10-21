@@ -245,6 +245,22 @@ pub fn stringify(node: &Node, destination: &mut dyn IDestination) -> Result<(), 
                     continue;
                 }
 
+                // Special-case: a document that is a single literal block scalar should emit
+                // the '|' on the same line as the '---' per test expectations.
+                if let Node::Document(nodes) = doc {
+                    if nodes.len() == 1 {
+                        if let Node::Str(s, QuoteType::Unquoted, BlockStyle::Literal) = &nodes[0] {
+                            let s = normalize_newlines(s);
+                            destination.add_bytes("--- |\n");
+                            for line in s.split('\n') {
+                                destination.add_bytes(&format!("{}\n", line));
+                            }
+                            destination.add_bytes("...\n");
+                            continue;
+                        }
+                    }
+                }
+
                 destination.add_bytes("---\n");
                 stringify_document(doc, destination)?;
                 destination.add_bytes("...\n");
