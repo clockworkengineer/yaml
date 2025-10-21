@@ -277,8 +277,14 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
 
                     // If we already established base indent and this line is less indented and not empty, end block
                     if let Some(bi) = base_indent {
-                        if cur_indent < bi && !cur_is_newline {
-                            break;
+                        if cur_indent < bi {
+                            // For top-level block scalars (bi == 1), allow a less-indented
+                            // blank line to be part of the scalar. For nested (e.g., mapping)
+                            // block scalars (bi > 1), treat a less-indented blank line as the
+                            // end of the block.
+                            if !(cur_is_newline && bi == 1) {
+                                break;
+                            }
                         }
                     }
 
@@ -726,9 +732,12 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
                     continue;
                 } else {
                     let value_node = parse_value(source)?;
-                    // If the parsed value is an Anchored node, it likely
-                    // consumed a nested block; avoid skipping the following line.
-                    last_was_nested = matches!(value_node, Node::Anchored(_, _));
+                    // If the parsed value consumed multiple subsequent lines (like
+                    // an anchored node or a block scalar), avoid skipping the
+                    // following line content here because the parser is already
+                    // positioned at the beginning of the next significant token.
+                    last_was_nested = matches!(value_node, Node::Anchored(_, _))
+                        || matches!(value_node, Node::Str(_, _, BlockStyle::Literal));
                     pairs.push((key_node, value_node));
                 }
             }
@@ -2390,5 +2399,18 @@ mod tests {
         let mut dest = DestBuffer::new();
         stringify(&result, &mut dest).unwrap();
         assert_eq!(dest.to_string(), "--- |\nSammy Sosa completed another fine season with great stats.\n\n  63 Home Runs\n  0.288 Batting Average\n\nWhat a year!\n...\n")
+    }
+
+    #[test]
+    fn test_parse_block_multiline_scalars_with_indent() {
+        // anchor a scalar in a sequence and reference it via alias
+        use crate::stringify;
+        let yaml = b"string1: |\n  Line1\n  line2\n  \"line3\"\n  line4\n\nstring2: >\n  Line1\n  line2\n  \"line3\"\n  line4\n";
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source).unwrap();
+        use crate::io::destinations::buffer::Buffer as DestBuffer;
+        let mut dest = DestBuffer::new();
+        stringify(&result, &mut dest).unwrap();
+        assert_eq!(dest.to_string(), "---\nstring1: |\n  Line1\n  line2\n  \"line3\"\n  line4\nstring2: |\n  Line1 line2 \"line3\" line4\n...\n");
     }
 }
