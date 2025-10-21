@@ -847,7 +847,48 @@ pub fn parse_document_contents(
             pairs.push((key_node, value_node));
             Ok(Node::Mapping(pairs))
         }
-        Some(c) if c.is_alphanumeric() => Ok(parse_mapping(source, indent_level)?),
+        Some(c) if c.is_alphanumeric() => {
+            // Decide whether this is a mapping (key:) or a plain scalar block value
+            if peek_ahead_for_mapping_key(source) {
+                Ok(parse_mapping(source, indent_level)?)
+            } else if indent_level > 0 {
+                // Parse a block of indented plain text lines as a single unquoted scalar
+                let base_indent = source.get_current_indent_level();
+                let mut parts: Vec<String> = Vec::new();
+                loop {
+                    // Read current line content up to newline, trimmed of trailing spaces and inline comment
+                    let line = read_line_trimmed_into_string(source);
+                    if !line.is_empty() {
+                        parts.push(line);
+                    }
+                    // Consume a newline if present
+                    if source.current() == Some(CHAR_NEWLINE) {
+                        source.next();
+                    }
+                    // Peek the next line's indentation
+                    let st = source.save_state();
+                    // Skip leading spaces/tabs to measure indent at the start of the next line
+                    skip_whitespace(source);
+                    let cur_indent = source.get_current_indent_level();
+                    let next_char = source.current();
+                    // Restore position to the start of next content
+                    source.restore_state(st);
+                    // Stop if dedented or EOF
+                    if next_char.is_none() || cur_indent < base_indent {
+                        break;
+                    }
+                    // Stop if the next content begins a structural node we shouldn't consume
+                    if matches!(next_char, Some(CHAR_DASH) | Some(CHAR_LBRACE) | Some(CHAR_LBRACKET) | Some(CHAR_QUESTION) | Some(CHAR_HASH)) {
+                        break;
+                    }
+                    // Otherwise, continue accumulating lines
+                }
+                let joined = parts.join(" ");
+                Ok(Node::Str(joined, QuoteType::Unquoted, BlockStyle::None))
+            } else {
+                Ok(parse_mapping(source, indent_level)?)
+            }
+        },
         Some(c) if c.is_whitespace() => {
             source.next();
             Ok(parse_document_contents(source, indent_level)?)
@@ -2224,6 +2265,6 @@ mod tests {
         use crate::io::destinations::buffer::Buffer as DestBuffer;
         let mut dest = DestBuffer::new();
         stringify(&result, &mut dest).unwrap();
-        assert_eq!(dest.to_string(), "---\nplain: |\n  This unquoted scalar\n  spans many lines.\n...\n")
+        assert_eq!(dest.to_string(), "---\nplain: This unquoted scalar spans many lines.\n...\n")
     }
 }
