@@ -58,7 +58,7 @@ fn read_quoted_flow_scalar(source: &mut dyn ISource) -> Result<String, String> {
         Some(c) if c == CHAR_SINGLE_QUOTE || c == CHAR_DOUBLE_QUOTE => c,
         Some(other) => {
             let msg =
-                crate::error::messages::ERR_EXPECT_QUOTE_FORMAT.replace("{}", &other.to_string());
+                ERR_EXPECT_QUOTE_FORMAT.replace("{}", &other.to_string());
             return Err(format!("{}", parse_error(source, &msg)));
         }
         None => return Err(parse_error(source, ERR_UNEXPECTED_EOF_EXPECTING_QUOTE)),
@@ -1080,7 +1080,7 @@ pub fn parse_document_contents(
             source,
             &format!(
                 "{}{}",
-                crate::error::messages::ERR_UNEXPECTED_CHAR_PREFIX,
+                ERR_UNEXPECTED_CHAR_PREFIX,
                 c
             ),
         )),
