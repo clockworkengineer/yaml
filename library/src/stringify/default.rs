@@ -230,7 +230,7 @@ fn stringify_document_with_indent(
             destination.add_bytes(&format!("*{}", name));
         }
         _ => {
-            return Err("Unsupported node type".to_string());
+            return Err(crate::error::messages::ERR_UNSUPPORTED_NODE_TYPE.to_string());
         }
     }
     Ok(())

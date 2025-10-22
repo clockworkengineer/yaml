@@ -2,12 +2,12 @@
 //! Provides functions for parsing different YAML data types including mappings,
 //! sequences, strings, numbers, boolean and null values.
 
+use crate::error::messages::*;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node::Document;
 use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
 use crate::parser::constants::*;
 use crate::parser::utils::*;
-pub use crate::error::messages::*;
 use std::collections::HashMap;
 
 // Helper to create richer parse error messages with current character and indent
@@ -57,10 +57,9 @@ fn read_quoted_flow_scalar(source: &mut dyn ISource) -> Result<String, String> {
     let quote = match source.current() {
         Some(c) if c == CHAR_SINGLE_QUOTE || c == CHAR_DOUBLE_QUOTE => c,
         Some(other) => {
-            return Err(format!(
-                "{}",
-                parse_error(source, &format!("Expected quote, found '{}'", other))
-            ));
+            let msg =
+                crate::error::messages::ERR_EXPECT_QUOTE_FORMAT.replace("{}", &other.to_string());
+            return Err(format!("{}", parse_error(source, &msg)));
         }
         None => return Err(parse_error(source, ERR_UNEXPECTED_EOF_EXPECTING_QUOTE)),
     };
@@ -271,7 +270,7 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
                     }
                 } else {
                     Ok(parsed)
-                }
+                };
             }
             Ok(parse_scalar(trimmed))
         }
@@ -1077,7 +1076,14 @@ pub fn parse_document_contents(
             // Allow certain scalar format strings to start with special characters, including block scalars
             Ok(parse_value(source)?)
         }
-        Some(c) => Err(parse_error(source, &format!("Unexpected character: {}", c))),
+        Some(c) => Err(parse_error(
+            source,
+            &format!(
+                "{}{}",
+                crate::error::messages::ERR_UNEXPECTED_CHAR_PREFIX,
+                c
+            ),
+        )),
         None => Ok(Node::None),
     }
 }
@@ -2274,7 +2280,7 @@ mod tests {
         let res = parse(&mut source);
         assert!(res.is_err());
         let err = res.unwrap_err();
-        assert!(err.contains(ERR_DUPLICATE_ANCHOR_PREFIX));
+    assert!(err.contains(ERR_DUPLICATE_ANCHOR_PREFIX));
     }
 
     #[test]

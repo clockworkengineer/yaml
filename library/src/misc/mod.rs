@@ -3,7 +3,7 @@ use crate::Node;
 pub fn get_number_of_documents(documents: &Node) -> Result<usize, String> {
     match documents {
         Node::Documents(docs) => Ok(docs.len()),
-        _ => Err("Expected Documents node".to_string()),
+        _ => Err(crate::error::messages::ERR_EXPECT_DOCUMENTS_NODE.to_string()),
     }
 }
 /// Returns the base node of document number n (0-based), reporting any errors.
@@ -21,7 +21,7 @@ pub fn get_document_base(node: &Node, n: usize) -> Result<&Node, String> {
                 ))
             }
         }
-        _ => Err("Node is not a Document or Array of Documents".to_string()),
+        _ => Err(crate::error::messages::ERR_NODE_NOT_DOCUMENTS_ARRAY.to_string()),
     }
 }
 
@@ -29,8 +29,8 @@ pub fn get_document_base(node: &Node, n: usize) -> Result<&Node, String> {
 mod tests {
     use super::*;
     use crate::io::sources::buffer::Buffer;
-    use crate::nodes::node::{BlockStyle, Node};
     use crate::nodes::node::QuoteType;
+    use crate::nodes::node::{BlockStyle, Node};
     use crate::parse;
     #[test]
     fn test_get_number_of_documents() {
