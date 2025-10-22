@@ -60,15 +60,23 @@ impl ISource for File {
         }
         if self.file.read(&mut byte1).unwrap_or(0) == 1 {
             if byte1[0] == b'\r' {
-                self.file.read(&mut byte2).unwrap_or(0);
-                // Treat \r\n as a single \n
-                if byte2[0] == b'\n' {
-                    self.line += 1;
-                    self.column = 0;
-                    self.current_byte = Some(b'\n');
-                } else {
-                    self.current_byte = Some(byte1[0]);
-                    self.file.seek(SeekFrom::Current(-1)).unwrap();
+                // Attempt to read the following byte; handle partial/EOF reads explicitly
+                match self.file.read(&mut byte2) {
+                    Ok(1) => {
+                        // Treat \r\n as a single \n
+                        if byte2[0] == b'\n' {
+                            self.line += 1;
+                            self.column = 0;
+                            self.current_byte = Some(b'\n');
+                        } else {
+                            self.current_byte = Some(byte1[0]);
+                            self.file.seek(SeekFrom::Current(-1)).unwrap();
+                        }
+                    }
+                    Ok(_) | Err(_) => {
+                        // No next byte available; keep the '\r' as current
+                        self.current_byte = Some(byte1[0]);
+                    }
                 }
             } else {
                 self.current_byte = Some(byte1[0]);
