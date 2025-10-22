@@ -259,7 +259,6 @@ pub fn stringify(node: &Node, destination: &mut dyn IDestination) -> Result<(), 
             // Helper to determine whether a node contains any meaningful content
             // use module-level `node_is_blank`
 
-
             for doc in docs {
                 // Emit all documents, including empty ones, to preserve explicit document boundaries
                 if let Node::Document(nodes) = doc {
@@ -603,5 +602,105 @@ mod tests {
         );
 
         assert_eq!(out, expected);
+    }
+
+    // Tests moved from parser::default that asserted stringify output of parse results
+    #[test]
+    fn test_stringify_from_parser_literal_block_literal_scalar_with_indent() {
+        use crate::io::destinations::buffer::Buffer as DestBuffer;
+        use crate::io::sources::buffer::Buffer as SrcBuffer;
+
+        let yaml = b"---\nstring1: |\n  Line1\n  line2\n";
+        let mut source = SrcBuffer::new(yaml);
+        let node = crate::parse(&mut source).unwrap();
+
+        let mut dest = DestBuffer::new();
+        stringify(&node, &mut dest).unwrap();
+        let out = dest.to_string();
+        assert_eq!(out, "---\nstring1: |\n  Line1\n  line2\n...\n");
+    }
+
+    #[test]
+    fn test_stringify_from_parser_literal_block_folded_scalar_with_indent() {
+        use crate::io::destinations::buffer::Buffer as DestBuffer;
+        use crate::io::sources::buffer::Buffer as SrcBuffer;
+
+        let yaml = b"---\nstring1: >\n  Line1\n  line2\n";
+        let mut source = SrcBuffer::new(yaml);
+        let node = crate::parse(&mut source).unwrap();
+
+        let mut dest = DestBuffer::new();
+        stringify(&node, &mut dest).unwrap();
+        let out = dest.to_string();
+        // parser folded '>' to a literal block in stringify behavior
+        assert_eq!(out, "---\nstring1: |\n  Line1 line2\n...\n");
+    }
+
+    #[test]
+    fn test_stringify_merge_key_with_single_alias() {
+        use crate::io::destinations::buffer::Buffer as DestBuffer;
+        use crate::io::sources::buffer::Buffer as SrcBuffer;
+
+        let yaml = b"---\na: &a\n  nested: anchor\nparent:\n  <<: *a\n  key: value\n";
+        let mut source = SrcBuffer::new(yaml);
+        let node = crate::parse(&mut source).unwrap();
+
+        let mut dest = DestBuffer::new();
+        stringify(&node, &mut dest).unwrap();
+        let out = dest.to_string();
+        assert!(
+            out.contains("<<:"),
+            "stringified output should contain merge key: {}",
+            out
+        );
+    }
+
+    #[test]
+    fn test_stringify_merge_key_with_sequence_of_aliases() {
+        use crate::io::destinations::buffer::Buffer as DestBuffer;
+        use crate::io::sources::buffer::Buffer as SrcBuffer;
+
+        let yaml =
+            b"---\na: &a\n  k1: v1\nb: &b\n  k2: v2\nparent:\n  <<: [*a, *b]\n  key: value\n";
+        let mut source = SrcBuffer::new(yaml);
+        let node = crate::parse(&mut source).unwrap();
+
+        let mut dest = DestBuffer::new();
+        stringify(&node, &mut dest).unwrap();
+        let out = dest.to_string();
+        assert!(
+            out.contains("<<:"),
+            "stringified output should contain merge key for sequence: {}",
+            out
+        );
+        assert!(
+            out.contains("[*a, *b]") || out.contains("*a"),
+            "merge sequence should be preserved in output: {}",
+            out
+        );
+    }
+
+    #[test]
+    fn test_stringify_merge_key_with_inline_mapping() {
+        use crate::io::destinations::buffer::Buffer as DestBuffer;
+        use crate::io::sources::buffer::Buffer as SrcBuffer;
+
+        let yaml = b"---\nparent:\n  <<: {k: v}\n  key: value\n";
+        let mut source = SrcBuffer::new(yaml);
+        let node = crate::parse(&mut source).unwrap();
+
+        let mut dest = DestBuffer::new();
+        stringify(&node, &mut dest).unwrap();
+        let out = dest.to_string();
+        assert!(
+            out.contains("<<:"),
+            "stringified output should contain inline mapping merge key: {}",
+            out
+        );
+        assert!(
+            out.contains("{k: v}") || out.contains("k: v"),
+            "inline mapping merge value should appear: {}",
+            out
+        );
     }
 }
