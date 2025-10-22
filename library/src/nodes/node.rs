@@ -60,6 +60,7 @@ pub enum Node {
     /// Represents an alias node that references a previously anchored node
     /// Stores the anchor name (e.g., *alias)
     Alias(String),
+    /// Represents a sequence of documents
     Documents(Vec<Node>),
     /// Represents a null value or uninitialized node
     /// Used for explicit null values in YAML or missing/undefined values

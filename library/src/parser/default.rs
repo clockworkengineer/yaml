@@ -53,7 +53,7 @@ fn node_is_blank(node: &Node) -> bool {
 }
 
 // Read a quoted flow scalar that may span multiple lines. Returns the raw text including quotes.
-fn read_quoted_flow_scalar(source: &mut dyn ISource) -> Result<String, String> {
+fn parse_quoted_scalar(source: &mut dyn ISource) -> Result<String, String> {
     let quote = match source.current() {
         Some(c) if c == CHAR_SINGLE_QUOTE || c == CHAR_DOUBLE_QUOTE => c,
         Some(other) => {
@@ -235,7 +235,7 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
             Some(CHAR_LBRACE) => parse_inline_mapping(source)?,
             Some(CHAR_LBRACKET) => parse_inline_sequence(source)?,
             Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
-                let raw = read_quoted_flow_scalar(source)?;
+                let raw = parse_quoted_scalar(source)?;
                 parse_scalar(raw.trim())
             }
             Some(_) => parse_value(source)?,
@@ -248,7 +248,7 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
         Some(CHAR_LBRACE) => parse_inline_mapping(source),
         Some(CHAR_LBRACKET) => parse_inline_sequence(source),
         Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
-            let raw = read_quoted_flow_scalar(source)?;
+            let raw = parse_quoted_scalar(source)?;
             let trimmed = raw.trim();
             // Special handling: if a double-quoted scalar spans multiple lines (i.e., contains
             // a literal newline in the source) and appears to be an indented block or ends
@@ -447,7 +447,7 @@ fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, String> {
         let key_node = {
             let raw = match source.current() {
                 Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
-                    read_quoted_flow_scalar(source)?
+                    parse_quoted_scalar(source)?
                 }
                 _ => collect_until(source, |c| c == CHAR_COLON || c == CHAR_RBRACE),
             };
@@ -468,7 +468,7 @@ fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, String> {
             Some(CHAR_LBRACE) => parse_inline_mapping(source)?,
             Some(CHAR_LBRACKET) => parse_inline_sequence(source)?,
             Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
-                let raw = read_quoted_flow_scalar(source)?;
+                let raw = parse_quoted_scalar(source)?;
                 parse_scalar(raw.trim())
             }
             Some(_) => {
@@ -538,7 +538,7 @@ fn parse_inline_sequence(source: &mut dyn ISource) -> Result<Node, String> {
                 // If the item starts with a quote, read a full quoted scalar (may span lines)
                 let node = match source.current() {
                     Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
-                        let raw = read_quoted_flow_scalar(source)?;
+                        let raw = parse_quoted_scalar(source)?;
                         parse_scalar(raw.trim())
                     }
                     _ => {
