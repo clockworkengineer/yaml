@@ -7,6 +7,7 @@ use crate::nodes::node::Node::Document;
 use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
 use crate::parser::constants::*;
 use crate::parser::utils::*;
+pub use crate::error::messages::*;
 use std::collections::HashMap;
 
 
@@ -251,16 +252,16 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
             if trimmed.starts_with(CHAR_DOUBLE_QUOTE) && trimmed.ends_with(CHAR_DOUBLE_QUOTE) && trimmed.contains('\n') {
                 // Parse using existing scalar logic to obtain folded/unescaped content
                 let parsed = parse_scalar(trimmed);
-                if let Node::Str(content, QuoteType::Double, _style) = parsed {
+                return if let Node::Str(content, QuoteType::Double, _style) = parsed {
                     let had_indent_after_newline = trimmed.contains("\n ");
                     let had_explicit_escaped_nl_at_end = trimmed.ends_with("\\\n\"");
                     if had_indent_after_newline || had_explicit_escaped_nl_at_end {
-                        return Ok(Node::Str(content, QuoteType::Unquoted, BlockStyle::Literal));
+                        Ok(Node::Str(content, QuoteType::Unquoted, BlockStyle::Literal))
                     } else {
-                        return Ok(Node::Str(content, QuoteType::Double, BlockStyle::None));
+                        Ok(Node::Str(content, QuoteType::Double, BlockStyle::None))
                     }
                 } else {
-                    return Ok(parsed);
+                    Ok(parsed)
                 }
             }
             Ok(parse_scalar(trimmed))
