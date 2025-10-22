@@ -2245,6 +2245,75 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_merge_key_with_single_alias() {
+        use crate::io::destinations::buffer::Buffer as DestBuffer;
+        use crate::stringify;
+
+        let yaml = b"---\na: &a\n  nested: anchor\nparent:\n  <<: *a\n  key: value\n";
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source).unwrap();
+
+        // Ensure parse succeeded and stringify preserves merge shorthand
+        let mut dest = DestBuffer::new();
+        stringify(&result, &mut dest).unwrap();
+        let out = dest.to_string();
+        assert!(
+            out.contains("<<:"),
+            "stringified output should contain merge key: {}",
+            out
+        );
+    }
+
+    #[test]
+    fn test_parse_merge_key_with_sequence_of_aliases() {
+        use crate::io::destinations::buffer::Buffer as DestBuffer;
+        use crate::stringify;
+
+        let yaml =
+            b"---\na: &a\n  k1: v1\nb: &b\n  k2: v2\nparent:\n  <<: [*a, *b]\n  key: value\n";
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source).unwrap();
+
+        let mut dest = DestBuffer::new();
+        stringify(&result, &mut dest).unwrap();
+        let out = dest.to_string();
+        assert!(
+            out.contains("<<:"),
+            "stringified output should contain merge key for sequence: {}",
+            out
+        );
+        assert!(
+            out.contains("[*a, *b]") || out.contains("*a"),
+            "merge sequence should be preserved in output: {}",
+            out
+        );
+    }
+
+    #[test]
+    fn test_parse_merge_key_with_inline_mapping() {
+        use crate::io::destinations::buffer::Buffer as DestBuffer;
+        use crate::stringify;
+
+        let yaml = b"---\nparent:\n  <<: {k: v}\n  key: value\n";
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source).unwrap();
+
+        let mut dest = DestBuffer::new();
+        stringify(&result, &mut dest).unwrap();
+        let out = dest.to_string();
+        assert!(
+            out.contains("<<:"),
+            "stringified output should contain inline mapping merge key: {}",
+            out
+        );
+        assert!(
+            out.contains("{k: v}") || out.contains("k: v"),
+            "inline mapping merge value should appear: {}",
+            out
+        );
+    }
+
+    #[test]
     fn test_parse_anchor_alias_sequence_hr_rbi() {
         // From testfile016.yaml
         let yaml = b"---\nhr:\n  - Mark McGwire\n  # Following node labeled SS\n  - &SS Sammy Sosa\nrbi:\n  - *SS # Subsequent occurance\n  - Ken Griffey\n";
