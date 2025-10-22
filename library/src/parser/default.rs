@@ -2280,7 +2280,7 @@ mod tests {
         let res = parse(&mut source);
         assert!(res.is_err());
         let err = res.unwrap_err();
-    assert!(err.contains(ERR_DUPLICATE_ANCHOR_PREFIX));
+        assert!(err.contains(ERR_DUPLICATE_ANCHOR_PREFIX));
     }
 
     #[test]
