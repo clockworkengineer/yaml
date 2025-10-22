@@ -2456,6 +2456,6 @@ mod tests {
         use crate::io::destinations::buffer::Buffer as DestBuffer;
         let mut dest = DestBuffer::new();
         stringify(&result, &mut dest).unwrap();
-        assert_eq!(dest.to_string(), "---\n---\nunicode: Sosa did fine.☺\ncontrol: \"\\b1998\\t1999\\t2000\\n\"\nhexesc: \"\\x13\\x10 is \\r\\n\"\nsingle: \'\"Howdy!\" he cried.\'\nquoted: \" # not a \'comment\'.\"\ntie-fighter: \"|\\\\-*-/|\"\n...\n");
+        assert_eq!(dest.to_string(), "---\nunicode: Sosa did fine.☺\ncontrol: \"\\b1998\\t1999\\t2000\\n\"\nhexesc: \"\\x13\\x10 is \\r\\n\"\nsingle: \'\"Howdy!\" he cried.\'\nquoted: \" # not a \'comment\'.\"\ntie-fighter: \"|\\\\-*-/|\"\n...\n");
     }
 }

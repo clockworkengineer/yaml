@@ -259,32 +259,6 @@ pub fn stringify(node: &Node, destination: &mut dyn IDestination) -> Result<(), 
             // Helper to determine whether a node contains any meaningful content
             // use module-level `node_is_blank`
 
-            // Special-case: some streams require an explicit leading stream start marker
-            // before the first (and only) document to match expected outputs for escape-heavy
-            // content. Detect a single-document stream whose first document contains at least
-            // one double-quoted scalar with a backslash in any mapping value, and emit a
-            // leading '---' line.
-            if docs.len() == 1 {
-                if let Node::Document(nodes) = &docs[0] {
-                    let mut needs_leading_marker = false;
-                    for n in nodes {
-                        if let Node::Mapping(pairs) = n {
-                            for (_k, v) in pairs {
-                                if let Node::Str(s, QuoteType::Double, _) = v {
-                                    if s.contains('\\') {
-                                        needs_leading_marker = true;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        if needs_leading_marker { break; }
-                    }
-                    if needs_leading_marker {
-                        destination.add_bytes("---\n");
-                    }
-                }
-            }
 
             for doc in docs {
                 // Emit all documents, including empty ones, to preserve explicit document boundaries
