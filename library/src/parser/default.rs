@@ -201,6 +201,10 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
         let name = collect_until(source, |c| {
             c == CHAR_NEWLINE || c == CHAR_HASH || c.is_whitespace()
         });
+        // Validate alias name
+        if name.trim().is_empty() {
+            return Err(parse_error(source, ERR_EMPTY_ALIAS_NAME));
+        }
         return Ok(Node::Alias(name));
     }
 
@@ -211,6 +215,10 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
         let name = collect_until(source, |c| {
             c == CHAR_SPACE || c == CHAR_NEWLINE || c == CHAR_HASH
         });
+        // Validate anchor name
+        if name.trim().is_empty() {
+            return Err(parse_error(source, ERR_EMPTY_ANCHOR_NAME));
+        }
         // Skip optional whitespace after the anchor name. If anchor is (only)
         // followed by whitespace and then a newline, the anchored value is
         // an indented block that follows on the next line.
@@ -1130,35 +1138,47 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
     }
     let mut doc_node = Document(normalized_nodes);
     // Resolve anchors and aliases within the document (collect anchors, then replace aliases)
-    fn collect_anchors(node: &Node, anchors: &mut HashMap<String, Node>) {
+    fn collect_anchors(node: &Node, anchors: &mut HashMap<String, Node>) -> Result<(), String> {
         match node {
             Node::Anchored(inner, name) => {
+                // Validate anchor name
+                if name.trim().is_empty() {
+                    return Err(ERR_EMPTY_ANCHOR_NAME.to_string());
+                }
+                if anchors.contains_key(name) {
+                    return Err(format!("{}{}", ERR_DUPLICATE_ANCHOR_PREFIX, name));
+                }
                 // node is &Node, inner is &Box<Node>; deref twice to get Node
                 anchors.insert(name.clone(), (**inner).clone());
-                collect_anchors(&**inner, anchors);
+                collect_anchors(&**inner, anchors)?;
+                Ok(())
             }
             Node::Mapping(pairs) => {
                 for (k, v) in pairs {
-                    collect_anchors(k, anchors);
-                    collect_anchors(v, anchors);
+                    collect_anchors(k, anchors)?;
+                    collect_anchors(v, anchors)?;
                 }
+                Ok(())
             }
             Node::Array(items) => {
                 for it in items {
-                    collect_anchors(it, anchors);
+                    collect_anchors(it, anchors)?;
                 }
+                Ok(())
             }
             Document(nodes) => {
                 for n in nodes {
-                    collect_anchors(n, anchors);
+                    collect_anchors(n, anchors)?;
                 }
+                Ok(())
             }
             Node::Documents(docs) => {
                 for d in docs {
-                    collect_anchors(d, anchors);
+                    collect_anchors(d, anchors)?;
                 }
+                Ok(())
             }
-            _ => {}
+            _ => Ok(()),
         }
     }
 
@@ -1210,7 +1230,7 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
 
     // initially parsed document before an anchor collection
     let mut anchors: HashMap<String, Node> = HashMap::new();
-    collect_anchors(&doc_node, &mut anchors);
+    collect_anchors(&doc_node, &mut anchors)?;
     // Now replace aliases; propagate any undefined-anchor error
     replace_aliases(&mut doc_node, &anchors)?;
     // resolved document
@@ -2242,6 +2262,34 @@ mod tests {
         let mut source = Buffer::new(b"---\nvalue: *nope\n");
         let res = parse(&mut source);
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_error_on_empty_alias_name() {
+        let mut source = Buffer::new(b"---\nvalue: *\n");
+        let res = parse(&mut source);
+        assert!(res.is_err());
+        let err = res.unwrap_err();
+        assert!(err.contains(ERR_EMPTY_ALIAS_NAME));
+    }
+
+    #[test]
+    fn test_error_on_empty_anchor_name() {
+        let mut source = Buffer::new(b"---\nroot: &\n  nested: 1\n");
+        let res = parse(&mut source);
+        assert!(res.is_err());
+        let err = res.unwrap_err();
+        assert!(err.contains(ERR_EMPTY_ANCHOR_NAME));
+    }
+
+    #[test]
+    fn test_error_on_duplicate_anchor() {
+        let yaml = b"---\na: &dup\n  x: 1\nb: &dup\n  y: 2\n";
+        let mut source = Buffer::new(yaml);
+        let res = parse(&mut source);
+        assert!(res.is_err());
+        let err = res.unwrap_err();
+        assert!(err.contains(ERR_DUPLICATE_ANCHOR_PREFIX));
     }
 
     #[test]

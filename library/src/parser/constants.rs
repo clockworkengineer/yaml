@@ -46,3 +46,6 @@ pub const ERR_UNTERMINATED_QUOTED_FLOW: &str = "Unterminated quoted scalar in fl
 pub const ERR_UNEXPECTED_EOF_EXPECTING_QUOTE: &str = "Unexpected EOF while expecting quote";
 pub const ERR_UNEXPECTED_EOF_AFTER_ANCHOR: &str = "Unexpected EOF after anchor";
 pub const ERR_UNDEFINED_ANCHOR_PREFIX: &str = "Undefined anchor: ";
+pub const ERR_DUPLICATE_ANCHOR_PREFIX: &str = "Duplicate anchor: ";
+pub const ERR_EMPTY_ANCHOR_NAME: &str = "Anchor name required";
+pub const ERR_EMPTY_ALIAS_NAME: &str = "Alias name required";
