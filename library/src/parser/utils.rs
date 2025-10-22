@@ -120,18 +120,63 @@ pub fn node_to_inline_string(node: &Node) -> String {
 
 pub fn unescape_double_quoted(s: &str) -> String {
     let mut result = String::with_capacity(s.len());
-    let mut chars = s.chars();
+    let mut chars = s.chars().peekable();
 
     while let Some(c) = chars.next() {
         if c == '\\' {
             match chars.next() {
-                Some('n') => result.push('\n'),
-                Some('r') => result.push('\r'),
-                Some('t') => result.push('\t'),
+                // Decode Unicode escapes \uXXXX into actual characters
+                Some('u') => {
+                    let mut hex = String::new();
+                    for _ in 0..4 {
+                        if let Some(h) = chars.peek().copied() {
+                            if h.is_ascii_hexdigit() {
+                                hex.push(h);
+                                chars.next();
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                    if hex.len() == 4 {
+                        if let Ok(code) = u16::from_str_radix(&hex, 16) {
+                            if let Some(ch) = char::from_u32(code as u32) {
+                                result.push(ch);
+                                continue;
+                            }
+                        }
+                    }
+                    // Fallback: preserve literally if malformed
+                    result.push('\\');
+                    result.push('u');
+                    result.push_str(&hex);
+                }
+                // Preserve hex escapes literally (e.g., \x13)
+                Some('x') => {
+                    result.push('\\');
+                    result.push('x');
+                    // copy up to two hex digits literally
+                    for _ in 0..2 {
+                        if let Some(h) = chars.peek().copied() {
+                            if h.is_ascii_hexdigit() {
+                                result.push(h);
+                                chars.next();
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                }
+                // Keep standard escapes as literal backslash+letter so they survive stringify
+                Some('n') => { result.push('\\'); result.push('n'); }
+                Some('r') => { result.push('\\'); result.push('r'); }
+                Some('t') => { result.push('\\'); result.push('t'); }
+                Some('b') => { result.push('\\'); result.push('b'); }
+                // Unescape quote and backslash to their literal characters
+                Some('"') => result.push('"'),
                 Some('\\') => result.push('\\'),
-                Some('\"') => result.push('\"'),
+                // Any other escape: keep it literally
                 Some(other) => {
-                    // Just keep the escaped character as-is
                     result.push('\\');
                     result.push(other);
                 }
