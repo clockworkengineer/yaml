@@ -1240,6 +1240,128 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
     collect_anchors(&doc_node, &mut anchors)?;
     // Now replace aliases; propagate any undefined-anchor error
     replace_aliases(&mut doc_node, &anchors)?;
+
+    // After aliases have been replaced, apply YAML merge keys (<<) by
+    // expanding merged mappings into their parents. This resolves patterns like
+    // '<<: *anchor' and '<<: [*a, *b]' as well as inline mapping values.
+    fn apply_merge_keys(node: &mut Node) {
+        match node {
+            Node::Mapping(pairs) => {
+                // First, recursively apply to children so nested merges resolve
+                for (k, v) in pairs.iter_mut() {
+                    apply_merge_keys(k);
+                    apply_merge_keys(v);
+                }
+                // Then process merges in this mapping
+                let mut merged_pairs: Vec<(Node, Node)> = Vec::new();
+                // Track keys already set to respect override semantics
+                use std::collections::HashSet;
+                let mut seen_keys: HashSet<String> = HashSet::new();
+
+                // Helper: insert pair if key not seen
+                let mut insert_if_absent = |k: &Node, v: &Node| {
+                    if let Node::Str(ks, _, _) = k {
+                        if !seen_keys.contains(ks) {
+                            seen_keys.insert(ks.clone());
+                            merged_pairs.push((k.clone(), v.clone()));
+                        }
+                    } else {
+                        // Non-scalar keys: just push, as we cannot deduplicate reliably
+                        merged_pairs.push((k.clone(), v.clone()));
+                    }
+                };
+
+                // First pass: handle all merge keys in order and collect non-merge pairs
+                // We will store non-merge pairs temporarily to append after merges
+                let mut non_merge_pairs: Vec<(Node, Node)> = Vec::new();
+                for (k, v) in pairs.iter() {
+                    if matches!(k, Node::Str(s, _, _) if s == "<<") {
+                        // Expand merge value
+                        match v {
+                            Node::Mapping(src_pairs) => {
+                                for (mk, mv) in src_pairs {
+                                    insert_if_absent(mk, mv);
+                                }
+                            }
+                            Node::Array(items) => {
+                                for item in items {
+                                    match item {
+                                        Node::Mapping(src_pairs) => {
+                                            for (mk, mv) in src_pairs {
+                                                insert_if_absent(mk, mv);
+                                            }
+                                        }
+                                        _ => {
+                                            // If array contains non-mapping (e.g., alias already resolved to scalar), skip
+                                        }
+                                    }
+                                }
+                            }
+                            _ => {
+                                // Ignore other types
+                            }
+                        }
+                    } else {
+                        non_merge_pairs.push((k.clone(), v.clone()));
+                    }
+                }
+
+                // Second pass: append non-merge pairs, overriding merged ones where keys match
+                for (k, v) in non_merge_pairs.into_iter() {
+                    // Work with a borrowed view of the key string to avoid moving from `k`
+                    let key_string_opt = if let Node::Str(ref ks, _, _) = k {
+                        Some(ks.clone())
+                    } else {
+                        None
+                    };
+
+                    if let Some(ks) = key_string_opt {
+                        if seen_keys.contains(&ks) {
+                            // Override: replace existing entry with this later one
+                            if let Some(pos) = merged_pairs
+                                .iter()
+                                .position(|(ek, _)| matches!(ek, Node::Str(s, _, _) if s == &ks))
+                            {
+                                merged_pairs[pos] = (k, v);
+                            } else {
+                                merged_pairs.push((k, v));
+                            }
+                        } else {
+                            seen_keys.insert(ks);
+                            merged_pairs.push((k, v));
+                        }
+                    } else {
+                        // Non-scalar key
+                        merged_pairs.push((k, v));
+                    }
+                }
+
+                // Replace mapping pairs with merged result, effectively removing '<<' entries
+                *pairs = merged_pairs;
+            }
+            Node::Array(items) => {
+                for it in items.iter_mut() {
+                    apply_merge_keys(it);
+                }
+            }
+            Document(nodes) => {
+                for n in nodes.iter_mut() {
+                    apply_merge_keys(n);
+                }
+            }
+            Node::Documents(docs) => {
+                for d in docs.iter_mut() {
+                    apply_merge_keys(d);
+                }
+            }
+            Node::Anchored(inner, _) => {
+                apply_merge_keys(inner);
+            }
+            _ => {}
+        }
+    }
+
+    apply_merge_keys(&mut doc_node);
     // resolved document
 
     Ok(doc_node)
@@ -2564,6 +2686,21 @@ mod tests {
         assert_eq!(
             dest.to_string(),
             "---\nunicode: Sosa did fine.☺\ncontrol: \"\\b1998\\t1999\\t2000\\n\"\nhexesc: \"\\x13\\x10 is \\r\\n\"\nsingle: \'\"Howdy!\" he cried.\'\nquoted: \" # not a \'comment\'.\"\ntie-fighter: \"|\\\\-*-/|\"\n...\n"
+        );
+    }
+    #[test]
+    fn test_parse_nested_anchor_and_alias_with_block_scalar() {
+        // anchor a scalar in a sequence and reference it via alias
+        use crate::stringify;
+        let yaml = b"version: \"3.9\"\n\nservices:\n  production-db: &database-definition\n    image: mysql:5.7\n    volumes:\n      - db_data:/var/lib/mysql\n    restart: always\n    environment: &environment-definition\n     MYSQL_ROOT_PASSWORD: somewordpress\n     MYSQL_DATABASE: wordpress\n     MYSQL_USER: wordpress\n     MYSQL_PASSWORD: production-password\n  test-db:\n    <<: *database-definition\n    environment:\n      <<: *environment-definition\n      MYSQL_PASSWORD: test-password";
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source).unwrap();
+        use crate::io::destinations::buffer::Buffer as DestBuffer;
+        let mut dest = DestBuffer::new();
+        stringify(&result, &mut dest).unwrap();
+        assert_eq!(
+            dest.to_string(),
+            "---\nversion: \"3.9\"\nservices:\n  production-db:\n    image: mysql:5.7\n    volumes:\n      - db_data:/var/lib/mysql\n    restart: always\n    environment:\n      MYSQL_ROOT_PASSWORD: somewordpress\n      MYSQL_DATABASE: wordpress\n      MYSQL_USER: wordpress\n      MYSQL_PASSWORD: production-password\n  test-db:\n    image: mysql:5.7\n    volumes:\n      - db_data:/var/lib/mysql\n    restart: always\n    environment:\n      MYSQL_ROOT_PASSWORD: somewordpress\n      MYSQL_DATABASE: wordpress\n      MYSQL_USER: wordpress\n      MYSQL_PASSWORD: test-password\n...\n"
         );
     }
 }
