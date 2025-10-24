@@ -144,3 +144,127 @@ pub fn read_file_to_string(filename: &str) -> Result<String> {
 }
 
 
+
+
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::{File, remove_file};
+    use std::io::{Write, Read};
+    use std::path::PathBuf;
+
+    fn temp_file(name: &str) -> PathBuf {
+        let mut p = std::env::temp_dir();
+        // ensure uniqueness by adding a timestamp
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        p.push(format!("yaml_lib_test_{}_{}.tmp", name, ts));
+        p
+    }
+
+    fn write_bytes(path: &PathBuf, bytes: &[u8]) {
+        let mut f = File::create(path).unwrap();
+        f.write_all(bytes).unwrap();
+        f.flush().unwrap();
+    }
+
+    fn read_all_bytes(path: &PathBuf) -> Vec<u8> {
+        let mut f = File::open(path).unwrap();
+        let mut v = Vec::new();
+        f.read_to_end(&mut v).unwrap();
+        v
+    }
+
+    #[test]
+    fn detect_utf8_empty_file() {
+        let path = temp_file("empty_utf8");
+        // create empty file
+        File::create(&path).unwrap();
+        let fmt = detect_format(path.to_str().unwrap()).unwrap();
+        assert!(matches!(fmt, Format::Utf8));
+        remove_file(path).ok();
+    }
+
+    #[test]
+    fn detect_all_boms() {
+        let cases: Vec<(&str, Vec<u8>, Format)> = vec![
+            ("utf8bom", vec![0xEF, 0xBB, 0xBF, b'a'], Format::Utf8bom),
+            ("utf16be", vec![0xFE, 0xFF, 0x00, 0x61], Format::Utf16be),
+            ("utf32le", vec![0xFF, 0xFE, 0x00, 0x00, 0x61, 0x00, 0x00, 0x00], Format::Utf32le),
+            ("utf32be", vec![0x00, 0x00, 0xFE, 0xFF, 0x00, 0x00, 0x00, 0x61], Format::Utf32be),
+            ("utf16le", vec![0xFF, 0xFE, 0x61, 0x00], Format::Utf16le),
+        ];
+        for (name, bytes, expected) in cases {
+            let path = temp_file(name);
+            write_bytes(&path, &bytes);
+            let fmt = detect_format(path.to_str().unwrap()).unwrap();
+            assert!(matches!(fmt, f if std::mem::discriminant(&f) == std::mem::discriminant(&expected)));
+            remove_file(path).ok();
+        }
+    }
+
+    fn roundtrip(content: &str, format: Format) {
+        let path = temp_file("roundtrip");
+        write_file_from_string(path.to_str().unwrap(), content, format).unwrap();
+        let read_back = read_file_to_string(path.to_str().unwrap()).unwrap();
+        assert_eq!(read_back, content.replace("\r\n", "\n"));
+        remove_file(path).ok();
+    }
+
+    #[test]
+    fn roundtrip_all_formats_simple_ascii() {
+        let content = "Hello\nWorld\n";
+        roundtrip(content, Format::Utf8);
+        roundtrip(content, Format::Utf8bom);
+        roundtrip(content, Format::Utf16le);
+        roundtrip(content, Format::Utf16be);
+        roundtrip(content, Format::Utf32le);
+        roundtrip(content, Format::Utf32be);
+    }
+
+    #[test]
+    fn roundtrip_all_formats_unicode() {
+        let content = "Héllö – 世界\nLine2"; // includes accents, en dash, CJK
+        roundtrip(content, Format::Utf8);
+        roundtrip(content, Format::Utf8bom);
+        roundtrip(content, Format::Utf16le);
+        roundtrip(content, Format::Utf16be);
+        roundtrip(content, Format::Utf32le);
+        roundtrip(content, Format::Utf32be);
+    }
+
+    #[test]
+    fn read_crlf_normalization_utf8() {
+        let path = temp_file("crlf_utf8");
+        let data = b"line1\r\nline2\r\n";
+        write_bytes(&path, data);
+        let s = read_file_to_string(path.to_str().unwrap()).unwrap();
+        assert_eq!(s, "line1\nline2\n");
+        remove_file(path).ok();
+    }
+
+    #[test]
+    fn write_bom_presence() {
+        // Ensure write_file_from_string emits BOM for formats that require it
+        let cases = vec![
+            (Format::Utf8, vec![] as Vec<u8>),
+            (Format::Utf8bom, vec![0xEF, 0xBB, 0xBF]),
+            (Format::Utf16le, vec![0xFF, 0xFE]),
+            (Format::Utf16be, vec![0xFE, 0xFF]),
+            (Format::Utf32le, vec![0xFF, 0xFE, 0x00, 0x00]),
+            (Format::Utf32be, vec![0x00, 0x00, 0xFE, 0xFF]),
+        ];
+        for (fmt, bom) in cases {
+            let path = temp_file("bom");
+            write_file_from_string(path.to_str().unwrap(), "A", fmt).unwrap();
+            let bytes = read_all_bytes(&path);
+            assert!(bytes.starts_with(&bom));
+            remove_file(path).ok();
+        }
+    }
+}
+
