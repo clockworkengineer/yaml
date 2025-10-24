@@ -12,7 +12,7 @@ pub fn get_version() -> &'static str {
 pub fn get_number_of_documents(documents: &Node) -> Result<usize, String> {
     match documents {
         Node::Documents(docs) => Ok(docs.len()),
-        _ => Err(crate::error::messages::ERR_EXPECT_DOCUMENTS_NODE.to_string()),
+        _ => Err("Expected Documents node".to_string()),
     }
 }
 /// Returns the base node of document number n (0-based), reporting any errors.
@@ -30,7 +30,7 @@ pub fn get_document_base(node: &Node, n: usize) -> Result<&Node, String> {
                 ))
             }
         }
-        _ => Err(crate::error::messages::ERR_NODE_NOT_DOCUMENTS_ARRAY.to_string()),
+        _ => Err("Expected Documents node".to_string()),
     }
 }
 

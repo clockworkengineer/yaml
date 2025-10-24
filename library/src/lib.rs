@@ -11,18 +11,19 @@
 //! Minimum supported Rust version: 1.88.0
 
 /// Module providing input/output operations for reading and writing YAML data
-pub mod io;
-// /// Module containing YAML data structure definitions and node types
-pub mod nodes;
-/// Module implementing YAML parsing and value extraction
-pub mod parser;
+mod io;
 /// Module defining error types and handling for YAML operations.
-pub mod error;
+mod error;
+/// Module for detecting and handling different Unicode text file formats
+mod file;
 /// Module containing utility functions and helpers for YAML processing
-pub mod misc;
+mod misc;
+/// Module containing YAML data structure definitions and node types
+mod nodes;
+/// Module implementing YAML parsing and value extraction
+mod parser;
 /// Module for converting YAML structures to formatted strings
-pub mod stringify;
-pub mod file;
+mod stringify;
 
 ///
 /// YAML_lib API
@@ -31,29 +32,35 @@ pub mod file;
 /// Returns the current version of the YAML library
 pub use misc::get_version as version;
 /// This enum represents different Unicode text file formats with their corresponding byte order marks (BOM)
-pub use file::file::Format as Format;
+pub use file::file::Format;
 /// This function detects the Unicode format of a text file by examining its byte order mark (BOM)
-pub use file::file::detect_format as detect_format;
+pub use file::file::detect_format;
 /// This function reads a text file and returns its content as a String, handling different Unicode formats
-pub use file::file::read_file_to_string as read_file_to_string;
+pub use file::file::read_file_to_string;
 /// This function writes a string to a file in the specified Unicode format
-pub use file::file::write_file_from_string as write_file_from_string;
-/// Source implementation for reading JSON data from a memory buffer
-pub use io::sources::buffer::Buffer as BufferSource;
+pub use file::file::write_file_from_string;
 /// Destination implementation for writing JSON data to a memory buffer
 pub use io::destinations::buffer::Buffer as BufferDestination;
-/// Source implementation for reading JSON data from a file
-pub use io::sources::file::File as FileSource;
 /// Destination implementation for writing JSON data to a file
 pub use io::destinations::file::File as FileDestination;
+/// Source implementation for reading JSON data from a memory buffer
+pub use io::sources::buffer::Buffer as BufferSource;
+/// Source implementation for reading JSON data from a file
+pub use io::sources::file::File as FileSource;
+/// Returns the number of documents in a YAML stream represented by the Documents node. 
+pub use misc::get_number_of_documents as get_number_of_documents;
+/// Returns the base node of document number n (0-based), reporting any errors.
+pub use misc::get_document_base as get_document;
+/// Helper function to create a Node from any value that can be converted into a Node
+pub use nodes::node::make_node as make_node;
 /// Core data structure representing a JSON node and numerical node in the parsed tree
-pub use nodes::node::Node as Node;
+pub use nodes::node::Node;
 /// Core data structure representing a numeric value node in the parsed tree
-pub use nodes::node::Numeric as Numeric;
-/// Converts a Node tree back to JSON format
-pub use stringify::default::stringify as stringify;
+pub use nodes::node::Numeric;
 /// Parses json data into a Node tree structure
-pub use parser::default::parse as parse;
+pub use parser::default::parse;
+/// Converts a Node tree back to JSON format
+pub use stringify::default::stringify;
 // /// Converts a Node tree to JSON format
 // pub use stringify::bencode::stringify as to_bencode;
 // /// Converts a Node tree to YAML format
