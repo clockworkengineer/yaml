@@ -1,5 +1,14 @@
 use crate::Node;
 
+/// Returns the current version of the package as specified in Cargo.toml.
+/// Uses CARGO_PKG_VERSION environment variable that is set during compilation
+/// from the version field in Cargo.toml.
+pub fn get_version() -> &'static str {
+    env!("CARGO_PKG_VERSION")
+}
+
+/// Returns the number of documents in a YAML stream represented by the Documents node.
+/// If the node is not a Documents node, returns an error message.
 pub fn get_number_of_documents(documents: &Node) -> Result<usize, String> {
     match documents {
         Node::Documents(docs) => Ok(docs.len()),
@@ -33,6 +42,10 @@ mod tests {
     use crate::nodes::node::{BlockStyle, Node};
     use crate::parse;
     #[test]
+    fn test_get_version_env() {
+        assert_eq!(get_version(), "0.1.0");
+    }
+    #[test]
     fn test_get_number_of_documents() {
         let mut source = Buffer::new(b"doc1: value1\n---\ndoc2: value2\n---\ndoc3: value3");
         let result = parse(&mut source).unwrap();
@@ -42,4 +55,5 @@ mod tests {
         let non_docs_node = Node::Str("test".to_string(), QuoteType::Unquoted, BlockStyle::None);
         assert!(get_number_of_documents(&non_docs_node).is_err());
     }
+    
 }

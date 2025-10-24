@@ -23,6 +23,9 @@ pub mod misc;
 /// Module for converting YAML structures to formatted strings
 pub mod stringify;
 
+/// Gets the current version of the YAML library
+pub use misc::get_version as version;
+/// Gets the base node of document number n (0-based)
 pub use misc::get_document_base as get_document;
 /// Gets the number of documents in a YAML stream
 pub use misc::get_number_of_documents;
