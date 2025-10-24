@@ -22,52 +22,39 @@ pub mod error;
 pub mod misc;
 /// Module for converting YAML structures to formatted strings
 pub mod stringify;
+pub mod file;
 
-/// Gets the current version of the YAML library
-pub use misc::get_version as version;
-/// Gets the base node of document number n (0-based)
-pub use misc::get_document_base as get_document;
-/// Gets the number of documents in a YAML stream
-pub use misc::get_number_of_documents;
-
-// /// Module handling YAML file reading and writing operations
-// pub mod file;
-/// Destination implementation for writing YAML data to a memory buffer
-pub use io::destinations::buffer::Buffer as BufferDestination;
-/// Destination implementation for writing YAML data to a file
-pub use io::destinations::file::File as FileDestination;
 ///
 /// YAML_lib API
 ///
 
-// /// Returns the current version of the YAML library
-// pub use misc::get_version as version;
-// /// Strip whitespace from a string.
-// pub use misc::strip as strip_whitespace;
-// /// Prints a formatted string to the destination.
-// pub use misc::print as print;
-// /// This enum represents different Unicode text file formats with their corresponding byte order marks (BOM)
-// pub use file::file::Format as Format;
-// /// This function detects the Unicode format of a text file by examining its byte order mark (BOM)
-// pub use file::file::detect_format as detect_format;
-// /// This function reads a text file and returns its content as a String, handling different Unicode formats
-// pub use file::file::read_file_to_string as read_file_to_string;
-// /// This function writes a string to a file in the specified Unicode format
-// pub use file::file::write_file_from_string as write_file_from_string;
-//
-/// Source implementation for reading YAML data from a memory buffer
+/// Returns the current version of the YAML library
+pub use misc::get_version as version;
+/// This enum represents different Unicode text file formats with their corresponding byte order marks (BOM)
+pub use file::file::Format as Format;
+/// This function detects the Unicode format of a text file by examining its byte order mark (BOM)
+pub use file::file::detect_format as detect_format;
+/// This function reads a text file and returns its content as a String, handling different Unicode formats
+pub use file::file::read_file_to_string as read_file_to_string;
+/// This function writes a string to a file in the specified Unicode format
+pub use file::file::write_file_from_string as write_file_from_string;
+/// Source implementation for reading JSON data from a memory buffer
 pub use io::sources::buffer::Buffer as BufferSource;
-/// Source implementation for reading YAML data from a file
+/// Destination implementation for writing JSON data to a memory buffer
+pub use io::destinations::buffer::Buffer as BufferDestination;
+/// Source implementation for reading JSON data from a file
 pub use io::sources::file::File as FileSource;
-/// Core data structure representing a YAML node and numerical node in the parsed tree
-pub use nodes::node::Node;
+/// Destination implementation for writing JSON data to a file
+pub use io::destinations::file::File as FileDestination;
+/// Core data structure representing a JSON node and numerical node in the parsed tree
+pub use nodes::node::Node as Node;
 /// Core data structure representing a numeric value node in the parsed tree
-pub use nodes::node::Numeric;
-/// Parses YAML data into a Node tree structure
-pub use parser::default::parse;
-/// Converts a Node tree back to YAML format
-pub use stringify::default::stringify;
-// /// Converts a Node tree to YAML format
+pub use nodes::node::Numeric as Numeric;
+/// Converts a Node tree back to JSON format
+pub use stringify::default::stringify as stringify;
+/// Parses json data into a Node tree structure
+pub use parser::default::parse as parse;
+// /// Converts a Node tree to JSON format
 // pub use stringify::bencode::stringify as to_bencode;
 // /// Converts a Node tree to YAML format
 // pub use stringify::yaml::stringify as to_yaml;
