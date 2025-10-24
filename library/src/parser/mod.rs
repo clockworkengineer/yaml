@@ -2,8 +2,7 @@
 //! Implements parsing of YAML text into internal data structures
 //! Supports standard YAML types and syntax validation
 
+/// Submodules for different parsing strategies and utilities
 pub mod constants;
-/// Default parser implementation
-/// Handles YAML parsing and error reporting functionality
 pub mod default;
 pub mod utils;
