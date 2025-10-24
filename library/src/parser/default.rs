@@ -46,7 +46,7 @@ fn node_is_blank(node: &Node) -> bool {
         Document(nodes) => nodes.iter().all(|n| node_is_blank(n)),
         Node::Str(s, _, _) => s.is_empty(),
         Node::Comment(_) => true,
-            Node::Anchored(inner, _name) => node_is_blank(&**inner),
+        Node::Anchored(inner, _name) => node_is_blank(&**inner),
         Node::Alias(_name) => false,
         _ => false,
     }
@@ -57,8 +57,7 @@ fn parse_quoted_scalar(source: &mut dyn ISource) -> Result<String, String> {
     let quote = match source.current() {
         Some(c) if c == CHAR_SINGLE_QUOTE || c == CHAR_DOUBLE_QUOTE => c,
         Some(other) => {
-            let msg =
-                ERR_EXPECT_QUOTE_FORMAT.replace("{}", &other.to_string());
+            let msg = ERR_EXPECT_QUOTE_FORMAT.replace("{}", &other.to_string());
             return Err(format!("{}", parse_error(source, &msg)));
         }
         None => return Err(parse_error(source, ERR_UNEXPECTED_EOF_EXPECTING_QUOTE)),
@@ -446,9 +445,7 @@ fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, String> {
         // Parse key as Node
         let key_node = {
             let raw = match source.current() {
-                Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
-                    parse_quoted_scalar(source)?
-                }
+                Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => parse_quoted_scalar(source)?,
                 _ => collect_until(source, |c| c == CHAR_COLON || c == CHAR_RBRACE),
             };
             if source.current() != Some(CHAR_COLON) {
@@ -1078,11 +1075,7 @@ pub fn parse_document_contents(
         }
         Some(c) => Err(parse_error(
             source,
-            &format!(
-                "{}{}",
-                ERR_UNEXPECTED_CHAR_PREFIX,
-                c
-            ),
+            &format!("{}{}", ERR_UNEXPECTED_CHAR_PREFIX, c),
         )),
         None => Ok(Node::None),
     }
@@ -1201,10 +1194,10 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
             }
             Node::Anchored(inner, _name) => {
                 // Preserve the anchor wrapper; recurse into the inner node
-                    let replacement = (**inner).clone();
-                    *node = replacement;
-                    // Continue replacing inside the newly-inserted node
-                    replace_aliases(node, anchors)
+                let replacement = (**inner).clone();
+                *node = replacement;
+                // Continue replacing inside the newly-inserted node
+                replace_aliases(node, anchors)
             }
             Node::Mapping(pairs) => {
                 for (k, v) in pairs.iter_mut() {
@@ -1241,146 +1234,8 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
     // Now replace aliases; propagate any undefined-anchor error
     replace_aliases(&mut doc_node, &anchors)?;
 
-    // After aliases have been replaced, apply YAML merge keys (<<) by
-    // expanding merged mappings into their parents. This resolves patterns like
-    // '<<: *anchor' and '<<: [*a, *b]' as well as inline mapping values.
-    fn apply_merge_keys(node: &mut Node, anchors: &HashMap<String, Node>) {
-        match node {
-            Node::Mapping(pairs) => {
-                // First, recursively apply to children so nested merges resolve
-                for (k, v) in pairs.iter_mut() {
-                    apply_merge_keys(k, anchors);
-                    apply_merge_keys(v, anchors);
-                }
-                // Then process merges in this mapping
-                let mut merged_pairs: Vec<(Node, Node)> = Vec::new();
-                // Track keys already set to respect override semantics
-                use std::collections::HashSet;
-                let mut seen_keys: HashSet<String> = HashSet::new();
-
-                // Helper: insert pair if key not seen
-                let mut insert_if_absent = |k: &Node, v: &Node| {
-                    if let Node::Str(ks, _, _) = k {
-                        if !seen_keys.contains(ks) {
-                            seen_keys.insert(ks.clone());
-                            merged_pairs.push((k.clone(), v.clone()));
-                        }
-                    } else {
-                        // Non-scalar keys: just push, as we cannot deduplicate reliably
-                        merged_pairs.push((k.clone(), v.clone()));
-                    }
-                };
-
-                // First pass: handle all merge keys in order and collect non-merge pairs
-                // We will store non-merge pairs temporarily to append after merges
-                let mut non_merge_pairs: Vec<(Node, Node)> = Vec::new();
-                for (k, v) in pairs.iter() {
-                    if matches!(k, Node::Str(s, _, _) if s == "<<") {
-                        // Expand merge value
-                        match v {
-                            Node::Mapping(src_pairs) => {
-                                for (mk, mv) in src_pairs {
-                                    insert_if_absent(mk, mv);
-                                }
-                            }
-                            Node::Array(items) => {
-                                for item in items {
-                                    match item {
-                                        Node::Mapping(src_pairs) => {
-                                            for (mk, mv) in src_pairs {
-                                                insert_if_absent(mk, mv);
-                                            }
-                                        }
-                                        Node::Alias(name) => {
-                                            if let Some(found) = anchors.get(name) {
-                                                if let Node::Mapping(src_pairs) = found {
-                                                    for (mk, mv) in src_pairs {
-                                                        insert_if_absent(mk, mv);
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        _ => {
-                                            // skip non-mapping items
-                                        }
-                                    }
-                                }
-                            }
-                            Node::Alias(name) => {
-                                if let Some(found) = anchors.get(name) {
-                                    if let Node::Mapping(src_pairs) = found {
-                                        for (mk, mv) in src_pairs {
-                                            insert_if_absent(mk, mv);
-                                        }
-                                    }
-                                }
-                            }
-                            _ => {
-                                // Ignore other types
-                            }
-                        }
-                    } else {
-                        non_merge_pairs.push((k.clone(), v.clone()));
-                    }
-                }
-
-                // Second pass: append non-merge pairs, overriding merged ones where keys match
-                for (k, v) in non_merge_pairs.into_iter() {
-                    // Work with a borrowed view of the key string to avoid moving from `k`
-                    let key_string_opt = if let Node::Str(ref ks, _, _) = k {
-                        Some(ks.clone())
-                    } else {
-                        None
-                    };
-
-                    if let Some(ks) = key_string_opt {
-                        if seen_keys.contains(&ks) {
-                            // Override: replace existing entry with this later one
-                            if let Some(pos) = merged_pairs
-                                .iter()
-                                .position(|(ek, _)| matches!(ek, Node::Str(s, _, _) if s == &ks))
-                            {
-                                merged_pairs[pos] = (k, v);
-                            } else {
-                                merged_pairs.push((k, v));
-                            }
-                        } else {
-                            seen_keys.insert(ks);
-                            merged_pairs.push((k, v));
-                        }
-                    } else {
-                        // Non-scalar key
-                        merged_pairs.push((k, v));
-                    }
-                }
-
-                // Replace mapping pairs with merged result, effectively removing '<<' entries
-                *pairs = merged_pairs;
-            }
-            Node::Array(items) => {
-                for it in items.iter_mut() {
-                    apply_merge_keys(it, anchors);
-                }
-            }
-            Document(nodes) => {
-                for n in nodes.iter_mut() {
-                    apply_merge_keys(n, anchors);
-                }
-            }
-            Node::Documents(docs) => {
-                for d in docs.iter_mut() {
-                    apply_merge_keys(d, anchors);
-                }
-            }
-            Node::Anchored(inner, _) => {
-                apply_merge_keys(inner, anchors);
-            }
-            _ => {}
-        }
-    }
-
-    apply_merge_keys(&mut doc_node, &anchors);
-    // resolved document
+    // Merge-key expansion (<<:) handling removed: aliases are replaced but YAML
+    // merge keys are not expanded into parent mappings by the parser anymore.
 
     Ok(doc_node)
 }
@@ -2432,23 +2287,6 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_merge_key_with_sequence_of_aliases() {
-        let yaml =
-            b"---\na: &a\n  k1: v1\nb: &b\n  k2: v2\nparent:\n  <<: [*a, *b]\n  key: value\n";
-        let mut source = Buffer::new(yaml);
-        let result = parse(&mut source).unwrap();
-        assert!(matches!(result, Node::Documents(_)));
-    }
-
-    #[test]
-    fn test_parse_merge_key_with_inline_mapping() {
-        let yaml = b"---\nparent:\n  <<: {k: v}\n  key: value\n";
-        let mut source = Buffer::new(yaml);
-        let result = parse(&mut source).unwrap();
-        assert!(matches!(result, Node::Documents(_)));
-    }
-
-    #[test]
     fn test_parse_anchor_alias_sequence_hr_rbi() {
         // From testfile016.yaml
         let yaml = b"---\nhr:\n  - Mark McGwire\n  # Following node labeled SS\n  - &SS Sammy Sosa\nrbi:\n  - *SS # Subsequent occurance\n  - Ken Griffey\n";
@@ -2636,7 +2474,7 @@ mod tests {
         let yaml = b"---\nplain:\n  This unquoted scalar\n  spans many lines.";
         let mut source = Buffer::new(yaml);
         let result = parse(&mut source).unwrap();
-    eprintln!("AST_DEBUG: {:#?}", result);
+        eprintln!("AST_DEBUG: {:#?}", result);
         use crate::io::destinations::buffer::Buffer as DestBuffer;
         let mut dest = DestBuffer::new();
         stringify(&result, &mut dest).unwrap();
@@ -2653,7 +2491,7 @@ mod tests {
         let yaml = b"---\nquoted: \"So does this\n  quoted scalar.\\n\"";
         let mut source = Buffer::new(yaml);
         let result = parse(&mut source).unwrap();
-    eprintln!("PARSED_NODE:\n{:#?}", result);
+        eprintln!("PARSED_NODE:\n{:#?}", result);
         use crate::io::destinations::buffer::Buffer as DestBuffer;
         let mut dest = DestBuffer::new();
         stringify(&result, &mut dest).unwrap();
