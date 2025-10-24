@@ -12,7 +12,6 @@ pub const ERR_EXPECT_SEQUENCE_ITEM: &str =
     "Expected sequence item starting with CHAR_DASH, got '{}'";
 pub const ERR_EOF_EXPLICIT_PAIR: &str = "Unexpected end of input while parsing explicit pair value";
 pub const ERR_UNEXPECTED_CHAR_PREFIX: &str = "Unexpected character: ";
-// Additional error messages
 pub const ERR_UNSUPPORTED_NODE_TYPE: &str = "Unsupported node type";
 pub const ERR_EXPECT_DOCUMENTS_NODE: &str = "Expected Documents node";
 pub const ERR_NODE_NOT_DOCUMENTS_ARRAY: &str = "Node is not a Document or Array of Documents";

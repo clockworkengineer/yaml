@@ -46,7 +46,7 @@ fn node_is_blank(node: &Node) -> bool {
         Document(nodes) => nodes.iter().all(|n| node_is_blank(n)),
         Node::Str(s, _, _) => s.is_empty(),
         Node::Comment(_) => true,
-        Node::Anchored(inner, _name) => node_is_blank(inner),
+            Node::Anchored(inner, _name) => node_is_blank(&**inner),
         Node::Alias(_name) => false,
         _ => false,
     }
@@ -1200,11 +1200,11 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
                 }
             }
             Node::Anchored(inner, _name) => {
-                // inner is &mut Box<Node>; deref twice to get Node
-                let replacement = (**inner).clone();
-                *node = replacement;
-                // Continue replacing inside the new node
-                replace_aliases(node, anchors)
+                // Preserve the anchor wrapper; recurse into the inner node
+                    let replacement = (**inner).clone();
+                    *node = replacement;
+                    // Continue replacing inside the newly-inserted node
+                    replace_aliases(node, anchors)
             }
             Node::Mapping(pairs) => {
                 for (k, v) in pairs.iter_mut() {
@@ -1244,13 +1244,13 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
     // After aliases have been replaced, apply YAML merge keys (<<) by
     // expanding merged mappings into their parents. This resolves patterns like
     // '<<: *anchor' and '<<: [*a, *b]' as well as inline mapping values.
-    fn apply_merge_keys(node: &mut Node) {
+    fn apply_merge_keys(node: &mut Node, anchors: &HashMap<String, Node>) {
         match node {
             Node::Mapping(pairs) => {
                 // First, recursively apply to children so nested merges resolve
                 for (k, v) in pairs.iter_mut() {
-                    apply_merge_keys(k);
-                    apply_merge_keys(v);
+                    apply_merge_keys(k, anchors);
+                    apply_merge_keys(v, anchors);
                 }
                 // Then process merges in this mapping
                 let mut merged_pairs: Vec<(Node, Node)> = Vec::new();
@@ -1291,8 +1291,26 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
                                                 insert_if_absent(mk, mv);
                                             }
                                         }
+                                        Node::Alias(name) => {
+                                            if let Some(found) = anchors.get(name) {
+                                                if let Node::Mapping(src_pairs) = found {
+                                                    for (mk, mv) in src_pairs {
+                                                        insert_if_absent(mk, mv);
+                                                    }
+                                                }
+                                            }
+                                        }
                                         _ => {
-                                            // If array contains non-mapping (e.g., alias already resolved to scalar), skip
+                                            // skip non-mapping items
+                                        }
+                                    }
+                                }
+                            }
+                            Node::Alias(name) => {
+                                if let Some(found) = anchors.get(name) {
+                                    if let Node::Mapping(src_pairs) = found {
+                                        for (mk, mv) in src_pairs {
+                                            insert_if_absent(mk, mv);
                                         }
                                     }
                                 }
@@ -1341,27 +1359,27 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
             }
             Node::Array(items) => {
                 for it in items.iter_mut() {
-                    apply_merge_keys(it);
+                    apply_merge_keys(it, anchors);
                 }
             }
             Document(nodes) => {
                 for n in nodes.iter_mut() {
-                    apply_merge_keys(n);
+                    apply_merge_keys(n, anchors);
                 }
             }
             Node::Documents(docs) => {
                 for d in docs.iter_mut() {
-                    apply_merge_keys(d);
+                    apply_merge_keys(d, anchors);
                 }
             }
             Node::Anchored(inner, _) => {
-                apply_merge_keys(inner);
+                apply_merge_keys(inner, anchors);
             }
             _ => {}
         }
     }
 
-    apply_merge_keys(&mut doc_node);
+    apply_merge_keys(&mut doc_node, &anchors);
     // resolved document
 
     Ok(doc_node)
@@ -2618,6 +2636,7 @@ mod tests {
         let yaml = b"---\nplain:\n  This unquoted scalar\n  spans many lines.";
         let mut source = Buffer::new(yaml);
         let result = parse(&mut source).unwrap();
+    eprintln!("AST_DEBUG: {:#?}", result);
         use crate::io::destinations::buffer::Buffer as DestBuffer;
         let mut dest = DestBuffer::new();
         stringify(&result, &mut dest).unwrap();
@@ -2634,6 +2653,7 @@ mod tests {
         let yaml = b"---\nquoted: \"So does this\n  quoted scalar.\\n\"";
         let mut source = Buffer::new(yaml);
         let result = parse(&mut source).unwrap();
+    eprintln!("PARSED_NODE:\n{:#?}", result);
         use crate::io::destinations::buffer::Buffer as DestBuffer;
         let mut dest = DestBuffer::new();
         stringify(&result, &mut dest).unwrap();
