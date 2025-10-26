@@ -2589,41 +2589,7 @@ mod tests {
             "---\nunicode: Sosa did fine.☺\ncontrol: \"\\b1998\\t1999\\t2000\\n\"\nhexesc: \"\\x13\\x10 is \\r\\n\"\nsingle: \'\"Howdy!\" he cried.\'\nquoted: \" # not a \'comment\'.\"\ntie-fighter: \"|\\\\-*-/|\"\n...\n"
         );
     }
-    // #[test]
-    // fn test_parse_nested_anchor_and_alias_with_block_scalar() {
-    //     // anchor a scalar in a sequence and reference it via alias
-    //     use crate::stringify;
-    //     let yaml = b"version: \"3.9\"\n\nservices:\n  production-db: &database-definition\n    image: mysql:5.7\n    volumes:\n      - db_data:/var/lib/mysql\n    restart: always\n    environment: &environment-definition\n     MYSQL_ROOT_PASSWORD: somewordpress\n     MYSQL_DATABASE: wordpress\n     MYSQL_USER: wordpress\n     MYSQL_PASSWORD: production-password\n  test-db:\n    <<: *database-definition\n    environment:\n      <<: *environment-definition\n      MYSQL_PASSWORD: test-password";
-    //     let mut source = Buffer::new(yaml);
-    //     let result = parse(&mut source).unwrap();
-    //     use crate::io::destinations::buffer::Buffer as DestBuffer;
-    //     let mut dest = DestBuffer::new();
-    //     stringify(&result, &mut dest).unwrap();
-    //     assert_eq!(
-    //         dest.to_string(),
-    //         "---\nversion: \"3.9\"\nservices:\n  production-db:\n    image: mysql:5.7\n    volumes:\n      - db_data:/var/lib/mysql\n    restart: always\n    environment:\n      MYSQL_ROOT_PASSWORD: somewordpress\n      MYSQL_DATABASE: wordpress\n      MYSQL_USER: wordpress\n      MYSQL_PASSWORD: production-password\n  test-db:\n    image: mysql:5.7\n    volumes:\n      - db_data:/var/lib/mysql\n    restart: always\n    environment:\n      MYSQL_ROOT_PASSWORD: somewordpress\n      MYSQL_DATABASE: wordpress\n      MYSQL_USER: wordpress\n      MYSQL_PASSWORD: test-password\n...\n"
-    //     );
-    // }
-    // #[test]
-    // fn test_parse_nested_anchor_and_alias_with_block_scalar() {
-    //     // Parse a document that defines an anchor and then uses it via merge
-    //     // keys. Rather than relying on stringification, assert the AST
-    //     // structure contains the anchored mapping and that the anchor value
-    //     // is preserved in the parsed tree.
-    //     let yaml = b"base: &base\n  name: Everyone has same name\nfoo:\n  <<: *base\n  age: 10\n  name: John\nbar:\n  <<: *base\n  age: 20";
-    //     let mut source = Buffer::new(yaml);
-    //     let result = parse(&mut source).unwrap();
 
-    //     // Stringify the parsed document and assert the canonical merged output
-    //     // (stringifier now expands `<<: *anchor` into the parent mapping).
-    //     use crate::io::destinations::buffer::Buffer as DestBuffer;
-    //     let mut dest = DestBuffer::new();
-    //     crate::stringify(&result, &mut dest).unwrap();
-    //     assert_eq!(
-    //         dest.to_string(),
-    //         "---\nbase: \n  name: Everyone has same name\nfoo: \n  name: John\n  age: 10\nbar: \n  name: Everyone has same name\n  age: 20\n...\n"
-    //     );
-    // }
     #[test]
     fn test_parse_mapping_with_quoted_string_value() {
         // Parse a document that defines an anchor and then uses it via merge
@@ -2643,5 +2609,40 @@ mod tests {
             dest.to_string(),
             "---\nKeys can be quoted too.: Useful if you want to put a ':' in your key.\n...\n"
         );
+        // #[test]
+        // fn test_parse_nested_anchor_and_alias_with_block_scalar() {
+        //     // anchor a scalar in a sequence and reference it via alias
+        //     use crate::stringify;
+        //     let yaml = b"version: \"3.9\"\n\nservices:\n  production-db: &database-definition\n    image: mysql:5.7\n    volumes:\n      - db_data:/var/lib/mysql\n    restart: always\n    environment: &environment-definition\n     MYSQL_ROOT_PASSWORD: somewordpress\n     MYSQL_DATABASE: wordpress\n     MYSQL_USER: wordpress\n     MYSQL_PASSWORD: production-password\n  test-db:\n    <<: *database-definition\n    environment:\n      <<: *environment-definition\n      MYSQL_PASSWORD: test-password";
+        //     let mut source = Buffer::new(yaml);
+        //     let result = parse(&mut source).unwrap();
+        //     use crate::io::destinations::buffer::Buffer as DestBuffer;
+        //     let mut dest = DestBuffer::new();
+        //     stringify(&result, &mut dest).unwrap();
+        //     assert_eq!(
+        //         dest.to_string(),
+        //         "---\nversion: \"3.9\"\nservices:\n  production-db:\n    image: mysql:5.7\n    volumes:\n      - db_data:/var/lib/mysql\n    restart: always\n    environment:\n      MYSQL_ROOT_PASSWORD: somewordpress\n      MYSQL_DATABASE: wordpress\n      MYSQL_USER: wordpress\n      MYSQL_PASSWORD: production-password\n  test-db:\n    image: mysql:5.7\n    volumes:\n      - db_data:/var/lib/mysql\n    restart: always\n    environment:\n      MYSQL_ROOT_PASSWORD: somewordpress\n      MYSQL_DATABASE: wordpress\n      MYSQL_USER: wordpress\n      MYSQL_PASSWORD: test-password\n...\n"
+        //     );
+        // }
+        // #[test]
+        // fn test_parse_nested_anchor_and_alias_with_block_scalar() {
+        //     // Parse a document that defines an anchor and then uses it via merge
+        //     // keys. Rather than relying on stringification, assert the AST
+        //     // structure contains the anchored mapping and that the anchor value
+        //     // is preserved in the parsed tree.
+        //     let yaml = b"base: &base\n  name: Everyone has same name\nfoo:\n  <<: *base\n  age: 10\n  name: John\nbar:\n  <<: *base\n  age: 20";
+        //     let mut source = Buffer::new(yaml);
+        //     let result = parse(&mut source).unwrap();
+
+        //     // Stringify the parsed document and assert the canonical merged output
+        //     // (stringifier now expands `<<: *anchor` into the parent mapping).
+        //     use crate::io::destinations::buffer::Buffer as DestBuffer;
+        //     let mut dest = DestBuffer::new();
+        //     crate::stringify(&result, &mut dest).unwrap();
+        //     assert_eq!(
+        //         dest.to_string(),
+        //         "---\nbase: \n  name: Everyone has same name\nfoo: \n  name: John\n  age: 10\nbar: \n  name: Everyone has same name\n  age: 20\n...\n"
+        //     );
+        // }
     }
 }
