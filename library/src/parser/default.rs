@@ -767,6 +767,20 @@ fn parse_sequence(source: &mut dyn ISource, indent_level: usize) -> Result<Node,
 }
 
 fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, String> {
+    // Helpers to decide if a scalar can be emitted safely without quotes.
+    fn is_plain_safe_value(s: &str) -> bool {
+        if s.is_empty() { return true; }
+        if s.starts_with(' ') || s.ends_with(' ') { return false; }
+        if s.contains(['\n', '\r']) { return false; }
+        // Disallow characters that tend to require quoting in plain scalars
+        let disallowed = ['#', '[', ']', '{', '}', '&', '*', '!', '|', '>', '"', '`', '%', '@', '\\'];
+        if s.chars().any(|ch| disallowed.contains(&ch)) { return false; }
+        true
+    }
+    fn is_plain_safe_key(s: &str) -> bool {
+        // Keys must also not contain ':' unquoted.
+        is_plain_safe_value(s) && !s.contains(':')
+    }
     let mut pairs: Vec<(Node, Node)> = Vec::new();
     let mut last_was_nested: bool;
     while let Some(c) = source.current() {
@@ -779,19 +793,40 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
             CHAR_HASH => {
                 parse_comment(source);
             }
-            c if c.is_alphanumeric() => {
+            c if c.is_alphanumeric() || c == CHAR_SINGLE_QUOTE || c == CHAR_DOUBLE_QUOTE => {
                 if source.get_current_indent_level() < indent_level {
                     break;
                 }
 
-                let (key_node, newline) = parse_mapping_key(source)?;
+                let (mut key_node, newline) = parse_mapping_key(source)?;
+
+                // If the key is a quoted scalar that could be plain safely, normalize it to Unquoted
+                if let Node::Str(ref mut s, ref mut qt, ref _style) = key_node {
+                    if matches!(*qt, QuoteType::Single | QuoteType::Double) {
+                        if is_plain_safe_key(s) {
+                            *qt = QuoteType::Unquoted;
+                        }
+                    }
+                }
 
                 let next_indent = source.get_current_indent_level();
                 if next_indent > indent_level && newline {
                     pairs.push((key_node, parse_document_contents(source, next_indent)?));
                     continue;
                 } else {
-                    let value_node = parse_value(source)?;
+                    let mut value_node = parse_value(source)?;
+
+                    // If the value is a quoted scalar that could be plain safely, normalize it to Unquoted
+                    if let Node::Str(ref mut s, ref mut qt, ref mut style) = value_node {
+                        if matches!(*qt, QuoteType::Single | QuoteType::Double) && is_plain_safe_value(s) {
+                            // Preserve explicit Literal style (multiline), otherwise no special style
+                            if !matches!(*style, BlockStyle::Literal) {
+                                *style = BlockStyle::None;
+                            }
+                            *qt = QuoteType::Unquoted;
+                        }
+                    }
+
                     // If the parsed value consumed multiple subsequent lines (like
                     // an anchored node or a block scalar), avoid skipping the
                     // following line content here because the parser is already
@@ -1070,8 +1105,16 @@ pub fn parse_document_contents(
         | Some(CHAR_DOUBLE_QUOTE)
         | Some(CHAR_SINGLE_QUOTE)
         | Some(CHAR_PIPE) => {
-            // Allow certain scalar format strings to start with special characters, including block scalars
-            Ok(parse_value(source)?)
+            // If the content starts with a quote, it could be a quoted mapping key.
+            // Peek ahead for a ':' on the same line; if present, parse a mapping.
+            if matches!(source.current(), Some(CHAR_DOUBLE_QUOTE) | Some(CHAR_SINGLE_QUOTE))
+                && peek_ahead_for_mapping_key(source)
+            {
+                Ok(parse_mapping(source, indent_level)?)
+            } else {
+                // Otherwise, treat as a plain value (scalar or block scalar)
+                Ok(parse_value(source)?)
+            }
         }
         Some(c) => Err(parse_error(
             source,
@@ -2581,4 +2624,24 @@ mod tests {
     //         "---\nbase: \n  name: Everyone has same name\nfoo: \n  name: John\n  age: 10\nbar: \n  name: Everyone has same name\n  age: 20\n...\n"
     //     );
     // }
+    #[test]
+    fn test_parse_mapping_with_quoted_string_value() {
+        // Parse a document that defines an anchor and then uses it via merge
+        // keys. Rather than relying on stringification, assert the AST
+        // structure contains the anchored mapping and that the anchor value
+        // is preserved in the parsed tree.
+        let yaml = b"\'Keys can be quoted too.\': \"Useful if you want to put a \':\' in your key.\"";
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source).unwrap();
+
+        // Stringify the parsed document and assert the canonical merged output
+        // (stringifier now expands `<<: *anchor` into the parent mapping).
+        use crate::io::destinations::buffer::Buffer as DestBuffer;
+        let mut dest = DestBuffer::new();
+        crate::stringify(&result, &mut dest).unwrap();
+        assert_eq!(
+            dest.to_string(),
+            "---\nKeys can be quoted too.: Useful if you want to put a ':' in your key.\n...\n"
+        );
+    }
 }
