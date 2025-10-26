@@ -277,22 +277,20 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
             let value = collect_until(source, |c| c == CHAR_NEWLINE || c == CHAR_HASH);
             let trimmed = value.trim();
             if trimmed == STR_LITERAL_BLOCK || trimmed == STR_FOLDED_BLOCK {
-                // Collect indented lines following the '|' (literal) or '>' (folded)
+                // Collect lines following '|' (literal) or '>' (folded).
                 let is_folded = trimmed == STR_FOLDED_BLOCK;
                 // Consume the newline after the block style indicator
                 if source.current() == Some(CHAR_NEWLINE) {
                     source.next();
                 }
 
-                let mut lines: Vec<String> = Vec::new();
-                let mut base_indent: Option<usize> = None; // minimal indent across non-empty lines
-
+                let mut raw_lines: Vec<String> = Vec::new();
+                let mut first_indent: Option<usize> = None;
                 loop {
                     if source.current().is_none() {
                         break;
                     }
-
-                    // Peek current line indent
+                    // Peek current line indent and whether it's empty
                     let st_line = source.save_state();
                     let mut cur_indent = 0usize;
                     while let Some(CHAR_SPACE) = source.current() {
@@ -302,120 +300,105 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
                     let cur_is_newline = source.current() == Some(CHAR_NEWLINE);
                     source.restore_state(st_line);
 
-                    // If we already established base indent and this line is less indented and not empty, end block
-                    if let Some(bi) = base_indent {
-                        if cur_indent < bi {
-                            // For top-level block scalars (bi == 1), allow a less-indented
-                            // blank line to be part of the scalar. For nested (e.g., mapping)
-                            // block scalars (bi > 1), treat a less-indented blank line as the
-                            // end of the block.
-                            if !(cur_is_newline && bi == 1) {
-                                break;
+                    // Establish the indent of the first non-empty line
+                    if first_indent.is_none() {
+                        if cur_is_newline {
+                            // Consume the blank line and retain it
+                            let _ = collect_until(source, |c| c == CHAR_NEWLINE);
+                            if source.current() == Some(CHAR_NEWLINE) {
+                                source.next();
                             }
+                            raw_lines.push(String::new());
+                            continue;
+                        } else {
+                            first_indent = Some(cur_indent);
+                        }
+                    } else {
+                        // Stop when a non-empty line is less indented than the first non-empty line
+                        if !cur_is_newline && cur_indent < first_indent.unwrap() {
+                            break;
                         }
                     }
 
                     // Read the raw line up to (but not including) newline
                     let raw_line = collect_until(source, |c| c == CHAR_NEWLINE);
-
-                    // Determine indent for non-empty lines and update base indent (minimal across non-empty)
-                    if !raw_line.is_empty() {
-                        let this_indent =
-                            raw_line.chars().take_while(|&ch| ch == CHAR_SPACE).count();
-                        base_indent = Some(match base_indent {
-                            Some(bi) => bi.min(this_indent),
-                            None => this_indent,
-                        });
-                    }
-
-                    // Consume the newline if present
                     if source.current() == Some(CHAR_NEWLINE) {
                         source.next();
                     }
-
-                    lines.push(raw_line);
+                    raw_lines.push(raw_line);
                 }
 
-                // Decide de-indentation amount: only fold top-level blocks with a single leading space
-                let deindent = if is_folded {
-                    match base_indent {
-                        Some(1) => 1,
-                        _ => 0,
-                    }
-                } else {
-                    0
-                };
-
-                if deindent > 0 {
-                    for line in &mut lines {
-                        if !line.is_empty() {
-                            let strip = deindent
-                                .min(line.chars().take_while(|&ch| ch == CHAR_SPACE).count());
-                            if strip > 0 {
-                                line.drain(0..strip);
-                            }
-                        }
+                // Prepare a normalized view for folding: strip first indent from non-empty lines
+                let fi = first_indent.unwrap_or(0);
+                let mut norm_lines: Vec<String> = Vec::with_capacity(raw_lines.len());
+                for l in raw_lines.iter() {
+                    if l.is_empty() {
+                        norm_lines.push(String::new());
+                    } else {
+                        let lead = l.chars().take_while(|&ch| ch == CHAR_SPACE).count();
+                        let strip = fi.min(lead);
+                        let stripped: String = l.chars().skip(strip).collect();
+                        norm_lines.push(stripped);
                     }
                 }
 
                 // Build output according to block style
                 let out = if is_folded {
-                    // Fold: join lines with spaces when both are at base indent; preserve blank lines and more-indented lines
+                    // Fold non-indented consecutive lines into a single line separated by spaces.
+                    // Preserve blank lines and more-indented lines as separate lines.
                     let mut out = String::new();
                     let mut i = 0usize;
-                    let bi = base_indent.unwrap_or(0);
-                    while i < lines.len() {
-                        let cur = &lines[i];
-                        if cur.is_empty() {
-                            // blank line
+                    while i < norm_lines.len() {
+                        let line = &norm_lines[i];
+                        if line.is_empty() {
                             out.push(CHAR_NEWLINE);
                             i += 1;
                             continue;
                         }
-                        out.push_str(cur);
-                        // Try to fold subsequent same-indented non-empty lines
-                        let mut j = i + 1;
-                        while j < lines.len() {
-                            let nxt = &lines[j];
-                            if nxt.is_empty() {
-                                break;
-                            }
-                            let cur_lead = lines[j - 1]
-                                .chars()
-                                .take_while(|&ch| ch == CHAR_SPACE)
-                                .count();
-                            let nxt_lead = nxt.chars().take_while(|&ch| ch == CHAR_SPACE).count();
-                            if cur_lead <= bi && nxt_lead <= bi {
-                                // fold: add a space then the next line without its base indent
-                                out.push(CHAR_SPACE);
-                                let slice_start = if nxt_lead >= bi { bi } else { 0 };
-                                let appended = &nxt[slice_start.min(nxt.len())..];
-                                out.push_str(appended);
+                        let is_indented = line.starts_with(' ');
+                        if !is_indented {
+                            // Collect a paragraph of consecutive non-indented non-empty lines
+                            let mut j = i;
+                            let mut first = true;
+                            while j < norm_lines.len() {
+                                let l = &norm_lines[j];
+                                if l.is_empty() || l.starts_with(' ') {
+                                    break;
+                                }
+                                if !first {
+                                    out.push(CHAR_SPACE);
+                                }
+                                out.push_str(l);
+                                first = false;
                                 j += 1;
-                            } else {
-                                break;
                             }
-                        }
-                        // If we didn't consume to end or next is blank/more-indented, end line with newline (unless last)
-                        if j < lines.len() {
                             out.push(CHAR_NEWLINE);
+                            i = j;
+                        } else {
+                            // Preserve more-indented line as-is
+                            out.push_str(line);
+                            out.push(CHAR_NEWLINE);
+                            i += 1;
                         }
-                        i = j;
+                    }
+                    // Trim a single trailing newline if present; the stringifier will add newlines per line
+                    if out.ends_with('\n') {
+                        out.pop();
                     }
                     out
                 } else {
                     // Literal: join with newlines exactly
                     let mut out = String::new();
-                    for (i, l) in lines.iter().enumerate() {
+                    for (idx, l) in norm_lines.iter().enumerate() {
                         out.push_str(l);
-                        if i + 1 < lines.len() {
+                        if idx + 1 < norm_lines.len() {
                             out.push(CHAR_NEWLINE);
                         }
                     }
                     out
                 };
 
-                // Store as Literal block style for stringify purposes in tests
+                // Store as Literal block style for stringify
                 Ok(Node::Str(out, QuoteType::Unquoted, BlockStyle::Literal))
             } else if !trimmed.is_empty() {
                 Ok(parse_scalar(trimmed))
@@ -847,8 +830,8 @@ fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, 
         // consumed its trailing newlines), don't advance further here.
         if !last_was_nested {
             skip_until_newline(source);
+            skip_whitespace(source);
         }
-        skip_whitespace(source);
     }
     // Sort pairs by key for deterministic output
     Ok(Node::Mapping(pairs))
@@ -2609,6 +2592,27 @@ mod tests {
             dest.to_string(),
             "---\nKeys can be quoted too.: Useful if you want to put a ':' in your key.\n...\n"
         );
+    }
+    #[test]
+        fn test_parse_a_literal_block_scalar() {
+            // Parse a document that defines an anchor and then uses it via merge
+            // keys. Rather than relying on stringification, assert the AST
+            // structure contains the anchored mapping and that the anchor value
+            // is preserved in the parsed tree.
+            let yaml = b"literal_block: |\n  This entire block of text will be the value of the \'literal_block\' key,\n  with line breaks being preserved.\n\n  The literal continues until de-dented, and the leading indentation is\n  stripped.\n\n      Any lines that are \'more-indented\' keep the rest of their indentation -\n      these lines will be indented by 4 spaces.";
+            let mut source = Buffer::new(yaml);
+            let result = parse(&mut source).unwrap();
+
+            // Stringify the parsed document and assert the canonical merged output
+            // (stringifier now expands `<<: *anchor` into the parent mapping).
+            use crate::io::destinations::buffer::Buffer as DestBuffer;
+            let mut dest = DestBuffer::new();
+            crate::stringify(&result, &mut dest).unwrap();
+            assert_eq!(
+                dest.to_string(),
+                "---\nliteral_block: |\n  This entire block of text will be the value of the \'literal_block\' key,\n  with line breaks being preserved.\n\n  The literal continues until de-dented, and the leading indentation is\n  stripped.\n\n      Any lines that are \'more-indented\' keep the rest of their indentation -\n      these lines will be indented by 4 spaces.\n...\n"
+            );
+        }
         // #[test]
         // fn test_parse_nested_anchor_and_alias_with_block_scalar() {
         //     // anchor a scalar in a sequence and reference it via alias
@@ -2644,5 +2648,4 @@ mod tests {
         //         "---\nbase: \n  name: Everyone has same name\nfoo: \n  name: John\n  age: 10\nbar: \n  name: Everyone has same name\n  age: 20\n...\n"
         //     );
         // }
-    }
 }

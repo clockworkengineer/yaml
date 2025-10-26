@@ -104,35 +104,21 @@ fn stringify_document_with_indent(
                         let content_indent = "  ".repeat(indent + 1);
                         destination.add_bytes(&format!("{}|{}\n", indent_str, ""));
 
-                        // Compute minimal leading spaces among non-empty lines so we can
-                        // preserve the original absolute indentation when emitting.
+                        // The parser has already normalized indentation for block literals.
+                        // Simply emit each line, prefixing content indent for non-empty lines
+                        // and using a bare newline for empty lines.
                         let lines: Vec<&str> = s.split('\n').collect();
-                        let mut min_lead = usize::MAX;
-                        for &line in lines.iter() {
-                            if line.trim().is_empty() {
-                                continue;
-                            }
-                            let lead = line.chars().take_while(|&ch| ch == ' ').count();
-                            if lead < min_lead {
-                                min_lead = lead;
-                            }
-                        }
-                        if min_lead == usize::MAX {
-                            min_lead = 0;
-                        }
-
                         if !s.contains('\n') && matches!(style, BlockStyle::Literal) {
-                            // Single-line literal: trim leading spaces only
+                            // Single-line literal: trim leading spaces only for display
                             let line = s.trim_start();
                             destination.add_bytes(&format!("{}{}\n", content_indent, line));
                         } else {
                             for line in lines {
-                                let stripped = if line.len() >= min_lead {
-                                    &line[min_lead..]
+                                if line.is_empty() {
+                                    destination.add_bytes("\n");
                                 } else {
-                                    line
-                                };
-                                destination.add_bytes(&format!("{}{}\n", content_indent, stripped));
+                                    destination.add_bytes(&format!("{}{}\n", content_indent, line));
+                                }
                             }
                         }
                     } else {
