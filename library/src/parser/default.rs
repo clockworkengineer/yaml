@@ -328,18 +328,33 @@ fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
                     raw_lines.push(raw_line);
                 }
 
-                // Prepare a normalized view for folding: strip first indent from non-empty lines
+                // Chomp trailing empty lines for both literal ('|') and folded ('>') styles
+                // so that a separating blank line after the block marker is not included
+                // in the scalar content (YAML default "clip" chomping).
+                while matches!(raw_lines.last(), Some(s) if s.is_empty()) {
+                    raw_lines.pop();
+                }
+
+                // For folded blocks we normalize by stripping the first indent
+                // from non-empty lines. For literal blocks we preserve the raw
+                // indentation exactly as it appeared in the source so tests that
+                // inspect the AST can see the original leading spaces.
                 let fi = first_indent.unwrap_or(0);
                 let mut norm_lines: Vec<String> = Vec::with_capacity(raw_lines.len());
-                for l in raw_lines.iter() {
-                    if l.is_empty() {
-                        norm_lines.push(String::new());
-                    } else {
-                        let lead = l.chars().take_while(|&ch| ch == CHAR_SPACE).count();
-                        let strip = fi.min(lead);
-                        let stripped: String = l.chars().skip(strip).collect();
-                        norm_lines.push(stripped);
+                if is_folded {
+                    for l in raw_lines.iter() {
+                        if l.is_empty() {
+                            norm_lines.push(String::new());
+                        } else {
+                            let lead = l.chars().take_while(|&ch| ch == CHAR_SPACE).count();
+                            let strip = fi.min(lead);
+                            let stripped: String = l.chars().skip(strip).collect();
+                            norm_lines.push(stripped);
+                        }
                     }
+                } else {
+                    // Literal: keep lines as-is
+                    norm_lines = raw_lines.clone();
                 }
 
                 // Build output according to block style

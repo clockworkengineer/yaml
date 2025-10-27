@@ -101,17 +101,30 @@ fn stringify_document_with_indent(
                 QuoteType::Unquoted => {
                     // Emit literal block scalars '|' when content is multiline OR when style is explicitly Literal.
                     if s.contains('\n') || matches!(style, BlockStyle::Literal) {
-                        let content_indent = "  ".repeat(indent + 1);
+                        // For literal style, emit lines exactly as stored by the parser
+                        // to avoid double-indenting when the AST already includes leading
+                        // spaces. For other multiline unquoted scalars, indent by one.
+                        let is_literal = matches!(style, BlockStyle::Literal);
+                        // Determine if the content already contains leading indentation on all
+                        // non-empty lines. If so, do not add additional emitter indentation to
+                        // avoid doubling spaces. Otherwise indent by one level.
+                        let lines: Vec<&str> = s.split('\n').collect();
+                        let needs_indent = if is_literal {
+                            lines.iter().any(|l| !l.is_empty() && !l.starts_with(' '))
+                        } else {
+                            // non-literal multiline unquoted always needs indenting
+                            true
+                        };
+                        let content_indent = if needs_indent {
+                            "  ".repeat(indent + 1)
+                        } else {
+                            String::new()
+                        };
                         destination.add_bytes(&format!("{}|{}\n", indent_str, ""));
 
-                        // The parser has already normalized indentation for block literals.
-                        // Simply emit each line, prefixing content indent for non-empty lines
-                        // and using a bare newline for empty lines.
-                        let lines: Vec<&str> = s.split('\n').collect();
-                        if !s.contains('\n') && matches!(style, BlockStyle::Literal) {
-                            // Single-line literal: trim leading spaces only for display
-                            let line = s.trim_start();
-                            destination.add_bytes(&format!("{}{}\n", content_indent, line));
+                        if !s.contains('\n') && is_literal {
+                            // Single-line literal: emit as-is
+                            destination.add_bytes(&format!("{}{}\n", content_indent, s));
                         } else {
                             for line in lines {
                                 if line.is_empty() {
