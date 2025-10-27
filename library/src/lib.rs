@@ -58,9 +58,9 @@ pub use nodes::node::Node;
 /// Core data structure representing a numeric value node in the parsed tree
 pub use nodes::node::Numeric;
 /// Parses json data into a Node tree structure
-pub use parser::default::parse;
+pub use parser::document::parse as parse;
 /// Converts a Node tree back to JSON format
-pub use stringify::default::stringify;
+pub use stringify::default::stringify as stringify;
 // /// Converts a Node tree to JSON format
 // pub use stringify::bencode::stringify as to_bencode;
 // /// Converts a Node tree to YAML format

@@ -4,5 +4,5 @@
 
 /// Submodules for different parsing strategies and utilities
 pub mod constants;
-pub mod default;
+pub mod document;
 pub mod utils;
