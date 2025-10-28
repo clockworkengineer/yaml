@@ -1471,4 +1471,11 @@ mod tests {
             panic!("expected Anchored node");
         }
     }
+    #[test]
+    fn test_parse_document_contents_empty_line() {
+        let mut src = Buffer::new(b"key: value\n\n");
+        let n = parse_document_contents(&mut src, 0).unwrap();
+        assert!(matches!(n, Node::Mapping(_)));
+    }
+
 }
