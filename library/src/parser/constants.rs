@@ -21,8 +21,8 @@ pub const CHAR_ASTERISK: char = '*';
 pub const CHAR_AMPERSAND: char = '&';
 pub const CHAR_SPACE: char = ' ';
 pub const CHAR_BACKSLASH: char = '\\';
-// pub const CHAR_CARRIAGE_RETURN: char = '\r';
-// pub const CHAR_TAB: char = '\t';
+pub const CHAR_CARRIAGE_RETURN: char = '\r';
+pub const CHAR_TAB: char = '\t';
 
 // Token/string constants
 pub const STR_EOF: &str = "<EOF>";

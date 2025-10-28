@@ -1,5 +1,6 @@
 use crate::io::traits::IDestination;
 use crate::nodes::node::*;
+use crate::parser::constants::*;
 
 // Escape string for double-quoted YAML scalars.
 fn escape_double(s: &str) -> String {
@@ -8,37 +9,37 @@ fn escape_double(s: &str) -> String {
     while let Some(c) = iter.next() {
         match c {
             // Preserve literal newlines to support multi-line flow scalars
-            '\n' => out.push('\n'),
-            '\r' => {
-                out.push('\\');
+            CHAR_NEWLINE => out.push(CHAR_NEWLINE),
+            CHAR_CARRIAGE_RETURN => {
+                out.push(CHAR_BACKSLASH);
                 out.push('r');
             }
-            '\t' => {
-                out.push('\\');
+            CHAR_TAB => {
+                out.push(CHAR_BACKSLASH);
                 out.push('t');
             }
-            '\\' => {
+            CHAR_BACKSLASH => {
                 // If this is a known YAML escape (n, r, t, b, x), emit as-is
                 if let Some(&next) = iter.peek() {
                     match next {
                         'n' | 'r' | 't' | 'b' | 'x' => {
-                            out.push('\\');
+                            out.push(CHAR_BACKSLASH);
                             out.push(next);
                             iter.next(); // consume the peeked char
                         }
                         _ => {
-                            out.push('\\');
-                            out.push('\\');
+                            out.push(CHAR_BACKSLASH);
+                            out.push(CHAR_BACKSLASH);
                         }
                     }
                 } else {
-                    out.push('\\');
-                    out.push('\\');
+                    out.push(CHAR_BACKSLASH);
+                    out.push(CHAR_BACKSLASH);
                 }
             }
             '"' => {
-                out.push('\\');
-                out.push('"');
+                out.push(CHAR_BACKSLASH);
+                out.push(CHAR_DOUBLE_QUOTE);
             }
             c if (c as u32) < 0x20 || (c as u32) == 0x7f => {
                 out.push_str(&format!("\\u{:04x}", c as u32));
@@ -53,9 +54,9 @@ fn escape_double(s: &str) -> String {
 fn escape_single(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
-        if c == '\'' {
-            out.push('\'');
-            out.push('\'');
+        if c == CHAR_SINGLE_QUOTE {
+            out.push(CHAR_SINGLE_QUOTE);
+            out.push(CHAR_SINGLE_QUOTE);
         } else {
             out.push(c);
         }
@@ -66,7 +67,7 @@ fn escape_single(s: &str) -> String {
 // Normalize newlines by removing CR characters so inputs read from files
 // with CRLF line endings don't emit stray '\r' characters when stringified.
 fn normalize_newlines(s: &str) -> String {
-    s.replace('\r', "")
+    s.replace(CHAR_CARRIAGE_RETURN, "")
 }
 
 fn stringify_document_with_indent(
@@ -85,22 +86,42 @@ fn stringify_document_with_indent(
             match qt {
                 QuoteType::Double => {
                     // escape common sequences for double-quoted output
-                    destination.add_bytes(&format!("{}\"{}\"", indent_str, escape_double(&s)))
+                    destination.add_bytes(&format!(
+                        "{}{}{}{}",
+                        indent_str,
+                        CHAR_DOUBLE_QUOTE,
+                        escape_double(&s),
+                        CHAR_DOUBLE_QUOTE
+                    ))
                 }
                 QuoteType::Single => {
                     // Prefer double quotes only for single-line content that contains
                     // a single quote or backslash. Preserve single quotes for multiline
                     // scalars to match expected output semantics.
-                    if !s.contains('\n') && (s.contains('\'') || s.contains('\\')) {
-                        destination.add_bytes(&format!("{}\"{}\"", indent_str, escape_double(&s)))
+                    if !s.contains(CHAR_NEWLINE)
+                        && (s.contains(CHAR_SINGLE_QUOTE) || s.contains(CHAR_BACKSLASH))
+                    {
+                        destination.add_bytes(&format!(
+                            "{}{}{}{}",
+                            indent_str,
+                            CHAR_DOUBLE_QUOTE,
+                            escape_double(&s),
+                            CHAR_DOUBLE_QUOTE
+                        ))
                     } else {
                         // In single-quoted YAML scalars, single quotes are represented by doubling them
-                        destination.add_bytes(&format!("{}'{}'", indent_str, escape_single(&s)))
+                        destination.add_bytes(&format!(
+                            "{}{}{}{}",
+                            indent_str,
+                            CHAR_SINGLE_QUOTE,
+                            escape_single(&s),
+                            CHAR_SINGLE_QUOTE
+                        ))
                     }
                 }
                 QuoteType::Unquoted => {
                     // Emit literal block scalars '|' when content is multiline OR when style is explicitly Literal.
-                    if s.contains('\n') || matches!(style, BlockStyle::Literal) {
+                    if s.contains(CHAR_NEWLINE) || matches!(style, BlockStyle::Literal) {
                         // For literal style, emit lines exactly as stored by the parser
                         // to avoid double-indenting when the AST already includes leading
                         // spaces. For other multiline unquoted scalars, indent by one.
@@ -108,7 +129,7 @@ fn stringify_document_with_indent(
                         // Determine if the content already contains leading indentation on all
                         // non-empty lines. If so, do not add additional emitter indentation to
                         // avoid doubling spaces. Otherwise indent by one level.
-                        let lines: Vec<&str> = s.split('\n').collect();
+                        let lines: Vec<&str> = s.split(CHAR_NEWLINE).collect();
                         let needs_indent = if is_literal {
                             lines.iter().any(|l| !l.is_empty() && !l.starts_with(' '))
                         } else {
@@ -120,17 +141,24 @@ fn stringify_document_with_indent(
                         } else {
                             String::new()
                         };
-                        destination.add_bytes(&format!("{}|{}\n", indent_str, ""));
+                        destination.add_bytes(&format!(
+                            "{}{}{}",
+                            indent_str, STR_LITERAL_BLOCK, CHAR_NEWLINE
+                        ));
 
-                        if !s.contains('\n') && is_literal {
+                        if !s.contains(CHAR_NEWLINE) && is_literal {
                             // Single-line literal: emit as-is
-                            destination.add_bytes(&format!("{}{}\n", content_indent, s));
+                            destination
+                                .add_bytes(&format!("{}{}{}", content_indent, s, CHAR_NEWLINE));
                         } else {
                             for line in lines {
                                 if line.is_empty() {
-                                    destination.add_bytes("\n");
+                                    destination.add_bytes(&CHAR_NEWLINE.to_string());
                                 } else {
-                                    destination.add_bytes(&format!("{}{}\n", content_indent, line));
+                                    destination.add_bytes(&format!(
+                                        "{}{}{}",
+                                        content_indent, line, CHAR_NEWLINE
+                                    ));
                                 }
                             }
                         }
@@ -143,7 +171,7 @@ fn stringify_document_with_indent(
         Node::Comment(c) => {
             // Normalize comments as well to avoid CR characters from file sources
             let c = normalize_newlines(c);
-            destination.add_bytes(&format!("{}# {}", indent_str, c))
+            destination.add_bytes(&format!("{}{}{}{}", indent_str, CHAR_HASH, CHAR_SPACE, c))
         }
         Node::Number(num) => match num {
             Numeric::Integer(i) => destination.add_bytes(&format!("{}{}", indent_str, i)),
@@ -152,7 +180,7 @@ fn stringify_document_with_indent(
         },
         Node::Array(items) => {
             for item in items {
-                destination.add_bytes(&format!("{}- ", indent_str));
+                destination.add_bytes(&format!("{}{}{}", indent_str, CHAR_DASH, CHAR_SPACE));
                 match item {
                     Node::Mapping(_) => {
                         // Serialize mapping into a temporary buffer at child
@@ -183,7 +211,7 @@ fn stringify_document_with_indent(
                     }
                     _ => {
                         stringify_document_with_indent(item, destination, 0)?;
-                        destination.add_bytes("\n");
+                        destination.add_bytes(&CHAR_NEWLINE.to_string());
                     }
                 }
             }
@@ -197,11 +225,14 @@ fn stringify_document_with_indent(
                 stringify_document_with_indent(key_node, &mut key_buf, 0)?;
                 let key_str = key_buf.to_string();
 
-                destination.add_bytes(&format!("{}{}: ", indent_str, key_str));
+                destination.add_bytes(&format!(
+                    "{}{}{}{}",
+                    indent_str, key_str, CHAR_COLON, CHAR_SPACE
+                ));
 
                 match value {
                     Node::Array(_) | Node::Mapping(_) => {
-                        destination.add_bytes("\n");
+                        destination.add_bytes(&CHAR_NEWLINE.to_string());
                         stringify_document_with_indent(value, destination, indent + 1)?;
                     }
                     Node::Str(_, QuoteType::Unquoted, BlockStyle::Literal) => {
@@ -210,7 +241,7 @@ fn stringify_document_with_indent(
                     }
                     _ => {
                         stringify_document_with_indent(value, destination, 0)?;
-                        destination.add_bytes("\n");
+                        destination.add_bytes(&CHAR_NEWLINE.to_string());
                     }
                 }
             }
@@ -222,11 +253,11 @@ fn stringify_document_with_indent(
         }
         Node::Anchored(inner, name) => {
             // Emit an anchor before the node
-            destination.add_bytes(&format!("&{} ", name));
+            destination.add_bytes(&format!("{}{}{}", CHAR_AMPERSAND, name, CHAR_SPACE));
             stringify_document_with_indent(inner, destination, indent)?;
         }
         Node::Alias(name) => {
-            destination.add_bytes(&format!("*{}", name));
+            destination.add_bytes(&format!("{}{}", CHAR_ASTERISK, name));
         }
         _ => {
             return Err(crate::error::messages::ERR_UNSUPPORTED_NODE_TYPE.to_string());
@@ -274,11 +305,12 @@ pub fn stringify(node: &Node, destination: &mut dyn IDestination) -> Result<(), 
                     if nodes.len() == 1 {
                         if let Node::Str(s, QuoteType::Unquoted, BlockStyle::Literal) = &nodes[0] {
                             let s = normalize_newlines(s);
-                            destination.add_bytes("--- |\n");
-                            for line in s.split('\n') {
-                                destination.add_bytes(&format!("{}\n", line));
+                            destination
+                                .add_bytes(&format!("--- {}{}", STR_LITERAL_BLOCK, CHAR_NEWLINE));
+                            for line in s.split(CHAR_NEWLINE) {
+                                destination.add_bytes(&format!("{}{}", line, CHAR_NEWLINE));
                             }
-                            destination.add_bytes("...\n");
+                            destination.add_bytes(&format!("...{}", CHAR_NEWLINE));
                             continue;
                         }
                     }
