@@ -1,6 +1,6 @@
+use crate::constants::constants::{CHAR_HASH, CHAR_NEWLINE};
 use crate::io::traits::ISource;
 use crate::{Node, Numeric};
-use crate::constants::constants::{ CHAR_HASH, CHAR_NEWLINE};
 
 // Collect characters until a stop predicate triggers; does not consume the stop char
 pub fn collect_until<F>(source: &mut dyn ISource, mut stop_pred: F) -> String
@@ -168,10 +168,22 @@ pub fn unescape_double_quoted(s: &str) -> String {
                     }
                 }
                 // Keep standard escapes as literal backslash+letter so they survive stringify
-                Some('n') => { result.push('\\'); result.push('n'); }
-                Some('r') => { result.push('\\'); result.push('r'); }
-                Some('t') => { result.push('\\'); result.push('t'); }
-                Some('b') => { result.push('\\'); result.push('b'); }
+                Some('n') => {
+                    result.push('\\');
+                    result.push('n');
+                }
+                Some('r') => {
+                    result.push('\\');
+                    result.push('r');
+                }
+                Some('t') => {
+                    result.push('\\');
+                    result.push('t');
+                }
+                Some('b') => {
+                    result.push('\\');
+                    result.push('b');
+                }
                 // Unescape quote and backslash to their literal characters
                 Some('"') => result.push('"'),
                 Some('\\') => result.push('\\'),
@@ -193,7 +205,6 @@ pub fn unescape_double_quoted(s: &str) -> String {
     result
 }
 // Character constants imported from `crate::parser::constants`
-
 
 #[cfg(test)]
 mod tests {
@@ -217,5 +228,4 @@ mod tests {
         skip_whitespace_and_comments(&mut buf);
         assert_eq!(buf.current(), Some('h'));
     }
-    
 }
