@@ -10,12 +10,14 @@
 //!
 //! Minimum supported Rust version: 1.88.0
 
-/// Module providing input/output operations for reading and writing YAML data
-mod io;
+/// Module containing constants for the library
+mod constants;
 /// Module defining error types and handling for YAML operations.
 mod error;
 /// Module for detecting and handling different Unicode text file formats
 mod file;
+/// Module providing input/output operations for reading and writing YAML data
+mod io;
 /// Module containing utility functions and helpers for YAML processing
 mod misc;
 /// Module containing YAML data structure definitions and node types
@@ -27,12 +29,6 @@ mod stringify;
 //
 mod test;
 
-///
-/// YAML_lib API
-///
-
-/// Returns the current version of the YAML library
-pub use misc::get_version as version;
 /// This enum represents different Unicode text file formats with their corresponding byte order marks (BOM)
 pub use file::file::Format;
 /// This function detects the Unicode format of a text file by examining its byte order mark (BOM)
@@ -49,20 +45,26 @@ pub use io::destinations::file::File as FileDestination;
 pub use io::sources::buffer::Buffer as BufferSource;
 /// Source implementation for reading JSON data from a file
 pub use io::sources::file::File as FileSource;
-/// Returns the number of documents in a YAML stream represented by the Documents node. 
-pub use misc::get_number_of_documents as get_number_of_documents;
 /// Returns the base node of document number n (0-based), reporting any errors.
 pub use misc::get_document_base as get_document;
-/// Helper function to create a Node from any value that can be converted into a Node
-pub use nodes::node::make_node as make_node;
+/// Returns the number of documents in a YAML stream represented by the Documents node.
+pub use misc::get_number_of_documents;
+///
+/// YAML_lib API
+///
+
+/// Returns the current version of the YAML library
+pub use misc::get_version as version;
 /// Core data structure representing a JSON node and numerical node in the parsed tree
 pub use nodes::node::Node;
 /// Core data structure representing a numeric value node in the parsed tree
 pub use nodes::node::Numeric;
+/// Helper function to create a Node from any value that can be converted into a Node
+pub use nodes::node::make_node;
 /// Parses json data into a Node tree structure
-pub use parser::document::parse as parse;
+pub use parser::document::parse;
 /// Converts a Node tree back to JSON format
-pub use stringify::default::stringify as stringify;
+pub use stringify::default::stringify;
 // /// Converts a Node tree to JSON format
 // pub use stringify::bencode::stringify as to_bencode;
 // /// Converts a Node tree to YAML format

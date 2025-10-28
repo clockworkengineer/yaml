@@ -1,6 +1,6 @@
+use crate::constants::constants::*;
 use crate::io::traits::IDestination;
 use crate::nodes::node::*;
-use crate::parser::constants::*;
 
 // Escape string for double-quoted YAML scalars.
 fn escape_double(s: &str) -> String {

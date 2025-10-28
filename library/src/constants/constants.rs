@@ -1,4 +1,4 @@
-// Shared character constants used by parser and utils
+// Shared character constants used across the library
 pub const CHAR_DASH: char = '-';
 pub const CHAR_DOT: char = '.';
 pub const CHAR_HASH: char = '#';
@@ -15,7 +15,7 @@ pub const CHAR_DOUBLE_QUOTE: char = '"';
 pub const CHAR_SINGLE_QUOTE: char = '\'';
 pub const CHAR_LESS: char = '<';
 pub const CHAR_GREATER: char = '>';
-// Newly added frequently used characters
+// Frequently used additional characters
 pub const CHAR_PIPE: char = '|';
 pub const CHAR_ASTERISK: char = '*';
 pub const CHAR_AMPERSAND: char = '&';

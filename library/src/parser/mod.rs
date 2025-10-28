@@ -3,6 +3,5 @@
 //! Supports standard YAML types and syntax validation
 
 /// Submodules for different parsing strategies and utilities
-pub mod constants;
 pub mod document;
 pub mod utils;

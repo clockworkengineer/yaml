@@ -1,6 +1,6 @@
 use crate::io::traits::ISource;
 use crate::{Node, Numeric};
-use crate::parser::constants::{ CHAR_HASH, CHAR_NEWLINE};
+use crate::constants::constants::{ CHAR_HASH, CHAR_NEWLINE};
 
 // Collect characters until a stop predicate triggers; does not consume the stop char
 pub fn collect_until<F>(source: &mut dyn ISource, mut stop_pred: F) -> String

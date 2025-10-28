@@ -2,11 +2,11 @@
 //! Provides functions for parsing different YAML data types including mappings,
 //! sequences, strings, numbers, boolean and null values.
 
+use crate::constants::constants::*;
 use crate::error::messages::*;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node::Document;
 use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
-use crate::parser::constants::*;
 use crate::parser::utils::*;
 use std::collections::HashMap;
 
@@ -1477,5 +1477,4 @@ mod tests {
         let n = parse_document_contents(&mut src, 0).unwrap();
         assert!(matches!(n, Node::Mapping(_)));
     }
-
 }
