@@ -458,4 +458,42 @@ mod tests {
         let none = make_node(Node::None);
         assert_eq!(none, Node::None);
     }
+
+    #[test]
+    #[should_panic(expected = "No such key exists")]
+    fn test_mapping_indexing_nonexistent_key() {
+        let obj = Node::Mapping(Vec::new());
+        let _ = &obj["nonexistent"];
+    }
+
+    #[test]
+    fn test_node_from_vec_of_strings() {
+        let vec = vec!["a", "b"];
+        let node = Node::from(vec);
+        assert_eq!(
+            node,
+            Node::Array(vec![
+                Node::Str("a".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Str("b".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            ])
+        );
+    }
+
+    #[test]
+    fn test_nested_mapping_indexing_and_mutation() {
+        let mut obj = Node::Mapping(vec![(
+            Node::Str("outer".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            Node::Mapping(vec![(
+                Node::Str("inner".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::from(5),
+            )]),
+        )]);
+
+        // Read nested value
+        assert_eq!(obj["outer"]["inner"], Node::from(5));
+
+        // Mutate nested value via chained indexing
+        obj["outer"]["inner"] = Node::from(10);
+        assert_eq!(obj["outer"]["inner"], Node::from(10));
+    }
 }

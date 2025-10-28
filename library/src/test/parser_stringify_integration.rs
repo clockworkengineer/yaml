@@ -1,10 +1,19 @@
+///
+/// Integration tests for parsing and stringifying YAML content.
+/// 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::collections::HashMap;
     use std::fs;
-    use crate::{FileSource, BufferDestination, parse, BufferSource, Node, Node::Document, Numeric};
+    use crate::{FileSource, BufferDestination, parse, stringify, BufferSource, Node, Node::Document, Numeric};
     use crate::nodes::node::{QuoteType, BlockStyle};
 
+    // Normalize newlines by removing CR characters so inputs read from files
+    // with CRLF line endings don't emit stray '\r' characters when stringified.
+    fn normalize_newlines(s: &str) -> String {
+        s.replace('\r', "")
+    }
 
     fn get_json_file_paths(directory: &str) -> Vec<String> {
         let mut paths = Vec::new();
@@ -1314,4 +1323,349 @@ mod tests {
     //         "---\nbase: \n  name: Everyone has same name\nfoo: \n  name: John\n  age: 10\nbar: \n  name: Everyone has same name\n  age: 20\n...\n"
     //     );
     // }
+
+
+    static TEST_FILE_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+    struct TestFile {
+        path: String,
+    }
+
+    impl TestFile {
+        fn new_with_content(content: &[u8]) -> Self {
+            let id = TEST_FILE_COUNTER.fetch_add(1, Ordering::SeqCst);
+            let path = format!("test_stringify_temp_{}.yaml", id);
+            fs::write(&path, content).unwrap();
+            Self { path }
+        }
+
+        fn new_empty() -> Self {
+            let id = TEST_FILE_COUNTER.fetch_add(1, Ordering::SeqCst);
+            let path = format!("test_stringify_temp_{}.yaml", id);
+            fs::write(&path, b"").unwrap();
+            Self { path }
+        }
+
+        fn path(&self) -> &str {
+            &self.path
+        }
+    }
+
+    impl Drop for TestFile {
+        fn drop(&mut self) {
+            let _ = fs::remove_file(&self.path);
+        }
+    }
+
+    #[test]
+    fn test_stringify_none() {
+        let mut dest = BufferDestination::new();
+        stringify(&Node::None, &mut dest).unwrap();
+        assert_eq!(dest.to_string(), "null");
+    }
+
+    #[test]
+    fn test_stringify_boolean() {
+        let mut dest = BufferDestination::new();
+        stringify(&Node::Boolean(true), &mut dest).unwrap();
+        assert_eq!(dest.to_string(), "true");
+    }
+
+    #[test]
+    fn test_stringify_string() {
+        let mut dest = BufferDestination::new();
+        stringify(
+            &Node::Str("test".to_string(), QuoteType::Double, BlockStyle::None),
+            &mut dest,
+        )
+        .unwrap();
+        assert_eq!(dest.to_string(), "\"test\"");
+    }
+
+    #[test]
+    fn test_stringify_comment() {
+        let mut dest = BufferDestination::new();
+        stringify(&Node::Comment("test".to_string()), &mut dest).unwrap();
+        assert_eq!(dest.to_string(), "# test");
+    }
+
+    #[test]
+    fn test_stringify_numbers() {
+        let mut dest = BufferDestination::new();
+        stringify(&Node::Number(Numeric::Integer(42)), &mut dest).unwrap();
+        assert_eq!(dest.to_string(), "42");
+
+        dest = BufferDestination::new();
+        stringify(&Node::Number(Numeric::Float(3.14)), &mut dest).unwrap();
+        assert_eq!(dest.to_string(), "3.14");
+    }
+
+    #[test]
+    fn test_stringify_array() {
+        let mut dest = BufferDestination::new();
+        let arr = vec![
+            Node::Number(Numeric::Integer(1)),
+            Node::Str("test".to_string(), QuoteType::Double, BlockStyle::None),
+        ];
+        stringify(&Node::Array(arr), &mut dest).unwrap();
+        assert_eq!(dest.to_string(), "- 1\n- \"test\"\n");
+    }
+
+    #[test]
+    fn test_stringify_mapping() {
+        let mut dest = BufferDestination::new();
+        let mapping = Node::Mapping(vec![(
+            Node::Str("key".to_string(), QuoteType::Double, BlockStyle::None),
+            Node::Str("value".to_string(), QuoteType::Double, BlockStyle::None),
+        )]);
+        stringify(&mapping, &mut dest).unwrap();
+        assert_eq!(dest.to_string(), "\"key\": \"value\"\n");
+    }
+
+    #[test]
+    fn test_stringify_documents() {
+        let mut dest = BufferDestination::new();
+        let docs = vec![
+            Node::Str("doc1".to_string(), QuoteType::Double, BlockStyle::None),
+            Node::Str("doc2".to_string(), QuoteType::Double, BlockStyle::None),
+        ];
+        stringify(&Node::Documents(docs), &mut dest).unwrap();
+        assert_eq!(dest.to_string(), "---\n\"doc1\"...\n---\n\"doc2\"...\n");
+    }
+
+    #[test]
+    fn test_stringify_anchor_and_alias() {
+        let mut dest = BufferDestination::new();
+        // Build an anchored mapping value and an alias node
+        let anchored = Node::Anchored(
+            Box::new(Node::Mapping(vec![(
+                Node::Str("nested".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Str("value".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            )])),
+            "a".to_string(),
+        );
+
+        let docs = vec![anchored, Node::Alias("a".to_string())];
+        stringify(&Node::Documents(docs), &mut dest).unwrap();
+        // Expect anchors and aliases to be emitted
+        let out = dest.to_string();
+        assert!(out.contains("&a"));
+        assert!(out.contains("*a"));
+    }
+
+    #[test]
+    fn test_stringify_integer_sequence() {
+        let mut dest = BufferDestination::new();
+        let mut source = BufferSource::new("---\n- 1\n- 2\n- 3\n...\n".as_bytes());
+        let node = parse(&mut source).unwrap();
+        stringify(&node, &mut dest).unwrap();
+        assert_eq!(dest.to_string(), "---\n- 1\n- 2\n- 3\n...\n");
+    }
+    #[test]
+    fn test_stringify_sequence_with_nested_mapping() {
+        let mut dest = BufferDestination::new();
+        let mut source = BufferSource::new("---\n- \n  name: Mark Joseph\n  hr: 87\n  avg: 0.278\n- \n  name: James Stephen\n  hr: 63\n  avg: 0.288\n...\n".as_bytes());
+        let node = parse(&mut source).unwrap();
+        stringify(&node, &mut dest).unwrap();
+        assert_eq!(
+            dest.to_string(),
+            "---\n- name: Mark Joseph\n  hr: 87\n  avg: 0.278\n- name: James Stephen\n  hr: 63\n  avg: 0.288\n...\n"
+        );
+    }
+    #[test]
+    fn test_stringify_sequence_with_nested_sequence() {
+        let mut dest = BufferDestination::new();
+        let mut source = BufferSource::new("- [Sammy Sosa, 63, 0.288]".as_bytes());
+        let node = parse(&mut source).unwrap();
+        stringify(&node, &mut dest).unwrap();
+        assert_eq!(
+            dest.to_string(),
+            "---\n- - Sammy Sosa\n  - 63\n  - 0.288\n...\n"
+        );
+    }
+
+    #[test]
+    fn test_stringify_anchor_alias_hr_rbi() {
+        use crate::io::sources::buffer::Buffer as SrcBuffer;
+        // YAML from testfile016.yaml
+        let yaml = b"---\nhr:\n  - Mark McGwire\n  # Following node labeled SS\n  - &SS Sammy Sosa\nrbi:\n  - *SS # Subsequent occurance\n  - Ken Griffey\n";
+        let mut source = SrcBuffer::new(yaml);
+        let node = crate::parse(&mut source).unwrap();
+
+        let mut dest = BufferDestination::new();
+        stringify(&node, &mut dest).unwrap();
+        let out = dest.to_string();
+        let expected = "---\nhr: \n  - Mark McGwire\n  - Sammy Sosa\nrbi: \n  - Sammy Sosa\n  - Ken Griffey\n...\n";
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn test_stringify_anchor_alias_hr_rbi_from_file() {
+        use crate::io::sources::file::File as FileSource;
+
+        // Create a temporary file with the YAML contents (same as testfile016.yaml)
+        let input = b"---\r\nhr:\r\n  - Mark McGwire\r\n  # Following node labeled SS\r\n  - &SS Sammy Sosa\r\nrbi:\r\n  - *SS # Subsequent occurance\r\n  - Ken Griffey\r\n";
+        let in_file = TestFile::new_with_content(input);
+
+        // parse from file source
+        let mut source = FileSource::new(in_file.path()).unwrap();
+        let node = parse(&mut source).unwrap();
+
+        // stringify to an in-memory buffer and compare
+        let mut dest = BufferDestination::new();
+        stringify(&node, &mut dest).unwrap();
+        let out = dest.to_string();
+        let expected = "---\nhr: \n  - Mark McGwire\n  - Sammy Sosa\nrbi: \n  - Sammy Sosa\n  - Ken Griffey\n...\n";
+        assert_eq!(out, expected);
+    }
+    #[test]
+    fn test_with_comment_header() {
+        let mut dest = BufferDestination::new();
+        let mut source = BufferSource::new(
+            "# Ranking of 1998 home runs\n---\n- Mark Joseph\n- James Stephen\n- Ken Griffey\n"
+                .as_bytes(),
+        );
+        let node = parse(&mut source).unwrap();
+        stringify(&node, &mut dest).unwrap();
+        assert_eq!(
+            dest.to_string(),
+            "---\n- Mark Joseph\n- James Stephen\n- Ken Griffey\n...\n"
+        );
+    }
+
+    #[test]
+    fn test_stringify_double_quoted_multiline_scalar() {
+        let mut dest = BufferDestination::new();
+        let node = Node::Str(
+            "line1\nline2".to_string(),
+            QuoteType::Double,
+            BlockStyle::None,
+        );
+        stringify(&node, &mut dest).unwrap();
+        assert_eq!(dest.to_string(), "\"line1\nline2\"");
+    }
+
+    #[test]
+    fn test_stringify_single_quoted_multiline_and_escaping() {
+        let mut dest = BufferDestination::new();
+        let node = Node::Str(
+            "O'Reilly\nBooks".to_string(),
+            QuoteType::Single,
+            BlockStyle::None,
+        );
+        stringify(&node, &mut dest).unwrap();
+        assert_eq!(dest.to_string(), "'O''Reilly\nBooks'");
+    }
+
+    #[test]
+    fn test_stringify_mapping_with_multiline_value() {
+        let mut dest = BufferDestination::new();
+        let mapping = Node::Mapping(vec![(
+            Node::Str("key".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            Node::Str("a\nb".to_string(), QuoteType::Double, BlockStyle::None),
+        )]);
+        stringify(&mapping, &mut dest).unwrap();
+        assert_eq!(dest.to_string(), "key: \"a\nb\"\n");
+    }
+
+    #[test]
+    fn test_stringify_sequence_with_multiline_item() {
+        let mut dest = BufferDestination::new();
+        let seq = Node::Array(vec![Node::Str(
+            "a\nb".to_string(),
+            QuoteType::Double,
+            BlockStyle::None,
+        )]);
+        stringify(&seq, &mut dest).unwrap();
+        assert_eq!(dest.to_string(), "- \"a\nb\"\n");
+    }
+
+    #[test]
+    fn test_stringify_mapping_with_inline_comment_and_indented_sequence_files() {
+        // Mirror parser test: ensure stringifier emits the mapping -> sequence correctly using files
+        use crate::io::destinations::file::File as FileDestination;
+        use crate::io::sources::file::File as FileSource;
+
+        let input = b"---\r\nhr: # 1998 hr ranking\r\n  - Mark McGwire\r\n  - Sammy Sosa\n";
+        let in_file = TestFile::new_with_content(input);
+        let out_file = TestFile::new_empty();
+
+        // parse from file source
+        let mut source = FileSource::new(in_file.path()).unwrap();
+        let node = parse(&mut source).unwrap();
+
+        // stringify to file destination
+        let mut dest = FileDestination::new(out_file.path()).unwrap();
+        stringify(&node, &mut dest).unwrap();
+
+        // read output and compare
+        let out = fs::read_to_string(out_file.path()).unwrap();
+        let expected = "---\nhr: \n  - Mark McGwire\n  - Sammy Sosa\n...\n";
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn test_stringify_explicit_sequence_keys() {
+        // Hardcoded YAML input (from files/testfile017.yaml)
+        let yaml = b"? # PLAY SCHEDULE\n  - Detroit Tigers\n  - Chicago Cubs\n:\n  - 2001-07-23\n\n? [ New York Yankees,\n    Atlanta Braves ]\n: [ 2001-07-02, 2001-08-12,\n    2001-08-14 ]\n";
+        let mut src = BufferSource::new(yaml.as_ref());
+        let node = parse(&mut src).expect("parse");
+
+        // stringify to buffer using the parser-produced node
+        let mut dest = BufferDestination::new();
+        stringify(&node, &mut dest).expect("");
+        let out = normalize_newlines(&dest.to_string());
+
+        // Hardcoded expected stringify output (from files/testfile017.yaml.stringify)
+        let expected = normalize_newlines(
+            "---\n\"[Detroit Tigers, Chicago Cubs]\": \n  - 2001-07-23\n\"[New York Yankees, Atlanta Braves]\": \n  - 2001-07-02\n  - 2001-08-12\n  - 2001-08-14\n...\n",
+        );
+
+        assert_eq!(out, expected);
+    }
+
+    // Tests moved from parser::default that asserted stringify output of parse results
+    #[test]
+    fn test_stringify_from_parser_literal_block_literal_scalar_with_indent() {
+
+        let yaml = b"---\nstring1: |\n  Line1\n  line2\n";
+        let mut source = BufferSource::new(yaml);
+        let node = crate::parse(&mut source).unwrap();
+
+        let mut dest = BufferDestination::new();
+        stringify(&node, &mut dest).unwrap();
+        let out = dest.to_string();
+        assert_eq!(out, "---\nstring1: |\n  Line1\n  line2\n...\n");
+    }
+
+    #[test]
+    fn test_stringify_from_parser_literal_block_folded_scalar_with_indent() {
+
+        let yaml = b"---\nstring1: >\n  Line1\n  line2\n";
+        let mut source = BufferSource::new(yaml);
+        let node = crate::parse(&mut source).unwrap();
+
+        let mut dest = BufferDestination::new();
+        stringify(&node, &mut dest).unwrap();
+        let out = dest.to_string();
+        // parser folded '>' to a literal block in stringify behavior
+        assert_eq!(out, "---\nstring1: |\n  Line1 line2\n...\n");
+    }
+
+    #[test]
+    fn test_stringify_merge_key_with_single_alias() {
+
+        let yaml = b"---\na: &a\n  nested: anchor\nparent:\n  <<: *a\n  key: value\n";
+        let mut source = BufferSource::new(yaml);
+        let node = crate::parse(&mut source).unwrap();
+
+        let mut dest = BufferDestination::new();
+        stringify(&node, &mut dest).unwrap();
+        let out = dest.to_string();
+        assert!(
+            out.contains("<<:"),
+            "stringified output should contain merge key: {}",
+            out
+        );
+    }
 }
