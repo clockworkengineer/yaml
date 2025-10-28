@@ -1,4 +1,4 @@
-use crate::constants::constants::{CHAR_HASH, CHAR_NEWLINE};
+use crate::constants::{CHAR_HASH, CHAR_NEWLINE};
 use crate::io::traits::ISource;
 use crate::{Node, Numeric};
 

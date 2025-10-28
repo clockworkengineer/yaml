@@ -2,7 +2,7 @@
 //! Provides functions for parsing different YAML data types including mappings,
 //! sequences, strings, numbers, boolean and null values.
 
-use crate::constants::constants::*;
+use crate::constants::*;
 use crate::error::messages::*;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node::Document;
