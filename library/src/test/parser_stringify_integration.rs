@@ -1490,7 +1490,7 @@ mod tests {
         // YAML from testfile016.yaml
         let yaml = b"---\nhr:\n  - Mark McGwire\n  # Following node labeled SS\n  - &SS Sammy Sosa\nrbi:\n  - *SS # Subsequent occurance\n  - Ken Griffey\n";
         let mut source = SrcBuffer::new(yaml);
-        let node = crate::parse(&mut source).unwrap();
+        let node = parse(&mut source).unwrap();
 
         let mut dest = BufferDestination::new();
         stringify(&node, &mut dest).unwrap();
@@ -1630,7 +1630,7 @@ mod tests {
 
         let yaml = b"---\nstring1: |\n  Line1\n  line2\n";
         let mut source = BufferSource::new(yaml);
-        let node = crate::parse(&mut source).unwrap();
+        let node = parse(&mut source).unwrap();
 
         let mut dest = BufferDestination::new();
         stringify(&node, &mut dest).unwrap();
@@ -1643,7 +1643,7 @@ mod tests {
 
         let yaml = b"---\nstring1: >\n  Line1\n  line2\n";
         let mut source = BufferSource::new(yaml);
-        let node = crate::parse(&mut source).unwrap();
+        let node = parse(&mut source).unwrap();
 
         let mut dest = BufferDestination::new();
         stringify(&node, &mut dest).unwrap();
@@ -1657,7 +1657,7 @@ mod tests {
 
         let yaml = b"---\na: &a\n  nested: anchor\nparent:\n  <<: *a\n  key: value\n";
         let mut source = BufferSource::new(yaml);
-        let node = crate::parse(&mut source).unwrap();
+        let node = parse(&mut source).unwrap();
 
         let mut dest = BufferDestination::new();
         stringify(&node, &mut dest).unwrap();
