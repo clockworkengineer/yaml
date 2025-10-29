@@ -1,7 +1,3 @@
-//! Parser module for processing YAML data
-//! Implements parsing of YAML text into internal data structures
-//! Supports standard YAML types and syntax validation
-
-/// Submodules for different parsing strategies and utilities
+/// Module for parsing YAML documents
 pub mod document;
-pub mod utils;
+

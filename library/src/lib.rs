@@ -26,9 +26,9 @@ mod nodes;
 mod parser;
 /// Module for converting YAML structures to formatted strings
 mod stringify;
-/// 
+/// Module containing tests for the YAML library
 mod test;
-/// 
+/// Module containing  utility functions for the YAML library
 mod utils;
 
 /// This enum represents different Unicode text file formats with their corresponding byte order marks (BOM)
