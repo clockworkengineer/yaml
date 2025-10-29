@@ -1,0 +1,93 @@
+use crate::constants::*;
+use crate::io::traits::ISource;
+use crate::nodes::node::Node;
+use crate::nodes::node::{BlockStyle, QuoteType};
+use crate::parser::document::helpers::{parse_comment, parse_mapping_key, skip_whitespace};
+use crate::parser::document::value::parse_value;
+
+pub(crate) fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, String> {
+    fn is_plain_safe_value(s: &str) -> bool {
+        if s.is_empty() {
+            return true;
+        }
+        if s.starts_with(' ') || s.ends_with(' ') {
+            return false;
+        }
+        if s.contains(['\n', '\r']) {
+            return false;
+        }
+        let disallowed = [
+            '#', '[', ']', '{', '}', '&', '*', '!', '|', '>', '"', '`', '%', '@', '\\',
+        ];
+        if s.chars().any(|ch| disallowed.contains(&ch)) {
+            return false;
+        }
+        true
+    }
+    fn is_plain_safe_key(s: &str) -> bool {
+        is_plain_safe_value(s) && !s.contains(':')
+    }
+
+    let mut pairs: Vec<(Node, Node)> = Vec::new();
+    let mut last_was_nested: bool;
+    while let Some(c) = source.current() {
+        last_was_nested = false;
+        match c {
+            CHAR_DASH | CHAR_DOT
+                if crate::parser::document::helpers::peek_ahead_for_document_start_end(
+                    source, c,
+                ) =>
+            {
+                break;
+            }
+            CHAR_HASH => {
+                parse_comment(source);
+            }
+            c if c.is_alphanumeric() || c == CHAR_SINGLE_QUOTE || c == CHAR_DOUBLE_QUOTE => {
+                if source.get_current_indent_level() < indent_level {
+                    break;
+                }
+                let (mut key_node, newline) = parse_mapping_key(source)?;
+                if let Node::Str(ref mut s, ref mut qt, ref mut _style) = key_node {
+                    if matches!(*qt, QuoteType::Single | QuoteType::Double)
+                        && is_plain_safe_key(s) {
+                            *qt = QuoteType::Unquoted;
+                        }
+                }
+                let next_indent = source.get_current_indent_level();
+                if next_indent > indent_level && newline {
+                    pairs.push((
+                        key_node,
+                        crate::parser::document::parse_document_contents(source, next_indent)?,
+                    ));
+                    continue;
+                } else {
+                    let mut value_node = parse_value(source)?;
+                    if let Node::Str(ref mut s, ref mut qt, ref mut style) = value_node {
+                        if matches!(*qt, QuoteType::Single | QuoteType::Double)
+                            && is_plain_safe_value(s)
+                        {
+                            if !matches!(*style, BlockStyle::Literal) {
+                                *style = BlockStyle::None;
+                            }
+                            *qt = QuoteType::Unquoted;
+                        }
+                    }
+                    last_was_nested = matches!(value_node, Node::Anchored(_, _))
+                        || matches!(value_node, Node::Str(_, _, BlockStyle::Literal));
+                    pairs.push((key_node, value_node));
+                }
+            }
+            c if c.is_whitespace() => {
+                source.next();
+                continue;
+            }
+            _ => break,
+        }
+        if !last_was_nested {
+            crate::utils::skip_until_newline(source);
+            skip_whitespace(source);
+        }
+    }
+    Ok(Node::Mapping(pairs))
+}

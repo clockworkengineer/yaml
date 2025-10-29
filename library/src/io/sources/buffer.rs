@@ -75,7 +75,7 @@ impl ISource for Buffer {
     // Use save_state/restore_state for restoring positions
 
     fn get_current_indent_level(&self) -> usize {
-        return self.column;
+        self.column
     }
 
     fn save_state(&mut self) -> crate::io::traits::SaveState {

@@ -77,8 +77,8 @@ fn stringify_document_with_indent(
 ) -> Result<(), String> {
     let indent_str = "  ".repeat(indent);
     match node {
-        Node::None => destination.add_bytes(&format!("{}null", indent_str)),
-        Node::Boolean(b) => destination.add_bytes(&format!("{}{}", indent_str, b)),
+        Node::None => destination.add_bytes(&format!("{indent_str}null")),
+        Node::Boolean(b) => destination.add_bytes(&format!("{indent_str}{b}")),
         Node::Str(s, qt, style) => {
             // Normalize CRLF -> LF by removing CR so file-based input using
             // Windows line endings doesn't leak '\r' into the output.
@@ -142,28 +142,26 @@ fn stringify_document_with_indent(
                             String::new()
                         };
                         destination.add_bytes(&format!(
-                            "{}{}{}",
-                            indent_str, STR_LITERAL_BLOCK, CHAR_NEWLINE
+                            "{indent_str}{STR_LITERAL_BLOCK}{CHAR_NEWLINE}"
                         ));
 
                         if !s.contains(CHAR_NEWLINE) && is_literal {
                             // Single-line literal: emit as-is
                             destination
-                                .add_bytes(&format!("{}{}{}", content_indent, s, CHAR_NEWLINE));
+                                .add_bytes(&format!("{content_indent}{s}{CHAR_NEWLINE}"));
                         } else {
                             for line in lines {
                                 if line.is_empty() {
                                     destination.add_bytes(&CHAR_NEWLINE.to_string());
                                 } else {
                                     destination.add_bytes(&format!(
-                                        "{}{}{}",
-                                        content_indent, line, CHAR_NEWLINE
+                                        "{content_indent}{line}{CHAR_NEWLINE}"
                                     ));
                                 }
                             }
                         }
                     } else {
-                        destination.add_bytes(&format!("{}{}", indent_str, s))
+                        destination.add_bytes(&format!("{indent_str}{s}"))
                     }
                 }
             }
@@ -171,16 +169,16 @@ fn stringify_document_with_indent(
         Node::Comment(c) => {
             // Normalize comments as well to avoid CR characters from file sources
             let c = normalize_newlines(c);
-            destination.add_bytes(&format!("{}{}{}{}", indent_str, CHAR_HASH, CHAR_SPACE, c))
+            destination.add_bytes(&format!("{indent_str}{CHAR_HASH}{CHAR_SPACE}{c}"))
         }
         Node::Number(num) => match num {
-            Numeric::Integer(i) => destination.add_bytes(&format!("{}{}", indent_str, i)),
-            Numeric::Float(f) => destination.add_bytes(&format!("{}{}", indent_str, f)),
-            _ => destination.add_bytes(&format!("{}{:?}", indent_str, num)),
+            Numeric::Integer(i) => destination.add_bytes(&format!("{indent_str}{i}")),
+            Numeric::Float(f) => destination.add_bytes(&format!("{indent_str}{f}")),
+            _ => destination.add_bytes(&format!("{indent_str}{num:?}")),
         },
         Node::Array(items) => {
             for item in items {
-                destination.add_bytes(&format!("{}{}{}", indent_str, CHAR_DASH, CHAR_SPACE));
+                destination.add_bytes(&format!("{indent_str}{CHAR_DASH}{CHAR_SPACE}"));
                 match item {
                     Node::Mapping(_) => {
                         // Serialize mapping into a temporary buffer at child
@@ -226,8 +224,7 @@ fn stringify_document_with_indent(
                 let key_str = key_buf.to_string();
 
                 destination.add_bytes(&format!(
-                    "{}{}{}{}",
-                    indent_str, key_str, CHAR_COLON, CHAR_SPACE
+                    "{indent_str}{key_str}{CHAR_COLON}{CHAR_SPACE}"
                 ));
 
                 match value {
@@ -253,11 +250,11 @@ fn stringify_document_with_indent(
         }
         Node::Anchored(inner, name) => {
             // Emit an anchor before the node
-            destination.add_bytes(&format!("{}{}{}", CHAR_AMPERSAND, name, CHAR_SPACE));
+            destination.add_bytes(&format!("{CHAR_AMPERSAND}{name}{CHAR_SPACE}"));
             stringify_document_with_indent(inner, destination, indent)?;
         }
         Node::Alias(name) => {
-            destination.add_bytes(&format!("{}{}", CHAR_ASTERISK, name));
+            destination.add_bytes(&format!("{CHAR_ASTERISK}{name}"));
         }
         _ => {
             return Err(crate::error::messages::ERR_UNSUPPORTED_NODE_TYPE.to_string());
@@ -272,9 +269,9 @@ fn node_is_blank(node: &Node) -> bool {
         Node::None => true,
         Node::Comment(_) => true,
         Node::Str(s, _, _) => s.is_empty(),
-        Node::Array(items) => items.iter().all(|n| node_is_blank(n)),
+        Node::Array(items) => items.iter().all(node_is_blank),
         Node::Mapping(pairs) => pairs.is_empty(),
-        Node::Document(nodes) => nodes.iter().all(|n| node_is_blank(n)),
+        Node::Document(nodes) => nodes.iter().all(node_is_blank),
         _ => false,
     }
 }
@@ -293,7 +290,7 @@ pub fn stringify(node: &Node, destination: &mut dyn IDestination) -> Result<(), 
                 // Emit all documents, including empty ones, to preserve explicit document boundaries
                 if let Node::Document(nodes) = doc {
                     // If this document is empty, emit only the start marker and continue
-                    if nodes.iter().all(|n| node_is_blank(n)) {
+                    if nodes.iter().all(node_is_blank) {
                         destination.add_bytes("---\n");
                         continue;
                     }
@@ -306,11 +303,11 @@ pub fn stringify(node: &Node, destination: &mut dyn IDestination) -> Result<(), 
                         if let Node::Str(s, QuoteType::Unquoted, BlockStyle::Literal) = &nodes[0] {
                             let s = normalize_newlines(s);
                             destination
-                                .add_bytes(&format!("--- {}{}", STR_LITERAL_BLOCK, CHAR_NEWLINE));
+                                .add_bytes(&format!("--- {STR_LITERAL_BLOCK}{CHAR_NEWLINE}"));
                             for line in s.split(CHAR_NEWLINE) {
-                                destination.add_bytes(&format!("{}{}", line, CHAR_NEWLINE));
+                                destination.add_bytes(&format!("{line}{CHAR_NEWLINE}"));
                             }
-                            destination.add_bytes(&format!("...{}", CHAR_NEWLINE));
+                            destination.add_bytes(&format!("...{CHAR_NEWLINE}"));
                             continue;
                         }
                     }
