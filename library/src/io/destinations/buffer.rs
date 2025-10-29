@@ -6,6 +6,12 @@ pub struct Buffer {
     pub buffer: Vec<u8>,
 }
 
+impl Default for Buffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Buffer {
     /// Creates a new empty Buffer instance.
     ///

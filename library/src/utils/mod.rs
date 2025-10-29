@@ -104,7 +104,7 @@ pub fn node_to_inline_string(node: &Node) -> String {
         Node::Number(Numeric::Float(f)) => f.to_string(),
         Node::Boolean(b) => b.to_string(),
         Node::Array(items) => {
-            let parts: Vec<String> = items.iter().map(|it| node_to_inline_string(it)).collect();
+            let parts: Vec<String> = items.iter().map(node_to_inline_string).collect();
             format!("[{}]", parts.join(", "))
         }
         Node::Mapping(pairs) => {
@@ -114,7 +114,7 @@ pub fn node_to_inline_string(node: &Node) -> String {
                 .collect();
             format!("{{{}}}", parts.join(", "))
         }
-        _ => format!("{:?}", node),
+        _ => format!("{node:?}"),
     }
 }
 

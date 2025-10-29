@@ -94,7 +94,7 @@ impl ISource for File {
     }
 
     fn reset(&mut self) {
-        if let Ok(_) = self.file.seek(SeekFrom::Start(0)) {
+        if self.file.seek(SeekFrom::Start(0)).is_ok() {
             let mut byte = [0u8; 1];
             self.current_byte = if self.file.read(&mut byte).unwrap_or(0) == 1 {
                 Some(byte[0])
@@ -112,7 +112,7 @@ impl ISource for File {
     }
 
     fn save_state(&mut self) -> crate::io::traits::SaveState {
-        let pos = self.file.seek(SeekFrom::Current(0)).unwrap_or(0);
+        let pos = self.file.stream_position().unwrap_or(0);
         crate::io::traits::SaveState {
             pos,
             current_byte: self.current_byte,

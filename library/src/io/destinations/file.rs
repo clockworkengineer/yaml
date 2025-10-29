@@ -35,7 +35,7 @@ impl File {
     }
     /// Returns the name/path of the file.
     pub fn file_name(&self) -> &str {
-        &self.file_name.as_str()
+        self.file_name.as_str()
     }
     /// Closes the file handle.
     pub fn close(&self) -> std::io::Result<()> {
@@ -59,7 +59,7 @@ impl IDestination for File {
     /// * `s` - The string to append as bytes
     fn add_bytes(&mut self, s: &str) {
         self.file.write_all(s.as_bytes()).unwrap();
-        self.file_length = self.file_length + s.len();
+        self.file_length += s.len();
     }
 
     /// Clears the file content by recreating it.

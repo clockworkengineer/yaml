@@ -2,12 +2,12 @@
 //! Provides functions for parsing different YAML data types including mappings,
 //! sequences, strings, numbers, boolean and null values.
 
-use crate::constants::*;
+use crate::constants::constants::*;
 use crate::error::messages::*;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node::Document;
 use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
-use crate::utils::*;
+use crate::parser::utils::*;
 use std::collections::HashMap;
 
 // Helper to create richer parse error messages with current character and indent
