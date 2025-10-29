@@ -141,14 +141,12 @@ fn stringify_document_with_indent(
                         } else {
                             String::new()
                         };
-                        destination.add_bytes(&format!(
-                            "{indent_str}{STR_LITERAL_BLOCK}{CHAR_NEWLINE}"
-                        ));
+                        destination
+                            .add_bytes(&format!("{indent_str}{STR_LITERAL_BLOCK}{CHAR_NEWLINE}"));
 
                         if !s.contains(CHAR_NEWLINE) && is_literal {
                             // Single-line literal: emit as-is
-                            destination
-                                .add_bytes(&format!("{content_indent}{s}{CHAR_NEWLINE}"));
+                            destination.add_bytes(&format!("{content_indent}{s}{CHAR_NEWLINE}"));
                         } else {
                             for line in lines {
                                 if line.is_empty() {
@@ -231,9 +229,7 @@ fn stringify_document_with_indent(
                     }
                 };
 
-                destination.add_bytes(&format!(
-                    "{indent_str}{key_str}{CHAR_COLON}{CHAR_SPACE}"
-                ));
+                destination.add_bytes(&format!("{indent_str}{key_str}{CHAR_COLON}{CHAR_SPACE}"));
 
                 match value {
                     Node::Array(_) | Node::Mapping(_) => {
