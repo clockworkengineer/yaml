@@ -517,4 +517,5 @@ mod tests {
         let n = parse_document_contents(&mut src, 0).unwrap();
         assert!(matches!(n, Node::Mapping(_)));
     }
+    
 }
