@@ -1693,7 +1693,7 @@ mod tests {
     //     assert_eq!(out, "---\n\"This is a key\\nthat has multiple lines\\n\": and this is its value\n...\n");
     // }
     #[test]
-    fn test_parse_stringify_multi_line_sequece_string_key() {
+    fn test_parse_stringify_multi_line_sequence_string_key() {
 
         let yaml = b"? - Manchester United\n  - Real Madrid\n : [ 2001-01-01, 2002-02-02 ]\n";
         let mut source = BufferSource::new(yaml);
