@@ -60,6 +60,12 @@ pub fn parse_document_contents(
 
             if source.current() == Some('[') {
                 key_node = parse_inline_sequence(source)?;
+            } else if source.current() == Some('-') {
+                // A sequence begins immediately after the explicit key marker
+                // on the same line (e.g. "? - item1\n  - item2"). Parse the
+                // following sequence as the key node.
+                let nested_indent = source.get_current_indent_level();
+                key_node = parse_sequence(source, nested_indent)?;
             } else if source.current() == Some('#') || source.current() == Some('\n') {
                 let st = source.save_state();
                 let _ = crate::utils::read_line_trimmed_into_string(source);
