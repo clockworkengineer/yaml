@@ -7,7 +7,7 @@ use crate::error::messages::*;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node::Document;
 use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
-use crate::parser::utils::*;
+use crate::utils::*;
 use std::collections::HashMap;
 
 // Helper to create richer parse error messages with current character and indent

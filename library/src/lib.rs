@@ -26,8 +26,10 @@ mod nodes;
 mod parser;
 /// Module for converting YAML structures to formatted strings
 mod stringify;
-//
+/// 
 mod test;
+/// 
+mod utils;
 
 /// This enum represents different Unicode text file formats with their corresponding byte order marks (BOM)
 pub use file::file::Format;
