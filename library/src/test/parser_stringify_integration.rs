@@ -1211,16 +1211,12 @@ mod tests {
 
     #[test]
     fn test_parse_mapping_with_quoted_string_value() {
-        // Parse a document that defines an anchor and then uses it via merge
-        // keys. Rather than relying on stringification, assert the AST
-        // structure contains the anchored mapping and that the anchor value
-        // is preserved in the parsed tree.
+
         let yaml = b"\'Keys can be quoted too.\': \"Useful if you want to put a \':\' in your key.\"";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source).unwrap();
 
-        // Stringify the parsed document and assert the canonical merged output
-        // (stringifier now expands `<<: *anchor` into the parent mapping).
+
 
         let mut dest = BufferDestination::new();
         crate::stringify(&result, &mut dest).unwrap();
@@ -1231,16 +1227,12 @@ mod tests {
     }
     #[test]
     fn test_parse_a_literal_block_scalar() {
-        // Parse a document that defines an anchor and then uses it via merge
-        // keys. Rather than relying on stringification, assert the AST
-        // structure contains the anchored mapping and that the anchor value
-        // is preserved in the parsed tree.
+
         let yaml = b"literal_block: |\n  This entire block of text will be the value of the \'literal_block\' key,\n  with line breaks being preserved.\n\n  The literal continues until de-dented, and the leading indentation is\n  stripped.\n\n      Any lines that are \'more-indented\' keep the rest of their indentation -\n      these lines will be indented by 4 spaces.";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source).unwrap();
 
-        // Stringify the parsed document and assert the canonical merged output
-        // (stringifier now expands `<<: *anchor` into the parent mapping).
+
         let mut dest = BufferDestination::new();
         crate::stringify(&result, &mut dest).unwrap();
         assert_eq!(
@@ -1248,46 +1240,36 @@ mod tests {
             "---\nliteral_block: |\n  This entire block of text will be the value of the \'literal_block\' key,\n  with line breaks being preserved.\n\n  The literal continues until de-dented, and the leading indentation is\n  stripped.\n\n      Any lines that are \'more-indented\' keep the rest of their indentation -\n      these lines will be indented by 4 spaces.\n...\n"
         );
     }
-    // #[test]
-    // fn test_parse_a_literal_scalar_strip() {
-    //     // Parse a document that defines an anchor and then uses it via merge
-    //     // keys. Rather than relying on stringification, assert the AST
-    //     // structure contains the anchored mapping and that the anchor value
-    //     // is preserved in the parsed tree.
-    //     let yaml = b"literal_strip: |-\n  This entire block of text will be the value of the \'literal_strip\' key,\n  with trailing blank line being stripped.";
-    //     let mut source = BufferSource::new(yaml);
-    //     let result = parse(&mut source).unwrap();
-    //
-    //     // Stringify the parsed document and assert the canonical merged output
-    //     // (stringifier now expands `<<: *anchor` into the parent mapping).
-    //    BufferSource as BufferSource;
-    //     let mut dest = BufferDestination::new();
-    //     crate::stringify(&result, &mut dest).unwrap();
-    //     assert_eq!(
-    //         dest.to_string(),
-    //         "---\nliteral_strip: |\n  This entire block of text will be the value of the \'literal_strip\' key,\n  with trailing blank line being stripped.\n...\n"
-    //     );
-    // }
-    // #[test]
-    // fn test_parse_a_block_scalar_strip() {
-    //     // Parse a document that defines an anchor and then uses it via merge
-    //     // keys. Rather than relying on stringification, assert the AST
-    //     // structure contains the anchored mapping and that the anchor value
-    //     // is preserved in the parsed tree.
-    //     let yaml = b"block_strip: >-\n  This entire block of text will be the value of \'block_strip\', but this\n  time, all newlines will be replaced with a single space and\n  trailing blank line being stripped.\n\n";
-    //     let mut source = BufferSource::new(yaml);
-    //     let result = parse(&mut source).unwrap();
-    //
-    //     // Stringify the parsed document and assert the canonical merged output
-    //     // (stringifier now expands `<<: *anchor` into the parent mapping).
-    //    BufferSource as BufferSource;
-    //     let mut dest = BufferDestination::new();
-    //     crate::stringify(&result, &mut dest).unwrap();
-    //     assert_eq!(
-    //         dest.to_string(),
-    //         "---\nblock_strip: This entire block of text will be the value of \'block_strip\', but\n  this time, all newlines will be replaced with a single space and trailing\n  blank line being stripped.\n...\n"
-    //     );
-    // }
+    #[test]
+    fn test_parse_a_literal_scalar_strip() {
+
+        let yaml = b"literal_strip: |-\n  This entire block of text will be the value of the \'literal_strip\' key,\n  with trailing blank line being stripped.";
+        let mut source = BufferSource::new(yaml);
+        let result = parse(&mut source).unwrap();
+
+        let mut dest = BufferDestination::new();
+        crate::stringify(&result, &mut dest).unwrap();
+        assert_eq!(
+            dest.to_string(),
+            "---\nliteral_strip: |\n  This entire block of text will be the value of the \'literal_strip\' key,\n  with trailing blank line being stripped.\n...\n"
+        );
+    }
+    #[test]
+    fn test_parse_a_block_scalar_strip() {
+
+        let yaml = b"block_strip: >-\n  This entire block of text will be the value of \'block_strip\', but this\n  time, all newlines will be replaced with a single space and\n  trailing blank line being stripped.\n\n";
+        let mut source = BufferSource::new(yaml);
+        let result = parse(&mut source).unwrap();
+    
+
+
+        let mut dest = BufferDestination::new();
+        crate::stringify(&result, &mut dest).unwrap();
+        assert_eq!(
+            dest.to_string(),
+            "---\nblock_strip: |\n  This entire block of text will be the value of \'block_strip\', but this time, all newlines will be replaced with a single space and trailing blank line being stripped.\n...\n"
+        );
+    }
     // #[test]
     // fn test_parse_nested_anchor_and_alias_with_block_scalar() {
     //     // anchor a scalar in a sequence and reference it via alias
@@ -1315,7 +1297,6 @@ mod tests {
 
     //     // Stringify the parsed document and assert the canonical merged output
     //     // (stringifier now expands `<<: *anchor` into the parent mapping).
-    //    BufferSource as BufferSource;
     //     let mut dest = BufferDestination::new();
     //     crate::stringify(&result, &mut dest).unwrap();
     //     assert_eq!(
@@ -1585,19 +1566,15 @@ mod tests {
         // Mirror parser test: ensure stringifier emits the mapping -> sequence correctly using files
         use crate::io::destinations::file::File as FileDestination;
         use crate::io::sources::file::File as FileSource;
-
         let input = b"---\r\nhr: # 1998 hr ranking\r\n  - Mark McGwire\r\n  - Sammy Sosa\n";
         let in_file = TestFile::new_with_content(input);
         let out_file = TestFile::new_empty();
-
         // parse from file source
         let mut source = FileSource::new(in_file.path()).unwrap();
         let node = parse(&mut source).unwrap();
-
         // stringify to file destination
         let mut dest = FileDestination::new(out_file.path()).unwrap();
         stringify(&node, &mut dest).unwrap();
-
         // read output and compare
         let out = fs::read_to_string(out_file.path()).unwrap();
         let expected = "---\nhr: \n  - Mark McGwire\n  - Sammy Sosa\n...\n";
@@ -1610,12 +1587,10 @@ mod tests {
         let yaml = b"? # PLAY SCHEDULE\n  - Detroit Tigers\n  - Chicago Cubs\n:\n  - 2001-07-23\n\n? [ New York Yankees,\n    Atlanta Braves ]\n: [ 2001-07-02, 2001-08-12,\n    2001-08-14 ]\n";
         let mut src = BufferSource::new(yaml.as_ref());
         let node = parse(&mut src).expect("parse");
-
         // stringify to buffer using the parser-produced node
         let mut dest = BufferDestination::new();
         stringify(&node, &mut dest).expect("");
         let out = normalize_newlines(&dest.to_string());
-
         // Hardcoded expected stringify output (from files/testfile017.yaml.stringify)
         let expected = normalize_newlines(
             "---\n\"[Detroit Tigers, Chicago Cubs]\": \n  - 2001-07-23\n\"[New York Yankees, Atlanta Braves]\": \n  - 2001-07-02\n  - 2001-08-12\n  - 2001-08-14\n...\n",
@@ -1631,7 +1606,6 @@ mod tests {
         let yaml = b"---\nstring1: |\n  Line1\n  line2\n";
         let mut source = BufferSource::new(yaml);
         let node = parse(&mut source).unwrap();
-
         let mut dest = BufferDestination::new();
         stringify(&node, &mut dest).unwrap();
         let out = dest.to_string();
@@ -1644,7 +1618,6 @@ mod tests {
         let yaml = b"---\nstring1: >\n  Line1\n  line2\n";
         let mut source = BufferSource::new(yaml);
         let node = parse(&mut source).unwrap();
-
         let mut dest = BufferDestination::new();
         stringify(&node, &mut dest).unwrap();
         let out = dest.to_string();
@@ -1658,7 +1631,6 @@ mod tests {
         let yaml = b"---\na: &a\n  nested: anchor\nparent:\n  <<: *a\n  key: value\n";
         let mut source = BufferSource::new(yaml);
         let node = parse(&mut source).unwrap();
-
         let mut dest = BufferDestination::new();
         stringify(&node, &mut dest).unwrap();
         let out = dest.to_string();
@@ -1667,5 +1639,39 @@ mod tests {
             "stringified output should contain merge key: {}",
             out
         );
+    }
+    #[test]
+    fn test_parse_stringify_floating_point_key() {
+
+        let yaml = b"---\n0.25: a float key\n";
+        let mut source = BufferSource::new(yaml);
+        let node = parse(&mut source).unwrap();
+
+        let mut dest = BufferDestination::new();
+        stringify(&node, &mut dest).unwrap();
+        let out = dest.to_string();
+        assert_eq!(out, "---\n\"0.25\": a float key\n...\n");
+    }
+    #[test]
+    fn test_parse_stringify_multi_line_string_key() {
+
+        let yaml = b"? |\n This is a key\n that has multiple lines\n : and this is its value";
+        let mut source = BufferSource::new(yaml);
+        let node = parse(&mut source).unwrap();
+        let mut dest = BufferDestination::new();
+        stringify(&node, &mut dest).unwrap();
+        let out = dest.to_string();
+        assert_eq!(out, "---\n\"This is a key\\nthat has multiple lines\\n\": and this is its value\n...\n");
+    }
+    #[test]
+    fn test_parse_stringify_multi_line_sequence_string_key() {
+
+        let yaml = b"? - Manchester United\n  - Real Madrid\n : [ 2001-01-01, 2002-02-02 ]\n";
+        let mut source = BufferSource::new(yaml);
+        let node = parse(&mut source).unwrap();
+        let mut dest = BufferDestination::new();
+        stringify(&node, &mut dest).unwrap();
+        let out = dest.to_string();
+        assert_eq!(out, "---\n\"[Manchester United, Real Madrid]\": \n  - 2001-01-01\n  - 2002-02-02\n...\n");
     }
 }

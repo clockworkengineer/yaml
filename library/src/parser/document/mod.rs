@@ -12,17 +12,19 @@ mod sequence;
 mod value;
 
 pub(crate) use anchors::{collect_anchors, replace_aliases};
-pub(crate) use helpers::{parse_comment, peek_ahead_for_mapping_key};
 #[cfg(test)]
 pub(crate) use helpers::parse_quoted_scalar;
+pub(crate) use helpers::{parse_comment, peek_ahead_for_mapping_key};
 pub(crate) use inline::{parse_inline_mapping, parse_inline_sequence};
 pub(crate) use mapping::parse_mapping;
-pub(crate) use sequence::parse_sequence;
-pub(crate) use value::parse_value;
 #[cfg(test)]
 pub(crate) use scalar::parse_scalar;
+pub(crate) use sequence::parse_sequence;
+pub(crate) use value::parse_value;
 
+use crate::constants::*;
 use crate::io::traits::ISource;
+use crate::nodes::node::BlockStyle;
 use crate::nodes::node::Node;
 use crate::nodes::node::Node::Document;
 use std::collections::HashMap;
@@ -60,6 +62,111 @@ pub fn parse_document_contents(
 
             if source.current() == Some('[') {
                 key_node = parse_inline_sequence(source)?;
+            } else if source.current() == Some('-') {
+                // A sequence begins immediately after the explicit key marker
+                // on the same line (e.g. "? - item1\n  - item2"). Parse the
+                // following sequence as the key node.
+                let nested_indent = source.get_current_indent_level();
+                key_node = parse_sequence(source, nested_indent)?;
+            } else if matches!(source.current(), Some('|') | Some('>')) {
+                // Block scalar used as explicit key. Read the block scalar
+                // content but stop if we encounter a following line whose
+                // first non-space character is ':' (the mapping value marker).
+                let is_folded = source.current() == Some('>');
+                // consume the block marker line
+                let _ = crate::utils::collect_until(source, |c| c == '\n');
+                if source.current() == Some('\n') {
+                    source.next();
+                }
+
+                let mut raw_lines: Vec<String> = Vec::new();
+                let mut first_indent: Option<usize> = None;
+                loop {
+                    if source.current().is_none() {
+                        break;
+                    }
+                    let st_line = source.save_state();
+                    let mut cur_indent = 0usize;
+                    while let Some(CHAR_SPACE) = source.current() {
+                        cur_indent += 1;
+                        source.next();
+                    }
+                    let cur_is_newline = source.current() == Some('\n');
+
+                    // Determine whether this line (after indentation) starts
+                    // with ':' which would indicate the mapping value. If so,
+                    // do not consume it as part of the key block scalar.
+                    let is_colon_start = matches!(source.current(), Some(':'));
+                    source.restore_state(st_line);
+
+                    if first_indent.is_none() {
+                        if cur_is_newline {
+                            let _ = crate::utils::collect_until(source, |c| c == '\n');
+                            if source.current() == Some('\n') {
+                                source.next();
+                            }
+                            raw_lines.push(String::new());
+                            continue;
+                        } else {
+                            first_indent = Some(cur_indent);
+                        }
+                    } else if !cur_is_newline && cur_indent < first_indent.unwrap() {
+                        break;
+                    }
+
+                    if is_colon_start {
+                        break;
+                    }
+
+                    let raw_line = crate::utils::collect_until(source, |c| c == '\n');
+                    if source.current() == Some('\n') {
+                        source.next();
+                    }
+                    raw_lines.push(raw_line);
+                }
+
+                while matches!(raw_lines.last(), Some(s) if s.is_empty()) {
+                    raw_lines.pop();
+                }
+
+                let fi = first_indent.unwrap_or(0);
+                let mut norm_lines: Vec<String> = Vec::with_capacity(raw_lines.len());
+                if is_folded {
+                    for l in raw_lines.iter() {
+                        if l.is_empty() {
+                            norm_lines.push(String::new());
+                        } else {
+                            let lead = l.chars().take_while(|&ch| ch == CHAR_SPACE).count();
+                            let strip = fi.min(lead);
+                            let stripped: String = l.chars().skip(strip).collect();
+                            norm_lines.push(stripped);
+                        }
+                    }
+                } else {
+                    norm_lines = raw_lines.clone();
+                }
+
+                // For explicit keys that are block scalars, produce a
+                // double-quoted key with embedded "\\n" escapes and no
+                // literal newlines. Also strip the common indentation from
+                // each line so the key content doesn't include leading spaces.
+                let mut escaped_parts: Vec<String> = Vec::with_capacity(norm_lines.len());
+                for l in norm_lines.iter() {
+                    let stripped: String = l.chars().skip(fi).collect();
+                    escaped_parts.push(stripped);
+                }
+                // Join lines with a literal backslash+n sequence and ensure a
+                // trailing backslash+n to represent the preserved final newline.
+                let mut escaped_key = escaped_parts.join("\\n");
+                escaped_key.push_str("\\n");
+                key_node = Node::Str(
+                    escaped_key,
+                    crate::nodes::node::QuoteType::Double,
+                    crate::nodes::node::BlockStyle::None,
+                );
+            } else if matches!(source.current(), Some('"') | Some('\'')) {
+                // Quoted scalar key - delegate to the normal value parser
+                key_node = crate::parser::document::value::parse_value(source)?;
             } else if source.current() == Some('#') || source.current() == Some('\n') {
                 let st = source.save_state();
                 let _ = crate::utils::read_line_trimmed_into_string(source);
@@ -101,9 +208,22 @@ pub fn parse_document_contents(
                         crate::nodes::node::BlockStyle::None,
                     );
                 }
-                Node::Str(s, _qt, _style) => {
+                Node::Str(s, _qt, style) => {
+                    // If the key was produced from a literal block style, the
+                    // parser's block-scalar handling does not include the final
+                    // trailing newline in the returned content. For explicit
+                    // mapping keys, tests expect the newline to be preserved and
+                    // the key to be emitted as a double-quoted string with
+                    // embedded "\n" sequences. Append a trailing newline only
+                    // for BlockStyle::Literal keys before converting to a
+                    // double-quoted, non-block style key node.
+                    let key_string = if matches!(style, BlockStyle::Literal) {
+                        format!("{}\n", s)
+                    } else {
+                        s
+                    };
                     key_node = Node::Str(
-                        s,
+                        key_string,
                         crate::nodes::node::QuoteType::Double,
                         crate::nodes::node::BlockStyle::None,
                     );
@@ -271,11 +391,13 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
 
     while let Some(c) = source.current() {
         if (c == '-' || c == '.')
-            && helpers::peek_ahead_for_document_start_end(source, c) {
-                crate::utils::skip_until_newline(source);
-                skip_whitespace(source);
-                break;
-            }
+            && crate::parser::document::helpers::peek_ahead_for_document_start_end(source, c)
+        {
+            crate::utils::skip_until_newline(source);
+            skip_whitespace(source);
+            break;
+        }
+
         match c {
             '#' => {
                 parse_comment(source);

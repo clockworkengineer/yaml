@@ -141,14 +141,12 @@ fn stringify_document_with_indent(
                         } else {
                             String::new()
                         };
-                        destination.add_bytes(&format!(
-                            "{indent_str}{STR_LITERAL_BLOCK}{CHAR_NEWLINE}"
-                        ));
+                        destination
+                            .add_bytes(&format!("{indent_str}{STR_LITERAL_BLOCK}{CHAR_NEWLINE}"));
 
                         if !s.contains(CHAR_NEWLINE) && is_literal {
                             // Single-line literal: emit as-is
-                            destination
-                                .add_bytes(&format!("{content_indent}{s}{CHAR_NEWLINE}"));
+                            destination.add_bytes(&format!("{content_indent}{s}{CHAR_NEWLINE}"));
                         } else {
                             for line in lines {
                                 if line.is_empty() {
@@ -218,14 +216,20 @@ fn stringify_document_with_indent(
         Node::Mapping(pairs) => {
             // Mapping keys are Nodes; stringify each key Node into a temporary buffer
             for (key_node, value) in pairs {
-                // Use a temporary buffer to stringify the key Node
-                let mut key_buf = crate::io::destinations::buffer::Buffer::new();
-                stringify_document_with_indent(key_node, &mut key_buf, 0)?;
-                let key_str = key_buf.to_string();
+                // If the key is a float number, emit it as a quoted string so
+                // mapping keys like 0.25 become "0.25". Integers remain unquoted.
+                let key_str = match key_node {
+                    Node::Number(Numeric::Float(f)) => format!("\"{}\"", f),
+                    Node::Number(Numeric::Integer(i)) => format!("{}", i),
+                    _ => {
+                        // Use a temporary buffer to stringify the key Node
+                        let mut key_buf = crate::io::destinations::buffer::Buffer::new();
+                        stringify_document_with_indent(key_node, &mut key_buf, 0)?;
+                        key_buf.to_string()
+                    }
+                };
 
-                destination.add_bytes(&format!(
-                    "{indent_str}{key_str}{CHAR_COLON}{CHAR_SPACE}"
-                ));
+                destination.add_bytes(&format!("{indent_str}{key_str}{CHAR_COLON}{CHAR_SPACE}"));
 
                 match value {
                     Node::Array(_) | Node::Mapping(_) => {

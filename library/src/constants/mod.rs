@@ -12,7 +12,7 @@ pub const CHAR_COMMA: char = ',';
 pub const CHAR_DOUBLE_QUOTE: char = '"';
 pub const CHAR_SINGLE_QUOTE: char = '\'';
 // Frequently used additional characters
-pub const CHAR_PIPE: char = '|';
+// pub const CHAR_PIPE: char = '|';
 pub const CHAR_ASTERISK: char = '*';
 pub const CHAR_AMPERSAND: char = '&';
 pub const CHAR_SPACE: char = ' ';

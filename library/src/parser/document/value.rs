@@ -3,9 +3,7 @@ use crate::error::messages::*;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::nodes::node::{BlockStyle, QuoteType};
-use crate::parser::document::helpers::{
-    parse_error, parse_quoted_scalar, skip_whitespace,
-};
+use crate::parser::document::helpers::{parse_error, parse_quoted_scalar, skip_whitespace};
 use crate::parser::document::inline::{parse_inline_mapping, parse_inline_sequence};
 use crate::parser::document::scalar::parse_scalar;
 use crate::utils::*;
@@ -79,8 +77,32 @@ pub(crate) fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
         Some(_) => {
             let value = collect_until(source, |c| c == CHAR_NEWLINE || c == CHAR_HASH);
             let trimmed = value.trim();
-            if trimmed == STR_LITERAL_BLOCK || trimmed == STR_FOLDED_BLOCK {
-                let is_folded = trimmed == STR_FOLDED_BLOCK;
+            // Support block scalar headers with optional chomping/indentation
+            // indicators (e.g. "|-", ">+", "|2", etc.). We currently
+            // only care about the style (literal '|' vs folded '>') and
+            // chomping indicator '+' (keep) or '-' (strip). If no chomping
+            // indicator is present we preserve existing behavior (strip).
+            if trimmed.starts_with(STR_LITERAL_BLOCK) || trimmed.starts_with(STR_FOLDED_BLOCK) {
+                // Only treat as a block header if the rest of the token (after
+                // the initial '|' or '>') contains only optional indentation
+                // digits and chomping indicators ('+' or '-'). This avoids
+                // misinterpreting values like "> hello" as block headers.
+                let first_ch = trimmed.chars().next().unwrap();
+                let rest = trimmed[1..].trim();
+                let valid_header_rest = rest
+                    .chars()
+                    .all(|c| c.is_ascii_digit() || c == '+' || c == '-');
+                if !valid_header_rest {
+                    // not a pure block header, treat as a normal scalar
+                    if !trimmed.is_empty() {
+                        return Ok(parse_scalar(trimmed));
+                    } else {
+                        return Ok(Node::None);
+                    }
+                }
+                let is_folded = first_ch == STR_FOLDED_BLOCK.chars().next().unwrap();
+                // detect chomping indicator: keep ('+') or strip ('-')
+                let keep_trailing = trimmed.contains('+');
                 if source.current() == Some(CHAR_NEWLINE) {
                     source.next();
                 }
@@ -122,8 +144,14 @@ pub(crate) fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
                     raw_lines.push(raw_line);
                 }
 
-                while matches!(raw_lines.last(), Some(s) if s.is_empty()) {
-                    raw_lines.pop();
+                // Apply chomping behavior. Default behaviour (no explicit
+                // indicator) keeps existing semantics: strip trailing blank
+                // lines. If a '+' indicator was provided, preserve trailing
+                // blank lines. If '-' provided (or default), remove them.
+                if !keep_trailing {
+                    while matches!(raw_lines.last(), Some(s) if s.is_empty()) {
+                        raw_lines.pop();
+                    }
                 }
 
                 let fi = first_indent.unwrap_or(0);
@@ -192,12 +220,13 @@ pub(crate) fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
                     out
                 };
 
-                Ok(Node::Str(
+                return Ok(Node::Str(
                     out,
                     crate::nodes::node::QuoteType::Unquoted,
                     crate::nodes::node::BlockStyle::Literal,
-                ))
-            } else if !trimmed.is_empty() {
+                ));
+            }
+            if !trimmed.is_empty() {
                 Ok(parse_scalar(trimmed))
             } else {
                 Ok(Node::None)
