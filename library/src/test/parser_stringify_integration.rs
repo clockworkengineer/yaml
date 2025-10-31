@@ -1566,19 +1566,15 @@ mod tests {
         // Mirror parser test: ensure stringifier emits the mapping -> sequence correctly using files
         use crate::io::destinations::file::File as FileDestination;
         use crate::io::sources::file::File as FileSource;
-
         let input = b"---\r\nhr: # 1998 hr ranking\r\n  - Mark McGwire\r\n  - Sammy Sosa\n";
         let in_file = TestFile::new_with_content(input);
         let out_file = TestFile::new_empty();
-
         // parse from file source
         let mut source = FileSource::new(in_file.path()).unwrap();
         let node = parse(&mut source).unwrap();
-
         // stringify to file destination
         let mut dest = FileDestination::new(out_file.path()).unwrap();
         stringify(&node, &mut dest).unwrap();
-
         // read output and compare
         let out = fs::read_to_string(out_file.path()).unwrap();
         let expected = "---\nhr: \n  - Mark McGwire\n  - Sammy Sosa\n...\n";
@@ -1591,12 +1587,10 @@ mod tests {
         let yaml = b"? # PLAY SCHEDULE\n  - Detroit Tigers\n  - Chicago Cubs\n:\n  - 2001-07-23\n\n? [ New York Yankees,\n    Atlanta Braves ]\n: [ 2001-07-02, 2001-08-12,\n    2001-08-14 ]\n";
         let mut src = BufferSource::new(yaml.as_ref());
         let node = parse(&mut src).expect("parse");
-
         // stringify to buffer using the parser-produced node
         let mut dest = BufferDestination::new();
         stringify(&node, &mut dest).expect("");
         let out = normalize_newlines(&dest.to_string());
-
         // Hardcoded expected stringify output (from files/testfile017.yaml.stringify)
         let expected = normalize_newlines(
             "---\n\"[Detroit Tigers, Chicago Cubs]\": \n  - 2001-07-23\n\"[New York Yankees, Atlanta Braves]\": \n  - 2001-07-02\n  - 2001-08-12\n  - 2001-08-14\n...\n",
@@ -1612,7 +1606,6 @@ mod tests {
         let yaml = b"---\nstring1: |\n  Line1\n  line2\n";
         let mut source = BufferSource::new(yaml);
         let node = parse(&mut source).unwrap();
-
         let mut dest = BufferDestination::new();
         stringify(&node, &mut dest).unwrap();
         let out = dest.to_string();
@@ -1625,7 +1618,6 @@ mod tests {
         let yaml = b"---\nstring1: >\n  Line1\n  line2\n";
         let mut source = BufferSource::new(yaml);
         let node = parse(&mut source).unwrap();
-
         let mut dest = BufferDestination::new();
         stringify(&node, &mut dest).unwrap();
         let out = dest.to_string();
@@ -1639,7 +1631,6 @@ mod tests {
         let yaml = b"---\na: &a\n  nested: anchor\nparent:\n  <<: *a\n  key: value\n";
         let mut source = BufferSource::new(yaml);
         let node = parse(&mut source).unwrap();
-
         let mut dest = BufferDestination::new();
         stringify(&node, &mut dest).unwrap();
         let out = dest.to_string();
@@ -1667,7 +1658,6 @@ mod tests {
         let yaml = b"? |\n This is a key\n that has multiple lines\n : and this is its value";
         let mut source = BufferSource::new(yaml);
         let node = parse(&mut source).unwrap();
-
         let mut dest = BufferDestination::new();
         stringify(&node, &mut dest).unwrap();
         let out = dest.to_string();
@@ -1679,7 +1669,6 @@ mod tests {
         let yaml = b"? - Manchester United\n  - Real Madrid\n : [ 2001-01-01, 2002-02-02 ]\n";
         let mut source = BufferSource::new(yaml);
         let node = parse(&mut source).unwrap();
-
         let mut dest = BufferDestination::new();
         stringify(&node, &mut dest).unwrap();
         let out = dest.to_string();
