@@ -1248,26 +1248,25 @@ mod tests {
             "---\nliteral_block: |\n  This entire block of text will be the value of the \'literal_block\' key,\n  with line breaks being preserved.\n\n  The literal continues until de-dented, and the leading indentation is\n  stripped.\n\n      Any lines that are \'more-indented\' keep the rest of their indentation -\n      these lines will be indented by 4 spaces.\n...\n"
         );
     }
-    // #[test]
-    // fn test_parse_a_literal_scalar_strip() {
-    //     // Parse a document that defines an anchor and then uses it via merge
-    //     // keys. Rather than relying on stringification, assert the AST
-    //     // structure contains the anchored mapping and that the anchor value
-    //     // is preserved in the parsed tree.
-    //     let yaml = b"literal_strip: |-\n  This entire block of text will be the value of the \'literal_strip\' key,\n  with trailing blank line being stripped.";
-    //     let mut source = BufferSource::new(yaml);
-    //     let result = parse(&mut source).unwrap();
-    //
-    //     // Stringify the parsed document and assert the canonical merged output
-    //     // (stringifier now expands `<<: *anchor` into the parent mapping).
-    //    BufferSource as BufferSource;
-    //     let mut dest = BufferDestination::new();
-    //     crate::stringify(&result, &mut dest).unwrap();
-    //     assert_eq!(
-    //         dest.to_string(),
-    //         "---\nliteral_strip: |\n  This entire block of text will be the value of the \'literal_strip\' key,\n  with trailing blank line being stripped.\n...\n"
-    //     );
-    // }
+    #[test]
+    fn test_parse_a_literal_scalar_strip() {
+        // Parse a document that defines an anchor and then uses it via merge
+        // keys. Rather than relying on stringification, assert the AST
+        // structure contains the anchored mapping and that the anchor value
+        // is preserved in the parsed tree.
+        let yaml = b"literal_strip: |-\n  This entire block of text will be the value of the \'literal_strip\' key,\n  with trailing blank line being stripped.";
+        let mut source = BufferSource::new(yaml);
+        let result = parse(&mut source).unwrap();
+    
+        // Stringify the parsed document and assert the canonical merged output
+        // (stringifier now expands `<<: *anchor` into the parent mapping).
+        let mut dest = BufferDestination::new();
+        crate::stringify(&result, &mut dest).unwrap();
+        assert_eq!(
+            dest.to_string(),
+            "---\nliteral_strip: |\n  This entire block of text will be the value of the \'literal_strip\' key,\n  with trailing blank line being stripped.\n...\n"
+        );
+    }
     // #[test]
     // fn test_parse_a_block_scalar_strip() {
     //     // Parse a document that defines an anchor and then uses it via merge
@@ -1315,7 +1314,6 @@ mod tests {
 
     //     // Stringify the parsed document and assert the canonical merged output
     //     // (stringifier now expands `<<: *anchor` into the parent mapping).
-    //    BufferSource as BufferSource;
     //     let mut dest = BufferDestination::new();
     //     crate::stringify(&result, &mut dest).unwrap();
     //     assert_eq!(

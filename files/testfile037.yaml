@@ -143,22 +143,22 @@ and quotes are optional: { key: [ 3, 2, 1, takeoff ] }
 anchored_content: &anchor_name This string will appear as the value of two keys.
 other_anchor: *anchor_name
 
-## Anchors can be used to duplicate/inherit properties
-#base: &base
-#  name: Everyone has same name
-#
-## The expression << is called 'Merge Key Language-Independent Type'. It is used to
-## indicate that all the keys of one or more specified maps should be inserted
-## into the current map.
-## NOTE: If key already exists alias will not be merged
-#foo:
-#  <<: *base # doesn't merge the anchor
-#  age: 10
-#  name: John
-#bar:
-#  <<: *base # base anchor will be merged
-#  age: 20
-#
+# Anchors can be used to duplicate/inherit properties
+base: &base
+ name: Everyone has same name
+
+# The expression << is called 'Merge Key Language-Independent Type'. It is used to
+# indicate that all the keys of one or more specified maps should be inserted
+# into the current map.
+# NOTE: If key already exists alias will not be merged
+foo:
+ <<: *base # doesn't merge the anchor
+ age: 10
+ name: John
+bar:
+ <<: *base # base anchor will be merged
+ age: 20
+
 ## foo name won't be changed and it will be: John. On the other hand, bar's name will be changed to the base one: Everyone has same name
 #
 ## YAML also has tags, which you can use to explicitly declare types.
