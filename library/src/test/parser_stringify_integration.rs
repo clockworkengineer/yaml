@@ -1211,16 +1211,12 @@ mod tests {
 
     #[test]
     fn test_parse_mapping_with_quoted_string_value() {
-        // Parse a document that defines an anchor and then uses it via merge
-        // keys. Rather than relying on stringification, assert the AST
-        // structure contains the anchored mapping and that the anchor value
-        // is preserved in the parsed tree.
+
         let yaml = b"\'Keys can be quoted too.\': \"Useful if you want to put a \':\' in your key.\"";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source).unwrap();
 
-        // Stringify the parsed document and assert the canonical merged output
-        // (stringifier now expands `<<: *anchor` into the parent mapping).
+
 
         let mut dest = BufferDestination::new();
         crate::stringify(&result, &mut dest).unwrap();
@@ -1231,16 +1227,12 @@ mod tests {
     }
     #[test]
     fn test_parse_a_literal_block_scalar() {
-        // Parse a document that defines an anchor and then uses it via merge
-        // keys. Rather than relying on stringification, assert the AST
-        // structure contains the anchored mapping and that the anchor value
-        // is preserved in the parsed tree.
+
         let yaml = b"literal_block: |\n  This entire block of text will be the value of the \'literal_block\' key,\n  with line breaks being preserved.\n\n  The literal continues until de-dented, and the leading indentation is\n  stripped.\n\n      Any lines that are \'more-indented\' keep the rest of their indentation -\n      these lines will be indented by 4 spaces.";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source).unwrap();
 
-        // Stringify the parsed document and assert the canonical merged output
-        // (stringifier now expands `<<: *anchor` into the parent mapping).
+
         let mut dest = BufferDestination::new();
         crate::stringify(&result, &mut dest).unwrap();
         assert_eq!(
@@ -1250,15 +1242,11 @@ mod tests {
     }
     #[test]
     fn test_parse_a_literal_scalar_strip() {
-        // Parse a document that defines an anchor and then uses it via merge
-        // keys. Rather than relying on stringification, assert the AST
-        // structure contains the anchored mapping and that the anchor value
-        // is preserved in the parsed tree.
+
         let yaml = b"literal_strip: |-\n  This entire block of text will be the value of the \'literal_strip\' key,\n  with trailing blank line being stripped.";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source).unwrap();
-        // Stringify the parsed document and assert the canonical merged output
-        // (stringifier now expands `<<: *anchor` into the parent mapping).
+
         let mut dest = BufferDestination::new();
         crate::stringify(&result, &mut dest).unwrap();
         assert_eq!(
@@ -1268,16 +1256,12 @@ mod tests {
     }
     #[test]
     fn test_parse_a_block_scalar_strip() {
-        // Parse a document that defines an anchor and then uses it via merge
-        // keys. Rather than relying on stringification, assert the AST
-        // structure contains the anchored mapping and that the anchor value
-        // is preserved in the parsed tree.
+
         let yaml = b"block_strip: >-\n  This entire block of text will be the value of \'block_strip\', but this\n  time, all newlines will be replaced with a single space and\n  trailing blank line being stripped.\n\n";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source).unwrap();
     
-        // Stringify the parsed document and assert the canonical merged output
-        // (stringifier now expands `<<: *anchor` into the parent mapping).
+
 
         let mut dest = BufferDestination::new();
         crate::stringify(&result, &mut dest).unwrap();
