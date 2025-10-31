@@ -201,7 +201,7 @@ pub fn parse_document_contents(
 
             match key_node {
                 Node::Array(_) | Node::Mapping(_) => {
-                    let inline = crate::parser::document::helpers::node_to_inline_string(&key_node);
+                    let inline = helpers::node_to_inline_string(&key_node);
                     key_node = Node::Str(
                         inline,
                         crate::nodes::node::QuoteType::Double,
@@ -229,7 +229,7 @@ pub fn parse_document_contents(
                     );
                 }
                 other => {
-                    let inline = crate::parser::document::helpers::node_to_inline_string(&other);
+                    let inline = helpers::node_to_inline_string(&other);
                     key_node = Node::Str(
                         inline,
                         crate::nodes::node::QuoteType::Double,
@@ -241,7 +241,7 @@ pub fn parse_document_contents(
             let st_colon = source.save_state();
             let mut found_colon = false;
             loop {
-                helpers::skip_whitespace(source);
+                skip_whitespace(source);
                 match source.current() {
                     Some(':') => {
                         source.next();
@@ -268,7 +268,7 @@ pub fn parse_document_contents(
                     source.next();
                 }
                 loop {
-                    helpers::skip_whitespace(source);
+                    skip_whitespace(source);
                     if source.current() == Some(':') {
                         break;
                     }
@@ -284,7 +284,7 @@ pub fn parse_document_contents(
             if source.current() == Some(':') {
                 source.next();
             }
-            helpers::skip_whitespace(source);
+            skip_whitespace(source);
             let mut value_node = match source.current() {
                 Some('[') => parse_inline_sequence(source)?,
                 Some('{') => parse_inline_mapping(source)?,
@@ -331,7 +331,7 @@ pub fn parse_document_contents(
                         source.next();
                     }
                     let st = source.save_state();
-                    helpers::skip_whitespace(source);
+                    skip_whitespace(source);
                     let cur_indent = source.get_current_indent_level();
                     let next_char = source.current();
                     source.restore_state(st);
@@ -397,6 +397,7 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
             skip_whitespace(source);
             break;
         }
+
         match c {
             '#' => {
                 parse_comment(source);
@@ -638,4 +639,5 @@ mod tests {
         let n = parse_document_contents(&mut src, 0).unwrap();
         assert!(matches!(n, Node::Mapping(_)));
     }
+
 }
