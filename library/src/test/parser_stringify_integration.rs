@@ -1680,18 +1680,18 @@ mod tests {
         let out = dest.to_string();
         assert_eq!(out, "---\n\"0.25\": a float key\n...\n");
     }
-    // #[test]
-    // fn test_parse_stringify_multi_line_string_key() {
+    #[test]
+    fn test_parse_stringify_multi_line_string_key() {
 
-    //     let yaml = b"? |\n This is a key\n that has multiple lines\n : and this is its value";
-    //     let mut source = BufferSource::new(yaml);
-    //     let node = parse(&mut source).unwrap();
+        let yaml = b"? |\n This is a key\n that has multiple lines\n : and this is its value";
+        let mut source = BufferSource::new(yaml);
+        let node = parse(&mut source).unwrap();
 
-    //     let mut dest = BufferDestination::new();
-    //     stringify(&node, &mut dest).unwrap();
-    //     let out = dest.to_string();
-    //     assert_eq!(out, "---\n\"This is a key\\nthat has multiple lines\\n\": and this is its value\n...\n");
-    // }
+        let mut dest = BufferDestination::new();
+        stringify(&node, &mut dest).unwrap();
+        let out = dest.to_string();
+        assert_eq!(out, "---\n\"This is a key\\nthat has multiple lines\\n\": and this is its value\n...\n");
+    }
     #[test]
     fn test_parse_stringify_multi_line_sequence_string_key() {
 
