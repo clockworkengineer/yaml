@@ -1,13 +1,16 @@
 ///
 /// Integration tests for parsing and stringifying YAML content.
-/// 
+///
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use crate::nodes::node::{BlockStyle, QuoteType};
+    use crate::{
+        BufferDestination, BufferSource, FileSource, Node, Node::Document, Numeric, parse,
+        stringify,
+    };
     use std::collections::HashMap;
     use std::fs;
-    use crate::{FileSource, BufferDestination, parse, stringify, BufferSource, Node, Node::Document, Numeric};
-    use crate::nodes::node::{QuoteType, BlockStyle};
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     // Normalize newlines by removing CR characters so inputs read from files
     // with CRLF line endings don't emit stray '\r' characters when stringified.
@@ -129,8 +132,9 @@ mod tests {
 
     #[test]
     fn test_parse_multi_document() {
-        let mut source =
-            BufferSource::new(b"key1: value1\n---\nkey2: value2\n---\nkey3: value3\nkey4: value4\n");
+        let mut source = BufferSource::new(
+            b"key1: value1\n---\nkey2: value2\n---\nkey3: value3\nkey4: value4\n",
+        );
         let result = parse(&mut source).unwrap();
         let expected = Node::Documents(vec![
             Document(vec![Node::Mapping(vec![(
@@ -294,8 +298,9 @@ mod tests {
     }
     #[test]
     fn test_parse_mapping_with_nested_sequence_and_comments() {
-        let mut source =
-            BufferSource::new(b"key1:\n  - item1\n  - item2\n# Comment 1\nkey2: value2\n# Comment 2");
+        let mut source = BufferSource::new(
+            b"key1:\n  - item1\n  - item2\n# Comment 1\nkey2: value2\n# Comment 2",
+        );
         let result = parse(&mut source).unwrap();
         let sequence = Node::Array(vec![
             Node::Str("item1".to_string(), QuoteType::Unquoted, BlockStyle::None),
@@ -321,8 +326,9 @@ mod tests {
 
     #[test]
     fn test_parse_sequence_with_nested_comments() {
-        let mut source =
-            BufferSource::new(b"- item1\n# Comment between items\n- item2\n# Final comment\n- item3");
+        let mut source = BufferSource::new(
+            b"- item1\n# Comment between items\n- item2\n# Final comment\n- item3",
+        );
         let result = parse(&mut source).unwrap();
         assert_eq!(
             result,
@@ -333,7 +339,6 @@ mod tests {
             ])])])
         );
     }
-
 
     #[test]
     fn test_parse_document_end_marker() {
@@ -402,7 +407,8 @@ mod tests {
 
     #[test]
     fn test_parse_document_end_marker_with_comments() {
-        let mut source = BufferSource::new(b"# Comment before\nkey: value\n---\n# After doc\nother: 1");
+        let mut source =
+            BufferSource::new(b"# Comment before\nkey: value\n---\n# After doc\nother: 1");
         let result = parse(&mut source).unwrap();
         let mut doc1 = HashMap::new();
         doc1.insert(
@@ -489,8 +495,9 @@ mod tests {
     }
     #[test]
     fn test_parse_nested_mapping_within_sequence() {
-        let mut source =
-            BufferSource::new(b"people:\n  - name: John\n    likes:\n      - apples\n      - bananas\n");
+        let mut source = BufferSource::new(
+            b"people:\n  - name: John\n    likes:\n      - apples\n      - bananas\n",
+        );
         let result = parse(&mut source).unwrap();
 
         // Expected: people -> [ { name: "John", likes: ["apples", "bananas"] } ]
@@ -719,6 +726,214 @@ mod tests {
             Node::Str(">folded".to_string(), QuoteType::Unquoted, BlockStyle::None),
         ])])]);
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_and_preserve_local_tag_on_scalar() {
+        // Simple test: parse a local tag (!!str) applied to a plain scalar
+        // Coercion should convert the value to a quoted string node
+        let mut source = BufferSource::new(b"value: !!str 123");
+        let result = parse(&mut source).unwrap();
+
+        // Expect the mapping's value to be a Str node containing "123"
+        if let Node::Documents(ref docs) = result {
+            if let Document(nodes) = &docs[0] {
+                if let Node::Mapping(pairs) = &nodes[0] {
+                    assert_eq!(pairs.len(), 1);
+                    let (_k, v) = &pairs[0];
+                    if let Node::Str(s, qt, _style) = v {
+                        println!("FOUND_STR s='{}' qt={:?}", s, qt);
+                        assert_eq!(s.as_str(), "123");
+                        assert_eq!(*qt, QuoteType::Unquoted);
+                        return;
+                    }
+                }
+            }
+        }
+        // Debug: print the parsed result to help diagnose coercion failures
+        println!("PARSED_RESULT: {:#?}", result);
+        panic!("Expected coerced string node not found");
+    }
+
+    #[test]
+    fn test_stringify_preserves_tag_token() {
+        // When a tag coerces the value (e.g. !!str), the stringifier should
+        // emit the coerced value (quoted) rather than the original tag token.
+        let mut source = BufferSource::new(b"value: !!str 123");
+        let node = parse(&mut source).unwrap();
+        let mut dest = BufferDestination::new();
+        stringify(&node, &mut dest).unwrap();
+        let out = dest.to_string();
+        // Debug: print stringify output when assertion fails
+        if !out.contains("\"123\"") {
+            println!("STRINGIFIED_OUT:\n{}", out);
+        }
+        assert!(
+            out.contains("value: 123"),
+            "stringify should include the coerced value: {}",
+            out
+        );
+    }
+
+    #[test]
+    fn test_coerce_int_tag_on_numeric_string() {
+        // !!int applied to a quoted numeric should coerce to an integer node
+        let mut source = BufferSource::new(b"value: !!int '123'");
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(ref docs) = result {
+            if let Document(nodes) = &docs[0] {
+                if let Node::Mapping(pairs) = &nodes[0] {
+                    assert_eq!(pairs.len(), 1);
+                    let (_k, v) = &pairs[0];
+                    assert_eq!(v, &Node::Number(Numeric::Integer(123)));
+                    return;
+                }
+            }
+        }
+        panic!("Expected coerced integer node not found");
+    }
+
+    #[test]
+    fn test_coerce_float_tag_on_numeric_string() {
+        // !!float applied to a quoted numeric should coerce to a float node
+        let mut source = BufferSource::new(b"value: !!float '3.14'");
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(ref docs) = result {
+            if let Document(nodes) = &docs[0] {
+                if let Node::Mapping(pairs) = &nodes[0] {
+                    assert_eq!(pairs.len(), 1);
+                    let (_k, v) = &pairs[0];
+                    assert_eq!(v, &Node::Number(Numeric::Float(3.14)));
+                    return;
+                }
+            }
+        }
+        panic!("Expected coerced float node not found");
+    }
+
+    #[test]
+    fn test_coerce_float_tag_on_integer_value() {
+        // !!float applied to an integer should coerce to a float node (e.g. 2 -> 2.0)
+        let mut source = BufferSource::new(b"value: !!float 2");
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(ref docs) = result {
+            if let Document(nodes) = &docs[0] {
+                if let Node::Mapping(pairs) = &nodes[0] {
+                    assert_eq!(pairs.len(), 1);
+                    let (_k, v) = &pairs[0];
+                    assert_eq!(v, &Node::Number(Numeric::Float(2.0)));
+                    return;
+                }
+            }
+        }
+        panic!("Expected coerced float from integer not found");
+    }
+
+    #[test]
+    fn test_coerce_timestamp_on_date_string() {
+        // !!timestamp applied to a date string should be preserved/coerced to a string node
+        let mut source = BufferSource::new(b"value: !!timestamp '2001-12-14'");
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(ref docs) = result {
+            if let Document(nodes) = &docs[0] {
+                if let Node::Mapping(pairs) = &nodes[0] {
+                    assert_eq!(pairs.len(), 1);
+                    let (_k, v) = &pairs[0];
+                    if let Node::Str(s, _, _) = v {
+                        assert_eq!(s, "2001-12-14");
+                        return;
+                    }
+                }
+            }
+        }
+        panic!("Expected coerced timestamp string node not found");
+    }
+
+    #[test]
+    fn test_coerce_timestamp_on_rfc3339_datetime() {
+        // !!timestamp applied to an RFC3339-like datetime should be preserved as a string
+        let mut source = BufferSource::new(b"value: !!timestamp 2001-12-14T21:59:43Z");
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(ref docs) = result {
+            if let Document(nodes) = &docs[0] {
+                if let Node::Mapping(pairs) = &nodes[0] {
+                    assert_eq!(pairs.len(), 1);
+                    let (_k, v) = &pairs[0];
+                    if let Node::Str(s, _, _) = v {
+                        assert_eq!(s, "2001-12-14T21:59:43Z");
+                        return;
+                    }
+                }
+            }
+        }
+        panic!("Expected coerced RFC3339 timestamp string node not found");
+    }
+
+    #[test]
+    fn test_unknown_tag_is_preserved_and_stringified() {
+        // Unknown local tags should be preserved and emitted by the stringifier
+        let mut source = BufferSource::new(b"value: !custom foo");
+        let node = parse(&mut source).unwrap();
+        let mut dest = BufferDestination::new();
+        stringify(&node, &mut dest).unwrap();
+        let out = dest.to_string();
+        assert!(
+            out.contains("!custom foo"),
+            "stringify should include unknown tag: {}",
+            out
+        );
+    }
+
+    #[test]
+    fn test_tag_on_sequence_is_preserved() {
+        // A tag applied to a sequence that isn't recognized for coercion should be preserved
+        let mut source = BufferSource::new(b"value: !seq - 1\n  - 2");
+        let node = parse(&mut source).unwrap();
+        let mut dest = BufferDestination::new();
+        stringify(&node, &mut dest).unwrap();
+        let out = dest.to_string();
+        assert!(
+            out.contains("!seq"),
+            "stringify should preserve sequence tag: {}",
+            out
+        );
+    }
+
+    #[test]
+    fn test_tagged_anchor_and_alias_resolution() {
+        // Anchor a tagged scalar and reference it via alias; alias resolution should yield the coerced value
+        let yaml = b"---\na: &a !!str 123\nb: *a\n";
+        let mut source = BufferSource::new(yaml);
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(docs) = result {
+            if let Document(nodes) = &docs[0] {
+                if let Node::Mapping(pairs) = &nodes[0] {
+                    // find values for a and b
+                    let mut found_a = None;
+                    let mut found_b = None;
+                    for (k, v) in pairs {
+                        if let Node::Str(ks, _, _) = k {
+                            if ks == "a" {
+                                found_a = Some(v.clone());
+                            }
+                            if ks == "b" {
+                                found_b = Some(v.clone());
+                            }
+                        }
+                    }
+                    assert!(found_a.is_some() && found_b.is_some());
+                    assert_eq!(found_a.unwrap(), found_b.unwrap());
+                    return;
+                }
+            }
+        }
+        panic!("Tagged anchor/alias resolution failed");
     }
 
     #[test]
@@ -1211,12 +1426,10 @@ mod tests {
 
     #[test]
     fn test_parse_mapping_with_quoted_string_value() {
-
-        let yaml = b"\'Keys can be quoted too.\': \"Useful if you want to put a \':\' in your key.\"";
+        let yaml =
+            b"\'Keys can be quoted too.\': \"Useful if you want to put a \':\' in your key.\"";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source).unwrap();
-
-
 
         let mut dest = BufferDestination::new();
         crate::stringify(&result, &mut dest).unwrap();
@@ -1227,11 +1440,9 @@ mod tests {
     }
     #[test]
     fn test_parse_a_literal_block_scalar() {
-
         let yaml = b"literal_block: |\n  This entire block of text will be the value of the \'literal_block\' key,\n  with line breaks being preserved.\n\n  The literal continues until de-dented, and the leading indentation is\n  stripped.\n\n      Any lines that are \'more-indented\' keep the rest of their indentation -\n      these lines will be indented by 4 spaces.";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source).unwrap();
-
 
         let mut dest = BufferDestination::new();
         crate::stringify(&result, &mut dest).unwrap();
@@ -1242,7 +1453,6 @@ mod tests {
     }
     #[test]
     fn test_parse_a_literal_scalar_strip() {
-
         let yaml = b"literal_strip: |-\n  This entire block of text will be the value of the \'literal_strip\' key,\n  with trailing blank line being stripped.";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source).unwrap();
@@ -1256,12 +1466,9 @@ mod tests {
     }
     #[test]
     fn test_parse_a_block_scalar_strip() {
-
         let yaml = b"block_strip: >-\n  This entire block of text will be the value of \'block_strip\', but this\n  time, all newlines will be replaced with a single space and\n  trailing blank line being stripped.\n\n";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source).unwrap();
-    
-
 
         let mut dest = BufferDestination::new();
         crate::stringify(&result, &mut dest).unwrap();
@@ -1304,7 +1511,6 @@ mod tests {
     //         "---\nbase: \n  name: Everyone has same name\nfoo: \n  name: John\n  age: 10\nbar: \n  name: Everyone has same name\n  age: 20\n...\n"
     //     );
     // }
-
 
     static TEST_FILE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -1602,7 +1808,6 @@ mod tests {
     // Tests moved from parser::default that asserted stringify output of parse results
     #[test]
     fn test_stringify_from_parser_literal_block_literal_scalar_with_indent() {
-
         let yaml = b"---\nstring1: |\n  Line1\n  line2\n";
         let mut source = BufferSource::new(yaml);
         let node = parse(&mut source).unwrap();
@@ -1614,7 +1819,6 @@ mod tests {
 
     #[test]
     fn test_stringify_from_parser_literal_block_folded_scalar_with_indent() {
-
         let yaml = b"---\nstring1: >\n  Line1\n  line2\n";
         let mut source = BufferSource::new(yaml);
         let node = parse(&mut source).unwrap();
@@ -1627,7 +1831,6 @@ mod tests {
 
     #[test]
     fn test_stringify_merge_key_with_single_alias() {
-
         let yaml = b"---\na: &a\n  nested: anchor\nparent:\n  <<: *a\n  key: value\n";
         let mut source = BufferSource::new(yaml);
         let node = parse(&mut source).unwrap();
@@ -1642,7 +1845,6 @@ mod tests {
     }
     #[test]
     fn test_parse_stringify_floating_point_key() {
-
         let yaml = b"---\n0.25: a float key\n";
         let mut source = BufferSource::new(yaml);
         let node = parse(&mut source).unwrap();
@@ -1654,24 +1856,28 @@ mod tests {
     }
     #[test]
     fn test_parse_stringify_multi_line_string_key() {
-
         let yaml = b"? |\n This is a key\n that has multiple lines\n : and this is its value";
         let mut source = BufferSource::new(yaml);
         let node = parse(&mut source).unwrap();
         let mut dest = BufferDestination::new();
         stringify(&node, &mut dest).unwrap();
         let out = dest.to_string();
-        assert_eq!(out, "---\n\"This is a key\\nthat has multiple lines\\n\": and this is its value\n...\n");
+        assert_eq!(
+            out,
+            "---\n\"This is a key\\nthat has multiple lines\\n\": and this is its value\n...\n"
+        );
     }
     #[test]
     fn test_parse_stringify_multi_line_sequence_string_key() {
-
         let yaml = b"? - Manchester United\n  - Real Madrid\n : [ 2001-01-01, 2002-02-02 ]\n";
         let mut source = BufferSource::new(yaml);
         let node = parse(&mut source).unwrap();
         let mut dest = BufferDestination::new();
         stringify(&node, &mut dest).unwrap();
         let out = dest.to_string();
-        assert_eq!(out, "---\n\"[Manchester United, Real Madrid]\": \n  - 2001-01-01\n  - 2002-02-02\n...\n");
+        assert_eq!(
+            out,
+            "---\n\"[Manchester United, Real Madrid]\": \n  - 2001-01-01\n  - 2002-02-02\n...\n"
+        );
     }
 }

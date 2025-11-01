@@ -1,14 +1,154 @@
 use crate::constants::*;
 use crate::error::messages::*;
 use crate::io::traits::ISource;
-use crate::nodes::node::Node;
-use crate::nodes::node::{BlockStyle, QuoteType};
+use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
 use crate::parser::document::helpers::{parse_error, parse_quoted_scalar, skip_whitespace};
 use crate::parser::document::inline::{parse_inline_mapping, parse_inline_sequence};
 use crate::parser::document::scalar::parse_scalar;
 use crate::utils::*;
 
+// Attempt to coerce a parsed node according to a YAML local tag like
+// "!!str", "!!int", "!!float", "!!bool", "!!null". Returns Some(coerced_node)
+// on successful coercion or None if the tag isn't recognized or coercion failed.
+fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
+    // DEBUG: temporary diagnostic prints to help trace coercion issues
+    //eprintln!("TRY_COERCE_TAG: tag='{}', node={:?}", tag, node);
+    match tag {
+        "!!str" | "!str" => {
+            // Convert any scalar into a quoted string so stringified output
+            // preserves that it was explicitly tagged as a string.
+            let s = match node {
+                Node::Str(s, _, _) => s,
+                Node::Number(Numeric::Integer(i)) => i.to_string(),
+                Node::Number(Numeric::Float(f)) => f.to_string(),
+                Node::Boolean(b) => b.to_string(),
+                Node::None => String::new(),
+                _ => return None,
+            };
+            // Use Unquoted here; the mapping/stringifier will normalize quoting
+            // for plain-safe values back to unquoted form.
+            return Some(Node::Str(s, QuoteType::Unquoted, BlockStyle::None));
+        }
+        "!!int" | "!int" => {
+            match node {
+                Node::Number(Numeric::Integer(i)) => {
+                    return Some(Node::Number(Numeric::Integer(i)));
+                }
+                Node::Number(Numeric::Float(f)) => {
+                    // Only coerce floats that are whole numbers
+                    if (f.trunc() - f).abs() < std::f64::EPSILON {
+                        return Some(Node::Number(Numeric::Integer(f as i64)));
+                    }
+                    return None;
+                }
+                Node::Str(s, _, _) => {
+                    if let Ok(i) = s.parse::<i64>() {
+                        return Some(Node::Number(Numeric::Integer(i)));
+                    }
+                    return None;
+                }
+                _ => return None,
+            }
+        }
+        "!!float" | "!float" => match node {
+            Node::Number(Numeric::Float(f)) => return Some(Node::Number(Numeric::Float(f))),
+            Node::Number(Numeric::Integer(i)) => {
+                return Some(Node::Number(Numeric::Float(i as f64)));
+            }
+            Node::Str(s, _, _) => {
+                if let Ok(f) = s.parse::<f64>() {
+                    return Some(Node::Number(Numeric::Float(f)));
+                }
+                return None;
+            }
+            _ => return None,
+        },
+        "!!bool" | "!bool" => match node {
+            Node::Boolean(b) => return Some(Node::Boolean(b)),
+            Node::Str(s, _, _) => {
+                let sl = s.to_ascii_lowercase();
+                if sl == "true" {
+                    return Some(Node::Boolean(true));
+                }
+                if sl == "false" {
+                    return Some(Node::Boolean(false));
+                }
+                return None;
+            }
+            _ => return None,
+        },
+        "!!null" | "!null" => {
+            return Some(Node::None);
+        }
+        "!!timestamp" | "!timestamp" => {
+            // Treat timestamps as strings in this AST: accept existing string
+            // nodes and numeric nodes (converted to a string). We don't add a
+            // dedicated Timestamp node type here to avoid a large refactor.
+            match node {
+                Node::Str(s, _, _) => {
+                    return Some(Node::Str(s, QuoteType::Unquoted, BlockStyle::None));
+                }
+                Node::Number(Numeric::Integer(i)) => {
+                    return Some(Node::Str(
+                        i.to_string(),
+                        QuoteType::Unquoted,
+                        BlockStyle::None,
+                    ));
+                }
+                Node::Number(Numeric::Float(f)) => {
+                    return Some(Node::Str(
+                        f.to_string(),
+                        QuoteType::Unquoted,
+                        BlockStyle::None,
+                    ));
+                }
+                _ => return None,
+            }
+        }
+        _ => return None,
+    }
+}
+
 pub(crate) fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
+    // Handle YAML tag prefix (e.g. !!str, !mytag)
+    if source.current() == Some('!') {
+        // consume '!'
+        source.next();
+        // collect until whitespace or newline (collect the remainder after the
+        // first '!' we consumed). Prepend the consumed '!' so callers see the
+        // full tag (e.g. "!!str").
+        let rest = collect_until(source, |c| c == CHAR_SPACE || c == CHAR_NEWLINE);
+        let tag = format!("!{}", rest);
+        if tag.trim().is_empty() {
+            return Err(parse_error(source, "Empty tag"));
+        }
+        skip_whitespace(source);
+        // parse the following value and wrap it in a Tagged node
+        let inner = match source.current() {
+            Some(CHAR_LBRACE) => parse_inline_mapping(source)?,
+            Some(CHAR_LBRACKET) => parse_inline_sequence(source)?,
+            Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
+                let raw = parse_quoted_scalar(source)?;
+                parse_scalar(raw.trim())
+            }
+            Some('-') => {
+                let nested_indent = source.get_current_indent_level();
+                crate::parser::document::parse_sequence(source, nested_indent)?
+            }
+            Some(_) => parse_value(source)?,
+            None => return Err(parse_error(source, ERR_UNEXPECTED_EOF_AFTER_ANCHOR)),
+        };
+        // Try to coerce the parsed inner node according to a handful of
+        // standard YAML local tags (e.g. !!str, !!int, !!float, !!bool, !!null).
+        // If coercion succeeds we return the coerced node. Otherwise preserve
+        // the tag by returning a Tagged node.
+        if let Some(coerced) = try_coerce_tag(&tag, inner.clone()) {
+            return Ok(coerced);
+        }
+
+        return Ok(Node::Tagged(Box::new(inner), tag));
+    }
+
     if source.current() == Some(CHAR_ASTERISK) {
         source.next();
         let name = collect_until(source, |c| {

@@ -57,6 +57,9 @@ pub enum Node {
     /// Represents an anchored node: a node with an associated anchor name
     /// Stores the inner node and the anchor name (e.g., &anchor)
     Anchored(Box<Node>, String),
+    /// Represents a tagged node using YAML tag syntax (e.g., !!str, !mytag)
+    /// Stores the inner node and the tag string
+    Tagged(Box<Node>, String),
     /// Represents an alias node that references a previously anchored node
     /// Stores the anchor name (e.g., *alias)
     Alias(String),

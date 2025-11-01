@@ -257,6 +257,11 @@ fn stringify_document_with_indent(
             destination.add_bytes(&format!("{CHAR_AMPERSAND}{name}{CHAR_SPACE}"));
             stringify_document_with_indent(inner, destination, indent)?;
         }
+        Node::Tagged(inner, tag) => {
+            // Emit tag before the node content
+            destination.add_bytes(&format!("{indent_str}{tag}{CHAR_SPACE}"));
+            stringify_document_with_indent(inner, destination, indent)?;
+        }
         Node::Alias(name) => {
             destination.add_bytes(&format!("{CHAR_ASTERISK}{name}"));
         }
@@ -273,6 +278,7 @@ fn node_is_blank(node: &Node) -> bool {
         Node::None => true,
         Node::Comment(_) => true,
         Node::Str(s, _, _) => s.is_empty(),
+        Node::Tagged(inner, _tag) => node_is_blank(inner),
         Node::Array(items) => items.iter().all(node_is_blank),
         Node::Mapping(pairs) => pairs.is_empty(),
         Node::Document(nodes) => nodes.iter().all(node_is_blank),
