@@ -525,7 +525,7 @@ mod tests {
         let yaml = b"-\n  name: Mark Joseph\n  hr: 87\n  avg: 0.278\n-\n  name: James Stephen\n  hr: 63\n  avg: 0.288\n";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source).unwrap();
-    // DEBUG: dump parsed AST (temporary diagnostic)
+        // DEBUG: dump parsed AST (temporary diagnostic)
 
         let mut mark_map = HashMap::new();
         mark_map.insert(
