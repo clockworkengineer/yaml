@@ -159,17 +159,17 @@ bar:
  <<: *base # base anchor will be merged
  age: 20
 
-## foo name won't be changed and it will be: John. On the other hand, bar's name will be changed to the base one: Everyone has same name
-#
-## YAML also has tags, which you can use to explicitly declare types.
-## Syntax: !![typeName] [value]
-#explicit_boolean: !!bool true
-#explicit_integer: !!int 42
-#explicit_float: !!float -42.24
-#explicit_string: !!str 0.5
-#explicit_datetime: !!timestamp 2022-11-17 12:34:56.78 +9
-#explicit_null: !!null null
-#
+# foo name won't be changed and it will be: John. On the other hand, bar's name will be changed to the base one: Everyone has same name
+
+# YAML also has tags, which you can use to explicitly declare types.
+# Syntax: !![typeName] [value]
+explicit_boolean: !!bool true
+explicit_integer: !!int 42
+explicit_float: !!float -42.24
+explicit_string: !!str 0.5
+explicit_datetime: !!timestamp 2022-11-17 12:34:56.78 +9
+explicit_null: !!null null
+
 ## Some parsers implement language specific tags, like this one for Python's
 ## complex number type.
 #python_complex_number: !!python/complex 1+2j
