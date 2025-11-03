@@ -1,9 +1,11 @@
+//! Module: stringify/toml.rs
+
 use crate::io::destinations::buffer::Buffer as BufferDestination;
 use crate::io::traits::IDestination;
 use crate::nodes::node::*;
 use crate::stringify::default::stringify as yaml_stringify;
 
-// Reuse JSON-style escaping for TOML basic strings
+
 fn escape_toml_string(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
@@ -45,7 +47,7 @@ fn node_to_key_string(key: &Node) -> Result<String, String> {
         Node::Boolean(b) => Ok((if *b { "true" } else { "false" }).to_string()),
         Node::None => Ok("".to_string()),
         _ => {
-            // Fall back to YAML stringify for complex keys
+
             let mut buf = BufferDestination::new();
             yaml_stringify(key, &mut buf).map_err(|e| e)?;
             Ok(buf.to_string())
@@ -53,7 +55,6 @@ fn node_to_key_string(key: &Node) -> Result<String, String> {
     }
 }
 
-// (removed unused flatten_mapping helper)
 
 fn is_array_of_maps(node: &Node) -> bool {
     match node {
@@ -62,8 +63,7 @@ fn is_array_of_maps(node: &Node) -> bool {
     }
 }
 
-// Write scalar (non-mapping) key/value pairs from `pairs`. If `write_newline` is true,
-// prepend a newline before writing the first entry.
+
 fn write_scalar_entries(
     pairs: &Vec<(Node, Node)>,
     prefix: Option<&str>,
@@ -71,11 +71,11 @@ fn write_scalar_entries(
     write_newline: &mut bool,
 ) -> Result<(), String> {
     for (k, v) in pairs.iter() {
-        // skip mapping values and arrays of mappings here
+
         if matches!(v, Node::Mapping(_)) || is_array_of_maps(v) {
             continue;
         }
-        // skip None values
+
         if let Node::None = v {
             continue;
         }
@@ -84,30 +84,28 @@ fn write_scalar_entries(
         }
         *write_newline = true;
 
-        // When writing scalar entries inside a table, we emit the local key only.
-        // For top-level we also emit the local key (no dotted prefix) because
-        // nested tables are represented by headers.
+
         let key_str = node_to_key_string(k)?;
         destination.add_bytes(&key_str);
         destination.add_bytes(" = ");
         write_toml_value(v, destination)?;
     }
-    // prefix is kept for potential future use; silence unused variable warning explicitly
+
     let _ = prefix;
     Ok(())
 }
 
-// Write a table recursively. If prefix is None, writes top-level scalar entries first.
+
 fn write_table(
     pairs: &Vec<(Node, Node)>,
     prefix: Option<&str>,
     destination: &mut dyn IDestination,
 ) -> Result<(), String> {
-    // First write scalar entries at this level
+
     let mut wrote_any = false;
     write_scalar_entries(pairs, prefix, destination, &mut wrote_any)?;
 
-    // Handle arrays-of-maps (array of tables)
+
     for (k, v) in pairs.iter() {
         if is_array_of_maps(v) {
             let key_str = node_to_key_string(k)?;
@@ -126,7 +124,7 @@ fn write_table(
             if let Node::Array(items) = v {
                 for item in items.iter() {
                     if let Node::Mapping(inner) = item {
-                        // array-of-tables header
+
                         if wrote_any {
                             destination.add_byte(b'\n');
                         }
@@ -134,12 +132,12 @@ fn write_table(
                         destination.add_bytes("[[");
                         destination.add_bytes(&full_key);
                         destination.add_bytes("]]");
-                        // write inner scalar entries for this table
+
                         write_scalar_entries(inner, Some(&full_key), destination, &mut true)?;
-                        // recurse for nested maps within this element
+
                         for (ik, iv) in inner.iter() {
                             if matches!(iv, Node::Mapping(_)) || is_array_of_maps(iv) {
-                                // recurse with element's key as prefix
+
                                 if let Node::Mapping(_) = iv {
                                     write_table(
                                         &vec![(ik.clone(), iv.clone())],
@@ -155,7 +153,7 @@ fn write_table(
         }
     }
 
-    // Then handle nested mappings (as tables)
+
     for (k, v) in pairs.iter() {
         if let Node::Mapping(inner) = v {
             let key_str = node_to_key_string(k)?;
@@ -171,7 +169,7 @@ fn write_table(
                 key_str.clone()
             };
 
-            // header
+
             if wrote_any {
                 destination.add_byte(b'\n');
             }
@@ -180,10 +178,10 @@ fn write_table(
             destination.add_bytes(&full_key);
             destination.add_bytes("]");
 
-            // write scalar entries inside the table
+
             write_scalar_entries(inner, Some(&full_key), destination, &mut true)?;
 
-            // recurse to write deeper nested tables
+
             for (ik, iv) in inner.iter() {
                 if matches!(iv, Node::Mapping(_)) || is_array_of_maps(iv) {
                     if let Node::Mapping(_) = iv {
@@ -204,8 +202,8 @@ fn write_table(
 fn write_toml_value(node: &Node, destination: &mut dyn IDestination) -> Result<(), String> {
     match node {
         Node::None => {
-            // TOML doesn't support null; caller should omit keys with None.
-            // If we ever get a standalone None, emit an empty string.
+
+
             destination.add_bytes("\"\"")
         }
         Node::Boolean(b) => destination.add_bytes(if *b { "true" } else { "false" }),
@@ -232,16 +230,15 @@ fn write_toml_value(node: &Node, destination: &mut dyn IDestination) -> Result<(
             destination.add_byte(b']');
         }
         Node::Mapping(pairs) => {
-            // For mappings we prefer to output TOML tables for nested mappings
-            // and array-of-tables for arrays of mappings. Use a dedicated
-            // table writer to keep output idiomatic.
+
+
             write_table(pairs, None, destination)?;
         }
         Node::Document(nodes) => {
             if nodes.len() == 1 {
                 write_toml_value(&nodes[0], destination)?;
             } else {
-                // multiple top-level nodes: write each separated by a newline
+
                 for (i, n) in nodes.iter().enumerate() {
                     if i > 0 {
                         destination.add_byte(b'\n');
@@ -262,12 +259,14 @@ fn write_toml_value(node: &Node, destination: &mut dyn IDestination) -> Result<(
             }
         }
         Node::Comment(_) => {
-            // Emit TOML comment
-            // Skip comment content for now to keep output deterministic
+
+
         }
     }
     Ok(())
 }
+
+/// stringify
 
 pub fn stringify(node: &Node, destination: &mut dyn IDestination) -> Result<(), String> {
     match node {
@@ -282,7 +281,7 @@ pub fn stringify_pretty(
     destination: &mut dyn IDestination,
     _spaces_per_indent: usize,
 ) -> Result<(), String> {
-    // For now pretty is same as non-pretty; TOML output here is already human readable
+
     stringify(node, destination)
 }
 
@@ -308,7 +307,7 @@ mod tests {
         stringify(&ni, &mut buf).unwrap();
         assert_eq!(buf.to_string(), "10");
 
-        // mapping
+
         buf.clear();
         let m = Node::Mapping(vec![(
             Node::Str("a".to_string(), QuoteType::Unquoted, BlockStyle::None),
@@ -317,7 +316,7 @@ mod tests {
         stringify(&m, &mut buf).unwrap();
         assert_eq!(buf.to_string(), "a = 1");
 
-        // nested mapping -> table
+
         buf.clear();
         let nested = Node::Mapping(vec![(
             Node::Str("parent".to_string(), QuoteType::Unquoted, BlockStyle::None),

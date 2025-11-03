@@ -1,3 +1,5 @@
+//! Module: io/sources/buffer.rs
+
 use crate::io::traits::ISource;
 
 /// A memory buffer implementation for reading JSON data from bytes.
@@ -11,12 +13,8 @@ pub struct Buffer {
     column: usize,
     /// Current line position in the buffer
     line: usize,
-    // /// Last position in the buffer
-    // last_position: usize,
-    // /// Last column position in the buffer
-    // last_column: usize,
-    // /// Last line position in the buffer
-    // last_line: usize,
+
+
 }
 
 impl Buffer {
@@ -72,7 +70,7 @@ impl ISource for Buffer {
     fn reset(&mut self) {
         self.position = 0;
     }
-    // Use save_state/restore_state for restoring positions
+
 
     fn get_current_indent_level(&self) -> usize {
         self.column
@@ -176,7 +174,7 @@ mod tests {
     #[test]
     fn save_restore_works() {
         let mut source = Buffer::new(String::from("abc").as_bytes());
-        // single-step behavior using save_state/restore_state
+
         let s0 = source.save_state();
         source.next();
         source.restore_state(s0);
@@ -185,10 +183,10 @@ mod tests {
             _ => assert!(false),
         }
 
-        // save/restore round-trip
-        source.next(); // move to 'b'
+
+        source.next();
         let s = source.save_state();
-        source.next(); // move to 'c'
+        source.next();
         assert_eq!(source.current(), Some('c'));
         source.restore_state(s);
         assert_eq!(source.current(), Some('b'));
@@ -204,9 +202,9 @@ mod tests {
     #[test]
     fn buffer_eof_after_consumption() {
         let mut source = Buffer::new(String::from("xy").as_bytes());
-        // consume all bytes
-        source.next(); // to 'y'
-        source.next(); // to EOF
+
+        source.next();
+        source.next();
         assert_eq!(source.current(), None);
         assert!(!source.more());
     }
@@ -215,9 +213,9 @@ mod tests {
     fn buffer_next_safe_at_eof() {
         let mut source = Buffer::new(String::from("a").as_bytes());
         assert_eq!(source.current(), Some('a'));
-        source.next(); // EOF
+        source.next();
         assert_eq!(source.current(), None);
-        source.next(); // should remain at EOF and not panic
+        source.next();
         assert_eq!(source.current(), None);
         assert!(!source.more());
     }
@@ -226,7 +224,7 @@ mod tests {
     fn buffer_reset_restores_after_eof() {
         let mut source = Buffer::new(String::from("z").as_bytes());
         assert_eq!(source.current(), Some('z'));
-        source.next(); // EOF
+        source.next();
         assert_eq!(source.current(), None);
         source.reset();
         assert_eq!(source.current(), Some('z'));

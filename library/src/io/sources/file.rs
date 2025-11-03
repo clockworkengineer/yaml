@@ -1,6 +1,10 @@
+//! Module: io/sources/file.rs
+
 use crate::io::traits::ISource;
 use std::fs::File as StdFile;
 use std::io::{Read, Seek, SeekFrom};
+
+/// File
 
 pub struct File {
     file: StdFile,
@@ -10,21 +14,22 @@ pub struct File {
 }
 
 impl File {
+    /// new
     pub fn new(path: &str) -> std::io::Result<Self> {
         let mut file = StdFile::open(path)?;
-        // Read first byte and normalize CRLF to a single '\n' like `next()` does.
+
         let mut first = [0u8; 1];
         let has_first = file.read(&mut first)? == 1;
         let current_byte = if has_first {
             if first[0] == b'\r' {
-                // Peek the next byte
+
                 let mut next = [0u8; 1];
                 if file.read(&mut next)? == 1 {
                     if next[0] == b'\n' {
-                        // CRLF -> treat as single '\n'
+
                         Some(b'\n')
                     } else {
-                        // Not CRLF: seek back one and keep '\r'
+
                         file.seek(SeekFrom::Current(-1))?;
                         Some(first[0])
                     }
@@ -60,10 +65,10 @@ impl ISource for File {
         }
         if self.file.read(&mut byte1).unwrap_or(0) == 1 {
             if byte1[0] == b'\r' {
-                // Attempt to read the following byte; handle partial/EOF reads explicitly
+
                 match self.file.read(&mut byte2) {
                     Ok(1) => {
-                        // Treat \r\n as a single \n
+
                         if byte2[0] == b'\n' {
                             self.line += 1;
                             self.column = 0;
@@ -74,7 +79,7 @@ impl ISource for File {
                         }
                     }
                     Ok(_) | Err(_) => {
-                        // No next byte available; keep the '\r' as current
+
                         self.current_byte = Some(byte1[0]);
                     }
                 }
@@ -106,7 +111,7 @@ impl ISource for File {
         }
     }
 
-    // Use save_state/restore_state for restoring positions
+
     fn get_current_indent_level(&self) -> usize {
         self.column
     }
@@ -122,7 +127,7 @@ impl ISource for File {
     }
 
     fn restore_state(&mut self, state: crate::io::traits::SaveState) {
-        // Restore underlying file cursor to the saved next-read position
+
         let _ = self.file.seek(SeekFrom::Start(state.pos));
         self.current_byte = state.current_byte;
         self.column = state.column;
@@ -201,19 +206,19 @@ mod tests {
     fn test_file_save_restore() {
         let test_file = TestFile::new(b"123\r\n456");
         let mut file = File::new(&test_file.path).unwrap();
-        // Validate save/restore works for multiple positions
+
         assert_eq!(file.current(), Some('1'));
-        let s1 = file.save_state(); // at '1'
-        file.next(); // move to '2'
-        let s2 = file.save_state(); // at '2'
-        file.next(); // move to '3'
-        let s3 = file.save_state(); // at '3'
-        file.next(); // move to '\n' (CRLF treated as single '\n')
-        let s_newline = file.save_state(); // at '\n'
-        file.next(); // move to '4'
+        let s1 = file.save_state();
+        file.next();
+        let s2 = file.save_state();
+        file.next();
+        let s3 = file.save_state();
+        file.next();
+        let s_newline = file.save_state();
+        file.next();
         assert_eq!(file.current(), Some('4'));
 
-        // restore to various saved positions
+
         file.restore_state(s_newline);
         assert_eq!(file.current(), Some('\n'));
         file.restore_state(s3);
@@ -234,9 +239,9 @@ mod tests {
         assert_eq!(file.get_current_indent_level(), 1);
         file.next();
         assert_eq!(file.get_current_indent_level(), 2);
-        file.next(); // now at '\n'
+        file.next();
         assert_eq!(file.get_current_indent_level(), 3);
-        file.next(); // should reset column to 0
+        file.next();
         assert_eq!(file.get_current_indent_level(), 0);
     }
 
@@ -253,46 +258,46 @@ mod tests {
         let test_file = TestFile::new(b"ab\r\ncd\r\nef");
         let mut file = File::new(&test_file.path).unwrap();
 
-        // 'a'
+
         assert_eq!(file.current(), Some('a'));
         assert_eq!(file.get_current_indent_level(), 0);
 
-        // 'b'
+
         file.next();
         assert_eq!(file.current(), Some('b'));
         assert_eq!(file.get_current_indent_level(), 1);
 
-        // '\n' (should reset column)
+
         file.next();
         assert_eq!(file.current(), Some('\n'));
         assert_eq!(file.get_current_indent_level(), 0);
 
-        // 'c'
+
         file.next();
         assert_eq!(file.current(), Some('c'));
         assert_eq!(file.get_current_indent_level(), 0);
 
-        // 'd'
+
         file.next();
         assert_eq!(file.current(), Some('d'));
         assert_eq!(file.get_current_indent_level(), 1);
 
-        // '\n'
+
         file.next();
         assert_eq!(file.current(), Some('\n'));
         assert_eq!(file.get_current_indent_level(), 0);
 
-        // 'e'
+
         file.next();
         assert_eq!(file.current(), Some('e'));
         assert_eq!(file.get_current_indent_level(), 0);
 
-        // 'f'
+
         file.next();
         assert_eq!(file.current(), Some('f'));
         assert_eq!(file.get_current_indent_level(), 1);
 
-        // None
+
         file.next();
         assert_eq!(file.current(), None);
     }
@@ -301,9 +306,9 @@ mod tests {
     fn test_file_eof_after_consumption() {
         let test_file = TestFile::new(b"xy");
         let mut file = File::new(&test_file.path).unwrap();
-        // consume all bytes
-        file.next(); // to 'y'
-        file.next(); // to EOF
+
+        file.next();
+        file.next();
         assert_eq!(file.current(), None);
         assert!(!file.more());
     }
@@ -313,9 +318,9 @@ mod tests {
         let test_file = TestFile::new(b"a");
         let mut file = File::new(&test_file.path).unwrap();
         assert_eq!(file.current(), Some('a'));
-        file.next(); // move to EOF
+        file.next();
         assert_eq!(file.current(), None);
-        // calling next again should be safe and leave us at EOF
+
         file.next();
         assert_eq!(file.current(), None);
         assert!(!file.more());
@@ -326,32 +331,32 @@ mod tests {
         let test_file = TestFile::new(b"- [Sammy Sosa, 63, 0.288]");
         let mut file = File::new(&test_file.path).unwrap();
         assert_eq!(file.current(), Some('-'));
-        file.next(); // move to ' '
-        file.next(); // move to '['
+        file.next();
+        file.next();
         assert_eq!(file.current(), Some('['));
-        file.next(); // move to 'S'
-        file.next(); // move to 'a'
-        file.next(); // move to 'm'
-        file.next(); // move to 'm'
-        file.next(); // move to 'y'
-        file.next(); // move to ' '
-        file.next(); // move to 'S'
-        file.next(); // move to 'o'
-        file.next(); // move to 's'
-        file.next(); // move to 'a'
-        file.next(); // move to ','
-        file.next(); // move to ' '
-        file.next(); // move to '6'
-        file.next(); // move to '3'
-        file.next(); // move to ','
-        file.next(); // move to ' '
-        file.next(); // move to '0'
-        file.next(); // move to '.'
-        file.next(); // move to '2'
-        file.next(); // move to '8'
-        file.next(); // move to '8'
-        file.next(); // move to ']'
-        file.next(); // move to EOF
+        file.next();
+        file.next();
+        file.next();
+        file.next();
+        file.next();
+        file.next();
+        file.next();
+        file.next();
+        file.next();
+        file.next();
+        file.next();
+        file.next();
+        file.next();
+        file.next();
+        file.next();
+        file.next();
+        file.next();
+        file.next();
+        file.next();
+        file.next();
+        file.next();
+        file.next();
+        file.next();
         assert_eq!(file.current(), None);
         file.reset();
         assert_eq!(file.current(), Some('-'));

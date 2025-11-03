@@ -18,7 +18,6 @@ pub trait ISource {
     /// Restore a previously-saved state.
     fn restore_state(&mut self, state: SaveState);
 
-    // (previous object-safe save/restore removed in favor of concrete SaveState)
 
     fn is_whitespace(&self, c: char) -> bool {
         c == ' ' || c == '\t'
@@ -29,6 +28,7 @@ pub trait ISource {
 
 /// Concrete save/restore snapshot used by all ISource implementations.
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// SaveState
 pub struct SaveState {
     /// Absolute byte position in the underlying source (file cursor or buffer index).
     pub pos: u64,

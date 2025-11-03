@@ -1,3 +1,5 @@
+//! Module: test/json_tests.rs
+
 #[cfg(test)]
 mod tests {
     use crate::io::traits::IDestination;

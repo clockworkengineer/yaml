@@ -1,14 +1,16 @@
+//! Module: stringify/default.rs
+
 use crate::constants::*;
 use crate::io::traits::IDestination;
 use crate::nodes::node::*;
 
-// Escape string for double-quoted YAML scalars.
+
 fn escape_double(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut iter = s.chars().peekable();
     while let Some(c) = iter.next() {
         match c {
-            // Preserve literal newlines to support multi-line flow scalars
+
             CHAR_NEWLINE => out.push(CHAR_NEWLINE),
             CHAR_CARRIAGE_RETURN => {
                 out.push(CHAR_BACKSLASH);
@@ -19,13 +21,13 @@ fn escape_double(s: &str) -> String {
                 out.push('t');
             }
             CHAR_BACKSLASH => {
-                // If this is a known YAML escape (n, r, t, b, x), emit as-is
+
                 if let Some(&next) = iter.peek() {
                     match next {
                         'n' | 'r' | 't' | 'b' | 'x' => {
                             out.push(CHAR_BACKSLASH);
                             out.push(next);
-                            iter.next(); // consume the peeked char
+                            iter.next();
                         }
                         _ => {
                             out.push(CHAR_BACKSLASH);
@@ -50,7 +52,7 @@ fn escape_double(s: &str) -> String {
     out
 }
 
-// Escape string for single-quoted YAML scalars by doubling single quotes.
+
 fn escape_single(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
@@ -64,8 +66,7 @@ fn escape_single(s: &str) -> String {
     out
 }
 
-// Normalize newlines by removing CR characters so inputs read from files
-// with CRLF line endings don't emit stray '\r' characters when stringified.
+
 fn normalize_newlines(s: &str) -> String {
     s.replace(CHAR_CARRIAGE_RETURN, "")
 }
@@ -80,12 +81,12 @@ fn stringify_document_with_indent(
         Node::None => destination.add_bytes(&format!("{indent_str}null")),
         Node::Boolean(b) => destination.add_bytes(&format!("{indent_str}{b}")),
         Node::Str(s, qt, style) => {
-            // Normalize CRLF -> LF by removing CR so file-based input using
-            // Windows line endings doesn't leak '\r' into the output.
+
+
             let s = normalize_newlines(s);
             match qt {
                 QuoteType::Double => {
-                    // escape common sequences for double-quoted output
+
                     destination.add_bytes(&format!(
                         "{}{}{}{}",
                         indent_str,
@@ -95,9 +96,8 @@ fn stringify_document_with_indent(
                     ))
                 }
                 QuoteType::Single => {
-                    // Prefer double quotes only for single-line content that contains
-                    // a single quote or backslash. Preserve single quotes for multiline
-                    // scalars to match expected output semantics.
+
+
                     if !s.contains(CHAR_NEWLINE)
                         && (s.contains(CHAR_SINGLE_QUOTE) || s.contains(CHAR_BACKSLASH))
                     {
@@ -109,7 +109,7 @@ fn stringify_document_with_indent(
                             CHAR_DOUBLE_QUOTE
                         ))
                     } else {
-                        // In single-quoted YAML scalars, single quotes are represented by doubling them
+
                         destination.add_bytes(&format!(
                             "{}{}{}{}",
                             indent_str,
@@ -120,20 +120,18 @@ fn stringify_document_with_indent(
                     }
                 }
                 QuoteType::Unquoted => {
-                    // Emit literal block scalars '|' when content is multiline OR when style is explicitly Literal.
+
                     if s.contains(CHAR_NEWLINE) || matches!(style, BlockStyle::Literal) {
-                        // For literal style, emit lines exactly as stored by the parser
-                        // to avoid double-indenting when the AST already includes leading
-                        // spaces. For other multiline unquoted scalars, indent by one.
+
+
                         let is_literal = matches!(style, BlockStyle::Literal);
-                        // Determine if the content already contains leading indentation on all
-                        // non-empty lines. If so, do not add additional emitter indentation to
-                        // avoid doubling spaces. Otherwise indent by one level.
+
+
                         let lines: Vec<&str> = s.split(CHAR_NEWLINE).collect();
                         let needs_indent = if is_literal {
                             lines.iter().any(|l| !l.is_empty() && !l.starts_with(' '))
                         } else {
-                            // non-literal multiline unquoted always needs indenting
+
                             true
                         };
                         let content_indent = if needs_indent {
@@ -145,7 +143,7 @@ fn stringify_document_with_indent(
                             .add_bytes(&format!("{indent_str}{STR_LITERAL_BLOCK}{CHAR_NEWLINE}"));
 
                         if !s.contains(CHAR_NEWLINE) && is_literal {
-                            // Single-line literal: emit as-is
+
                             destination.add_bytes(&format!("{content_indent}{s}{CHAR_NEWLINE}"));
                         } else {
                             for line in lines {
@@ -165,7 +163,7 @@ fn stringify_document_with_indent(
             }
         }
         Node::Comment(c) => {
-            // Normalize comments as well to avoid CR characters from file sources
+
             let c = normalize_newlines(c);
             destination.add_bytes(&format!("{indent_str}{CHAR_HASH}{CHAR_SPACE}{c}"))
         }
@@ -179,10 +177,8 @@ fn stringify_document_with_indent(
                 destination.add_bytes(&format!("{indent_str}{CHAR_DASH}{CHAR_SPACE}"));
                 match item {
                     Node::Mapping(_) => {
-                        // Serialize mapping into a temporary buffer at child
-                        // indent and strip that leading indent once so the
-                        // first line appears after the "-". Later lines
-                        // remain indented.
+
+
                         let mut buf = crate::io::destinations::buffer::Buffer::new();
                         stringify_document_with_indent(item, &mut buf, indent + 1)?;
                         let mut out = buf.to_string();
@@ -193,9 +189,8 @@ fn stringify_document_with_indent(
                         destination.add_bytes(&out);
                     }
                     Node::Array(_) => {
-                        // Serialize a nested sequence into a temporary buffer at
-                        // child indent and strip the leading child indent once
-                        // so the first inner item follows the outer "-".
+
+
                         let mut buf = crate::io::destinations::buffer::Buffer::new();
                         stringify_document_with_indent(item, &mut buf, indent + 1)?;
                         let mut out = buf.to_string();
@@ -214,15 +209,15 @@ fn stringify_document_with_indent(
         }
 
         Node::Mapping(pairs) => {
-            // Mapping keys are Nodes; stringify each key Node into a temporary buffer
+
             for (key_node, value) in pairs {
-                // If the key is a float number, emit it as a quoted string so
-                // mapping keys like 0.25 become "0.25". Integers remain unquoted.
+
+
                 let key_str = match key_node {
                     Node::Number(Numeric::Float(f)) => format!("\"{}\"", f),
                     Node::Number(Numeric::Integer(i)) => format!("{}", i),
                     _ => {
-                        // Use a temporary buffer to stringify the key Node
+
                         let mut key_buf = crate::io::destinations::buffer::Buffer::new();
                         stringify_document_with_indent(key_node, &mut key_buf, 0)?;
                         key_buf.to_string()
@@ -237,7 +232,7 @@ fn stringify_document_with_indent(
                         stringify_document_with_indent(value, destination, indent + 1)?;
                     }
                     Node::Str(_, QuoteType::Unquoted, BlockStyle::Literal) => {
-                        // Literal block already emits its own trailing newline lines; don't add another
+
                         stringify_document_with_indent(value, destination, 0)?;
                     }
                     _ => {
@@ -253,12 +248,12 @@ fn stringify_document_with_indent(
             }
         }
         Node::Anchored(inner, name) => {
-            // Emit an anchor before the node
+
             destination.add_bytes(&format!("{CHAR_AMPERSAND}{name}{CHAR_SPACE}"));
             stringify_document_with_indent(inner, destination, indent)?;
         }
         Node::Tagged(inner, tag) => {
-            // Emit tag before the node content
+
             destination.add_bytes(&format!("{indent_str}{tag}{CHAR_SPACE}"));
             stringify_document_with_indent(inner, destination, indent)?;
         }
@@ -272,7 +267,7 @@ fn stringify_document_with_indent(
     Ok(())
 }
 
-// Helper to determine whether a node is blank (used when emitting documents)
+
 fn node_is_blank(node: &Node) -> bool {
     match node {
         Node::None => true,
@@ -286,28 +281,30 @@ fn node_is_blank(node: &Node) -> bool {
     }
 }
 
+/// stringify_document
+
 pub fn stringify_document(node: &Node, destination: &mut dyn IDestination) -> Result<(), String> {
     stringify_document_with_indent(node, destination, 0)
 }
 
+/// stringify
+
 pub fn stringify(node: &Node, destination: &mut dyn IDestination) -> Result<(), String> {
     match node {
         Node::Documents(docs) => {
-            // Helper to determine whether a node contains any meaningful content
-            // use module-level `node_is_blank`
+
 
             for doc in docs {
-                // Emit all documents, including empty ones, to preserve explicit document boundaries
+
                 if let Node::Document(nodes) = doc {
-                    // If this document is empty, emit only the start marker and continue
+
                     if nodes.iter().all(node_is_blank) {
                         destination.add_bytes("---\n");
                         continue;
                     }
                 }
 
-                // Special-case: a document that is a single literal block scalar should emit
-                // the '|' on the same line as the '---' per test expectations.
+
                 if let Node::Document(nodes) = doc {
                     if nodes.len() == 1 {
                         if let Node::Str(s, QuoteType::Unquoted, BlockStyle::Literal) = &nodes[0] {
@@ -343,11 +340,11 @@ mod tests {
 
     #[test]
     fn test_escape_double_basic() {
-        // double-quote must be escaped
+
         assert_eq!(escape_double("a\"b"), "a\\\"b");
-        // known escape sequences remain as backslash+char when preceded by a backslash
+
         assert_eq!(escape_double("\\n"), "\\n");
-        // control character should be emitted as a unicode escape
+
         assert_eq!(escape_double("\u{0001}"), "\\u0001");
     }
 

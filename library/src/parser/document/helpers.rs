@@ -1,3 +1,5 @@
+//! Module: parser/document/helpers.rs
+
 use crate::constants::*;
 use crate::error::messages::*;
 use crate::io::traits::ISource;

@@ -1,3 +1,4 @@
 /// Module for parsing YAML documents
 #[path = "document/mod.rs"]
+/// document
 pub mod document;

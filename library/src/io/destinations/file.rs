@@ -1,3 +1,5 @@
+//! Module: io/destinations/file.rs
+
 use crate::io::traits::IDestination;
 use std::fs::File as StdFile;
 use std::io::{Read, Seek, Write};

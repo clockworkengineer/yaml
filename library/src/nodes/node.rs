@@ -1,21 +1,25 @@
+//! Module: nodes/node.rs
+
 use std::ops::{Index, IndexMut};
 
 /// Represents different numeric types that can be stored in a YAML node
 #[derive(Clone, Debug, PartialEq)]
+/// Numeric
 pub enum Numeric {
-    Integer(i64),  // 64-bit signed integer
-    Float(f64),    // 64-bit floating point
-    UInteger(u64), // 64-bit unsigned integer
-    Byte(u8),      // 8-bit unsigned integer
-    Int32(i32),    // 32-bit signed integer
-    UInt32(u32),   // 32-bit unsigned integer
-    Int16(i16),    // 16-bit signed integer
-    UInt16(u16),   // 16-bit unsigned integer
-    Int8(i8),      // 8-bit signed integer
+    Integer(i64),
+    Float(f64),
+    UInteger(u64),
+    Byte(u8),
+    Int32(i32),
+    UInt32(u32),
+    Int16(i16),
+    UInt16(u16),
+    Int8(i8),
 }
 
 /// Represents how a string was quoted in the source YAML
 #[derive(Clone, Debug, PartialEq)]
+/// QuoteType
 pub enum QuoteType {
     Unquoted,
     Single,
@@ -24,6 +28,7 @@ pub enum QuoteType {
 
 /// Represents whether a string originated from a block scalar and its style
 #[derive(Clone, Debug, PartialEq)]
+/// BlockStyle
 pub enum BlockStyle {
     None,
     Literal,
@@ -32,6 +37,7 @@ pub enum BlockStyle {
 
 /// A node in the YAML data structure that can represent different types of values.
 #[derive(Clone, Debug, PartialEq)]
+/// Node
 pub enum Node {
     /// Represents a boolean value (true/false)
     /// Used for YAML boolean values like true/false, yes/no, on/off
@@ -492,10 +498,10 @@ mod tests {
             )]),
         )]);
 
-        // Read nested value
+
         assert_eq!(obj["outer"]["inner"], Node::from(5));
 
-        // Mutate nested value via chained indexing
+
         obj["outer"]["inner"] = Node::from(10);
         assert_eq!(obj["outer"]["inner"], Node::from(10));
     }

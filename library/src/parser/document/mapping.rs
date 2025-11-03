@@ -1,3 +1,5 @@
+//! Module: parser/document/mapping.rs
+
 use crate::constants::*;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;

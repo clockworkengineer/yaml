@@ -1,15 +1,16 @@
+//! Module: file/file.rs
 
 use std::fs::File;
 use std::io::{Read, Result, Write};
 
 /// Represents different Unicode text file formats with their corresponding byte order marks (BOM)
 pub enum Format {
-    Utf8,        // UTF-8 without BOM
-    Utf8bom,     // UTF-8 with BOM (EF BB BF)
-    Utf16le,     // UTF-16 Little Endian (FF FE)
-    Utf16be,     // UTF-16 Big Endian (FE FF)
-    Utf32le,     // UTF-32 Little Endian (FF FE 00 00)
-    Utf32be,     // UTF-32 Big Endian (00 00 FE FF)
+    Utf8,
+    Utf8bom,
+    Utf16le,
+    Utf16be,
+    Utf32le,
+    Utf32be,
 }
 
 impl Format {
@@ -144,10 +145,6 @@ pub fn read_file_to_string(filename: &str) -> Result<String> {
 }
 
 
-
-
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -157,7 +154,7 @@ mod tests {
 
     fn temp_file(name: &str) -> PathBuf {
         let mut p = std::env::temp_dir();
-        // ensure uniqueness by adding a timestamp
+
         let ts = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -182,7 +179,7 @@ mod tests {
     #[test]
     fn detect_utf8_empty_file() {
         let path = temp_file("empty_utf8");
-        // create empty file
+
         File::create(&path).unwrap();
         let fmt = detect_format(path.to_str().unwrap()).unwrap();
         assert!(matches!(fmt, Format::Utf8));
@@ -228,7 +225,7 @@ mod tests {
 
     #[test]
     fn roundtrip_all_formats_unicode() {
-        let content = "Héllö – 世界\nLine2"; // includes accents, en dash, CJK
+        let content = "Héllö – 世界\nLine2";
         roundtrip(content, Format::Utf8);
         roundtrip(content, Format::Utf8bom);
         roundtrip(content, Format::Utf16le);
@@ -249,7 +246,7 @@ mod tests {
 
     #[test]
     fn write_bom_presence() {
-        // Ensure write_file_from_string emits BOM for formats that require it
+
         let cases = vec![
             (Format::Utf8, vec![] as Vec<u8>),
             (Format::Utf8bom, vec![0xEF, 0xBB, 0xBF]),

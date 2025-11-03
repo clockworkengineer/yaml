@@ -1,3 +1,5 @@
+//! Module: test/bencode_tests.rs
+
 #[cfg(test)]
 mod tests {
     use crate::io::traits::IDestination;
@@ -32,7 +34,7 @@ fn test_bencode_list_and_map_sorting() {
         (Node::from("a"), Node::from("alpha")),
     ]);
     crate::stringify::bencode::stringify(&mapping, &mut buf).expect("bencode stringify failed");
-    // keys should be sorted lexicographically: 'a' then 'b'
+
     assert_eq!(buf.to_string(), "d1: a5:alpha1: b4:betae".replace(" ", ""));
 }
 
@@ -57,7 +59,7 @@ fn test_bencode_nested_mapping() {
         Node::Array(vec![Node::from(1), Node::from(2)]),
     )]);
     crate::stringify::bencode::stringify(&mapping, &mut buf).expect("bencode stringify failed");
-    // Expect: d4:listl i1e i2e e  -> without spaces: d4:listli1ei2ee
+
     assert_eq!(buf.to_string(), "d4:listli1ei2eee");
 }
 }

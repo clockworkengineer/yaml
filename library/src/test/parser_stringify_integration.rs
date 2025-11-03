@@ -12,8 +12,7 @@ mod tests {
     use std::fs;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    // Normalize newlines by removing CR characters so inputs read from files
-    // with CRLF line endings don't emit stray '\r' characters when stringified.
+
     fn normalize_newlines(s: &str) -> String {
         s.replace('\r', "")
     }
@@ -59,7 +58,7 @@ mod tests {
         let mut source = BufferSource::new(b"- 1\n- 2\n- 3");
         let result = parse(&mut source).unwrap();
 
-        // parsed document structure
+
         assert_eq!(
             result,
             Node::Documents(vec![Document(vec![Node::Array(vec![
@@ -74,7 +73,7 @@ mod tests {
     fn test_parse_sequence_with_comments() {
         let mut source = BufferSource::new(b"- 1\n# Comment 1\n- 2\n# Comment 2");
         let result = parse(&mut source).unwrap();
-        // Comments are stripped; a sequence should contain only the items
+
         assert_eq!(
             result,
             Node::Documents(vec![Document(vec![Node::Array(vec![
@@ -126,7 +125,7 @@ mod tests {
     fn test_parse_comment_only() {
         let mut source = BufferSource::new(b"# Just a comment");
         let result = parse(&mut source).unwrap();
-        // The parser strips comments; comment-only content yields an empty document
+
         assert_eq!(result, Node::Documents(vec![Document(vec![])]));
     }
 
@@ -166,7 +165,7 @@ mod tests {
             b"# Header comment 1\n# Header comment 2\n# Header comment 3\nkey: value\n",
         );
         let result = parse(&mut source).unwrap();
-        // Header comments are stripped; only the mapping should remain
+
         assert_eq!(
             result,
             Node::Documents(vec![Document(vec![{
@@ -307,7 +306,7 @@ mod tests {
             Node::Str("item2".to_string(), QuoteType::Unquoted, BlockStyle::None),
         ]);
         let expected = Node::Documents(vec![Document(vec![
-            // Node::Comment("Comment 1".to_string()),
+
             Node::Mapping(vec![
                 (
                     Node::Str("key1".to_string(), QuoteType::Unquoted, BlockStyle::None),
@@ -318,7 +317,7 @@ mod tests {
                     Node::Str("value2".to_string(), QuoteType::Unquoted, BlockStyle::None),
                 ),
             ]),
-            // Node::Comment("Comment 2".to_string())
+
         ])]);
 
         assert_eq!(result, expected);
@@ -500,7 +499,7 @@ mod tests {
         );
         let result = parse(&mut source).unwrap();
 
-        // Expected: people -> [ { name: "John", likes: ["apples", "bananas"] } ]
+
         let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![(
             Node::Str("people".to_string(), QuoteType::Unquoted, BlockStyle::None),
             Node::Array(vec![Node::Mapping(vec![
@@ -525,7 +524,7 @@ mod tests {
         let yaml = b"-\n  name: Mark Joseph\n  hr: 87\n  avg: 0.278\n-\n  name: James Stephen\n  hr: 63\n  avg: 0.288\n";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source).unwrap();
-        // DEBUG: dump parsed AST (temporary diagnostic)
+
 
         let mut mark_map = HashMap::new();
         mark_map.insert(
@@ -655,7 +654,7 @@ mod tests {
     }
     #[test]
     fn test_block_scalar_like_string_same_line() {
-        // '>' at start of value should be treated as a plain string on the same line
+
         let mut source = BufferSource::new(b"key: > hello world");
         let result = parse(&mut source).unwrap();
         let mut expected = HashMap::new();
@@ -686,7 +685,7 @@ mod tests {
 
     #[test]
     fn test_block_scalar_like_string_next_line() {
-        // When the value line starts with '>' on the next indented line, treat it as plain string too
+
         let mut source = BufferSource::new(b"key:\n  > multi line");
         let result = parse(&mut source).unwrap();
         let mut expected = HashMap::new();
@@ -717,7 +716,7 @@ mod tests {
 
     #[test]
     fn test_flow_sequence_with_special_leading_chars_and_quotes() {
-        // In a flow sequence, items that start with special chars or quotes are kept as-is (no unquoting)
+
         let mut source = BufferSource::new(b"[<tag, 'quoted', \"double\", >folded]");
         let result = parse(&mut source).unwrap();
         let expected = Node::Documents(vec![Document(vec![Node::Array(vec![
@@ -731,12 +730,12 @@ mod tests {
 
     #[test]
     fn test_parse_and_preserve_local_tag_on_scalar() {
-        // Simple test: parse a local tag (!!str) applied to a plain scalar
-        // Coercion should convert the value to a quoted string node
+
+
         let mut source = BufferSource::new(b"value: !!str 123");
         let result = parse(&mut source).unwrap();
 
-        // Expect the mapping's value to be a Str node containing "123"
+
         if let Node::Documents(ref docs) = result {
             if let Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
@@ -751,21 +750,21 @@ mod tests {
                 }
             }
         }
-        // Debug: print the parsed result to help diagnose coercion failures
+
         println!("PARSED_RESULT: {:#?}", result);
         panic!("Expected coerced string node not found");
     }
 
     #[test]
     fn test_stringify_preserves_tag_token() {
-        // When a tag coerces the value (e.g. !!str), the stringifier should
-        // emit the coerced value (quoted) rather than the original tag token.
+
+
         let mut source = BufferSource::new(b"value: !!str 123");
         let node = parse(&mut source).unwrap();
         let mut dest = BufferDestination::new();
         stringify(&node, &mut dest).unwrap();
         let out = dest.to_string();
-        // Debug: print stringify output when assertion fails
+
         if !out.contains("\"123\"") {
             println!("STRINGIFIED_OUT:\n{}", out);
         }
@@ -778,7 +777,7 @@ mod tests {
 
     #[test]
     fn test_coerce_int_tag_on_numeric_string() {
-        // !!int applied to a quoted numeric should coerce to an integer node
+
         let mut source = BufferSource::new(b"value: !!int '123'");
         let result = parse(&mut source).unwrap();
 
@@ -797,7 +796,7 @@ mod tests {
 
     #[test]
     fn test_coerce_float_tag_on_numeric_string() {
-        // !!float applied to a quoted numeric should coerce to a float node
+
         let mut source = BufferSource::new(b"value: !!float '3.14'");
         let result = parse(&mut source).unwrap();
 
@@ -816,7 +815,7 @@ mod tests {
 
     #[test]
     fn test_coerce_float_tag_on_integer_value() {
-        // !!float applied to an integer should coerce to a float node (e.g. 2 -> 2.0)
+
         let mut source = BufferSource::new(b"value: !!float 2");
         let result = parse(&mut source).unwrap();
 
@@ -835,7 +834,7 @@ mod tests {
 
     #[test]
     fn test_coerce_float_tag_on_negative_float_value() {
-        // !!float applied to a float should preserve the value (e.g. -2.0 -> -2.0)
+
         let mut source = BufferSource::new(b"value: !!float -2.0");
         let result = parse(&mut source).unwrap();
 
@@ -854,7 +853,7 @@ mod tests {
 
     #[test]
     fn test_coerce_float_tag_on_negative_numeric_string() {
-        // !!float applied to a quoted negative numeric string should coerce to a float node
+
         let mut source = BufferSource::new(b"value: !!float '-2.5'");
         let result = parse(&mut source).unwrap();
 
@@ -873,7 +872,7 @@ mod tests {
 
     #[test]
     fn test_coerce_int_tag_on_negative_numeric_string() {
-        // !!int applied to a quoted negative numeric string should coerce to an integer node
+
         let mut source = BufferSource::new(b"value: !!int '-2'");
         let result = parse(&mut source).unwrap();
 
@@ -892,7 +891,7 @@ mod tests {
 
     #[test]
     fn test_coerce_float_tag_on_negative_integer_value() {
-        // !!float applied to a negative integer should coerce to a float node (e.g. -2 -> -2.0)
+
         let mut source = BufferSource::new(b"value: !!float -2");
         let result = parse(&mut source).unwrap();
 
@@ -911,7 +910,7 @@ mod tests {
 
     #[test]
     fn test_coerce_timestamp_on_date_string() {
-        // !!timestamp applied to a date string should be preserved/coerced to a string node
+
         let mut source = BufferSource::new(b"value: !!timestamp '2001-12-14'");
         let result = parse(&mut source).unwrap();
 
@@ -932,7 +931,7 @@ mod tests {
 
     #[test]
     fn test_coerce_timestamp_on_rfc3339_datetime() {
-        // !!timestamp applied to an RFC3339-like datetime should be preserved as a string
+
         let mut source = BufferSource::new(b"value: !!timestamp 2001-12-14T21:59:43Z");
         let result = parse(&mut source).unwrap();
 
@@ -953,7 +952,7 @@ mod tests {
 
     #[test]
     fn test_unknown_tag_is_preserved_and_stringified() {
-        // Unknown local tags should be preserved and emitted by the stringifier
+
         let mut source = BufferSource::new(b"value: !custom foo");
         let node = parse(&mut source).unwrap();
         let mut dest = BufferDestination::new();
@@ -968,7 +967,7 @@ mod tests {
 
     #[test]
     fn test_tag_on_sequence_is_preserved() {
-        // A tag applied to a sequence that isn't recognized for coercion should be preserved
+
         let mut source = BufferSource::new(b"value: !seq - 1\n  - 2");
         let node = parse(&mut source).unwrap();
         let mut dest = BufferDestination::new();
@@ -983,7 +982,7 @@ mod tests {
 
     #[test]
     fn test_tagged_anchor_and_alias_resolution() {
-        // Anchor a tagged scalar and reference it via alias; alias resolution should yield the coerced value
+
         let yaml = b"---\na: &a !!str 123\nb: *a\n";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source).unwrap();
@@ -991,7 +990,7 @@ mod tests {
         if let Node::Documents(docs) = result {
             if let Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
-                    // find values for a and b
+
                     let mut found_a = None;
                     let mut found_b = None;
                     for (k, v) in pairs {
@@ -1087,7 +1086,7 @@ mod tests {
         let yaml = b"---\nstring1: >\n  Line1\n  line2\n";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source).unwrap();
-        // Parser should produce a document (structure correctness checked elsewhere)
+
         assert!(matches!(result, Node::Documents(_)));
     }
 
@@ -1122,20 +1121,18 @@ mod tests {
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source).unwrap();
 
-        // Expect parsing to succeed; we don't currently resolve aliases to nodes,
-        // but we expect Alias/Anchored nodes to be present in the AST
-        // A more thorough test will inspect the structure via stringify.
+
         assert!(matches!(result, Node::Documents(_)));
     }
 
     #[test]
     fn test_parse_anchor_and_alias_in_sequence() {
-        // anchor a scalar in a sequence and reference it via alias
+
         let yaml = b"---\n- &a hello\n- *a\n";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source).unwrap();
 
-        // After resolution, both items should be the same scalar "hello"
+
         if let Node::Documents(docs) = result {
             if let Document(nodes) = &docs[0] {
                 if let Node::Array(items) = &nodes[0] {
@@ -1155,26 +1152,26 @@ mod tests {
     }
     #[test]
     fn test_parse_nested_anchor_and_alias() {
-        // anchor a mapping nested inside a mapping and reference it
+
         let yaml = b"---\nroot: &a\n  nested:\n    value: 1\nref: *a\n";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source).unwrap();
 
-        // DEBUG: print parsed result
+
         println!("TEST_PARSED: {:#?}", result);
 
-        // After resolution, 'ref' should be a mapping containing 'nested' mapping
+
         if let Node::Documents(docs) = result {
             if let Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
-                    // find ref key
+
                     let mut found = false;
                     for (k, v) in pairs {
                         if let Node::Str(ks, _, _) = k {
                             if ks == "ref" {
-                                // value should be a mapping with nested->value:1
+
                                 if let Node::Mapping(inner_pairs) = v {
-                                    // look for a a nested key
+
                                     let mut ok = false;
                                     for (ik, _iv) in inner_pairs {
                                         if let Node::Str(iks, _, _) = ik {
@@ -1244,7 +1241,7 @@ mod tests {
     }
     #[test]
     fn test_parse_anchor_alias_sequence_hr_rbi() {
-        // From testfile016.yaml
+
         let yaml = b"---\nhr:\n  - Mark McGwire\n  # Following node labeled SS\n  - &SS Sammy Sosa\nrbi:\n  - *SS # Subsequent occurance\n  - Ken Griffey\n";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source).unwrap();
@@ -1252,7 +1249,7 @@ mod tests {
         if let Node::Documents(docs) = result {
             if let Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
-                    // Extract hr and rbi values
+
                     let mut found_hr = false;
                     let mut found_rbi = false;
                     for (k, v) in pairs {
@@ -1313,15 +1310,12 @@ mod tests {
 
     #[test]
     fn test_parse_explicit_sequence_keys() {
-        // From files/testfile017.yaml (explicit keys that are sequences or commented sequences)
+
         let yaml = b"? # PLAY SCHEDULE\n  - Detroit Tigers\n  - Chicago Cubs\n:\n  - 2001-07-23\n\n? [ New York Yankees,\n    Atlanta Braves ]\n: [ 2001-07-02, 2001-08-12,\n    2001-08-14 ]\n";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source).unwrap();
 
-        // Collect mapping pairs from the document nodes. The parser may return
-        // the key and value as separate nodes (Mapping then Array) in some
-        // cases, so be tolerant: walk the document node list and assemble
-        // key/value pairs for assertions.
+
         let mut collected: Vec<(Node, Node)> = Vec::new();
         if let Node::Documents(docs) = result {
             assert_eq!(docs.len(), 1);
@@ -1332,7 +1326,7 @@ mod tests {
                         Node::Mapping(pairs) if pairs.len() == 1 => {
                             let (k, v) = &pairs[0];
                             if matches!(v, Node::None) {
-                                // Try to take the next node as the value if present
+
                                 if i + 1 < nodes.len() {
                                     let next = nodes[i + 1].clone();
                                     collected.push((k.clone(), next));
@@ -1355,10 +1349,10 @@ mod tests {
                     i += 1;
                 }
 
-                // Now assert we found two pairs
+
                 assert_eq!(collected.len(), 2);
 
-                // First pair checks
+
                 let (k1, v1) = &collected[0];
                 if let Node::Str(ks1, qt1, _style1) = k1 {
                     assert_eq!(ks1, "[Detroit Tigers, Chicago Cubs]");
@@ -1380,7 +1374,7 @@ mod tests {
                     panic!("First value is not an array");
                 }
 
-                // Second pair checks
+
                 let (k2, v2) = &collected[1];
                 if let Node::Str(ks2, qt2, _style2) = k2 {
                     assert_eq!(ks2, "[New York Yankees, Atlanta Braves]");
@@ -1425,7 +1419,7 @@ mod tests {
     }
     #[test]
     fn test_parse_block_unquoted_block_scalar_with_indent() {
-        // anchor a scalar in a sequence and reference it via alias
+
         use crate::stringify;
         let yaml = b"---\nplain:\n  This unquoted scalar\n  spans many lines.";
         let mut source = BufferSource::new(yaml);
@@ -1441,7 +1435,7 @@ mod tests {
 
     #[test]
     fn test_parse_block_double_quoted_block_scalar_with_indent() {
-        // anchor a scalar in a sequence and reference it via alias
+
         use crate::stringify;
         let yaml = b"---\nquoted: \"So does this\n  quoted scalar.\\n\"";
         let mut source = BufferSource::new(yaml);
@@ -1456,7 +1450,7 @@ mod tests {
     }
     #[test]
     fn test_parse_block_unquoted_block_multiline_scalar_with_indent() {
-        // anchor a scalar in a sequence and reference it via alias
+
         use crate::stringify;
         let yaml = b"--- >\n Sammy Sosa completed another\n fine season with great stats.\n\n   63 Home Runs\n   0.288 Batting Average\n\n What a year!";
         let mut source = BufferSource::new(yaml);
@@ -1472,7 +1466,7 @@ mod tests {
 
     #[test]
     fn test_parse_block_multiline_scalars_with_indent() {
-        // anchor a scalar in a sequence and reference it via alias
+
         use crate::stringify;
         let yaml = b"string1: |\n  Line1\n  line2\n  \"line3\"\n  line4\n\nstring2: >\n  Line1\n  line2\n  \"line3\"\n  line4\n";
         let mut source = BufferSource::new(yaml);
@@ -1487,7 +1481,7 @@ mod tests {
     }
     #[test]
     fn test_parse_escapes_in_strings() {
-        // anchor a scalar in a sequence and reference it via alias
+
         use crate::stringify;
         let yaml = b"unicode: \"Sosa did fine.\\u263A\"\ncontrol: \"\\b1998\\t1999\\t2000\\n\"\nhexesc:  \"\\x13\\x10 is \\r\\n\"\n\nsingle: \'\"Howdy!\" he cried.\'\nquoted: \' # not a \'\'comment\'\'.\'\ntie-fighter: \'|\\-*-/|\'\n";
         let mut source = BufferSource::new(yaml);
@@ -1554,61 +1548,36 @@ mod tests {
             "---\nblock_strip: |\n  This entire block of text will be the value of \'block_strip\', but this time, all newlines will be replaced with a single space and trailing blank line being stripped.\n...\n"
         );
     }
-    // #[test]
-    // fn test_parse_nested_anchor_and_alias_with_block_scalar() {
-    //     // anchor a scalar in a sequence and reference it via alias
-    //     use crate::stringify;
-    //     let yaml = b"version: \"3.9\"\n\nservices:\n  production-db: &database-definition\n    image: mysql:5.7\n    volumes:\n      - db_data:/var/lib/mysql\n    restart: always\n    environment: &environment-definition\n     MYSQL_ROOT_PASSWORD: somewordpress\n     MYSQL_DATABASE: wordpress\n     MYSQL_USER: wordpress\n     MYSQL_PASSWORD: production-password\n  test-db:\n    <<: *database-definition\n    environment:\n      <<: *environment-definition\n      MYSQL_PASSWORD: test-password";
-    //     let mut source = BufferSource::new(yaml);
-    //     let result = parse(&mut source).unwrap();
-    //    BufferSource as BufferSource;
-    //     let mut dest = BufferDestination::new();
-    //     stringify(&result, &mut dest).unwrap();
-    //     assert_eq!(
-    //         dest.to_string(),
-    //         "---\nversion: \"3.9\"\nservices:\n  production-db:\n    image: mysql:5.7\n    volumes:\n      - db_data:/var/lib/mysql\n    restart: always\n    environment:\n      MYSQL_ROOT_PASSWORD: somewordpress\n      MYSQL_DATABASE: wordpress\n      MYSQL_USER: wordpress\n      MYSQL_PASSWORD: production-password\n  test-db:\n    image: mysql:5.7\n    volumes:\n      - db_data:/var/lib/mysql\n    restart: always\n    environment:\n      MYSQL_ROOT_PASSWORD: somewordpress\n      MYSQL_DATABASE: wordpress\n      MYSQL_USER: wordpress\n      MYSQL_PASSWORD: test-password\n...\n"
-    //     );
-    // }
+
+
     #[test]
     fn test_parse_nested_anchor_and_alias_with_block_scalar() {
-        // Parse a document that defines an anchor and then uses it via merge
-        // keys. Rather than relying on stringification, assert the AST
-        // structure contains the anchored mapping and that the anchor value
-        // is preserved in the parsed tree.
+
+
         let yaml = b"base: &base\n  name: Everyone has same name\nfoo:\n  <<: *base\n  age: 10\n  name: John\nbar:\n  <<: *base\n  age: 20";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source).unwrap();
 
-        // The parser currently preserves merge keys in the AST/stringifier.
-        // For test purposes we simulate merge resolution here: collect anchors
-        // and expand any `<<: *anchor` aliases into the parent mapping so the
-        // stringified output shows merged content with no `<<:` keys.
+
         let mut mutated = result.clone();
         use std::collections::HashMap as Map;
 
-        // Collect anchors defined at the top-level mapping and unwrap Anchored nodes
+
         let mut anchors: Map<String, Node> = Map::new();
         if let Node::Documents(docs) = &mut mutated {
             if let Node::Document(nodes) = &mut docs[0] {
                 if let Node::Mapping(pairs) = &mut nodes[0] {
                     for (_k, v) in pairs.iter_mut() {
                         if let Node::Anchored(inner, name) = v {
-                            // inner is a Box<Node>; unwrap and clone the contained Node
+
                             let unboxed: Node = (**inner).clone();
                             anchors.insert(name.clone(), unboxed.clone());
-                            // replace Anchored node with its inner value for further processing
+
                             *v = unboxed;
                         }
                     }
 
-                    // Now expand merge aliases inside the flattened top-level mapping
-                    // Some documents get parsed with nested mappings flattened (as
-                    // seen here). We detect value strings like "<<: *base" on a
-                    // key (e.g. `foo`) and collect the following key/value pairs as
-                    // the intended nested mapping, then merge in the anchor
-                    // mapping (found by name) with later keys overriding anchor
-                    // keys.
-                    // Build a quick anchor lookup from pairs that are pure mappings
+
                     let mut anchor_map: Map<String, Vec<(Node, Node)>> = Map::new();
                     {
                         let snapshot = pairs.clone();
@@ -1621,23 +1590,23 @@ mod tests {
                         }
                     }
 
-                    // Rebuild pairs with merged/expanded nested mappings
+
                     let mut rebuilt: Vec<(Node, Node)> = Vec::new();
                     let mut i = 0usize;
                     while i < pairs.len() {
                         let (k, v) = pairs[i].clone();
                         if let Node::Str(_, _, _) = &k {
                             if let Node::Str(s, _, _) = &v {
-                                // detect merge marker like "<<: *name"
+
                                 if s.trim_start().starts_with("<<:") && s.contains('*') {
-                                    // parse alias name after '*'
+
                                     if let Some(pos) = s.find('*') {
                                         let aname = s[pos + 1..].trim().to_string();
-                                        // collect subsequent pairs that belong to this nested mapping
+
                                         let mut nested: Vec<(Node, Node)> = Vec::new();
                                         let mut j = i + 1;
                                         while j < pairs.len() {
-                                            // stop if next pair is another merge starter
+
                                             if let Node::Str(ns, _, _) = &pairs[j].1 {
                                                 if ns.trim_start().starts_with("<<:") {
                                                     break;
@@ -1647,14 +1616,14 @@ mod tests {
                                             j += 1;
                                         }
 
-                                        // start with anchor pairs if present
+
                                         let mut merged_pairs: Vec<(Node, Node)> = Vec::new();
                                         if let Some(ap) = anchor_map.get(&aname) {
                                             merged_pairs.extend(ap.clone());
                                         }
-                                        // merge nested pairs, allowing nested to override
+
                                         for (nk, nv) in nested.iter() {
-                                            // replace if key exists
+
                                             let mut replaced = false;
                                             if let Node::Str(nks, _, _) = nk {
                                                 for p in merged_pairs.iter_mut() {
@@ -1672,7 +1641,7 @@ mod tests {
                                             }
                                         }
 
-                                        // push the reconstructed mapping for the key
+
                                         rebuilt.push((k.clone(), Node::Mapping(merged_pairs)));
                                         i = j;
                                         continue;
@@ -1680,7 +1649,7 @@ mod tests {
                                 }
                             }
                         }
-                        // default: keep as-is
+
                         rebuilt.push((k, v));
                         i += 1;
                     }
@@ -1690,7 +1659,7 @@ mod tests {
             }
         }
 
-        // Stringify the mutated (merge-resolved) AST and assert expected output
+
         let mut dest = BufferDestination::new();
         crate::stringify(&mutated, &mut dest).unwrap();
         let out = dest.to_string();
@@ -1827,7 +1796,7 @@ mod tests {
     #[test]
     fn test_stringify_anchor_and_alias() {
         let mut dest = BufferDestination::new();
-        // Build an anchored mapping value and an alias node
+
         let anchored = Node::Anchored(
             Box::new(Node::Mapping(vec![(
                 Node::Str("nested".to_string(), QuoteType::Unquoted, BlockStyle::None),
@@ -1838,7 +1807,7 @@ mod tests {
 
         let docs = vec![anchored, Node::Alias("a".to_string())];
         stringify(&Node::Documents(docs), &mut dest).unwrap();
-        // Expect anchors and aliases to be emitted
+
         let out = dest.to_string();
         assert!(out.contains("&a"));
         assert!(out.contains("*a"));
@@ -1878,7 +1847,7 @@ mod tests {
     #[test]
     fn test_stringify_anchor_alias_hr_rbi() {
         use crate::io::sources::buffer::Buffer as SrcBuffer;
-        // YAML from testfile016.yaml
+
         let yaml = b"---\nhr:\n  - Mark McGwire\n  # Following node labeled SS\n  - &SS Sammy Sosa\nrbi:\n  - *SS # Subsequent occurance\n  - Ken Griffey\n";
         let mut source = SrcBuffer::new(yaml);
         let node = parse(&mut source).unwrap();
@@ -1894,15 +1863,15 @@ mod tests {
     fn test_stringify_anchor_alias_hr_rbi_from_file() {
         use crate::io::sources::file::File as FileSource;
 
-        // Create a temporary file with the YAML contents (same as testfile016.yaml)
+
         let input = b"---\r\nhr:\r\n  - Mark McGwire\r\n  # Following node labeled SS\r\n  - &SS Sammy Sosa\r\nrbi:\r\n  - *SS # Subsequent occurance\r\n  - Ken Griffey\r\n";
         let in_file = TestFile::new_with_content(input);
 
-        // parse from file source
+
         let mut source = FileSource::new(in_file.path()).unwrap();
         let node = parse(&mut source).unwrap();
 
-        // stringify to an in-memory buffer and compare
+
         let mut dest = BufferDestination::new();
         stringify(&node, &mut dest).unwrap();
         let out = dest.to_string();
@@ -1973,19 +1942,19 @@ mod tests {
 
     #[test]
     fn test_stringify_mapping_with_inline_comment_and_indented_sequence_files() {
-        // Mirror parser test: ensure stringifier emits the mapping -> sequence correctly using files
+
         use crate::io::destinations::file::File as FileDestination;
         use crate::io::sources::file::File as FileSource;
         let input = b"---\r\nhr: # 1998 hr ranking\r\n  - Mark McGwire\r\n  - Sammy Sosa\n";
         let in_file = TestFile::new_with_content(input);
         let out_file = TestFile::new_empty();
-        // parse from file source
+
         let mut source = FileSource::new(in_file.path()).unwrap();
         let node = parse(&mut source).unwrap();
-        // stringify to file destination
+
         let mut dest = FileDestination::new(out_file.path()).unwrap();
         stringify(&node, &mut dest).unwrap();
-        // read output and compare
+
         let out = fs::read_to_string(out_file.path()).unwrap();
         let expected = "---\nhr: \n  - Mark McGwire\n  - Sammy Sosa\n...\n";
         assert_eq!(out, expected);
@@ -1993,15 +1962,15 @@ mod tests {
 
     #[test]
     fn test_stringify_explicit_sequence_keys() {
-        // Hardcoded YAML input (from files/testfile017.yaml)
+
         let yaml = b"? # PLAY SCHEDULE\n  - Detroit Tigers\n  - Chicago Cubs\n:\n  - 2001-07-23\n\n? [ New York Yankees,\n    Atlanta Braves ]\n: [ 2001-07-02, 2001-08-12,\n    2001-08-14 ]\n";
         let mut src = BufferSource::new(yaml.as_ref());
         let node = parse(&mut src).expect("parse");
-        // stringify to buffer using the parser-produced node
+
         let mut dest = BufferDestination::new();
         stringify(&node, &mut dest).expect("");
         let out = normalize_newlines(&dest.to_string());
-        // Hardcoded expected stringify output (from files/testfile017.yaml.stringify)
+
         let expected = normalize_newlines(
             "---\n\"[Detroit Tigers, Chicago Cubs]\": \n  - 2001-07-23\n\"[New York Yankees, Atlanta Braves]\": \n  - 2001-07-02\n  - 2001-08-12\n  - 2001-08-14\n...\n",
         );
@@ -2009,7 +1978,7 @@ mod tests {
         assert_eq!(out, expected);
     }
 
-    // Tests moved from parser::default that asserted stringify output of parse results
+
     #[test]
     fn test_stringify_from_parser_literal_block_literal_scalar_with_indent() {
         let yaml = b"---\nstring1: |\n  Line1\n  line2\n";
@@ -2029,7 +1998,7 @@ mod tests {
         let mut dest = BufferDestination::new();
         stringify(&node, &mut dest).unwrap();
         let out = dest.to_string();
-        // parser folded '>' to a literal block in stringify behavior
+
         assert_eq!(out, "---\nstring1: |\n  Line1 line2\n...\n");
     }
 
@@ -2041,9 +2010,8 @@ mod tests {
         let mut dest = BufferDestination::new();
         stringify(&node, &mut dest).unwrap();
         let out = dest.to_string();
-        // Parser now expands merge keys during parse; stringified output
-        // should therefore NOT contain the literal merge key but should
-        // include the merged mapping content.
+
+
         assert!(
             !out.contains("<<:"),
             "stringified output should not contain merge key: {}",

@@ -1,11 +1,11 @@
+//! Module: stringify/json.rs
+
 use crate::io::destinations::buffer::Buffer as BufferDestination;
 use crate::io::traits::IDestination;
 use crate::nodes::node::*;
 use crate::stringify::default::stringify as yaml_stringify;
 
-// Basic JSON string escaper. Not fully comprehensive for all Unicode
-// escaping, but sufficient for typical ASCII/control character escaping
-// used in our tests (quotes, backslashes, control chars).
+
 fn escape_json_string(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
@@ -47,8 +47,8 @@ fn node_to_key_string(key: &Node) -> Result<String, String> {
         Node::Boolean(b) => Ok((if *b { "true" } else { "false" }).to_string()),
         Node::None => Ok("".to_string()),
         _ => {
-            // Fall back to YAML stringify for complex keys, then use that
-            // textual representation as the JSON key string.
+
+
             let mut buf = BufferDestination::new();
             yaml_stringify(key, &mut buf).map_err(|e| e)?;
             Ok(buf.to_string())
@@ -86,7 +86,7 @@ fn stringify_node(node: &Node, destination: &mut dyn IDestination) -> Result<(),
             destination.add_byte(b'{');
             let mut first = true;
             for (k, v) in pairs.iter() {
-                // Skip comment keys if any — but ensure iteration stays deterministic
+
                 let key_str = node_to_key_string(k)?;
                 if !first {
                     destination.add_byte(b',');
@@ -126,12 +126,14 @@ fn stringify_node(node: &Node, destination: &mut dyn IDestination) -> Result<(),
             destination.add_byte(b']');
         }
         Node::Comment(_) => {
-            // JSON has no comments; skip comments by emitting null for standalone comment nodes
+
             destination.add_bytes("null");
         }
     }
     Ok(())
 }
+
+/// stringify
 
 pub fn stringify(node: &Node, destination: &mut dyn IDestination) -> Result<(), String> {
     stringify_node(node, destination)

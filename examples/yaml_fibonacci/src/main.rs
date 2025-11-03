@@ -15,7 +15,7 @@ use yaml_lib::{FileDestination, FileSource, Node, Numeric, parse, stringify};
 /// * `Ok(Node)` - A Node::List containing the sequence
 /// * `Err(String)` - Error message if reading or parsing fails
 fn read_sequence(file_path: &Path) -> Result<Node, String> {
-    // Initialize with the default sequence if the file doesn't exist
+
     if !file_path.exists() {
         return Ok(Node::Array(vec![
             Node::Number(Numeric::Integer(1)),
@@ -23,7 +23,7 @@ fn read_sequence(file_path: &Path) -> Result<Node, String> {
         ]));
     }
 
-    // Try to open and parse the existing file
+
     match FileSource::new(&file_path.to_string_lossy()) {
         Ok(mut file) => match parse(&mut file) {
             Ok(Node::Documents(docs)) if !docs.is_empty() => {
@@ -49,7 +49,7 @@ fn read_sequence(file_path: &Path) -> Result<Node, String> {
 /// # Arguments
 /// * `sequence` - Mutable reference to the Node containing the sequence
 fn add_next(sequence: &mut Node) {
-    // Extract the list of numbers from the Node
+
     if let Node::Array(items) = sequence {
         if items.len() < 2 {
             return;
@@ -75,7 +75,7 @@ fn add_next(sequence: &mut Node) {
 /// * `Ok(())` - Write operation succeeded
 /// * `Err(String)` - Error message if writing fails
 fn write_sequence(file_path: &Path, sequence: &Node) -> Result<(), String> {
-    // Create a new file destination, falling back to empty string if the path is invalid
+
     let file = FileDestination::new(file_path.to_str().unwrap_or(""));
     match file {
         Ok(mut f) => {
@@ -90,7 +90,7 @@ fn write_sequence(file_path: &Path, sequence: &Node) -> Result<(), String> {
 /// Reads the existing Fibonacci sequence, adds the next number,
 /// and saves the updated sequence back to the file.
 fn main() {
-    // Define the file_path to the sequence file
+
     let file_path = Path::new("fibonacci.yaml");
     match read_sequence(file_path) {
         Ok(mut sequence) => {
