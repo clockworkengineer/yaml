@@ -132,8 +132,26 @@ pub(crate) fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
                 parse_scalar(raw.trim())
             }
             Some('-') => {
-                let nested_indent = source.get_current_indent_level();
-                crate::parser::document::parse_sequence(source, nested_indent)?
+                // Only treat '-' as a sequence indicator when it's followed by
+                // whitespace/newline (e.g. "- item"). If the '-' is directly
+                // followed by a non-space (e.g. "-2.0"), it's a negative
+                // scalar and should be parsed as a value.
+                let st = source.save_state();
+                source.next();
+                let next_ch = source.current();
+                source.restore_state(st);
+
+                if let Some(ch) = next_ch {
+                    if source.is_whitespace(ch) || ch == CHAR_NEWLINE {
+                        let nested_indent = source.get_current_indent_level();
+                        crate::parser::document::parse_sequence(source, nested_indent)?
+                    } else {
+                        // Treat as scalar (negative number or other dash-leading scalar)
+                        parse_value(source)?
+                    }
+                } else {
+                    return Err(parse_error(source, ERR_UNEXPECTED_EOF_AFTER_ANCHOR));
+                }
             }
             Some(_) => parse_value(source)?,
             None => return Err(parse_error(source, ERR_UNEXPECTED_EOF_AFTER_ANCHOR)),

@@ -834,6 +834,82 @@ mod tests {
     }
 
     #[test]
+    fn test_coerce_float_tag_on_negative_float_value() {
+        // !!float applied to a float should preserve the value (e.g. -2.0 -> -2.0)
+        let mut source = BufferSource::new(b"value: !!float -2.0");
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(ref docs) = result {
+            if let Document(nodes) = &docs[0] {
+                if let Node::Mapping(pairs) = &nodes[0] {
+                    assert_eq!(pairs.len(), 1);
+                    let (_k, v) = &pairs[0];
+                    assert_eq!(v, &Node::Number(Numeric::Float(-2.0)));
+                    return;
+                }
+            }
+        }
+        panic!("Expected coerced float from integer not found");
+    }
+
+    #[test]
+    fn test_coerce_float_tag_on_negative_numeric_string() {
+        // !!float applied to a quoted negative numeric string should coerce to a float node
+        let mut source = BufferSource::new(b"value: !!float '-2.5'");
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(ref docs) = result {
+            if let Document(nodes) = &docs[0] {
+                if let Node::Mapping(pairs) = &nodes[0] {
+                    assert_eq!(pairs.len(), 1);
+                    let (_k, v) = &pairs[0];
+                    assert_eq!(v, &Node::Number(Numeric::Float(-2.5)));
+                    return;
+                }
+            }
+        }
+        panic!("Expected coerced negative float node not found");
+    }
+
+    #[test]
+    fn test_coerce_int_tag_on_negative_numeric_string() {
+        // !!int applied to a quoted negative numeric string should coerce to an integer node
+        let mut source = BufferSource::new(b"value: !!int '-2'");
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(ref docs) = result {
+            if let Document(nodes) = &docs[0] {
+                if let Node::Mapping(pairs) = &nodes[0] {
+                    assert_eq!(pairs.len(), 1);
+                    let (_k, v) = &pairs[0];
+                    assert_eq!(v, &Node::Number(Numeric::Integer(-2)));
+                    return;
+                }
+            }
+        }
+        panic!("Expected coerced negative integer node not found");
+    }
+
+    #[test]
+    fn test_coerce_float_tag_on_negative_integer_value() {
+        // !!float applied to a negative integer should coerce to a float node (e.g. -2 -> -2.0)
+        let mut source = BufferSource::new(b"value: !!float -2");
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(ref docs) = result {
+            if let Document(nodes) = &docs[0] {
+                if let Node::Mapping(pairs) = &nodes[0] {
+                    assert_eq!(pairs.len(), 1);
+                    let (_k, v) = &pairs[0];
+                    assert_eq!(v, &Node::Number(Numeric::Float(-2.0)));
+                    return;
+                }
+            }
+        }
+        panic!("Expected coerced float from negative integer not found");
+    }
+
+    #[test]
     fn test_coerce_timestamp_on_date_string() {
         // !!timestamp applied to a date string should be preserved/coerced to a string node
         let mut source = BufferSource::new(b"value: !!timestamp '2001-12-14'");
