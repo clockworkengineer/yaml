@@ -11,7 +11,7 @@ mod scalar;
 mod sequence;
 mod value;
 
-pub(crate) use anchors::{collect_anchors, replace_aliases};
+pub(crate) use anchors::{collect_anchors, expand_merge_keys, replace_aliases};
 #[cfg(test)]
 pub(crate) use helpers::parse_quoted_scalar;
 pub(crate) use helpers::{parse_comment, peek_ahead_for_mapping_key};
@@ -437,6 +437,10 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
 
     let mut anchors: HashMap<String, Node> = HashMap::new();
     collect_anchors(&doc_node, &mut anchors)?;
+    // Expand any YAML merge keys (<<) using the collected anchors before
+    // replacing alias nodes. This produces canonical merged mappings so
+    // downstream code and the stringifier see the expanded mapping content.
+    expand_merge_keys(&mut doc_node, &anchors)?;
     replace_aliases(&mut doc_node, &anchors)?;
 
     Ok(doc_node)
@@ -639,5 +643,4 @@ mod tests {
         let n = parse_document_contents(&mut src, 0).unwrap();
         assert!(matches!(n, Node::Mapping(_)));
     }
-
 }
