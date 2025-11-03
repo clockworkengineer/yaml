@@ -68,5 +68,7 @@ pub use nodes::node::make_node;
 pub use parser::document::parse;
 /// Converts a Node tree to bencode format
 pub use stringify::bencode::stringify as to_bencode;
-/// Converts a Node tree back to JSON format
+/// Converts a Node tree back to YAML format
 pub use stringify::default::stringify;
+/// Converts a Node tree to JSON format
+pub use stringify::json::stringify as to_json;
