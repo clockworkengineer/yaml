@@ -1,4 +1,4 @@
 [workspace]
 resolver = "3"
-members=[ "examples/yaml_fibonacci", "examples/yaml_parse_and_stringify", "examples/yaml_to_json", "examples/yaml_utility_lib","library"]
+members=[ "examples/yaml_fibonacci", "examples/yaml_parse_and_stringify", "examples/yaml_to_bencode", "examples/yaml_to_json", "examples/yaml_utility_lib","library"]
 
