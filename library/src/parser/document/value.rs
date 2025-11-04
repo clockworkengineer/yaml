@@ -9,14 +9,23 @@ use crate::parser::document::inline::{parse_inline_mapping, parse_inline_sequenc
 use crate::parser::document::scalar::parse_scalar;
 use crate::utils::*;
 
-
+/// Attempts to coerce a node to match the specified YAML tag type.
+///
+/// Handles type coercion for various YAML tags including string (!str),
+/// integer (!int), float (!float), boolean (!bool), and timestamp (!timestamp).
+/// Returns None if the coercion is not possible or the tag is unsupported.
+///
+/// # Arguments
+///
+/// * `tag` - The YAML tag string (e.g., "!!str", "!!int")
+/// * `node` - The Node to coerce
+///
+/// # Returns
+///
+/// Some(Node) with the coerced type, or None if coercion failed
 fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
-
-
     match tag {
         "!!str" | "!str" => {
-
-
             let s = match node {
                 Node::Str(s, _, _) => s,
                 Node::Number(Numeric::Integer(i)) => i.to_string(),
@@ -26,30 +35,26 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
                 _ => return None,
             };
 
-
             return Some(Node::Str(s, QuoteType::Unquoted, BlockStyle::None));
         }
-        "!!int" | "!int" => {
-            match node {
-                Node::Number(Numeric::Integer(i)) => {
+        "!!int" | "!int" => match node {
+            Node::Number(Numeric::Integer(i)) => {
+                return Some(Node::Number(Numeric::Integer(i)));
+            }
+            Node::Number(Numeric::Float(f)) => {
+                if (f.trunc() - f).abs() < std::f64::EPSILON {
+                    return Some(Node::Number(Numeric::Integer(f as i64)));
+                }
+                return None;
+            }
+            Node::Str(s, _, _) => {
+                if let Ok(i) = s.parse::<i64>() {
                     return Some(Node::Number(Numeric::Integer(i)));
                 }
-                Node::Number(Numeric::Float(f)) => {
-
-                    if (f.trunc() - f).abs() < std::f64::EPSILON {
-                        return Some(Node::Number(Numeric::Integer(f as i64)));
-                    }
-                    return None;
-                }
-                Node::Str(s, _, _) => {
-                    if let Ok(i) = s.parse::<i64>() {
-                        return Some(Node::Number(Numeric::Integer(i)));
-                    }
-                    return None;
-                }
-                _ => return None,
+                return None;
             }
-        }
+            _ => return None,
+        },
         "!!float" | "!float" => match node {
             Node::Number(Numeric::Float(f)) => return Some(Node::Number(Numeric::Float(f))),
             Node::Number(Numeric::Integer(i)) => {
@@ -80,40 +85,46 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
         "!!null" | "!null" => {
             return Some(Node::None);
         }
-        "!!timestamp" | "!timestamp" => {
-
-
-            match node {
-                Node::Str(s, _, _) => {
-                    return Some(Node::Str(s, QuoteType::Unquoted, BlockStyle::None));
-                }
-                Node::Number(Numeric::Integer(i)) => {
-                    return Some(Node::Str(
-                        i.to_string(),
-                        QuoteType::Unquoted,
-                        BlockStyle::None,
-                    ));
-                }
-                Node::Number(Numeric::Float(f)) => {
-                    return Some(Node::Str(
-                        f.to_string(),
-                        QuoteType::Unquoted,
-                        BlockStyle::None,
-                    ));
-                }
-                _ => return None,
+        "!!timestamp" | "!timestamp" => match node {
+            Node::Str(s, _, _) => {
+                return Some(Node::Str(s, QuoteType::Unquoted, BlockStyle::None));
             }
-        }
+            Node::Number(Numeric::Integer(i)) => {
+                return Some(Node::Str(
+                    i.to_string(),
+                    QuoteType::Unquoted,
+                    BlockStyle::None,
+                ));
+            }
+            Node::Number(Numeric::Float(f)) => {
+                return Some(Node::Str(
+                    f.to_string(),
+                    QuoteType::Unquoted,
+                    BlockStyle::None,
+                ));
+            }
+            _ => return None,
+        },
         _ => return None,
     }
 }
 
+/// Parses a YAML value, handling tags, anchors, aliases, and various value types.
+///
+/// Processes YAML values including tagged values (!tag), anchored values (&anchor),
+/// aliases (*alias), inline collections, quoted scalars, and plain scalars.
+/// Handles type coercion based on tags and resolves anchors and aliases.
+///
+/// # Arguments
+///
+/// * `source` - A mutable reference to a source implementing ISource trait
+///
+/// # Returns
+///
+/// Result containing the parsed Node value or an error string
 pub(crate) fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
-
     if source.current() == Some('!') {
-
         source.next();
-
 
         let rest = collect_until(source, |c| c == CHAR_SPACE || c == CHAR_NEWLINE);
         let tag = format!("!{}", rest);
@@ -130,8 +141,6 @@ pub(crate) fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
                 parse_scalar(raw.trim())
             }
             Some('-') => {
-
-
                 let st = source.save_state();
                 source.next();
                 let next_ch = source.current();
@@ -142,7 +151,6 @@ pub(crate) fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
                         let nested_indent = source.get_current_indent_level();
                         crate::parser::document::parse_sequence(source, nested_indent)?
                     } else {
-
                         parse_value(source)?
                     }
                 } else {
@@ -152,7 +160,6 @@ pub(crate) fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
             Some(_) => parse_value(source)?,
             None => return Err(parse_error(source, ERR_UNEXPECTED_EOF_AFTER_ANCHOR)),
         };
-
 
         if let Some(coerced) = try_coerce_tag(&tag, inner.clone()) {
             return Ok(coerced);
@@ -230,17 +237,13 @@ pub(crate) fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
             let value = collect_until(source, |c| c == CHAR_NEWLINE || c == CHAR_HASH);
             let trimmed = value.trim();
 
-
             if trimmed.starts_with(STR_LITERAL_BLOCK) || trimmed.starts_with(STR_FOLDED_BLOCK) {
-
-
                 let first_ch = trimmed.chars().next().unwrap();
                 let rest = trimmed[1..].trim();
                 let valid_header_rest = rest
                     .chars()
                     .all(|c| c.is_ascii_digit() || c == '+' || c == '-');
                 if !valid_header_rest {
-
                     if !trimmed.is_empty() {
                         return Ok(parse_scalar(trimmed));
                     } else {
@@ -290,7 +293,6 @@ pub(crate) fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
                     }
                     raw_lines.push(raw_line);
                 }
-
 
                 if !keep_trailing {
                     while matches!(raw_lines.last(), Some(s) if s.is_empty()) {

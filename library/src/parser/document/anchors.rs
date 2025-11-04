@@ -3,6 +3,20 @@
 use crate::nodes::node::Node;
 use std::collections::HashMap;
 
+/// Recursively collects all anchor definitions from a YAML document tree.
+///
+/// Traverses the node tree and builds a map of anchor names to their
+/// corresponding node values. Validates that anchor names are not empty
+/// and that no duplicate anchors exist.
+///
+/// # Arguments
+///
+/// * `node` - The root node to search for anchors
+/// * `anchors` - A mutable HashMap to store anchor name-to-node mappings
+///
+/// # Returns
+///
+/// Result indicating success or an error string for invalid anchors
 pub(crate) fn collect_anchors(
     node: &Node,
     anchors: &mut HashMap<String, Node>,
@@ -52,6 +66,20 @@ pub(crate) fn collect_anchors(
     }
 }
 
+/// Recursively replaces all alias references with their corresponding anchor values.
+///
+/// Traverses the node tree and replaces any Alias nodes with the actual
+/// node values they reference. Validates that all aliases have corresponding
+/// anchors and that alias names are not empty.
+///
+/// # Arguments
+///
+/// * `node` - The node tree to process for alias replacement
+/// * `anchors` - HashMap containing anchor name-to-node mappings
+///
+/// # Returns
+///
+/// Result indicating success or an error string for undefined aliases
 pub(crate) fn replace_aliases(
     node: &mut Node,
     anchors: &HashMap<String, Node>,
@@ -103,26 +131,35 @@ pub(crate) fn replace_aliases(
     }
 }
 
-
+/// Expands YAML merge keys (<<) by incorporating referenced mapping values.
+///
+/// Processes merge key syntax in mappings, which allows inheriting key-value
+/// pairs from other mappings. Handles both single aliases and sequences of
+/// aliases as merge sources.
+///
+/// # Arguments
+///
+/// * `node` - The node tree to process for merge key expansion
+/// * `anchors` - HashMap containing anchor name-to-node mappings
+///
+/// # Returns
+///
+/// Result indicating success or an error string for invalid merge operations
 pub(crate) fn expand_merge_keys(
     node: &mut Node,
     anchors: &HashMap<String, Node>,
 ) -> Result<(), String> {
     match node {
         Node::Mapping(pairs) => {
-
-
             let mut combined: Vec<(Node, Node)> = Vec::new();
             let snapshot = pairs.clone();
             let mut i = 0usize;
             while i < snapshot.len() {
                 let (k, v) = snapshot[i].clone();
 
-
                 let mut handled = false;
                 if let Node::Str(ks, _, _) = &k {
                     if ks.trim() == "<<" {
-
                         let mut expanded_pairs: Vec<(Node, Node)> = Vec::new();
                         match &v {
                             Node::Alias(name) => {
@@ -184,7 +221,6 @@ pub(crate) fn expand_merge_keys(
                     continue;
                 }
 
-
                 if let Node::Str(_, _, _) = &k {
                     if let Node::Str(s, _, _) = &v {
                         let ts = s.trim_start();
@@ -203,7 +239,6 @@ pub(crate) fn expand_merge_keys(
                                     nested.push(snapshot[j].clone());
                                     j += 1;
                                 }
-
 
                                 let mut merged_pairs: Vec<(Node, Node)> = Vec::new();
                                 if let Some(src) = anchors.get(&aname) {
@@ -239,11 +274,9 @@ pub(crate) fn expand_merge_keys(
                     }
                 }
 
-
                 combined.push((k, v));
                 i += 1;
             }
-
 
             use std::collections::HashMap as Map;
             let mut last_index: Map<String, usize> = Map::new();
@@ -262,7 +295,6 @@ pub(crate) fn expand_merge_keys(
             }
 
             *pairs = rebuilt;
-
 
             for (_k, v) in pairs.iter_mut() {
                 expand_merge_keys(v, anchors)?;

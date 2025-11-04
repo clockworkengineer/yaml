@@ -8,6 +8,19 @@ use crate::nodes::node::Node::Document;
 use crate::nodes::node::{BlockStyle, QuoteType};
 use crate::utils::*;
 
+/// Creates a formatted error message with current parser context information.
+///
+/// Generates an error message that includes the current character being parsed
+/// and the current indentation level to help with debugging parsing issues.
+///
+/// # Arguments
+///
+/// * `source` - A mutable reference to a source implementing ISource trait
+/// * `msg` - The base error message to include
+///
+/// # Returns
+///
+/// A formatted error string with context information
 pub(crate) fn parse_error(source: &mut dyn ISource, msg: &str) -> String {
     let current = match source.current() {
         Some(c) => c.to_string(),
@@ -21,6 +34,14 @@ pub(crate) fn parse_error(source: &mut dyn ISource, msg: &str) -> String {
     )
 }
 
+/// Skips whitespace characters in the source.
+///
+/// Advances the source position past all consecutive whitespace characters
+/// as defined by the source's is_whitespace method.
+///
+/// # Arguments
+///
+/// * `source` - A mutable reference to a source implementing ISource trait
 pub(crate) fn skip_whitespace(source: &mut dyn ISource) {
     while let Some(c) = source.current() {
         if source.is_whitespace(c) {
@@ -31,6 +52,18 @@ pub(crate) fn skip_whitespace(source: &mut dyn ISource) {
     }
 }
 
+/// Determines if a node represents blank or empty content.
+///
+/// Checks various node types to determine if they should be considered
+/// blank (None, empty arrays, empty strings, comments, etc.).
+///
+/// # Arguments
+///
+/// * `node` - A reference to the Node to check
+///
+/// # Returns
+///
+/// true if the node is considered blank, false otherwise
 pub(crate) fn node_is_blank(node: &Node) -> bool {
     match node {
         Node::None => true,
@@ -45,6 +78,19 @@ pub(crate) fn node_is_blank(node: &Node) -> bool {
     }
 }
 
+/// Parses a quoted scalar value (single or double quoted) from the source.
+///
+/// Handles both single and double quoted strings, processing escape sequences
+/// and handling multiline strings correctly. Returns the complete quoted string
+/// including the quote characters.
+///
+/// # Arguments
+///
+/// * `source` - A mutable reference to a source implementing ISource trait
+///
+/// # Returns
+///
+/// Result containing the complete quoted string or an error string
 pub(crate) fn parse_quoted_scalar(source: &mut dyn ISource) -> Result<String, String> {
     let quote = match source.current() {
         Some(c) if c == CHAR_SINGLE_QUOTE || c == CHAR_DOUBLE_QUOTE => c,
@@ -99,6 +145,19 @@ pub(crate) fn parse_quoted_scalar(source: &mut dyn ISource) -> Result<String, St
     Ok(out)
 }
 
+/// Peeks ahead to check if the current position represents a document start/end marker.
+///
+/// Looks for document separators (---) or end markers (...) by checking if the
+/// current character is repeated three times consecutively.
+///
+/// # Arguments
+///
+/// * `source` - A mutable reference to a source implementing ISource trait
+/// * `c` - The character to check for repetition (usually '-' or '.')
+///
+/// # Returns
+///
+/// true if a document marker is found, false otherwise
 pub(crate) fn peek_ahead_for_document_start_end(source: &mut dyn ISource, c: char) -> bool {
     if source.current() != Some(c) {
         return false;
@@ -118,6 +177,18 @@ pub(crate) fn peek_ahead_for_document_start_end(source: &mut dyn ISource, c: cha
     true
 }
 
+/// Peeks ahead to determine if the current content represents a mapping key.
+///
+/// Looks for a colon (:) character that would indicate the current content
+/// should be parsed as a mapping key rather than a standalone value.
+///
+/// # Arguments
+///
+/// * `source` - A mutable reference to a source implementing ISource trait
+///
+/// # Returns
+///
+/// true if a mapping key pattern is detected, false otherwise
 pub(crate) fn peek_ahead_for_mapping_key(source: &mut dyn ISource) -> bool {
     let mut found = false;
     let state = source.save_state();
@@ -141,6 +212,18 @@ pub(crate) fn peek_ahead_for_mapping_key(source: &mut dyn ISource) -> bool {
     found
 }
 
+/// Parses a mapping key and determines if it has an explicit complex structure.
+///
+/// Handles both simple keys and complex keys (like sequences or mappings used as keys).
+/// Returns the parsed key node and a boolean indicating if it's a complex key.
+///
+/// # Arguments
+///
+/// * `source` - A mutable reference to a source implementing ISource trait
+///
+/// # Returns
+///
+/// Result containing a tuple of (key_node, is_complex_key) or an error string
 pub(crate) fn parse_mapping_key(source: &mut dyn ISource) -> Result<(Node, bool), String> {
     let raw = collect_until(source, |c| c == CHAR_COLON || c == CHAR_NEWLINE);
     let mut newline = false;
@@ -168,11 +251,35 @@ pub(crate) fn parse_mapping_key(source: &mut dyn ISource) -> Result<(Node, bool)
     }
 }
 
+/// Parses a comment line from the source.
+///
+/// Consumes a comment starting with '#' and returns the comment text
+/// without the hash character and with trailing whitespace trimmed.
+///
+/// # Arguments
+///
+/// * `source` - A mutable reference to a source implementing ISource trait
+///
+/// # Returns
+///
+/// The comment text as a String
 pub(crate) fn parse_comment(source: &mut dyn ISource) -> String {
     source.next();
     read_line_trimmed_into_string(source)
 }
 
+/// Converts a node to its inline string representation for display.
+///
+/// Similar to the utility function but specifically tailored for parser
+/// context. Provides compact string representations for debugging.
+///
+/// # Arguments
+///
+/// * `node` - A reference to the Node to convert
+///
+/// # Returns
+///
+/// A String containing the inline representation
 pub(crate) fn node_to_inline_string(node: &Node) -> String {
     crate::utils::node_to_inline_string(node)
 }

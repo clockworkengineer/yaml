@@ -27,7 +27,18 @@ impl Format {
     }
 }
 
-/// Detects the Unicode format of a text file by examining its byte order mark (BOM)
+/// Detects the Unicode format of a text file by examining its byte order mark (BOM).
+///
+/// Reads the first few bytes of a file to identify the Unicode encoding format
+/// based on the presence and type of byte order mark. Defaults to UTF-8 if no BOM is found.
+///
+/// # Arguments
+///
+/// * `filename` - Path to the file to analyze
+///
+/// # Returns
+///
+/// Result containing the detected Format or an IO error
 pub fn detect_format(filename: &str) -> Result<Format> {
     let mut file = File::open(filename)?;
     let mut bom_buffer = [0u8; 4];
@@ -39,13 +50,28 @@ pub fn detect_format(filename: &str) -> Result<Format> {
         [0xFF, 0xFE, 0x00, 0x00] => Format::Utf32le,
         [0x00, 0x00, 0xFE, 0xFF] => Format::Utf32be,
         [0xFF, 0xFE, ..] => Format::Utf16le,
-        _ => Format::Utf8
+        _ => Format::Utf8,
     };
 
     Ok(format)
 }
 
 /// Writes a string to a file in the specified Unicode format
+/// Writes string content to a file with the specified Unicode format and BOM.
+///
+/// Creates or overwrites a file with the given content, adding the appropriate
+/// byte order mark based on the specified format. Handles Unicode encoding
+/// conversions as needed.
+///
+/// # Arguments
+///
+/// * `filename` - Path where the file will be created/written
+/// * `content` - String content to write to the file
+/// * `format` - Unicode format specifying encoding and BOM requirements
+///
+/// # Returns
+///
+/// Result indicating success or an IO error
 pub fn write_file_from_string(filename: &str, content: &str, format: Format) -> Result<()> {
     let mut file = File::create(filename)?;
     file.write_all(format.get_bom())?;
@@ -79,6 +105,18 @@ pub fn write_file_from_string(filename: &str, content: &str, format: Format) -> 
 }
 
 /// Reads a text file and returns its content as a String, handling different Unicode formats
+/// Reads a text file and returns its content as a UTF-8 string.
+///
+/// Automatically handles BOM detection and removal, converting the file
+/// content to a standard UTF-8 string regardless of the original encoding format.
+///
+/// # Arguments
+///
+/// * `filename` - Path to the file to read
+///
+/// # Returns
+///
+/// Result containing the file content as a String or an IO error
 pub fn read_file_to_string(filename: &str) -> Result<String> {
     let mut content = String::new();
     let format = detect_format(filename)?;
@@ -97,14 +135,18 @@ pub fn read_file_to_string(filename: &str) -> Result<String> {
         file.read_to_end(&mut bytes)?;
 
         let content = String::from_utf16(
-            &bytes.chunks(2)
-                .map(|chunk| if is_be {
-                    u16::from_be_bytes([chunk[0], chunk[1]])
-                } else {
-                    u16::from_le_bytes([chunk[0], chunk[1]])
+            &bytes
+                .chunks(2)
+                .map(|chunk| {
+                    if is_be {
+                        u16::from_be_bytes([chunk[0], chunk[1]])
+                    } else {
+                        u16::from_le_bytes([chunk[0], chunk[1]])
+                    }
                 })
-                .collect::<Vec<u16>>()
-        ).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+                .collect::<Vec<u16>>(),
+        )
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
 
         Ok(content.replace("\r\n", "\n"))
     }
@@ -115,11 +157,14 @@ pub fn read_file_to_string(filename: &str) -> Result<String> {
         let mut bytes = Vec::new();
         file.read_to_end(&mut bytes)?;
 
-        let content = bytes.chunks(4)
-            .map(|chunk| if is_be {
-                u32::from_be_bytes([chunk[0], chunk[1], chunk[2], chunk[3]])
-            } else {
-                u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]])
+        let content = bytes
+            .chunks(4)
+            .map(|chunk| {
+                if is_be {
+                    u32::from_be_bytes([chunk[0], chunk[1], chunk[2], chunk[3]])
+                } else {
+                    u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]])
+                }
             })
             .map(|cp| char::from_u32(cp).unwrap_or('\u{FFFD}'))
             .collect::<String>();
@@ -144,12 +189,11 @@ pub fn read_file_to_string(filename: &str) -> Result<String> {
     Ok(content.replace("\r\n", "\n"))
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::fs::{File, remove_file};
-    use std::io::{Write, Read};
+    use std::io::{Read, Write};
     use std::path::PathBuf;
 
     fn temp_file(name: &str) -> PathBuf {
@@ -191,15 +235,25 @@ mod tests {
         let cases: Vec<(&str, Vec<u8>, Format)> = vec![
             ("utf8bom", vec![0xEF, 0xBB, 0xBF, b'a'], Format::Utf8bom),
             ("utf16be", vec![0xFE, 0xFF, 0x00, 0x61], Format::Utf16be),
-            ("utf32le", vec![0xFF, 0xFE, 0x00, 0x00, 0x61, 0x00, 0x00, 0x00], Format::Utf32le),
-            ("utf32be", vec![0x00, 0x00, 0xFE, 0xFF, 0x00, 0x00, 0x00, 0x61], Format::Utf32be),
+            (
+                "utf32le",
+                vec![0xFF, 0xFE, 0x00, 0x00, 0x61, 0x00, 0x00, 0x00],
+                Format::Utf32le,
+            ),
+            (
+                "utf32be",
+                vec![0x00, 0x00, 0xFE, 0xFF, 0x00, 0x00, 0x00, 0x61],
+                Format::Utf32be,
+            ),
             ("utf16le", vec![0xFF, 0xFE, 0x61, 0x00], Format::Utf16le),
         ];
         for (name, bytes, expected) in cases {
             let path = temp_file(name);
             write_bytes(&path, &bytes);
             let fmt = detect_format(path.to_str().unwrap()).unwrap();
-            assert!(matches!(fmt, f if std::mem::discriminant(&f) == std::mem::discriminant(&expected)));
+            assert!(
+                matches!(fmt, f if std::mem::discriminant(&f) == std::mem::discriminant(&expected))
+            );
             remove_file(path).ok();
         }
     }
@@ -246,7 +300,6 @@ mod tests {
 
     #[test]
     fn write_bom_presence() {
-
         let cases = vec![
             (Format::Utf8, vec![] as Vec<u8>),
             (Format::Utf8bom, vec![0xEF, 0xBB, 0xBF]),
@@ -264,4 +317,3 @@ mod tests {
         }
     }
 }
-

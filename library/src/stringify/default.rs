@@ -4,13 +4,24 @@ use crate::constants::*;
 use crate::io::traits::IDestination;
 use crate::nodes::node::*;
 
-
+/// Escapes special characters in a string for double-quoted YAML representation.
+///
+/// Processes characters that need escaping in double-quoted strings including
+/// newlines, carriage returns, tabs, and backslashes. Preserves existing
+/// escape sequences when appropriate.
+///
+/// # Arguments
+///
+/// * `s` - The string to escape
+///
+/// # Returns
+///
+/// A new String with appropriate escape sequences
 fn escape_double(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut iter = s.chars().peekable();
     while let Some(c) = iter.next() {
         match c {
-
             CHAR_NEWLINE => out.push(CHAR_NEWLINE),
             CHAR_CARRIAGE_RETURN => {
                 out.push(CHAR_BACKSLASH);
@@ -21,7 +32,6 @@ fn escape_double(s: &str) -> String {
                 out.push('t');
             }
             CHAR_BACKSLASH => {
-
                 if let Some(&next) = iter.peek() {
                     match next {
                         'n' | 'r' | 't' | 'b' | 'x' => {
@@ -52,7 +62,18 @@ fn escape_double(s: &str) -> String {
     out
 }
 
-
+/// Escapes single quotes in a string for single-quoted YAML representation.
+///
+/// Handles the single quote escaping rule where single quotes are escaped
+/// by doubling them ('') in single-quoted YAML strings.
+///
+/// # Arguments
+///
+/// * `s` - The string to escape
+///
+/// # Returns
+///
+/// A new String with single quotes properly escaped
 fn escape_single(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
@@ -66,11 +87,36 @@ fn escape_single(s: &str) -> String {
     out
 }
 
-
+/// Normalizes newline characters in a string to use Unix-style line endings.
+///
+/// Converts Windows-style CRLF sequences to LF for consistent output.
+///
+/// # Arguments
+///
+/// * `s` - The string to normalize
+///
+/// # Returns
+///
+/// A new String with normalized line endings
 fn normalize_newlines(s: &str) -> String {
     s.replace(CHAR_CARRIAGE_RETURN, "")
 }
 
+/// Recursively stringifies a YAML node with the specified indentation level.
+///
+/// Handles all node types including scalars, arrays, mappings, documents,
+/// anchors, aliases, and comments. Applies proper indentation and formatting
+/// rules based on the node type and content.
+///
+/// # Arguments
+///
+/// * `node` - The Node to stringify
+/// * `destination` - The output destination for the YAML content
+/// * `indent` - The current indentation level (number of spaces)
+///
+/// # Returns
+///
+/// Result indicating success or an error string
 fn stringify_document_with_indent(
     node: &Node,
     destination: &mut dyn IDestination,
@@ -81,23 +127,16 @@ fn stringify_document_with_indent(
         Node::None => destination.add_bytes(&format!("{indent_str}null")),
         Node::Boolean(b) => destination.add_bytes(&format!("{indent_str}{b}")),
         Node::Str(s, qt, style) => {
-
-
             let s = normalize_newlines(s);
             match qt {
-                QuoteType::Double => {
-
-                    destination.add_bytes(&format!(
-                        "{}{}{}{}",
-                        indent_str,
-                        CHAR_DOUBLE_QUOTE,
-                        escape_double(&s),
-                        CHAR_DOUBLE_QUOTE
-                    ))
-                }
+                QuoteType::Double => destination.add_bytes(&format!(
+                    "{}{}{}{}",
+                    indent_str,
+                    CHAR_DOUBLE_QUOTE,
+                    escape_double(&s),
+                    CHAR_DOUBLE_QUOTE
+                )),
                 QuoteType::Single => {
-
-
                     if !s.contains(CHAR_NEWLINE)
                         && (s.contains(CHAR_SINGLE_QUOTE) || s.contains(CHAR_BACKSLASH))
                     {
@@ -109,7 +148,6 @@ fn stringify_document_with_indent(
                             CHAR_DOUBLE_QUOTE
                         ))
                     } else {
-
                         destination.add_bytes(&format!(
                             "{}{}{}{}",
                             indent_str,
@@ -120,18 +158,13 @@ fn stringify_document_with_indent(
                     }
                 }
                 QuoteType::Unquoted => {
-
                     if s.contains(CHAR_NEWLINE) || matches!(style, BlockStyle::Literal) {
-
-
                         let is_literal = matches!(style, BlockStyle::Literal);
-
 
                         let lines: Vec<&str> = s.split(CHAR_NEWLINE).collect();
                         let needs_indent = if is_literal {
                             lines.iter().any(|l| !l.is_empty() && !l.starts_with(' '))
                         } else {
-
                             true
                         };
                         let content_indent = if needs_indent {
@@ -143,7 +176,6 @@ fn stringify_document_with_indent(
                             .add_bytes(&format!("{indent_str}{STR_LITERAL_BLOCK}{CHAR_NEWLINE}"));
 
                         if !s.contains(CHAR_NEWLINE) && is_literal {
-
                             destination.add_bytes(&format!("{content_indent}{s}{CHAR_NEWLINE}"));
                         } else {
                             for line in lines {
@@ -163,7 +195,6 @@ fn stringify_document_with_indent(
             }
         }
         Node::Comment(c) => {
-
             let c = normalize_newlines(c);
             destination.add_bytes(&format!("{indent_str}{CHAR_HASH}{CHAR_SPACE}{c}"))
         }
@@ -177,8 +208,6 @@ fn stringify_document_with_indent(
                 destination.add_bytes(&format!("{indent_str}{CHAR_DASH}{CHAR_SPACE}"));
                 match item {
                     Node::Mapping(_) => {
-
-
                         let mut buf = crate::io::destinations::buffer::Buffer::new();
                         stringify_document_with_indent(item, &mut buf, indent + 1)?;
                         let mut out = buf.to_string();
@@ -189,8 +218,6 @@ fn stringify_document_with_indent(
                         destination.add_bytes(&out);
                     }
                     Node::Array(_) => {
-
-
                         let mut buf = crate::io::destinations::buffer::Buffer::new();
                         stringify_document_with_indent(item, &mut buf, indent + 1)?;
                         let mut out = buf.to_string();
@@ -209,15 +236,11 @@ fn stringify_document_with_indent(
         }
 
         Node::Mapping(pairs) => {
-
             for (key_node, value) in pairs {
-
-
                 let key_str = match key_node {
                     Node::Number(Numeric::Float(f)) => format!("\"{}\"", f),
                     Node::Number(Numeric::Integer(i)) => format!("{}", i),
                     _ => {
-
                         let mut key_buf = crate::io::destinations::buffer::Buffer::new();
                         stringify_document_with_indent(key_node, &mut key_buf, 0)?;
                         key_buf.to_string()
@@ -232,7 +255,6 @@ fn stringify_document_with_indent(
                         stringify_document_with_indent(value, destination, indent + 1)?;
                     }
                     Node::Str(_, QuoteType::Unquoted, BlockStyle::Literal) => {
-
                         stringify_document_with_indent(value, destination, 0)?;
                     }
                     _ => {
@@ -248,12 +270,10 @@ fn stringify_document_with_indent(
             }
         }
         Node::Anchored(inner, name) => {
-
             destination.add_bytes(&format!("{CHAR_AMPERSAND}{name}{CHAR_SPACE}"));
             stringify_document_with_indent(inner, destination, indent)?;
         }
         Node::Tagged(inner, tag) => {
-
             destination.add_bytes(&format!("{indent_str}{tag}{CHAR_SPACE}"));
             stringify_document_with_indent(inner, destination, indent)?;
         }
@@ -267,7 +287,18 @@ fn stringify_document_with_indent(
     Ok(())
 }
 
-
+/// Determines if a node represents blank content that should be omitted.
+///
+/// Checks if a node is considered blank for stringification purposes,
+/// such as None nodes, empty arrays, or empty strings.
+///
+/// # Arguments
+///
+/// * `node` - The Node to check
+///
+/// # Returns
+///
+/// true if the node is considered blank, false otherwise
 fn node_is_blank(node: &Node) -> bool {
     match node {
         Node::None => true,
@@ -281,29 +312,48 @@ fn node_is_blank(node: &Node) -> bool {
     }
 }
 
-/// stringify_document
-
+/// Stringifies a single YAML document to the destination.
+///
+/// Converts a document node to its YAML string representation,
+/// starting with zero indentation. This is typically used for
+/// individual documents within a multi-document stream.
+///
+/// # Arguments
+///
+/// * `node` - The Document Node to stringify
+/// * `destination` - The output destination for the YAML content
+///
+/// # Returns
+///
+/// Result indicating success or an error string
 pub fn stringify_document(node: &Node, destination: &mut dyn IDestination) -> Result<(), String> {
     stringify_document_with_indent(node, destination, 0)
 }
 
-/// stringify
-
+/// Main entry point for stringifying YAML nodes to their text representation.
+///
+/// Converts any YAML node structure (documents, individual nodes) to
+/// properly formatted YAML text. Handles multi-document streams by
+/// adding appropriate document separators.
+///
+/// # Arguments
+///
+/// * `node` - The root Node to stringify
+/// * `destination` - The output destination for the YAML content
+///
+/// # Returns
+///
+/// Result indicating success or an error string
 pub fn stringify(node: &Node, destination: &mut dyn IDestination) -> Result<(), String> {
     match node {
         Node::Documents(docs) => {
-
-
             for doc in docs {
-
                 if let Node::Document(nodes) = doc {
-
                     if nodes.iter().all(node_is_blank) {
                         destination.add_bytes("---\n");
                         continue;
                     }
                 }
-
 
                 if let Node::Document(nodes) = doc {
                     if nodes.len() == 1 {
@@ -340,7 +390,6 @@ mod tests {
 
     #[test]
     fn test_escape_double_basic() {
-
         assert_eq!(escape_double("a\"b"), "a\\\"b");
 
         assert_eq!(escape_double("\\n"), "\\n");

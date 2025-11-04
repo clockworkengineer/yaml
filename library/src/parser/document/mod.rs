@@ -32,21 +32,30 @@ use std::collections::HashMap;
 use helpers::node_is_blank;
 use helpers::skip_whitespace;
 
-/// parse_document_contents
-
+/// Parses the contents of a YAML document based on the current character and context.
+///
+/// Determines the appropriate parsing strategy based on the current character:
+/// sequences (-), comments (#), inline mappings ({}), inline sequences ([]),
+/// explicit mapping keys (?), block scalars (| or >), or regular mappings.
+///
+/// # Arguments
+///
+/// * `source` - A mutable reference to a source implementing ISource trait
+/// * `indent_level` - The current indentation level for proper nesting
+///
+/// # Returns
+///
+/// Result containing the parsed Node or an error string
 pub fn parse_document_contents(
     source: &mut dyn ISource,
     indent_level: usize,
 ) -> Result<Node, String> {
-
-
     match source.current() {
         Some(c) if c == '-' => {
             let indent_level = source.get_current_indent_level();
             Ok(parse_sequence(source, indent_level)?)
         }
         Some(c) if c == '#' => {
-
             parse_comment(source);
             skip_whitespace(source);
             parse_document_contents(source, indent_level)
@@ -54,8 +63,6 @@ pub fn parse_document_contents(
         Some(c) if c == '{' => Ok(parse_inline_mapping(source)?),
         Some(c) if c == '[' => Ok(parse_inline_sequence(source)?),
         Some(c) if c == '?' => {
-
-
             source.next();
             skip_whitespace(source);
             let mut key_node: Node;
@@ -63,13 +70,9 @@ pub fn parse_document_contents(
             if source.current() == Some('[') {
                 key_node = parse_inline_sequence(source)?;
             } else if source.current() == Some('-') {
-
-
                 let nested_indent = source.get_current_indent_level();
                 key_node = parse_sequence(source, nested_indent)?;
             } else if matches!(source.current(), Some('|') | Some('>')) {
-
-
                 let is_folded = source.current() == Some('>');
 
                 let _ = crate::utils::collect_until(source, |c| c == '\n');
@@ -90,7 +93,6 @@ pub fn parse_document_contents(
                         source.next();
                     }
                     let cur_is_newline = source.current() == Some('\n');
-
 
                     let is_colon_start = matches!(source.current(), Some(':'));
                     source.restore_state(st_line);
@@ -142,13 +144,11 @@ pub fn parse_document_contents(
                     norm_lines = raw_lines.clone();
                 }
 
-
                 let mut escaped_parts: Vec<String> = Vec::with_capacity(norm_lines.len());
                 for l in norm_lines.iter() {
                     let stripped: String = l.chars().skip(fi).collect();
                     escaped_parts.push(stripped);
                 }
-
 
                 let mut escaped_key = escaped_parts.join("\\n");
                 escaped_key.push_str("\\n");
@@ -158,7 +158,6 @@ pub fn parse_document_contents(
                     crate::nodes::node::BlockStyle::None,
                 );
             } else if matches!(source.current(), Some('"') | Some('\'')) {
-
                 key_node = crate::parser::document::value::parse_value(source)?;
             } else if source.current() == Some('#') || source.current() == Some('\n') {
                 let st = source.save_state();
@@ -202,8 +201,6 @@ pub fn parse_document_contents(
                     );
                 }
                 Node::Str(s, _qt, style) => {
-
-
                     let key_string = if matches!(style, BlockStyle::Literal) {
                         format!("{}\n", s)
                     } else {
@@ -371,8 +368,20 @@ pub fn parse_document_contents(
     }
 }
 
-/// parse_document
-
+/// Parses a single YAML document from the source.
+///
+/// Processes document content while handling document start/end markers (--- and ...),
+/// comments, and various node types. Collects all document nodes and performs
+/// post-processing including anchor resolution and merge key expansion.
+///
+/// # Arguments
+///
+/// * `source` - A mutable reference to a source implementing ISource trait
+/// * `indent_level` - The indentation level for the document
+///
+/// # Returns
+///
+/// Result containing a Document Node or an error string
 pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<Node, String> {
     skip_whitespace(source);
 
@@ -402,7 +411,6 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
         }
     }
 
-
     let mut normalized_nodes: Vec<Node> = Vec::new();
     let mut i = 0usize;
     while i < document_nodes.len() {
@@ -427,15 +435,25 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
     let mut anchors: HashMap<String, Node> = HashMap::new();
     collect_anchors(&doc_node, &mut anchors)?;
 
-
     expand_merge_keys(&mut doc_node, &anchors)?;
     replace_aliases(&mut doc_node, &anchors)?;
 
     Ok(doc_node)
 }
 
-/// parse
-
+/// Main entry point for parsing YAML content from a source.
+///
+/// Parses one or more YAML documents from the source, handling document
+/// separators and creating a Documents node containing all parsed documents.
+/// Empty or blank documents are filtered out automatically.
+///
+/// # Arguments
+///
+/// * `source` - A mutable reference to a source implementing ISource trait
+///
+/// # Returns
+///
+/// Result containing a Documents Node with all parsed documents or an error string
 pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
     let mut docs: Vec<Node> = Vec::new();
     if helpers::peek_ahead_for_document_start_end(source, '-') {

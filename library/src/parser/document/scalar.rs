@@ -3,6 +3,20 @@
 use crate::nodes::node::Node;
 use crate::nodes::node::{BlockStyle, Numeric, QuoteType};
 
+/// Parses a scalar value string into the appropriate YAML Node type.
+///
+/// Handles various scalar types including null values, booleans, numbers,
+/// and strings. Processes quoted strings (single and double) with proper
+/// escape sequence handling and quote style preservation. Determines the
+/// appropriate BlockStyle and QuoteType based on content analysis.
+///
+/// # Arguments
+///
+/// * `value` - The string value to parse as a scalar
+///
+/// # Returns
+///
+/// A Node representing the parsed scalar value
 pub(crate) fn parse_scalar(value: &str) -> Node {
     match value {
         v if v.starts_with('#') => Node::Str(v.to_string(), QuoteType::Unquoted, BlockStyle::None),

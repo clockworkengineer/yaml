@@ -4,10 +4,16 @@ use crate::constants::{CHAR_HASH, CHAR_NEWLINE};
 use crate::io::traits::ISource;
 use crate::{Node, Numeric};
 
-
-/// collect_until
-
-
+/// Collects characters from the source until the stop predicate returns true.
+///
+/// # Arguments
+///
+/// * `source` - A mutable reference to a source implementing ISource trait
+/// * `stop_pred` - A closure that takes a character and returns true when collection should stop
+///
+/// # Returns
+///
+/// A String containing all collected characters before the stop condition
 pub fn collect_until<F>(source: &mut dyn ISource, mut stop_pred: F) -> String
 where
     F: FnMut(char) -> bool,
@@ -23,10 +29,14 @@ where
     out
 }
 
-
-/// skip_whitespace_and_comments
-
-
+/// Skips whitespace characters and comment lines in the source.
+///
+/// Continuously advances through the source, skipping whitespace and comment lines
+/// (lines starting with #) until non-whitespace, non-comment content is encountered.
+///
+/// # Arguments
+///
+/// * `source` - A mutable reference to a source implementing ISource trait
 pub fn skip_whitespace_and_comments(source: &mut dyn ISource) {
     loop {
         while let Some(c) = source.current() {
@@ -37,7 +47,6 @@ pub fn skip_whitespace_and_comments(source: &mut dyn ISource) {
             }
         }
         if source.current() == Some(CHAR_HASH) {
-
             while let Some(c) = source.current() {
                 if c == CHAR_NEWLINE {
                     break;
@@ -51,10 +60,14 @@ pub fn skip_whitespace_and_comments(source: &mut dyn ISource) {
     }
 }
 
-
-/// skip_until_newline
-
-
+/// Skips characters in the source until a newline character is encountered.
+///
+/// Advances through the source character by character until it finds a newline
+/// character ('\n'), which is also consumed.
+///
+/// # Arguments
+///
+/// * `source` - A mutable reference to a source implementing ISource trait
 pub fn skip_until_newline(source: &mut dyn ISource) {
     while let Some(c) = source.current() {
         if c == CHAR_NEWLINE {
@@ -65,10 +78,15 @@ pub fn skip_until_newline(source: &mut dyn ISource) {
     }
 }
 
-
-/// consume_inline_comment_and_newline
-
-
+/// Consumes an inline comment and any following newline and whitespace.
+///
+/// If the current character is a hash (#), consumes all characters until a newline,
+/// then consumes the newline and any whitespace that follows. If the current character
+/// is not a hash, this function returns immediately without consuming anything.
+///
+/// # Arguments
+///
+/// * `source` - A mutable reference to a source implementing ISource trait
 pub fn consume_inline_comment_and_newline(source: &mut dyn ISource) {
     if source.current() != Some(CHAR_HASH) {
         return;
@@ -94,13 +112,21 @@ pub fn consume_inline_comment_and_newline(source: &mut dyn ISource) {
     }
 }
 
-
-/// read_line_trimmed_into_string
-
-
+/// Reads a line from the source and returns it as a trimmed string, excluding comments.
+///
+/// Collects characters until a newline is encountered. If a hash (#) character is found,
+/// everything from the hash to the end of the line is treated as a comment and excluded.
+/// The resulting string is trimmed of leading and trailing whitespace.
+///
+/// # Arguments
+///
+/// * `source` - A mutable reference to a source implementing ISource trait
+///
+/// # Returns
+///
+/// A trimmed String containing the line content without comments
 pub fn read_line_trimmed_into_string(source: &mut dyn ISource) -> String {
     let s = collect_until(source, |c| c == CHAR_NEWLINE);
-
 
     if let Some(pos) = s.find(CHAR_HASH) {
         return s[..pos].trim().to_string();
@@ -108,10 +134,18 @@ pub fn read_line_trimmed_into_string(source: &mut dyn ISource) -> String {
     s.trim().to_string()
 }
 
-
-/// node_to_inline_string
-
-
+/// Converts a Node to its inline string representation.
+///
+/// Transforms various Node types into compact string representations suitable for
+/// inline display. Arrays and mappings are formatted in compact JSON-like syntax.
+///
+/// # Arguments
+///
+/// * `node` - A reference to the Node to convert
+///
+/// # Returns
+///
+/// A String containing the inline representation of the node
 pub fn node_to_inline_string(node: &Node) -> String {
     match node {
         Node::Str(s, _, _) => s.clone(),
@@ -133,8 +167,19 @@ pub fn node_to_inline_string(node: &Node) -> String {
     }
 }
 
-/// unescape_double_quoted
-
+/// Processes escape sequences in a double-quoted string.
+///
+/// Handles various escape sequences including Unicode escapes (\u), hex escapes (\x),
+/// and standard escape characters (\n, \r, \t, \b, \", \\). Unicode escapes are
+/// processed but not fully decoded (preserves as-is for most cases).
+///
+/// # Arguments
+///
+/// * `s` - A string slice containing the potentially escaped string
+///
+/// # Returns
+///
+/// A new String with escape sequences processed
 pub fn unescape_double_quoted(s: &str) -> String {
     let mut result = String::with_capacity(s.len());
     let mut chars = s.chars().peekable();
@@ -142,7 +187,6 @@ pub fn unescape_double_quoted(s: &str) -> String {
     while let Some(c) = chars.next() {
         if c == '\\' {
             match chars.next() {
-
                 Some('u') => {
                     let mut hex = String::new();
                     for _ in 0..4 {
@@ -210,7 +254,6 @@ pub fn unescape_double_quoted(s: &str) -> String {
                     result.push(other);
                 }
                 None => {
-
                     result.push('\\');
                 }
             }
@@ -221,7 +264,6 @@ pub fn unescape_double_quoted(s: &str) -> String {
 
     result
 }
-
 
 #[cfg(test)]
 mod tests {

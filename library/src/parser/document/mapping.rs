@@ -7,7 +7,25 @@ use crate::nodes::node::{BlockStyle, QuoteType};
 use crate::parser::document::helpers::{parse_comment, parse_mapping_key, skip_whitespace};
 use crate::parser::document::value::parse_value;
 
+/// Parses a YAML mapping (dictionary) with the specified indentation level.
+///
+/// Processes key-value pairs, handling complex keys, nested mappings,
+/// comments, and proper indentation. Determines appropriate quoting
+/// for keys and values based on content safety rules.
+///
+/// # Arguments
+///
+/// * `source` - A mutable reference to a source implementing ISource trait
+/// * `indent_level` - The expected indentation level for mapping entries
+///
+/// # Returns
+///
+/// Result containing a Mapping Node or an error string
 pub(crate) fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, String> {
+    /// Checks if a string value can be safely represented as plain (unquoted) YAML.
+    ///
+    /// Returns false if the string contains characters that require quoting
+    /// or has leading/trailing spaces that would be lost in plain format.
     fn is_plain_safe_value(s: &str) -> bool {
         if s.is_empty() {
             return true;
@@ -26,6 +44,10 @@ pub(crate) fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Re
         }
         true
     }
+    /// Checks if a string key can be safely represented as plain (unquoted) YAML.
+    ///
+    /// Similar to is_plain_safe_value but additionally excludes colons which
+    /// have special meaning in YAML key-value syntax.
     fn is_plain_safe_key(s: &str) -> bool {
         is_plain_safe_value(s) && !s.contains(':')
     }
@@ -51,10 +73,10 @@ pub(crate) fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Re
                 }
                 let (mut key_node, newline) = parse_mapping_key(source)?;
                 if let Node::Str(ref mut s, ref mut qt, ref mut _style) = key_node {
-                    if matches!(*qt, QuoteType::Single | QuoteType::Double)
-                        && is_plain_safe_key(s) {
-                            *qt = QuoteType::Unquoted;
-                        }
+                    if matches!(*qt, QuoteType::Single | QuoteType::Double) && is_plain_safe_key(s)
+                    {
+                        *qt = QuoteType::Unquoted;
+                    }
                 }
                 let next_indent = source.get_current_indent_level();
                 if next_indent > indent_level && newline {

@@ -4,12 +4,23 @@ use crate::constants::*;
 use crate::error::messages::*;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
-use crate::parser::document::helpers::{
-    parse_error, parse_quoted_scalar, skip_whitespace,
-};
+use crate::parser::document::helpers::{parse_error, parse_quoted_scalar, skip_whitespace};
 use crate::parser::document::scalar::parse_scalar;
 use crate::utils::*;
 
+/// Parses an inline YAML mapping enclosed in curly braces {}.
+///
+/// Handles comma-separated key-value pairs within braces, including
+/// nested inline collections, quoted strings, and whitespace handling.
+/// Supports empty mappings and nested structures.
+///
+/// # Arguments
+///
+/// * `source` - A mutable reference to a source implementing ISource trait
+///
+/// # Returns
+///
+/// Result containing a Mapping Node or an error string
 pub(crate) fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, String> {
     let mut pairs: Vec<(Node, Node)> = Vec::new();
     source.next();
@@ -79,6 +90,19 @@ pub(crate) fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, Str
     Ok(Node::Mapping(pairs))
 }
 
+/// Parses an inline YAML sequence enclosed in square brackets [].
+///
+/// Handles comma-separated values within brackets, including nested
+/// inline collections, quoted strings, and proper whitespace handling.
+/// Supports empty sequences and nested structures.
+///
+/// # Arguments
+///
+/// * `source` - A mutable reference to a source implementing ISource trait
+///
+/// # Returns
+///
+/// Result containing an Array Node or an error string
 pub(crate) fn parse_inline_sequence(source: &mut dyn ISource) -> Result<Node, String> {
     let mut items: Vec<Node> = Vec::new();
     source.next();

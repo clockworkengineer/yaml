@@ -8,6 +8,20 @@ use crate::parser::document::helpers::{
 };
 use crate::parser::document::value::parse_value;
 
+/// Parses a YAML sequence (array) with the specified indentation level.
+///
+/// Processes sequence items marked with '-' at the beginning of lines,
+/// handling nested sequences, comments, and document boundaries.
+/// Maintains proper indentation tracking for nested structures.
+///
+/// # Arguments
+///
+/// * `source` - A mutable reference to a source implementing ISource trait
+/// * `indent_level` - The expected indentation level for sequence items
+///
+/// # Returns
+///
+/// Result containing an Array Node or an error string
 pub(crate) fn parse_sequence(
     source: &mut dyn ISource,
     indent_level: usize,

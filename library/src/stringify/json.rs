@@ -5,7 +5,19 @@ use crate::io::traits::IDestination;
 use crate::nodes::node::*;
 use crate::stringify::default::stringify as yaml_stringify;
 
-
+/// Escapes special characters in a string for JSON representation.
+///
+/// Handles JSON-specific escape sequences including quotes, backslashes,
+/// newlines, and control characters. Converts control characters to
+/// Unicode escape sequences.
+///
+/// # Arguments
+///
+/// * `s` - The string to escape
+///
+/// # Returns
+///
+/// A new String with proper JSON escape sequences
 fn escape_json_string(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
@@ -24,12 +36,32 @@ fn escape_json_string(s: &str) -> String {
     out
 }
 
+/// Writes a JSON-escaped string to the destination with surrounding quotes.
+///
+/// Combines escaping and quoting into a single operation for efficiency.
+///
+/// # Arguments
+///
+/// * `s` - The string to escape and write
+/// * `destination` - The output destination
 fn write_json_string(s: &str, destination: &mut dyn IDestination) {
     destination.add_byte(b'"');
     destination.add_bytes(&escape_json_string(s));
     destination.add_byte(b'"');
 }
 
+/// Converts a YAML node to a string representation suitable for use as a JSON key.
+///
+/// JSON keys must be strings, so this function converts various node types
+/// to appropriate string representations for use as object keys.
+///
+/// # Arguments
+///
+/// * `key` - The Node to convert to a key string
+///
+/// # Returns
+///
+/// Result containing the key string or an error for invalid key types
 fn node_to_key_string(key: &Node) -> Result<String, String> {
     match key {
         Node::Str(s, _, _) => Ok(s.clone()),
@@ -47,8 +79,6 @@ fn node_to_key_string(key: &Node) -> Result<String, String> {
         Node::Boolean(b) => Ok((if *b { "true" } else { "false" }).to_string()),
         Node::None => Ok("".to_string()),
         _ => {
-
-
             let mut buf = BufferDestination::new();
             yaml_stringify(key, &mut buf).map_err(|e| e)?;
             Ok(buf.to_string())
@@ -56,6 +86,19 @@ fn node_to_key_string(key: &Node) -> Result<String, String> {
     }
 }
 
+/// Recursively stringifies a YAML node to JSON format.
+///
+/// Converts YAML nodes to their JSON equivalents, handling type mappings
+/// and structural differences between YAML and JSON formats.
+///
+/// # Arguments
+///
+/// * `node` - The Node to convert to JSON
+/// * `destination` - The output destination for the JSON content
+///
+/// # Returns
+///
+/// Result indicating success or an error string
 fn stringify_node(node: &Node, destination: &mut dyn IDestination) -> Result<(), String> {
     match node {
         Node::None => destination.add_bytes("null"),
@@ -86,7 +129,6 @@ fn stringify_node(node: &Node, destination: &mut dyn IDestination) -> Result<(),
             destination.add_byte(b'{');
             let mut first = true;
             for (k, v) in pairs.iter() {
-
                 let key_str = node_to_key_string(k)?;
                 if !first {
                     destination.add_byte(b',');
@@ -126,7 +168,6 @@ fn stringify_node(node: &Node, destination: &mut dyn IDestination) -> Result<(),
             destination.add_byte(b']');
         }
         Node::Comment(_) => {
-
             destination.add_bytes("null");
         }
     }
@@ -135,11 +176,37 @@ fn stringify_node(node: &Node, destination: &mut dyn IDestination) -> Result<(),
 
 /// stringify
 
+/// Converts YAML nodes to compact JSON format.
+///
+/// Main entry point for JSON stringification. Converts YAML document
+/// structures to valid JSON, handling multi-document streams appropriately.
+///
+/// # Arguments
+///
+/// * `node` - The root Node to convert to JSON
+/// * `destination` - The output destination for the JSON content
+///
+/// # Returns
+///
+/// Result indicating success or an error string
 pub fn stringify(node: &Node, destination: &mut dyn IDestination) -> Result<(), String> {
     stringify_node(node, destination)
 }
 
-/// Pretty-print JSON with the given number of spaces per indent level.
+/// Converts YAML nodes to pretty-printed JSON format with indentation.
+///
+/// Similar to stringify() but adds proper indentation and newlines
+/// for human-readable JSON output.
+///
+/// # Arguments
+///
+/// * `node` - The root Node to convert to JSON
+/// * `destination` - The output destination for the JSON content
+/// * `spaces_per_indent` - The number of spaces per indentation level
+///
+/// # Returns
+///
+/// Result indicating success or an error string
 pub fn stringify_pretty(
     node: &Node,
     destination: &mut dyn IDestination,
