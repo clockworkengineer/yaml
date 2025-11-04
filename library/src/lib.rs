@@ -31,6 +31,10 @@ mod test;
 /// Module containing  utility functions for the YAML library
 mod utils;
 
+/// ============
+/// YAML_lib API
+/// ============
+
 /// This enum represents different Unicode text file formats with their corresponding byte order marks (BOM)
 pub use file::file::Format;
 /// This function detects the Unicode format of a text file by examining its byte order mark (BOM)
@@ -51,9 +55,6 @@ pub use io::sources::file::File as FileSource;
 pub use misc::get_document_base as get_document;
 /// Returns the number of documents in a YAML stream represented by the Documents node.
 pub use misc::get_number_of_documents;
-///
-/// YAML_lib API
-///
 
 /// Returns the current version of the YAML library
 pub use misc::get_version as version;
@@ -65,13 +66,9 @@ pub use nodes::node::Numeric;
 pub use nodes::node::make_node;
 /// Parses json data into a Node tree structure
 pub use parser::document::parse;
-/// Converts a Node tree back to JSON format
+/// Converts a Node tree to bencode format
+pub use stringify::bencode::stringify as to_bencode;
+/// Converts a Node tree back to YAML format
 pub use stringify::default::stringify;
-// /// Converts a Node tree to JSON format
-// pub use stringify::bencode::stringify as to_bencode;
-// /// Converts a Node tree to YAML format
-// pub use stringify::yaml::stringify as to_yaml;
-// /// Converts a Node tree to XML format
-// pub use stringify::xml::stringify as to_xml;
-// /// Converts a Node tree to TOML format
-// pub use stringify::toml::stringify as to_toml;
+/// Converts a Node tree to JSON format
+pub use stringify::json::stringify as to_json;

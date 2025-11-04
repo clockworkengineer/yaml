@@ -1,3 +1,5 @@
+//! Module: parser/document/scalar.rs
+
 use crate::nodes::node::Node;
 use crate::nodes::node::{BlockStyle, Numeric, QuoteType};
 

@@ -1,3 +1,5 @@
+//! Module: parser/document/anchors.rs
+
 use crate::nodes::node::Node;
 use std::collections::HashMap;
 
@@ -101,35 +103,26 @@ pub(crate) fn replace_aliases(
     }
 }
 
-// Expand YAML merge keys ("<<") within mappings by merging the referenced
-// anchor mappings into the target mapping. This function walks the AST and
-// rewrites Mapping nodes so any encountered merge keys are removed and their
-// referenced mapping pairs are inserted, respecting override semantics (later
-// occurrences override earlier ones, and local explicit keys override merged
-// keys).
+
 pub(crate) fn expand_merge_keys(
     node: &mut Node,
     anchors: &HashMap<String, Node>,
 ) -> Result<(), String> {
     match node {
         Node::Mapping(pairs) => {
-            // Build a combined list: expand any merge entries (key == "<<")
-            // inline where they appear, but also handle a flattened parsing
-            // pattern where a mapping key's value is the literal string
-            // '<<: *anchor' and the intended nested pairs follow at the
-            // same mapping level (see tests). We handle both canonical
-            // merge keys and this flattened form.
+
+
             let mut combined: Vec<(Node, Node)> = Vec::new();
             let snapshot = pairs.clone();
             let mut i = 0usize;
             while i < snapshot.len() {
                 let (k, v) = snapshot[i].clone();
 
-                // Case A: canonical merge key where key == "<<"
+
                 let mut handled = false;
                 if let Node::Str(ks, _, _) = &k {
                     if ks.trim() == "<<" {
-                        // canonical merge: expand the value
+
                         let mut expanded_pairs: Vec<(Node, Node)> = Vec::new();
                         match &v {
                             Node::Alias(name) => {
@@ -191,17 +184,14 @@ pub(crate) fn expand_merge_keys(
                     continue;
                 }
 
-                // Case B: flattened pattern where the value is a literal merge
-                // marker like "<<: *base" and the intended nested mapping
-                // pairs follow at the same mapping level. Detect and rebuild
-                // the nested mapping accordingly.
+
                 if let Node::Str(_, _, _) = &k {
                     if let Node::Str(s, _, _) = &v {
                         let ts = s.trim_start();
                         if ts.starts_with("<<:") && ts.contains('*') {
                             if let Some(pos) = ts.find('*') {
                                 let aname = ts[pos + 1..].trim().to_string();
-                                // collect subsequent pairs as nested mapping
+
                                 let mut nested: Vec<(Node, Node)> = Vec::new();
                                 let mut j = i + 1;
                                 while j < snapshot.len() {
@@ -214,17 +204,17 @@ pub(crate) fn expand_merge_keys(
                                     j += 1;
                                 }
 
-                                // Start with anchor pairs, then merge nested pairs
+
                                 let mut merged_pairs: Vec<(Node, Node)> = Vec::new();
                                 if let Some(src) = anchors.get(&aname) {
                                     if let Node::Mapping(ap) = src {
                                         merged_pairs.extend(ap.clone());
                                     }
                                 }
-                                // Nested overrides anchor keys
+
                                 for (nk, nv) in nested.iter() {
                                     let mut replaced = false;
-                                    // compare using inline string representation
+
                                     if let Node::Str(nks, _, _) = nk {
                                         for p in merged_pairs.iter_mut() {
                                             if let Node::Str(pk, _, _) = &p.0 {
@@ -249,13 +239,12 @@ pub(crate) fn expand_merge_keys(
                     }
                 }
 
-                // Default: keep as-is
+
                 combined.push((k, v));
                 i += 1;
             }
 
-            // Deduplicate by key (using inline string representation) keeping
-            // the last occurrence to implement override semantics (last wins).
+
             use std::collections::HashMap as Map;
             let mut last_index: Map<String, usize> = Map::new();
             for (idx, (k, _v)) in combined.iter().enumerate() {
@@ -274,7 +263,7 @@ pub(crate) fn expand_merge_keys(
 
             *pairs = rebuilt;
 
-            // Recurse into values
+
             for (_k, v) in pairs.iter_mut() {
                 expand_merge_keys(v, anchors)?;
             }

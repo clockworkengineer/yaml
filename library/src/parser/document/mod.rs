@@ -32,12 +32,13 @@ use std::collections::HashMap;
 use helpers::node_is_blank;
 use helpers::skip_whitespace;
 
+/// parse_document_contents
+
 pub fn parse_document_contents(
     source: &mut dyn ISource,
     indent_level: usize,
 ) -> Result<Node, String> {
-    // This function was the central dispatcher in the single-file parser.
-    // Keep the logic here while delegating functionality to submodules.
+
 
     match source.current() {
         Some(c) if c == '-' => {
@@ -45,7 +46,7 @@ pub fn parse_document_contents(
             Ok(parse_sequence(source, indent_level)?)
         }
         Some(c) if c == '#' => {
-            // Consume the comment line and continue parsing the next content
+
             parse_comment(source);
             skip_whitespace(source);
             parse_document_contents(source, indent_level)
@@ -53,9 +54,8 @@ pub fn parse_document_contents(
         Some(c) if c == '{' => Ok(parse_inline_mapping(source)?),
         Some(c) if c == '[' => Ok(parse_inline_sequence(source)?),
         Some(c) if c == '?' => {
-            // Keep the explicit mapping parsing logic here to avoid duplicating
-            // heavy special-case code. The body is ported from the original file
-            // but it uses helpers/value/inline modules where appropriate.
+
+
             source.next();
             skip_whitespace(source);
             let mut key_node: Node;
@@ -63,17 +63,15 @@ pub fn parse_document_contents(
             if source.current() == Some('[') {
                 key_node = parse_inline_sequence(source)?;
             } else if source.current() == Some('-') {
-                // A sequence begins immediately after the explicit key marker
-                // on the same line (e.g. "? - item1\n  - item2"). Parse the
-                // following sequence as the key node.
+
+
                 let nested_indent = source.get_current_indent_level();
                 key_node = parse_sequence(source, nested_indent)?;
             } else if matches!(source.current(), Some('|') | Some('>')) {
-                // Block scalar used as explicit key. Read the block scalar
-                // content but stop if we encounter a following line whose
-                // first non-space character is ':' (the mapping value marker).
+
+
                 let is_folded = source.current() == Some('>');
-                // consume the block marker line
+
                 let _ = crate::utils::collect_until(source, |c| c == '\n');
                 if source.current() == Some('\n') {
                     source.next();
@@ -93,9 +91,7 @@ pub fn parse_document_contents(
                     }
                     let cur_is_newline = source.current() == Some('\n');
 
-                    // Determine whether this line (after indentation) starts
-                    // with ':' which would indicate the mapping value. If so,
-                    // do not consume it as part of the key block scalar.
+
                     let is_colon_start = matches!(source.current(), Some(':'));
                     source.restore_state(st_line);
 
@@ -146,17 +142,14 @@ pub fn parse_document_contents(
                     norm_lines = raw_lines.clone();
                 }
 
-                // For explicit keys that are block scalars, produce a
-                // double-quoted key with embedded "\\n" escapes and no
-                // literal newlines. Also strip the common indentation from
-                // each line so the key content doesn't include leading spaces.
+
                 let mut escaped_parts: Vec<String> = Vec::with_capacity(norm_lines.len());
                 for l in norm_lines.iter() {
                     let stripped: String = l.chars().skip(fi).collect();
                     escaped_parts.push(stripped);
                 }
-                // Join lines with a literal backslash+n sequence and ensure a
-                // trailing backslash+n to represent the preserved final newline.
+
+
                 let mut escaped_key = escaped_parts.join("\\n");
                 escaped_key.push_str("\\n");
                 key_node = Node::Str(
@@ -165,7 +158,7 @@ pub fn parse_document_contents(
                     crate::nodes::node::BlockStyle::None,
                 );
             } else if matches!(source.current(), Some('"') | Some('\'')) {
-                // Quoted scalar key - delegate to the normal value parser
+
                 key_node = crate::parser::document::value::parse_value(source)?;
             } else if source.current() == Some('#') || source.current() == Some('\n') {
                 let st = source.save_state();
@@ -209,14 +202,8 @@ pub fn parse_document_contents(
                     );
                 }
                 Node::Str(s, _qt, style) => {
-                    // If the key was produced from a literal block style, the
-                    // parser's block-scalar handling does not include the final
-                    // trailing newline in the returned content. For explicit
-                    // mapping keys, tests expect the newline to be preserved and
-                    // the key to be emitted as a double-quoted string with
-                    // embedded "\n" sequences. Append a trailing newline only
-                    // for BlockStyle::Literal keys before converting to a
-                    // double-quoted, non-block style key node.
+
+
                     let key_string = if matches!(style, BlockStyle::Literal) {
                         format!("{}\n", s)
                     } else {
@@ -384,6 +371,8 @@ pub fn parse_document_contents(
     }
 }
 
+/// parse_document
+
 pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<Node, String> {
     skip_whitespace(source);
 
@@ -413,7 +402,7 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
         }
     }
 
-    // Normalize mapping-then-array artifact, collect/replace anchors
+
     let mut normalized_nodes: Vec<Node> = Vec::new();
     let mut i = 0usize;
     while i < document_nodes.len() {
@@ -437,14 +426,15 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
 
     let mut anchors: HashMap<String, Node> = HashMap::new();
     collect_anchors(&doc_node, &mut anchors)?;
-    // Expand any YAML merge keys (<<) using the collected anchors before
-    // replacing alias nodes. This produces canonical merged mappings so
-    // downstream code and the stringifier see the expanded mapping content.
+
+
     expand_merge_keys(&mut doc_node, &anchors)?;
     replace_aliases(&mut doc_node, &anchors)?;
 
     Ok(doc_node)
 }
+
+/// parse
 
 pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
     let mut docs: Vec<Node> = Vec::new();

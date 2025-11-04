@@ -1,3 +1,5 @@
+//! Module: io/destinations/buffer.rs
+
 use crate::io::traits::IDestination;
 /// A memory buffer implementation for storing encoded JSON data as bytes.
 /// Provides functionality to write and manipulate byte content in memory.
