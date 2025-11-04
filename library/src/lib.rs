@@ -72,3 +72,5 @@ pub use stringify::bencode::stringify as to_bencode;
 pub use stringify::default::stringify;
 /// Converts a Node tree to JSON format
 pub use stringify::json::stringify as to_json;
+/// Converts a Node tree to XML format
+pub use stringify::xml::stringify as to_xml;
