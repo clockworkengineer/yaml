@@ -4,18 +4,18 @@
 mod tests {
     use crate::io::traits::IDestination;
     use crate::nodes::node::{BlockStyle, QuoteType};
-    use crate::{BufferDestination, Node, Numeric};
+    use crate::{BufferDestination, Node, Numeric, to_toml};
 
     #[test]
     fn test_toml_basic_string_and_number() {
         let mut buf = BufferDestination::new();
         let n = Node::Str("hi".to_string(), QuoteType::Unquoted, BlockStyle::None);
-        crate::stringify::toml::stringify(&n, &mut buf).expect("toml stringify failed");
+        to_toml(&n, &mut buf).expect("toml stringify failed");
         assert_eq!(buf.to_string(), "\"hi\"");
 
         buf.clear();
         let ni = Node::Number(Numeric::Integer(123));
-        crate::stringify::toml::stringify(&ni, &mut buf).expect("toml stringify failed");
+        to_toml(&ni, &mut buf).expect("toml stringify failed");
         assert_eq!(buf.to_string(), "123");
     }
 
@@ -26,7 +26,7 @@ mod tests {
             Node::Str("a".to_string(), QuoteType::Unquoted, BlockStyle::None),
             Node::from(1),
         )]);
-        crate::stringify::toml::stringify(&m, &mut buf).expect("toml stringify failed");
+        to_toml(&m, &mut buf).expect("toml stringify failed");
         assert_eq!(buf.to_string(), "a = 1");
 
         buf.clear();
@@ -37,7 +37,7 @@ mod tests {
                 Node::from(2),
             )]),
         )]);
-        crate::stringify::toml::stringify(&nested, &mut buf).expect("toml stringify failed");
+        to_toml(&nested, &mut buf).expect("toml stringify failed");
         assert_eq!(buf.to_string(), "[parent]\nchild = 2");
     }
 
@@ -73,7 +73,7 @@ mod tests {
             people,
         )]);
 
-        crate::stringify::toml::stringify(&top, &mut buf).expect("toml stringify failed");
+        to_toml(&top, &mut buf).expect("toml stringify failed");
 
         let expected =
             "[[people]]\nname = \"Alice\"\nage = 30\n[[people]]\nname = \"Bob\"\nage = 25";
