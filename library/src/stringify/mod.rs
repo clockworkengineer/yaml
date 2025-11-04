@@ -6,3 +6,5 @@ pub mod default;
 pub mod json;
 /// toml
 pub mod toml;
+/// xml
+pub mod xml;
