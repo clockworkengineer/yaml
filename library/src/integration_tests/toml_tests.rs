@@ -1,4 +1,4 @@
-//! Module: test/toml_tests.rs
+//! Module: integration_tests/toml_tests.rs
 
 #[cfg(test)]
 mod tests {

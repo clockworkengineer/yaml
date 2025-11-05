@@ -27,7 +27,7 @@ mod parser;
 /// Module for converting YAML structures to formatted strings
 mod stringify;
 /// Module containing tests for the YAML library
-mod test;
+mod integration_tests;
 /// Module containing  utility functions for the YAML library
 mod utils;
 

@@ -1,4 +1,4 @@
-//! Module: test/bencode_tests.rs
+//! Module: integration_tests/bencode_tests.rs
 
 #[cfg(test)]
 mod tests {

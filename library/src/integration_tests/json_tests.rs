@@ -1,4 +1,4 @@
-//! Module: test/json_tests.rs
+//! Module: integration_tests/json_tests.rs
 
 #[cfg(test)]
 mod tests {
