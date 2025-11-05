@@ -2057,4 +2057,17 @@ mod tests {
             "---\n\"[Manchester United, Real Madrid]\": \n  - 2001-01-01\n  - 2002-02-02\n...\n"
         );
     }
+        #[test]
+    fn test_parse_stringify_mapping_and_inent() {
+        let yaml = b"base: &base\n name: Everyone has same name\nfoo:\n <<: *base # doesn\'t merge the anchor\n age: 10\n name: John\nbar:\n <<: *base # base anchor will be merged\n age: 20\n\nexplicit_boolean: !!bool true\n";
+        let mut source = BufferSource::new(yaml);
+        let node = parse(&mut source).unwrap();
+        let mut dest = BufferDestination::new();
+        stringify(&node, &mut dest).unwrap();
+        let out = dest.to_string();
+        assert_eq!(
+            out,
+            "---\nbase: \n  name: Everyone has same name\nfoo: \n  name: John\n  age: 10\nbar: \n  name: Everyone has same name\n  age: 20\nexplicit_boolean: true\n...\n"
+        );
+    }
 }
