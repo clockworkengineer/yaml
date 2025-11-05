@@ -237,16 +237,18 @@ pub(crate) fn expand_merge_keys(
                                             break;
                                         }
                                     }
-                                    
+
                                     // Check if this entry looks like it should be at root level
                                     // by examining the key name for patterns that suggest it's not part of the current mapping
                                     if let Node::Str(key_name, _, _) = &snapshot[j].0 {
                                         // Keys that contain "explicit" or "boolean" are likely root-level entries
                                         // especially when they appear after a mapping section
-                                        if key_name.contains("boolean") || key_name.contains("explicit") {
+                                        if key_name.contains("boolean")
+                                            || key_name.contains("explicit")
+                                        {
                                             break;
                                         }
-                                        
+
                                         // Also check for other common root-level patterns
                                         // If the key doesn't look like a typical nested property,
                                         // it might be a new root-level entry
@@ -255,7 +257,7 @@ pub(crate) fn expand_merge_keys(
                                             break;
                                         }
                                     }
-                                    
+
                                     nested.push(snapshot[j].clone());
                                     j += 1;
                                 }
