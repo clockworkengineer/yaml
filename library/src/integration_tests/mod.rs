@@ -12,5 +12,3 @@ mod inline_flow_tests;
 mod nested_structure_tests;
 mod tag_coercion_tests;
 
-// Original large integration test file (will be kept for reference during transition)
-// mod parser_stringify_integration;
