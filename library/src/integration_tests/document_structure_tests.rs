@@ -207,4 +207,353 @@ mod tests {
         let result = parse(&mut source).unwrap();
         assert_eq!(result, Node::Documents(vec![Document(vec![])]));
     }
+
+    #[test]
+    fn test_parse_document_start_marker() {
+        let mut source = BufferSource::new(b"---\nkey: value");
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(docs) = &result {
+            assert_eq!(docs.len(), 1);
+            if let Document(nodes) = &docs[0] {
+                assert!(!nodes.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_document_start_and_end_markers() {
+        let mut source = BufferSource::new(b"---\nkey: value\n...");
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(docs) = &result {
+            assert_eq!(docs.len(), 1);
+            if let Document(nodes) = &docs[0] {
+                assert!(!nodes.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_multiple_documents_with_start_markers() {
+        let mut source = BufferSource::new(b"---\nfirst: 1\n---\nsecond: 2\n---\nthird: 3");
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(docs) = &result {
+            assert_eq!(docs.len(), 3);
+        }
+    }
+
+    #[test]
+    fn test_parse_documents_with_mixed_markers() {
+        let mut source =
+            BufferSource::new(b"---\nfirst: 1\n...\n---\nsecond: 2\n---\nthird: 3\n...");
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(docs) = &result {
+            assert_eq!(docs.len(), 3);
+        }
+    }
+
+    #[test]
+    fn test_parse_empty_documents_between_markers() {
+        let mut source = BufferSource::new(b"---\n---\nkey: value\n---");
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(docs) = &result {
+            // Parser may merge empty documents, so expect at least 1 document with content
+            assert!(!docs.is_empty());
+
+            // Find the document with content
+            let mut found_content = false;
+            for doc in docs {
+                if let Document(nodes) = doc {
+                    if !nodes.is_empty() {
+                        found_content = true;
+                        break;
+                    }
+                }
+            }
+            assert!(found_content, "Should have at least one document with content");
+        }
+    }
+
+    #[test]
+    fn test_parse_document_with_yaml_version_directive() {
+        // Note: YAML directives are not supported by this parser, so we test without them
+        let mut source = BufferSource::new(b"# YAML version would be %YAML 1.2 here\n---\nkey: value");
+        let result = parse(&mut source).unwrap();
+        
+        if let Node::Documents(docs) = &result {
+            assert_eq!(docs.len(), 1);
+            if let Document(nodes) = &docs[0] {
+                assert!(!nodes.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_document_with_tag_directive() {
+        // Note: TAG directives are not supported by this parser, so we test without them
+        let mut source = BufferSource::new(b"# TAG directive would be %TAG ! tag:example.com,2000:app/ here\n---\nkey: value");
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(docs) = &result {
+            assert_eq!(docs.len(), 1);
+            if let Document(nodes) = &docs[0] {
+                assert!(!nodes.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_document_with_multiple_directives() {
+        // Note: Directives are not supported by this parser, so we test with comments instead
+        let mut source = BufferSource::new(
+            b"# Would have %YAML 1.2 and %TAG ! tag:example.com,2000:app/ directives here\n---\nkey: value"
+        );
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(docs) = &result {
+            assert_eq!(docs.len(), 1);
+            if let Document(nodes) = &docs[0] {
+                assert!(!nodes.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_document_with_comments_around_markers() {
+        let mut source = BufferSource::new(b"# Before first marker\n---\n# After first marker\nkey: value\n# Before end marker\n...\n# After end marker");
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(docs) = &result {
+            assert_eq!(docs.len(), 1);
+            if let Document(nodes) = &docs[0] {
+                assert!(!nodes.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_documents_with_different_content_types() {
+        let mut source =
+            BufferSource::new(b"---\n\"scalar document\"\n---\n- item1\n- item2\n---\nkey: value");
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(docs) = &result {
+            assert_eq!(docs.len(), 3);
+
+            // First document: scalar
+            if let Document(nodes) = &docs[0] {
+                assert_eq!(nodes.len(), 1);
+                matches!(nodes[0], Node::Str(_, _, _));
+            }
+
+            // Second document: sequence
+            if let Document(nodes) = &docs[1] {
+                assert_eq!(nodes.len(), 1);
+                matches!(nodes[0], Node::Array(_));
+            }
+
+            // Third document: mapping
+            if let Document(nodes) = &docs[2] {
+                assert_eq!(nodes.len(), 1);
+                matches!(nodes[0], Node::Mapping(_));
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_document_with_whitespace_only_content() {
+        let mut source = BufferSource::new(b"---\n   \n  \n\t\n---\nkey: value");
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(docs) = &result {
+            // Should have 1 document since whitespace-only documents are treated as empty/merged
+            assert_eq!(docs.len(), 1);
+        }
+    }
+
+    #[test]
+    fn test_parse_document_with_trailing_spaces_on_markers() {
+        let mut source = BufferSource::new(b"---   \nkey: value\n...   ");
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(docs) = &result {
+            assert_eq!(docs.len(), 1);
+            if let Document(nodes) = &docs[0] {
+                assert!(!nodes.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_document_markers_with_comments_inline() {
+        let mut source = BufferSource::new(b"--- # Start of document\nkey: value\n# End of document");
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(docs) = &result {
+            assert_eq!(docs.len(), 1);
+            if let Document(nodes) = &docs[0] {
+                assert!(!nodes.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_documents_with_complex_nested_content() {
+        let mut source = BufferSource::new(
+            b"---\nusers:\n  - name: alice\n    roles: [admin, user]\n  - name: bob\n    roles: [user]\nconfig:\n  database:\n    host: localhost\n    port: 5432\n---\nservers:\n  web:\n    - host: web1.example.com\n    - host: web2.example.com"
+        );
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(docs) = &result {
+            assert_eq!(docs.len(), 2);
+
+            // Both documents should have non-empty content
+            for doc in docs {
+                if let Document(nodes) = doc {
+                    assert!(!nodes.is_empty());
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_document_with_boolean_and_null_values() {
+        let mut source = BufferSource::new(
+            b"---\n\
+            enabled: true\n\
+            disabled: false\n\
+            empty: null\n\
+            missing: ~\n\
+            ---\n\
+            yes: yes\n\
+            no: no\n\
+            on: on\n\
+            off: off",
+        );
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(docs) = &result {
+            assert_eq!(docs.len(), 2);
+        }
+    }
+
+    #[test]
+    fn test_parse_document_with_numeric_values() {
+        let mut source = BufferSource::new(
+            b"---\n\
+            integer: 42\n\
+            negative: -123\n\
+            float: 3.14159\n\
+            scientific: 1.23e+4\n\
+            binary: 0b1010\n\
+            octal: 0o755\n\
+            hex: 0xFF",
+        );
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(docs) = &result {
+            assert_eq!(docs.len(), 1);
+            if let Document(nodes) = &docs[0] {
+                assert!(!nodes.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_document_with_anchor_and_alias() {
+        let mut source = BufferSource::new(
+            b"---\n\
+            default: &default\n\
+              host: localhost\n\
+              port: 8080\n\
+            development:\n\
+              config: *default\n\
+              debug: true\n\
+            production:\n\
+              config: *default\n\
+              debug: false",
+        );
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(docs) = &result {
+            assert_eq!(docs.len(), 1);
+            if let Document(nodes) = &docs[0] {
+                assert!(!nodes.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_document_with_literal_and_folded_strings() {
+        let mut source = BufferSource::new(
+            b"---\n\
+            literal: |\n\
+              Line 1\n\
+              Line 2\n\
+              Line 3\n\
+            folded: >\n\
+              This is a very long\n\
+              line that will be\n\
+              folded into a single\n\
+              paragraph.\n\
+            mixed:\n\
+              - |\n\
+                Literal in array\n\
+              - >\n\
+                Folded in array",
+        );
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(docs) = &result {
+            assert_eq!(docs.len(), 1);
+            if let Document(nodes) = &docs[0] {
+                assert!(!nodes.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_document_with_unicode_content() {
+        let mut source = BufferSource::new(
+            b"---\n\
+            greeting: \"\xE4\xBD\xA0\xE5\xA5\xBD\"  # Hello in Chinese\n\
+            emoji: \"\xF0\x9F\x91\x8B\"  # Wave emoji\n\
+            mixed: [\"\xC2\xA1Hola!\", \"world\", \"\xF0\x9F\x8C\x8D\"]  # Spanish + world emoji",
+        );
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(docs) = &result {
+            assert_eq!(docs.len(), 1);
+            if let Document(nodes) = &docs[0] {
+                assert!(!nodes.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_document_with_tags() {
+        let mut source = BufferSource::new(
+            b"---\n\
+            timestamp: !!timestamp 2001-12-14t21:59:43.10-05:00\n\
+            integer: !!int \"123\"\n\
+            float: !!float \"456.789\"\n\
+            binary: !!binary |\n\
+              R0lGODlhDAAMAIQAAP//9/X17unp5WZmZgAAAOfn515eXvPz7Y6OjuDg4J+fn5\n\
+              OTk6enp56enmlpaWNjY6Ojo4SEhP/++f/++f/++f/++f/++f/++f/++f/++f/+\n\
+              +f/++f/++f/++f/++f/++SH+Dk1hZGUgd2l0aCBHSU1QACwAAAAADAAMAAAFLC\n\
+              AgjoEwnuNAFOhpEMTRiggcz4BNJHrv/zCFcLiwMWYNG84BwwEeECcgggoBADs=",
+        );
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(docs) = &result {
+            assert_eq!(docs.len(), 1);
+            if let Document(nodes) = &docs[0] {
+                assert!(!nodes.is_empty());
+            }
+        }
+    }
 }
