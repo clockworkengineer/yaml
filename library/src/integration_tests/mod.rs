@@ -1,4 +1,16 @@
-mod parser_stringify_integration;
+// Original integration test modules
 mod bencode_tests;
 mod json_tests;
 mod toml_tests;
+
+// New organized integration test modules (split from parser_stringify_integration)
+mod basic_parsing_tests;
+mod document_structure_tests;
+mod error_handling_tests;
+mod file_parsing_tests;
+mod inline_flow_tests;
+mod nested_structure_tests;
+mod tag_coercion_tests;
+
+// Original large integration test file (will be kept for reference during transition)
+// mod parser_stringify_integration;
