@@ -470,4 +470,199 @@ mod tests {
         }
         panic!("Expected tagged node for invalid set mapping");
     }
+
+    #[test]
+    fn test_parse_set_inline_format() {
+        let yaml = b"my_set: !!set {item1, item2, item3}";
+        let mut source = BufferSource::new(yaml);
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(ref docs) = result {
+            if let Node::Document(nodes) = &docs[0] {
+                if let Node::Mapping(pairs) = &nodes[0] {
+                    let (_, v) = &pairs[0];
+                    match v {
+                        Node::Set(items) => {
+                            println!(
+                                "Debug: Found inline Set with {} items: {:?}",
+                                items.len(),
+                                items
+                            );
+                            assert_eq!(items.len(), 3);
+                            // Items should be the keys from the inline syntax
+                            assert!(items.iter().any(|item| {
+                                matches!(item, Node::Str(s, _, _) if s == "item1")
+                            }));
+                            assert!(items.iter().any(|item| {
+                                matches!(item, Node::Str(s, _, _) if s == "item2")
+                            }));
+                            assert!(items.iter().any(|item| {
+                                matches!(item, Node::Str(s, _, _) if s == "item3")
+                            }));
+                            return;
+                        }
+                        Node::Tagged(inner, tag) if tag == "!!set" => {
+                            println!(
+                                "Debug: Found Tagged inline set with tag '{}': {:?}",
+                                tag, inner
+                            );
+                            // Parser might not coerce inline format yet, check if it's a valid structure
+                            match inner.as_ref() {
+                                Node::Mapping(mapping_pairs) => {
+                                    println!(
+                                        "Debug: Tagged inline set with mapping of {} pairs",
+                                        mapping_pairs.len()
+                                    );
+                                    // Should be 3 pairs with null values
+                                    assert_eq!(mapping_pairs.len(), 3);
+                                    for (key, value) in mapping_pairs {
+                                        assert!(matches!(value, Node::None));
+                                        assert!(matches!(key, Node::Str(_, _, _)));
+                                    }
+                                    return;
+                                }
+                                _ => {}
+                            }
+                        }
+                        _ => {
+                            println!("Debug: Got unexpected node type from inline set: {:?}", v);
+                        }
+                    }
+                }
+            }
+        }
+        panic!("Expected set or tagged mapping from inline set format");
+    }
+
+    #[test]
+    fn test_parse_set_inline_empty() {
+        let yaml = b"empty_set: !!set {}";
+        let mut source = BufferSource::new(yaml);
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(ref docs) = result {
+            if let Node::Document(nodes) = &docs[0] {
+                if let Node::Mapping(pairs) = &nodes[0] {
+                    let (_, v) = &pairs[0];
+                    match v {
+                        Node::Set(items) => {
+                            assert_eq!(items.len(), 0);
+                            return;
+                        }
+                        Node::Tagged(inner, tag) if tag == "!!set" => match inner.as_ref() {
+                            Node::Mapping(mapping_pairs) => {
+                                assert_eq!(mapping_pairs.len(), 0);
+                                return;
+                            }
+                            _ => {}
+                        },
+                        _ => {}
+                    }
+                }
+            }
+        }
+        panic!("Expected empty set from inline empty set format");
+    }
+
+    #[test]
+    fn test_parse_set_inline_with_quotes() {
+        let yaml = b"my_set: !!set {\"quoted item\", 'single quoted', unquoted}";
+        let mut source = BufferSource::new(yaml);
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(ref docs) = result {
+            if let Node::Document(nodes) = &docs[0] {
+                if let Node::Mapping(pairs) = &nodes[0] {
+                    let (_, v) = &pairs[0];
+                    match v {
+                        Node::Set(items) => {
+                            assert_eq!(items.len(), 3);
+                            return;
+                        }
+                        Node::Tagged(inner, tag) if tag == "!!set" => match inner.as_ref() {
+                            Node::Set(items) => {
+                                assert_eq!(items.len(), 3);
+                                return;
+                            }
+                            Node::Mapping(mapping_pairs) => {
+                                assert_eq!(mapping_pairs.len(), 3);
+                                return;
+                            }
+                            _ => {}
+                        },
+                        _ => {}
+                    }
+                }
+            }
+        }
+        panic!("Expected set with quoted items from inline set format");
+    }
+
+    #[test]
+    fn test_comprehensive_set_formats() {
+        // Test that all set formats work together and produce equivalent results
+        let yaml = b"
+array_set: !!set [item1, item2, item3]
+explicit_set: !!set
+  ? item1
+  ? item2
+  ? item3
+inline_set: !!set {item1, item2, item3}
+mapping_set: !!set
+  item1: null
+  item2: null
+  item3: null
+";
+        let mut source = BufferSource::new(yaml);
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(ref docs) = result {
+            if let Node::Document(nodes) = &docs[0] {
+                if let Node::Mapping(pairs) = &nodes[0] {
+                    // All four sets should contain the same 3 items
+                    for (key, value) in pairs {
+                        match key {
+                            Node::Str(key_name, _, _) if key_name.ends_with("_set") => {
+                                match value {
+                                    Node::Set(items) => {
+                                        assert_eq!(items.len(), 3, "Set {} should have 3 items", key_name);
+                                        // Check for expected items
+                                        assert!(items.iter().any(|item| {
+                                            matches!(item, Node::Str(s, _, _) if s == "item1")
+                                        }));
+                                        assert!(items.iter().any(|item| {
+                                            matches!(item, Node::Str(s, _, _) if s == "item2")
+                                        }));
+                                        assert!(items.iter().any(|item| {
+                                            matches!(item, Node::Str(s, _, _) if s == "item3")
+                                        }));
+                                    }
+                                    Node::Tagged(inner, tag) if tag == "!!set" => {
+                                        // Handle cases where sets are still tagged
+                                        match inner.as_ref() {
+                                            Node::Mapping(mapping_pairs) => {
+                                                assert_eq!(mapping_pairs.len(), 3, "Tagged set {} should have 3 pairs", key_name);
+                                                for (map_key, map_value) in mapping_pairs {
+                                                    assert!(matches!(map_value, Node::None));
+                                                    assert!(matches!(map_key, Node::Str(_, _, _)));
+                                                }
+                                            }
+                                            Node::Array(array_items) => {
+                                                assert_eq!(array_items.len(), 3, "Tagged set {} should have 3 array items", key_name);
+                                            }
+                                            _ => panic!("Unexpected tagged set structure for {}", key_name),
+                                        }
+                                    }
+                                    _ => panic!("Expected Set or Tagged set for key {}, got: {:?}", key_name, value),
+                                }
+                            }
+                            _ => {} // Skip non-set keys
+                        }
+                    }
+                    return;
+                }
+            }
+        }
+        panic!("Expected comprehensive set parsing to work");
+    }
 }

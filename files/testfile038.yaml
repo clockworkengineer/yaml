@@ -12,4 +12,9 @@ set2: !!set
   ? three
   ? four
 
+# Inline set syntax examples
+inline_set1: !!set {apple, banana, cherry}
+inline_set2: !!set {"quoted item", 'single quoted', unquoted}
+empty_inline_set: !!set {}
+
 # my-set: !!set {'one', "two"}

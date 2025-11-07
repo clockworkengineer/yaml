@@ -1,0 +1,15 @@
+test_set: !!set [apple, banana, cherry, apple]
+empty_set: !!set []
+number_set: !!set [1, 2, 3, 2]
+explicit_set: 
+  ? item1
+  ? item2
+  ? item3
+inline_set: !!set {apple, banana, cherry}
+inline_empty_set: !!set {}
+# Alternative set syntax examples:
+# block_set: !!set
+#   item1: null
+#   item2: null
+#   item3: null
+# or inline: { item1, item2, item3 }

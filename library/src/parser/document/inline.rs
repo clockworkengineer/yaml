@@ -8,11 +8,82 @@ use crate::parser::document::helpers::{parse_error, parse_quoted_scalar, skip_wh
 use crate::parser::document::scalar::parse_scalar;
 use crate::utils::*;
 
-/// Parses an inline YAML mapping enclosed in curly braces {}.
+/// Parses an inline YAML set enclosed in curly braces {} without colons.
 ///
-/// Handles comma-separated key-value pairs within braces, including
-/// nested inline collections, quoted strings, and whitespace handling.
-/// Supports empty mappings and nested structures.
+/// Handles comma-separated values within braces for set syntax like {item1, item2, item3}.
+/// This is used when the inline mapping parser detects no colons in the content.
+///
+/// # Arguments
+///
+/// * `source` - A mutable reference to a source implementing ISource trait
+///
+/// # Returns
+///
+/// Result containing a Mapping Node with null values (for set coercion) or an error string
+pub(crate) fn parse_inline_set(source: &mut dyn ISource) -> Result<Node, String> {
+    let mut pairs: Vec<(Node, Node)> = Vec::new();
+    source.next(); // Skip the opening '{'
+    skip_whitespace(source);
+
+    if source.current() == Some(CHAR_RBRACE) {
+        source.next();
+        return Ok(Node::Mapping(pairs)); // Empty set as empty mapping
+    }
+
+    loop {
+        let item_node = match source.current() {
+            Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
+                let raw = parse_quoted_scalar(source)?;
+                parse_scalar(raw.trim())
+            }
+            Some(CHAR_LBRACE) => parse_inline_mapping(source)?,
+            Some(CHAR_LBRACKET) => parse_inline_sequence(source)?,
+            Some(_) => {
+                let val = collect_until(source, |c| {
+                    c == CHAR_COMMA || c == CHAR_RBRACE || c == CHAR_HASH
+                });
+                let trimmed = val.trim();
+                if trimmed.is_empty() {
+                    return Err(parse_error(source, "Empty item in inline set"));
+                }
+                parse_scalar(trimmed)
+            }
+            None => return Err(parse_error(source, "Unexpected EOF in inline set")),
+        };
+
+        // Add item as a key with null value (set format)
+        pairs.push((item_node, Node::None));
+
+        skip_whitespace_and_comments(source);
+
+        match source.current() {
+            Some(CHAR_COMMA) => {
+                source.next();
+                skip_whitespace(source);
+                continue;
+            }
+            Some(CHAR_RBRACE) => {
+                source.next();
+                break;
+            }
+            Some(c) => {
+                return Err(parse_error(
+                    source,
+                    &format!("Unexpected character in inline set: {}", c),
+                ));
+            }
+            None => return Err(parse_error(source, "Unexpected EOF in inline set")),
+        }
+    }
+
+    Ok(Node::Mapping(pairs))
+}
+
+/// Parses an inline YAML mapping or set enclosed in curly braces {}.
+///
+/// First attempts to parse as a mapping with key-value pairs. If no colons
+/// are found, parses as an inline set with comma-separated items.
+/// Supports empty mappings/sets and nested structures.
 ///
 /// # Arguments
 ///
@@ -22,6 +93,53 @@ use crate::utils::*;
 ///
 /// Result containing a Mapping Node or an error string
 pub(crate) fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, String> {
+    // Save the current position to potentially backtrack
+    let saved_state = source.save_state();
+
+    // Look ahead to see if this is a set (no colons) or a mapping (has colons)
+    let mut has_colons = false;
+    let mut brace_depth = 0;
+    let mut bracket_depth = 0;
+    let mut in_quotes = false;
+    let mut quote_char = '\0';
+
+    source.next(); // Skip opening brace
+
+    while let Some(c) = source.current() {
+        match c {
+            CHAR_RBRACE if brace_depth == 0 && !in_quotes => break,
+            CHAR_LBRACE if !in_quotes => brace_depth += 1,
+            CHAR_RBRACE if !in_quotes => brace_depth -= 1,
+            CHAR_LBRACKET if !in_quotes => bracket_depth += 1,
+            CHAR_RBRACKET if !in_quotes => bracket_depth -= 1,
+            CHAR_SINGLE_QUOTE | CHAR_DOUBLE_QUOTE if !in_quotes => {
+                in_quotes = true;
+                quote_char = c;
+            }
+            c if in_quotes && c == quote_char => {
+                in_quotes = false;
+                quote_char = '\0';
+            }
+            CHAR_COLON if !in_quotes && brace_depth == 0 && bracket_depth == 0 => {
+                has_colons = true;
+                break;
+            }
+            _ => {}
+        }
+        source.next();
+    }
+
+    // Restore position and parse accordingly
+    source.restore_state(saved_state);
+
+    if has_colons {
+        parse_inline_mapping_with_colons(source)
+    } else {
+        parse_inline_set(source)
+    }
+}
+/// Parses an inline YAML mapping with key-value pairs (original implementation).
+fn parse_inline_mapping_with_colons(source: &mut dyn ISource) -> Result<Node, String> {
     let mut pairs: Vec<(Node, Node)> = Vec::new();
     source.next();
     skip_whitespace(source);
