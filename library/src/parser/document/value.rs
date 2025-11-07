@@ -9,7 +9,34 @@ use crate::parser::document::inline::{parse_inline_mapping, parse_inline_sequenc
 use crate::parser::document::scalar::parse_scalar;
 use crate::utils::*;
 
-/// Attempts to coerce a node to match the specified YAML tag type.
+/// Validates if a string is valid base64 format
+fn is_base64(s: &str) -> bool {
+    if s.is_empty() {
+        return true;
+    }
+    
+    // Check length (must be multiple of 4 for proper base64)
+    if s.len() % 4 != 0 {
+        return false;
+    }
+    
+    // Check characters (only A-Z, a-z, 0-9, +, /, and = for padding)
+    for c in s.chars() {
+        match c {
+            'A'..='Z' | 'a'..='z' | '0'..='9' | '+' | '/' => continue,
+            '=' => continue, // Padding character
+            _ => return false,
+        }
+    }
+    
+    // Check padding rules
+    let padding_count = s.chars().rev().take_while(|&c| c == '=').count();
+    if padding_count > 2 {
+        return false;
+    }
+    
+    true
+}
 ///
 /// Handles type coercion for various YAML tags including string (!str),
 /// integer (!int), float (!float), boolean (!bool), and timestamp (!timestamp).
@@ -137,6 +164,109 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
             _ => {
                 return Some(Node::Set(vec![node]));
             }
+        },
+        "!!binary" | "!binary" => match node {
+            Node::Str(s, _, _) => {
+                // Validate base64 format and decode if valid
+                let clean_input = s.chars().filter(|c| !c.is_whitespace()).collect::<String>();
+                if is_base64(&clean_input) {
+                    // Store as a tagged string node to preserve the binary nature
+                    return Some(Node::Tagged(
+                        Box::new(Node::Str(clean_input, QuoteType::Unquoted, BlockStyle::None)),
+                        "!!binary".to_string(),
+                    ));
+                }
+                return None;
+            }
+            _ => return None,
+        },
+        "!!omap" | "!omap" => match node {
+            // Ordered mapping - convert to array of single-key mappings
+            Node::Array(items) => {
+                let mut omap_items = Vec::new();
+                for item in items {
+                    match &item {
+                        Node::Mapping(pairs) if pairs.len() == 1 => {
+                            omap_items.push(item);
+                        }
+                        _ => return None, // Invalid omap format
+                    }
+                }
+                return Some(Node::Tagged(
+                    Box::new(Node::Array(omap_items)),
+                    "!!omap".to_string(),
+                ));
+            }
+            Node::Mapping(pairs) => {
+                // Convert mapping to array of single-key mappings
+                let mut omap_items = Vec::new();
+                for (key, value) in pairs {
+                    omap_items.push(Node::Mapping(vec![(key, value)]));
+                }
+                return Some(Node::Tagged(
+                    Box::new(Node::Array(omap_items)),
+                    "!!omap".to_string(),
+                ));
+            }
+            _ => return None,
+        },
+        "!!pairs" | "!pairs" => match node {
+            // Pairs - array of key-value pairs
+            Node::Array(items) => {
+                let mut pairs_items = Vec::new();
+                for item in items {
+                    match &item {
+                        Node::Mapping(pairs) if pairs.len() == 1 => {
+                            pairs_items.push(item);
+                        }
+                        Node::Array(arr) if arr.len() == 2 => {
+                            // Convert [key, value] to {key: value}
+                            let key = arr[0].clone();
+                            let value = arr[1].clone();
+                            pairs_items.push(Node::Mapping(vec![(key, value)]));
+                        }
+                        _ => return None, // Invalid pairs format
+                    }
+                }
+                return Some(Node::Tagged(
+                    Box::new(Node::Array(pairs_items)),
+                    "!!pairs".to_string(),
+                ));
+            }
+            _ => return None,
+        },
+        // Support for YAML 1.1 compatibility tags
+        "!!yaml" | "!yaml" => match node {
+            // YAML version tag - just preserve as string
+            Node::Str(s, qt, bs) => Some(Node::Tagged(
+                Box::new(Node::Str(s, qt, bs)),
+                "!!yaml".to_string(),
+            )),
+            _ => None,
+        },
+        // Support for hexadecimal integers
+        "!!int:hex" | "!int:hex" => match node {
+            Node::Str(s, _, _) => {
+                let clean = s.trim_start_matches("0x").trim_start_matches("0X");
+                if let Ok(i) = i64::from_str_radix(clean, 16) {
+                    Some(Node::Number(Numeric::Integer(i)))
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        },
+        // Support for octal integers  
+        "!!int:oct" | "!int:oct" => match node {
+            Node::Str(s, _, _) => {
+                let clean = s.trim_start_matches("0o").trim_start_matches("0");
+                if let Ok(i) = i64::from_str_radix(clean, 8) {
+                    Some(Node::Number(Numeric::Integer(i)))
+                } else {
+                    None
+                }
+            }
+            _ => None,
         },
         _ => return None,
     }

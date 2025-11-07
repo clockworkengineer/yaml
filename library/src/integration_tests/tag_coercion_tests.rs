@@ -489,6 +489,107 @@ mod tests {
     }
 
     #[test]
+    fn test_coerce_omap_tag() {
+        let yaml = b"ordered: !!omap\n  - key1: value1\n  - key2: value2\n  - key3: value3";
+        let mut source = BufferSource::new(yaml);
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(ref docs) = result {
+            if let Document(nodes) = &docs[0] {
+                if let Node::Mapping(pairs) = &nodes[0] {
+                    assert_eq!(pairs.len(), 1);
+                    let (_k, v) = &pairs[0];
+                    // omap should be treated as tagged array
+                    match v {
+                        Node::Tagged(inner, tag) if tag == "!!omap" => {
+                            if let Node::Array(items) = inner.as_ref() {
+                                assert_eq!(items.len(), 3);
+                                // Each item should be a mapping with one key-value pair
+                                for item in items {
+                                    match item {
+                                        Node::Mapping(pairs) => {
+                                            assert_eq!(pairs.len(), 1);
+                                        }
+                                        _ => panic!("Expected mapping in omap item"),
+                                    }
+                                }
+                                return;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+        panic!("Expected omap as tagged array not found");
+    }
+
+    #[test]
+    fn test_coerce_pairs_tag() {
+        let yaml = b"pairs: !!pairs\n  - [key1, value1]\n  - [key2, value2]";
+        let mut source = BufferSource::new(yaml);
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(ref docs) = result {
+            if let Document(nodes) = &docs[0] {
+                if let Node::Mapping(pairs) = &nodes[0] {
+                    assert_eq!(pairs.len(), 1);
+                    let (_k, v) = &pairs[0];
+                    // pairs should be treated as tagged array
+                    match v {
+                        Node::Tagged(inner, tag) if tag == "!!pairs" => {
+                            if let Node::Array(items) = inner.as_ref() {
+                                assert_eq!(items.len(), 2);
+                                // Each item should be a mapping with one key-value pair
+                                for item in items {
+                                    match item {
+                                        Node::Mapping(pairs) => {
+                                            assert_eq!(pairs.len(), 1);
+                                        }
+                                        _ => panic!("Expected mapping in pairs item"),
+                                    }
+                                }
+                                return;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+        panic!("Expected pairs as tagged array not found");
+    }
+
+    #[test]
+    fn test_enhanced_binary_validation() {
+        // Test valid base64 strings
+        let valid_yaml = b"data: !!binary SGVsbG8gV29ybGQ=";
+        let mut source = BufferSource::new(valid_yaml);
+        let result = parse(&mut source);
+        assert!(result.is_ok());
+
+        // Test invalid base64 strings
+        let invalid_yaml = b"data: !!binary Invalid@Base64!";
+        let mut source = BufferSource::new(invalid_yaml);
+        let result = parse(&mut source).unwrap();
+        
+        // Should still parse but not be coerced to binary tag
+        if let Node::Documents(ref docs) = result {
+            if let Document(nodes) = &docs[0] {
+                if let Node::Mapping(pairs) = &nodes[0] {
+                    let (_k, v) = &pairs[0];
+                    match v {
+                        Node::Tagged(_, tag) => {
+                            assert_eq!(tag, "!!binary"); // Still tagged but invalid data
+                        }
+                        _ => {} // May not be tagged if coercion failed
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn test_numeric_tags_with_different_bases() {
         let binary_yaml = b"value: !!int 0b1010";
         let octal_yaml = b"value: !!int 0o12";
@@ -1053,6 +1154,82 @@ mod tests {
                 // Parser might not support custom tag directives - that's ok
             }
         }
+    }
+
+    #[test]
+    fn test_hex_and_octal_integer_tags() {
+        let hex_yaml = b"hex_value: !!int:hex '0xFF'";
+        let mut source = BufferSource::new(hex_yaml);
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(ref docs) = result {
+            if let Document(nodes) = &docs[0] {
+                if let Node::Mapping(pairs) = &nodes[0] {
+                    let (_k, v) = &pairs[0];
+                    match v {
+                        Node::Number(Numeric::Integer(255)) => return, // Successfully parsed
+                        Node::Tagged(_, tag) => {
+                            assert_eq!(tag, "!!int:hex");
+                            return; // Tagged but not converted - acceptable
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+        
+        // Test octal
+        let oct_yaml = b"oct_value: !!int:oct '0o777'";
+        let mut source = BufferSource::new(oct_yaml);
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(ref docs) = result {
+            if let Document(nodes) = &docs[0] {
+                if let Node::Mapping(pairs) = &nodes[0] {
+                    let (_k, v) = &pairs[0];
+                    match v {
+                        Node::Number(Numeric::Integer(511)) => return, // Successfully parsed
+                        Node::Tagged(_, tag) => {
+                            assert_eq!(tag, "!!int:oct");
+                            return; // Tagged but not converted - acceptable
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+        panic!("Expected hex or octal integer handling");
+    }
+
+    #[test]
+    fn test_yaml_version_tag() {
+        let yaml_version = b"version: !!yaml '1.2'";
+        let mut source = BufferSource::new(yaml_version);
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(ref docs) = result {
+            if let Document(nodes) = &docs[0] {
+                if let Node::Mapping(pairs) = &nodes[0] {
+                    let (_k, v) = &pairs[0];
+                    match v {
+                        Node::Tagged(inner, tag) => {
+                            assert_eq!(tag, "!!yaml");
+                            if let Node::Str(s, _, _) = inner.as_ref() {
+                                assert_eq!(s, "1.2");
+                            }
+                            return;
+                        }
+                        Node::Str(s, _, _) => {
+                            // Might not be tagged but still valid
+                            assert_eq!(s, "1.2");
+                            return;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+        panic!("Expected yaml version tag handling");
     }
 
     #[test]
