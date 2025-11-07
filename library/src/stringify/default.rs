@@ -236,30 +236,17 @@ fn stringify_document_with_indent(
         }
 
         Node::Set(items) => {
-            // Render sets with !!set tag in block format
-            destination.add_bytes(&format!("{indent_str}!!set"));
-            if items.is_empty() {
-                destination.add_bytes(" {}\n");
-            } else {
-                destination.add_bytes(&CHAR_NEWLINE.to_string());
-                for item in items {
-                    match item {
-                        // Complex items (mappings, arrays, sets) require explicit-key style
-                        Node::Mapping(_) | Node::Array(_) | Node::Set(_) => {
-                            destination.add_bytes(&format!("{indent_str}? "));
-                            destination.add_bytes(&CHAR_NEWLINE.to_string());
-                            stringify_document_with_indent(item, destination, indent + 1)?;
-                        }
-                        // Simple scalar keys can be rendered as key: null entries which are
-                        // easier for the parser to round-trip.
-                        _ => {
-                            // Serialize the key into a temporary buffer to obtain its text
-                            let mut key_buf = crate::io::destinations::buffer::Buffer::new();
-                            stringify_document_with_indent(item, &mut key_buf, 0)?;
-                            let key_str = key_buf.to_string();
-                            destination
-                                .add_bytes(&format!("{indent_str}{key_str}: null{CHAR_NEWLINE}"));
-                        }
+            // Render sets as plain sequences (without !!set tag)
+            for item in items {
+                destination.add_bytes(&format!("{indent_str}{CHAR_DASH}{CHAR_SPACE}"));
+                match item {
+                    Node::Mapping(_) | Node::Array(_) | Node::Set(_) => {
+                        destination.add_bytes(&CHAR_NEWLINE.to_string());
+                        stringify_document_with_indent(item, destination, indent + 1)?;
+                    }
+                    _ => {
+                        stringify_document_with_indent(item, destination, 0)?;
+                        destination.add_bytes(&CHAR_NEWLINE.to_string());
                     }
                 }
             }
@@ -489,7 +476,7 @@ mod tests {
         stringify(&set_doc, &mut buf).expect("stringify failed");
         assert_eq!(
             buf.to_string(),
-            "---\n!!set\nitem1: null\nitem2: null\nitem3: null\n...\n"
+            "---\n- item1\n- item2\n- item3\n...\n"
         );
     }
 
@@ -499,7 +486,7 @@ mod tests {
 
         let mut buf = Buffer::new();
         stringify(&set_doc, &mut buf).expect("stringify failed");
-        assert_eq!(buf.to_string(), "---\n!!set {}\n...\n");
+        assert_eq!(buf.to_string(), "---\n...\n");
     }
 
     #[test]
@@ -512,9 +499,6 @@ mod tests {
 
         let mut buf = Buffer::new();
         stringify(&set_doc, &mut buf).expect("stringify failed");
-        assert_eq!(
-            buf.to_string(),
-            "---\n!!set\n1: null\n2: null\n3: null\n...\n"
-        );
+        assert_eq!(buf.to_string(), "---\n- 1\n- 2\n- 3\n...\n");
     }
 }

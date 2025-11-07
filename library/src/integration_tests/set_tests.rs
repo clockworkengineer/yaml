@@ -270,22 +270,43 @@ mod tests {
         stringify(&original_set, &mut dest).unwrap();
         let yaml_string = dest.to_string();
 
-        // Should contain !!set tag
+        // Should NOT contain !!set tag (sets stringify as plain sequences)
         assert!(
-            yaml_string.contains("!!set"),
-            "Set should be stringified with !!set tag: {}",
+            !yaml_string.contains("!!set"),
+            "Set should be stringified as plain sequence: {}",
             yaml_string
         );
 
-        // Parse it back
+        // Should contain sequence format with dashes
+        assert!(
+            yaml_string.contains("- apple"),
+            "Set should be stringified as sequence: {}",
+            yaml_string
+        );
+
+        // Parse it back - note: it will be parsed as an Array since no !!set tag
         let mut source = BufferSource::new(yaml_string.as_bytes());
-        let reparsed = parse(&mut source).unwrap(); // Verify structure is preserved
+        let reparsed = parse(&mut source).unwrap(); 
         if let Node::Documents(ref docs) = reparsed {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
                     let (_, v) = &pairs[0];
                     match v {
+                        // When reparsed without !!set tag, it becomes an Array
+                        Node::Array(items) => {
+                            assert_eq!(items.len(), 3);
+                            assert!(items.iter().any(|item| {
+                                matches!(item, Node::Str(s, _, _) if s == "apple")
+                            }));
+                            assert!(items.iter().any(|item| {
+                                matches!(item, Node::Str(s, _, _) if s == "banana")
+                            }));
+                            assert!(items.iter().any(|item| {
+                                matches!(item, Node::Str(s, _, _) if s == "cherry")
+                            }));
+                        }
                         Node::Set(items) => {
+                            // Might still be a Set in some cases
                             assert_eq!(items.len(), 3);
                             assert!(items.iter().any(|item| {
                                 matches!(item, Node::Str(s, _, _) if s == "apple")
@@ -625,7 +646,12 @@ mapping_set: !!set
                             Node::Str(key_name, _, _) if key_name.ends_with("_set") => {
                                 match value {
                                     Node::Set(items) => {
-                                        assert_eq!(items.len(), 3, "Set {} should have 3 items", key_name);
+                                        assert_eq!(
+                                            items.len(),
+                                            3,
+                                            "Set {} should have 3 items",
+                                            key_name
+                                        );
                                         // Check for expected items
                                         assert!(items.iter().any(|item| {
                                             matches!(item, Node::Str(s, _, _) if s == "item1")
@@ -641,19 +667,35 @@ mapping_set: !!set
                                         // Handle cases where sets are still tagged
                                         match inner.as_ref() {
                                             Node::Mapping(mapping_pairs) => {
-                                                assert_eq!(mapping_pairs.len(), 3, "Tagged set {} should have 3 pairs", key_name);
+                                                assert_eq!(
+                                                    mapping_pairs.len(),
+                                                    3,
+                                                    "Tagged set {} should have 3 pairs",
+                                                    key_name
+                                                );
                                                 for (map_key, map_value) in mapping_pairs {
                                                     assert!(matches!(map_value, Node::None));
                                                     assert!(matches!(map_key, Node::Str(_, _, _)));
                                                 }
                                             }
                                             Node::Array(array_items) => {
-                                                assert_eq!(array_items.len(), 3, "Tagged set {} should have 3 array items", key_name);
+                                                assert_eq!(
+                                                    array_items.len(),
+                                                    3,
+                                                    "Tagged set {} should have 3 array items",
+                                                    key_name
+                                                );
                                             }
-                                            _ => panic!("Unexpected tagged set structure for {}", key_name),
+                                            _ => panic!(
+                                                "Unexpected tagged set structure for {}",
+                                                key_name
+                                            ),
                                         }
                                     }
-                                    _ => panic!("Expected Set or Tagged set for key {}, got: {:?}", key_name, value),
+                                    _ => panic!(
+                                        "Expected Set or Tagged set for key {}, got: {:?}",
+                                        key_name, value
+                                    ),
                                 }
                             }
                             _ => {} // Skip non-set keys
@@ -664,5 +706,63 @@ mapping_set: !!set
             }
         }
         panic!("Expected comprehensive set parsing to work");
+    }
+
+    #[test]
+    fn test_set_stringifies_as_sequence() {
+        // Test that sets are stringified as plain sequences (no !!set tag)
+        let yaml = b"my_set: !!set [item1, item2, item3]";
+        let mut source = BufferSource::new(yaml);
+        let result = parse(&mut source).unwrap();
+
+        // Stringify the parsed result back to YAML
+        let mut dest = BufferDestination::new();
+        stringify(&result, &mut dest).unwrap();
+        let yaml_string = dest.to_string();
+
+        println!("Stringified YAML:\n{}", yaml_string);
+
+        // Should NOT contain !!set tag (sets are plain sequences when stringified)
+        assert!(!yaml_string.contains("!!set"));
+
+        // Should be formatted as a sequence (with dashes), not a mapping (with colons and null)
+        assert!(yaml_string.contains("- item1"));
+        assert!(yaml_string.contains("- item2"));
+        assert!(yaml_string.contains("- item3"));
+
+        // Should NOT contain mapping format with null values
+        assert!(!yaml_string.contains(": null"));
+    }
+
+    #[test]
+    fn test_set_final_behavior() {
+        // Comprehensive test showing the final set behavior
+        let yaml = b"
+sets_demo:
+  array_set: !!set [apple, banana, cherry]
+  inline_set: !!set {red, green, blue}
+  explicit_set: !!set
+    ? one
+    ? two
+    ? three
+";
+        let mut source = BufferSource::new(yaml);
+        let result = parse(&mut source).unwrap();
+
+        // Stringify back to YAML
+        let mut dest = BufferDestination::new();
+        stringify(&result, &mut dest).unwrap();
+        let yaml_string = dest.to_string();
+
+        println!("Final set behavior:\n{}", yaml_string);
+
+        // Verify sets are stringified as plain sequences without !!set tags
+        assert!(!yaml_string.contains("!!set"), "Sets should not contain !!set tag when stringified");
+        
+        // Should contain sequence format (dashes)
+        assert!(yaml_string.contains("- apple") || yaml_string.contains("- red") || yaml_string.contains("- one"));
+        
+        // Should not contain mapping format
+        assert!(!yaml_string.contains(": null"));
     }
 }
