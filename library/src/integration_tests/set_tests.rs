@@ -286,7 +286,7 @@ mod tests {
 
         // Parse it back - note: it will be parsed as an Array since no !!set tag
         let mut source = BufferSource::new(yaml_string.as_bytes());
-        let reparsed = parse(&mut source).unwrap(); 
+        let reparsed = parse(&mut source).unwrap();
         if let Node::Documents(ref docs) = reparsed {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
@@ -757,11 +757,18 @@ sets_demo:
         println!("Final set behavior:\n{}", yaml_string);
 
         // Verify sets are stringified as plain sequences without !!set tags
-        assert!(!yaml_string.contains("!!set"), "Sets should not contain !!set tag when stringified");
-        
+        assert!(
+            !yaml_string.contains("!!set"),
+            "Sets should not contain !!set tag when stringified"
+        );
+
         // Should contain sequence format (dashes)
-        assert!(yaml_string.contains("- apple") || yaml_string.contains("- red") || yaml_string.contains("- one"));
-        
+        assert!(
+            yaml_string.contains("- apple")
+                || yaml_string.contains("- red")
+                || yaml_string.contains("- one")
+        );
+
         // Should not contain mapping format
         assert!(!yaml_string.contains(": null"));
     }

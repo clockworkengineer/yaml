@@ -474,10 +474,7 @@ mod tests {
 
         let mut buf = Buffer::new();
         stringify(&set_doc, &mut buf).expect("stringify failed");
-        assert_eq!(
-            buf.to_string(),
-            "---\n- item1\n- item2\n- item3\n...\n"
-        );
+        assert_eq!(buf.to_string(), "---\n- item1\n- item2\n- item3\n...\n");
     }
 
     #[test]
