@@ -1,15 +1,15 @@
 #  set examples
-# baseball-players: !!set
-#   ? Tom Nolan
-#   ? Ryan Raynolds
-#   ? John Smith
+baseball-players: !!set
+  ? Tom Nolan
+  ? Ryan Raynolds
+  ? John Smith
 
-# set1: !!set
-#   ? one
-#   ? two
+set1: !!set
+  ? one
+  ? two
 
-# set2: !!set
-#   ? three
-#   ? four
+set2: !!set
+  ? three
+  ? four
 
 # my-set: !!set {'one', "two"}

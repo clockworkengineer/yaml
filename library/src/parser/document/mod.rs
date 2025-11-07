@@ -32,6 +32,67 @@ use std::collections::HashMap;
 use helpers::node_is_blank;
 use helpers::skip_whitespace;
 
+/// Parses multiple explicit keys for sets or mappings.
+///
+/// Handles the case where we have multiple consecutive lines starting with '?'
+/// which typically represents a set with explicit key syntax.
+///
+/// # Arguments
+///
+/// * `source` - A mutable reference to a source implementing ISource trait
+/// * `indent_level` - The current indentation level for proper nesting
+///
+/// # Returns
+///
+/// Result containing a Mapping Node with null values, suitable for set conversion
+fn parse_multiple_explicit_keys(
+    source: &mut dyn ISource,
+    indent_level: usize,
+) -> Result<Node, String> {
+    let mut pairs: Vec<(Node, Node)> = Vec::new();
+
+    while source.current() == Some('?') {
+        // Skip the '?' character
+        source.next();
+        skip_whitespace(source);
+
+        // Parse the key
+        let key_node = if source.current() == Some('\n') || source.current().is_none() {
+            // Empty key, skip this entry
+            if source.current() == Some('\n') {
+                source.next();
+                skip_whitespace(source);
+            }
+            continue;
+        } else {
+            // Read the key content
+            let key_content = crate::utils::read_line_trimmed_into_string(source);
+            if source.current() == Some('\n') {
+                source.next();
+            }
+            Node::Str(
+                key_content,
+                crate::nodes::node::QuoteType::Unquoted,
+                crate::nodes::node::BlockStyle::None,
+            )
+        };
+
+        // For explicit keys without explicit values, the value is implicitly null
+        pairs.push((key_node, Node::None));
+
+        // Skip whitespace and check if we're still at the same indentation level
+        skip_whitespace(source);
+        let current_indent = source.get_current_indent_level();
+
+        // If we're at a different indentation level or don't see another '?', stop
+        if current_indent != indent_level || source.current() != Some('?') {
+            break;
+        }
+    }
+
+    Ok(Node::Mapping(pairs))
+}
+
 /// Parses the contents of a YAML document based on the current character and context.
 ///
 /// Determines the appropriate parsing strategy based on the current character:
@@ -62,243 +123,272 @@ pub fn parse_document_contents(
         }
         Some(c) if c == '{' => Ok(parse_inline_mapping(source)?),
         Some(c) if c == '[' => Ok(parse_inline_sequence(source)?),
+        // Support tagged values at the start of a nested block (e.g. indented "!!set" lines)
+        Some(c) if c == '!' => Ok(crate::parser::document::value::parse_value(source)?),
         Some(c) if c == '?' => {
-            source.next();
+            // Check if we have multiple explicit keys at this indentation level (likely a set)
+            let current_indent = source.get_current_indent_level();
+            let state = source.save_state();
+
+            // Look ahead to see if there are multiple '?' at the same indentation
+            let mut has_multiple_explicit_keys = false;
+            source.next(); // Skip first '?'
+            crate::utils::skip_until_newline(source);
+            if source.current() == Some('\n') {
+                source.next();
+            }
             skip_whitespace(source);
-            let mut key_node: Node;
 
-            if source.current() == Some('[') {
-                key_node = parse_inline_sequence(source)?;
-            } else if source.current() == Some('-') {
-                let nested_indent = source.get_current_indent_level();
-                key_node = parse_sequence(source, nested_indent)?;
-            } else if matches!(source.current(), Some('|') | Some('>')) {
-                let is_folded = source.current() == Some('>');
+            if source.get_current_indent_level() == current_indent && source.current() == Some('?')
+            {
+                has_multiple_explicit_keys = true;
+            }
 
-                let _ = crate::utils::collect_until(source, |c| c == '\n');
-                if source.current() == Some('\n') {
-                    source.next();
-                }
+            // Restore state to beginning of first '?'
+            source.restore_state(state);
 
-                let mut raw_lines: Vec<String> = Vec::new();
-                let mut first_indent: Option<usize> = None;
-                loop {
-                    if source.current().is_none() {
-                        break;
-                    }
-                    let st_line = source.save_state();
-                    let mut cur_indent = 0usize;
-                    while let Some(CHAR_SPACE) = source.current() {
-                        cur_indent += 1;
-                        source.next();
-                    }
-                    let cur_is_newline = source.current() == Some('\n');
+            if has_multiple_explicit_keys {
+                // Parse multiple explicit keys (typically for sets)
+                return Ok(parse_multiple_explicit_keys(source, current_indent)?);
+            } else {
+                // Original single explicit key logic
+                source.next();
+                skip_whitespace(source);
+                let mut key_node: Node;
 
-                    let is_colon_start = matches!(source.current(), Some(':'));
-                    source.restore_state(st_line);
+                if source.current() == Some('[') {
+                    key_node = parse_inline_sequence(source)?;
+                } else if source.current() == Some('-') {
+                    let nested_indent = source.get_current_indent_level();
+                    key_node = parse_sequence(source, nested_indent)?;
+                } else if matches!(source.current(), Some('|') | Some('>')) {
+                    let is_folded = source.current() == Some('>');
 
-                    if first_indent.is_none() {
-                        if cur_is_newline {
-                            let _ = crate::utils::collect_until(source, |c| c == '\n');
-                            if source.current() == Some('\n') {
-                                source.next();
-                            }
-                            raw_lines.push(String::new());
-                            continue;
-                        } else {
-                            first_indent = Some(cur_indent);
-                        }
-                    } else if !cur_is_newline && cur_indent < first_indent.unwrap() {
-                        break;
-                    }
-
-                    if is_colon_start {
-                        break;
-                    }
-
-                    let raw_line = crate::utils::collect_until(source, |c| c == '\n');
+                    let _ = crate::utils::collect_until(source, |c| c == '\n');
                     if source.current() == Some('\n') {
                         source.next();
                     }
-                    raw_lines.push(raw_line);
-                }
 
-                while matches!(raw_lines.last(), Some(s) if s.is_empty()) {
-                    raw_lines.pop();
-                }
-
-                let fi = first_indent.unwrap_or(0);
-                let mut norm_lines: Vec<String> = Vec::with_capacity(raw_lines.len());
-                if is_folded {
-                    for l in raw_lines.iter() {
-                        if l.is_empty() {
-                            norm_lines.push(String::new());
-                        } else {
-                            let lead = l.chars().take_while(|&ch| ch == CHAR_SPACE).count();
-                            let strip = fi.min(lead);
-                            let stripped: String = l.chars().skip(strip).collect();
-                            norm_lines.push(stripped);
+                    let mut raw_lines: Vec<String> = Vec::new();
+                    let mut first_indent: Option<usize> = None;
+                    loop {
+                        if source.current().is_none() {
+                            break;
                         }
+                        let st_line = source.save_state();
+                        let mut cur_indent = 0usize;
+                        while let Some(CHAR_SPACE) = source.current() {
+                            cur_indent += 1;
+                            source.next();
+                        }
+                        let cur_is_newline = source.current() == Some('\n');
+
+                        let is_colon_start = matches!(source.current(), Some(':'));
+                        source.restore_state(st_line);
+
+                        if first_indent.is_none() {
+                            if cur_is_newline {
+                                let _ = crate::utils::collect_until(source, |c| c == '\n');
+                                if source.current() == Some('\n') {
+                                    source.next();
+                                }
+                                raw_lines.push(String::new());
+                                continue;
+                            } else {
+                                first_indent = Some(cur_indent);
+                            }
+                        } else if !cur_is_newline && cur_indent < first_indent.unwrap() {
+                            break;
+                        }
+
+                        if is_colon_start {
+                            break;
+                        }
+
+                        let raw_line = crate::utils::collect_until(source, |c| c == '\n');
+                        if source.current() == Some('\n') {
+                            source.next();
+                        }
+                        raw_lines.push(raw_line);
                     }
-                } else {
-                    norm_lines = raw_lines.clone();
-                }
 
-                let mut escaped_parts: Vec<String> = Vec::with_capacity(norm_lines.len());
-                for l in norm_lines.iter() {
-                    let stripped: String = l.chars().skip(fi).collect();
-                    escaped_parts.push(stripped);
-                }
+                    while matches!(raw_lines.last(), Some(s) if s.is_empty()) {
+                        raw_lines.pop();
+                    }
 
-                let mut escaped_key = escaped_parts.join("\\n");
-                escaped_key.push_str("\\n");
-                key_node = Node::Str(
-                    escaped_key,
-                    crate::nodes::node::QuoteType::Double,
-                    crate::nodes::node::BlockStyle::None,
-                );
-            } else if matches!(source.current(), Some('"') | Some('\'')) {
-                key_node = crate::parser::document::value::parse_value(source)?;
-            } else if source.current() == Some('#') || source.current() == Some('\n') {
-                let st = source.save_state();
-                let _ = crate::utils::read_line_trimmed_into_string(source);
-                if source.current() == Some('\n') {
-                    source.next();
-                }
-                skip_whitespace(source);
-                if source.current() == Some('-') {
-                    let nested_indent = source.get_current_indent_level();
-                    key_node = parse_sequence(source, nested_indent)?;
-                } else {
-                    source.restore_state(st);
+                    let fi = first_indent.unwrap_or(0);
+                    let mut norm_lines: Vec<String> = Vec::with_capacity(raw_lines.len());
+                    if is_folded {
+                        for l in raw_lines.iter() {
+                            if l.is_empty() {
+                                norm_lines.push(String::new());
+                            } else {
+                                let lead = l.chars().take_while(|&ch| ch == CHAR_SPACE).count();
+                                let strip = fi.min(lead);
+                                let stripped: String = l.chars().skip(strip).collect();
+                                norm_lines.push(stripped);
+                            }
+                        }
+                    } else {
+                        norm_lines = raw_lines.clone();
+                    }
+
+                    let mut escaped_parts: Vec<String> = Vec::with_capacity(norm_lines.len());
+                    for l in norm_lines.iter() {
+                        let stripped: String = l.chars().skip(fi).collect();
+                        escaped_parts.push(stripped);
+                    }
+
+                    let mut escaped_key = escaped_parts.join("\\n");
+                    escaped_key.push_str("\\n");
+                    key_node = Node::Str(
+                        escaped_key,
+                        crate::nodes::node::QuoteType::Double,
+                        crate::nodes::node::BlockStyle::None,
+                    );
+                } else if matches!(source.current(), Some('"') | Some('\'')) {
+                    key_node = crate::parser::document::value::parse_value(source)?;
+                } else if source.current() == Some('#') || source.current() == Some('\n') {
+                    let st = source.save_state();
+                    let _ = crate::utils::read_line_trimmed_into_string(source);
+                    if source.current() == Some('\n') {
+                        source.next();
+                    }
+                    skip_whitespace(source);
+                    if source.current() == Some('-') {
+                        let nested_indent = source.get_current_indent_level();
+                        key_node = parse_sequence(source, nested_indent)?;
+                    } else {
+                        source.restore_state(st);
+                        key_node = Node::Str(
+                            crate::utils::read_line_trimmed_into_string(source),
+                            crate::nodes::node::QuoteType::Unquoted,
+                            crate::nodes::node::BlockStyle::None,
+                        );
+                    }
+                } else if source.current().is_some() {
                     key_node = Node::Str(
                         crate::utils::read_line_trimmed_into_string(source),
                         crate::nodes::node::QuoteType::Unquoted,
                         crate::nodes::node::BlockStyle::None,
                     );
+                } else {
+                    key_node = Node::Str(
+                        String::new(),
+                        crate::nodes::node::QuoteType::Unquoted,
+                        crate::nodes::node::BlockStyle::None,
+                    );
                 }
-            } else if source.current().is_some() {
-                key_node = Node::Str(
-                    crate::utils::read_line_trimmed_into_string(source),
-                    crate::nodes::node::QuoteType::Unquoted,
-                    crate::nodes::node::BlockStyle::None,
-                );
-            } else {
-                key_node = Node::Str(
-                    String::new(),
-                    crate::nodes::node::QuoteType::Unquoted,
-                    crate::nodes::node::BlockStyle::None,
-                );
-            }
 
-            match key_node {
-                Node::Array(_) | Node::Mapping(_) => {
-                    let inline = helpers::node_to_inline_string(&key_node);
-                    key_node = Node::Str(
-                        inline,
-                        crate::nodes::node::QuoteType::Double,
-                        crate::nodes::node::BlockStyle::None,
-                    );
+                match key_node {
+                    Node::Array(_) | Node::Mapping(_) => {
+                        let inline = helpers::node_to_inline_string(&key_node);
+                        key_node = Node::Str(
+                            inline,
+                            crate::nodes::node::QuoteType::Double,
+                            crate::nodes::node::BlockStyle::None,
+                        );
+                    }
+                    Node::Str(s, _qt, style) => {
+                        let key_string = if matches!(style, BlockStyle::Literal) {
+                            format!("{}\n", s)
+                        } else {
+                            s
+                        };
+                        key_node = Node::Str(
+                            key_string,
+                            crate::nodes::node::QuoteType::Double,
+                            crate::nodes::node::BlockStyle::None,
+                        );
+                    }
+                    other => {
+                        let inline = helpers::node_to_inline_string(&other);
+                        key_node = Node::Str(
+                            inline,
+                            crate::nodes::node::QuoteType::Double,
+                            crate::nodes::node::BlockStyle::None,
+                        );
+                    }
                 }
-                Node::Str(s, _qt, style) => {
-                    let key_string = if matches!(style, BlockStyle::Literal) {
-                        format!("{}\n", s)
-                    } else {
-                        s
-                    };
-                    key_node = Node::Str(
-                        key_string,
-                        crate::nodes::node::QuoteType::Double,
-                        crate::nodes::node::BlockStyle::None,
-                    );
-                }
-                other => {
-                    let inline = helpers::node_to_inline_string(&other);
-                    key_node = Node::Str(
-                        inline,
-                        crate::nodes::node::QuoteType::Double,
-                        crate::nodes::node::BlockStyle::None,
-                    );
-                }
-            }
 
-            let st_colon = source.save_state();
-            let mut found_colon = false;
-            loop {
-                skip_whitespace(source);
-                match source.current() {
-                    Some(':') => {
-                        source.next();
-                        found_colon = true;
-                        break;
-                    }
-                    Some('#') => {
-                        parse_comment(source);
-                        if source.current() == Some('\n') {
-                            source.next();
-                        }
-                        continue;
-                    }
-                    Some('\n') => {
-                        source.next();
-                        continue;
-                    }
-                    Some(_) | None => break,
-                }
-            }
-            if !found_colon {
-                source.restore_state(st_colon);
-                if source.current() == Some('\n') {
-                    source.next();
-                }
+                let st_colon = source.save_state();
+                let mut found_colon = false;
                 loop {
                     skip_whitespace(source);
-                    if source.current() == Some(':') {
-                        break;
-                    }
-                    if source.current().is_none() {
-                        break;
-                    }
-                    crate::utils::skip_until_newline(source);
-                    if source.current().is_none() {
-                        break;
+                    match source.current() {
+                        Some(':') => {
+                            source.next();
+                            found_colon = true;
+                            break;
+                        }
+                        Some('#') => {
+                            parse_comment(source);
+                            if source.current() == Some('\n') {
+                                source.next();
+                            }
+                            continue;
+                        }
+                        Some('\n') => {
+                            source.next();
+                            continue;
+                        }
+                        Some(_) | None => break,
                     }
                 }
-            }
-            if source.current() == Some(':') {
-                source.next();
-            }
-            skip_whitespace(source);
-            let mut value_node = match source.current() {
-                Some('[') => parse_inline_sequence(source)?,
-                Some('{') => parse_inline_mapping(source)?,
-                Some('-') => {
-                    let nested_indent = source.get_current_indent_level();
-                    parse_sequence(source, nested_indent)?
+                if !found_colon {
+                    source.restore_state(st_colon);
+                    if source.current() == Some('\n') {
+                        source.next();
+                    }
+                    loop {
+                        skip_whitespace(source);
+                        if source.current() == Some(':') {
+                            break;
+                        }
+                        if source.current().is_none() {
+                            break;
+                        }
+                        crate::utils::skip_until_newline(source);
+                        if source.current().is_none() {
+                            break;
+                        }
+                    }
                 }
-                Some(_) => parse_value(source)?,
-                None => {
-                    return Err(helpers::parse_error(
-                        source,
-                        "Unexpected end of input while parsing explicit pair value",
-                    ));
+                if source.current() == Some(':') {
+                    source.next();
                 }
-            };
+                skip_whitespace(source);
+                let mut value_node = match source.current() {
+                    Some('[') => parse_inline_sequence(source)?,
+                    Some('{') => parse_inline_mapping(source)?,
+                    Some('-') => {
+                        let nested_indent = source.get_current_indent_level();
+                        parse_sequence(source, nested_indent)?
+                    }
+                    Some(_) => parse_value(source)?,
+                    None => {
+                        return Err(helpers::parse_error(
+                            source,
+                            "Unexpected end of input while parsing explicit pair value",
+                        ));
+                    }
+                };
 
-            if matches!(value_node, Node::None) {
-                let st_peek = source.save_state();
-                crate::utils::skip_whitespace_and_comments(source);
-                if source.current() == Some('-') {
-                    let nested_indent = source.get_current_indent_level();
-                    value_node = parse_sequence(source, nested_indent)?;
-                } else {
-                    source.restore_state(st_peek);
+                if matches!(value_node, Node::None) {
+                    let st_peek = source.save_state();
+                    crate::utils::skip_whitespace_and_comments(source);
+                    if source.current() == Some('-') {
+                        let nested_indent = source.get_current_indent_level();
+                        value_node = parse_sequence(source, nested_indent)?;
+                    } else {
+                        source.restore_state(st_peek);
+                    }
                 }
-            }
 
-            let mut pairs: Vec<(Node, Node)> = Vec::new();
-            pairs.push((key_node, value_node));
-            Ok(Node::Mapping(pairs))
+                let mut pairs: Vec<(Node, Node)> = Vec::new();
+                pairs.push((key_node, value_node));
+                Ok(Node::Mapping(pairs))
+            }
         }
         Some(c) if c.is_alphanumeric() => {
             if peek_ahead_for_mapping_key(source) {

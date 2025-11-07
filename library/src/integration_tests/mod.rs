@@ -10,5 +10,5 @@ mod error_handling_tests;
 mod file_parsing_tests;
 mod inline_flow_tests;
 mod nested_structure_tests;
+mod set_tests;
 mod tag_coercion_tests;
-

@@ -105,6 +105,14 @@ fn stringify_node(node: &Node, destination: &mut dyn IDestination) -> Result<(),
                 destination.add_bytes("</item>");
             }
         }
+        Node::Set(items) => {
+            // Represent sets as XML elements with set attribute
+            for item in items.iter() {
+                destination.add_bytes("<item type=\"set\">");
+                stringify_node(item, destination)?;
+                destination.add_bytes("</item>");
+            }
+        }
         Node::Mapping(pairs) => {
             for (k, v) in pairs.iter() {
                 let key_str = node_to_key_string(k)?;
@@ -220,6 +228,32 @@ pub fn stringify_pretty(
                     match item {
                         Node::Mapping(_)
                         | Node::Array(_)
+                        | Node::Set(_)
+                        | Node::Document(_)
+                        | Node::Documents(_) => {
+                            dest.add_bytes("\n");
+                            helper(item, dest, spaces, level + 1)?;
+                            dest.add_bytes("\n");
+                            write_indent(dest, level, spaces);
+                            dest.add_bytes("</item>");
+                        }
+                        _ => {
+                            helper(item, dest, spaces, 0)?;
+                            dest.add_bytes("</item>");
+                        }
+                    }
+                    dest.add_bytes("\n");
+                }
+            }
+            Node::Set(items) => {
+                for item in items.iter() {
+                    write_indent(dest, level, spaces);
+                    dest.add_bytes("<item type=\"set\">");
+                    // scalar or complex?
+                    match item {
+                        Node::Mapping(_)
+                        | Node::Array(_)
+                        | Node::Set(_)
                         | Node::Document(_)
                         | Node::Documents(_) => {
                             dest.add_bytes("\n");
@@ -247,6 +281,7 @@ pub fn stringify_pretty(
                     match v {
                         Node::Mapping(_)
                         | Node::Array(_)
+                        | Node::Set(_)
                         | Node::Document(_)
                         | Node::Documents(_) => {
                             dest.add_bytes(">");

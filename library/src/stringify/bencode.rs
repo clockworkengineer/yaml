@@ -91,6 +91,15 @@ fn encode_node(node: &Node, destination: &mut dyn IDestination) -> Result<(), St
             destination.add_bytes("e");
             Ok(())
         }
+        Node::Set(items) => {
+            // Represent sets as bencode lists in bencode output
+            destination.add_bytes("l");
+            for item in items {
+                encode_node(item, destination)?;
+            }
+            destination.add_bytes("e");
+            Ok(())
+        }
         Node::Mapping(pairs) => {
             let mut entries: Vec<(Vec<u8>, &Node)> = Vec::new();
             for (k, v) in pairs.iter() {

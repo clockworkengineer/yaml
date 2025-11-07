@@ -1,0 +1,4 @@
+block_set: !!set
+  ? item1
+  ? item2
+  ? item3

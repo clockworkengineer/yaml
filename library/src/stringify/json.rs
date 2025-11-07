@@ -125,6 +125,17 @@ fn stringify_node(node: &Node, destination: &mut dyn IDestination) -> Result<(),
             }
             destination.add_byte(b']');
         }
+        Node::Set(items) => {
+            // Represent sets as JSON arrays in JSON output
+            destination.add_byte(b'[');
+            for (i, it) in items.iter().enumerate() {
+                if i > 0 {
+                    destination.add_byte(b',');
+                }
+                stringify_node(it, destination)?;
+            }
+            destination.add_byte(b']');
+        }
         Node::Mapping(pairs) => {
             destination.add_byte(b'{');
             let mut first = true;
@@ -234,6 +245,27 @@ pub fn stringify_pretty(
                 Numeric::Int8(i) => destination.add_bytes(&i.to_string()),
             },
             Node::Array(items) => {
+                if items.is_empty() {
+                    destination.add_bytes("[]");
+                    return Ok(());
+                }
+                destination.add_byte(b'[');
+                destination.add_byte(b'\n');
+                for (i, it) in items.iter().enumerate() {
+                    let indent = " ".repeat(spaces * (level + 1));
+                    destination.add_bytes(&indent);
+                    helper(it, destination, spaces, level + 1)?;
+                    if i + 1 < items.len() {
+                        destination.add_byte(b',');
+                    }
+                    destination.add_byte(b'\n');
+                }
+                let indent = " ".repeat(spaces * level);
+                destination.add_bytes(&indent);
+                destination.add_byte(b']');
+            }
+            Node::Set(items) => {
+                // Represent sets as JSON arrays in JSON output
                 if items.is_empty() {
                     destination.add_bytes("[]");
                     return Ok(());

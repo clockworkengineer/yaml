@@ -5,7 +5,6 @@ use crate::io::traits::IDestination;
 use crate::nodes::node::*;
 use crate::stringify::default::stringify as yaml_stringify;
 
-
 fn escape_toml_string(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
@@ -47,14 +46,12 @@ fn node_to_key_string(key: &Node) -> Result<String, String> {
         Node::Boolean(b) => Ok((if *b { "true" } else { "false" }).to_string()),
         Node::None => Ok("".to_string()),
         _ => {
-
             let mut buf = BufferDestination::new();
             yaml_stringify(key, &mut buf).map_err(|e| e)?;
             Ok(buf.to_string())
         }
     }
 }
-
 
 fn is_array_of_maps(node: &Node) -> bool {
     match node {
@@ -63,7 +60,6 @@ fn is_array_of_maps(node: &Node) -> bool {
     }
 }
 
-
 fn write_scalar_entries(
     pairs: &Vec<(Node, Node)>,
     prefix: Option<&str>,
@@ -71,7 +67,6 @@ fn write_scalar_entries(
     write_newline: &mut bool,
 ) -> Result<(), String> {
     for (k, v) in pairs.iter() {
-
         if matches!(v, Node::Mapping(_)) || is_array_of_maps(v) {
             continue;
         }
@@ -84,7 +79,6 @@ fn write_scalar_entries(
         }
         *write_newline = true;
 
-
         let key_str = node_to_key_string(k)?;
         destination.add_bytes(&key_str);
         destination.add_bytes(" = ");
@@ -95,16 +89,13 @@ fn write_scalar_entries(
     Ok(())
 }
 
-
 fn write_table(
     pairs: &Vec<(Node, Node)>,
     prefix: Option<&str>,
     destination: &mut dyn IDestination,
 ) -> Result<(), String> {
-
     let mut wrote_any = false;
     write_scalar_entries(pairs, prefix, destination, &mut wrote_any)?;
-
 
     for (k, v) in pairs.iter() {
         if is_array_of_maps(v) {
@@ -124,7 +115,6 @@ fn write_table(
             if let Node::Array(items) = v {
                 for item in items.iter() {
                     if let Node::Mapping(inner) = item {
-
                         if wrote_any {
                             destination.add_byte(b'\n');
                         }
@@ -137,7 +127,6 @@ fn write_table(
 
                         for (ik, iv) in inner.iter() {
                             if matches!(iv, Node::Mapping(_)) || is_array_of_maps(iv) {
-
                                 if let Node::Mapping(_) = iv {
                                     write_table(
                                         &vec![(ik.clone(), iv.clone())],
@@ -152,7 +141,6 @@ fn write_table(
             }
         }
     }
-
 
     for (k, v) in pairs.iter() {
         if let Node::Mapping(inner) = v {
@@ -169,7 +157,6 @@ fn write_table(
                 key_str.clone()
             };
 
-
             if wrote_any {
                 destination.add_byte(b'\n');
             }
@@ -178,9 +165,7 @@ fn write_table(
             destination.add_bytes(&full_key);
             destination.add_bytes("]");
 
-
             write_scalar_entries(inner, Some(&full_key), destination, &mut true)?;
-
 
             for (ik, iv) in inner.iter() {
                 if matches!(iv, Node::Mapping(_)) || is_array_of_maps(iv) {
@@ -201,11 +186,7 @@ fn write_table(
 
 fn write_toml_value(node: &Node, destination: &mut dyn IDestination) -> Result<(), String> {
     match node {
-        Node::None => {
-
-
-            destination.add_bytes("\"\"")
-        }
+        Node::None => destination.add_bytes("\"\""),
         Node::Boolean(b) => destination.add_bytes(if *b { "true" } else { "false" }),
         Node::Str(s, _, _) => write_toml_string(s, destination),
         Node::Number(num) => match num {
@@ -229,16 +210,24 @@ fn write_toml_value(node: &Node, destination: &mut dyn IDestination) -> Result<(
             }
             destination.add_byte(b']');
         }
+        Node::Set(items) => {
+            // Represent sets as TOML arrays
+            destination.add_byte(b'[');
+            for (i, it) in items.iter().enumerate() {
+                if i > 0 {
+                    destination.add_bytes(", ");
+                }
+                write_toml_value(it, destination)?;
+            }
+            destination.add_byte(b']');
+        }
         Node::Mapping(pairs) => {
-
-
             write_table(pairs, None, destination)?;
         }
         Node::Document(nodes) => {
             if nodes.len() == 1 {
                 write_toml_value(&nodes[0], destination)?;
             } else {
-
                 for (i, n) in nodes.iter().enumerate() {
                     if i > 0 {
                         destination.add_byte(b'\n');
@@ -258,10 +247,7 @@ fn write_toml_value(node: &Node, destination: &mut dyn IDestination) -> Result<(
                 write_toml_value(d, destination)?;
             }
         }
-        Node::Comment(_) => {
-
-
-        }
+        Node::Comment(_) => {}
     }
     Ok(())
 }
@@ -281,7 +267,6 @@ pub fn stringify_pretty(
     destination: &mut dyn IDestination,
     _spaces_per_indent: usize,
 ) -> Result<(), String> {
-
     stringify(node, destination)
 }
 
@@ -307,7 +292,6 @@ mod tests {
         stringify(&ni, &mut buf).unwrap();
         assert_eq!(buf.to_string(), "10");
 
-
         buf.clear();
         let m = Node::Mapping(vec![(
             Node::Str("a".to_string(), QuoteType::Unquoted, BlockStyle::None),
@@ -315,7 +299,6 @@ mod tests {
         )]);
         stringify(&m, &mut buf).unwrap();
         assert_eq!(buf.to_string(), "a = 1");
-
 
         buf.clear();
         let nested = Node::Mapping(vec![(

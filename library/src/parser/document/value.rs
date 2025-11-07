@@ -105,6 +105,39 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
             }
             _ => return None,
         },
+        "!!set" | "!set" => match node {
+            // Convert mapping with null values to a set
+            Node::Mapping(pairs) => {
+                let mut set_items = Vec::new();
+                for (key, value) in pairs {
+                    match value {
+                        Node::None => {
+                            // Only add keys where value is null (which is what sets are)
+                            set_items.push(key);
+                        }
+                        _ => {
+                            // If any value is not null, it's not a valid set mapping
+                            return None;
+                        }
+                    }
+                }
+                return Some(Node::Set(set_items));
+            }
+            // Convert array to a set (remove duplicates)
+            Node::Array(items) => {
+                let mut unique_items = Vec::new();
+                for item in items {
+                    if !unique_items.contains(&item) {
+                        unique_items.push(item);
+                    }
+                }
+                return Some(Node::Set(unique_items));
+            }
+            // Single value becomes a set with one element
+            _ => {
+                return Some(Node::Set(vec![node]));
+            }
+        },
         _ => return None,
     }
 }
@@ -155,6 +188,21 @@ pub(crate) fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
                     }
                 } else {
                     return Err(parse_error(source, ERR_UNEXPECTED_EOF_AFTER_ANCHOR));
+                }
+            }
+            Some('\n') => {
+                // Tag followed by newline - content is on following lines
+                source.next(); // consume the newline
+                skip_whitespace(source);
+
+                // Check if there's indented content
+                let current_indent = source.get_current_indent_level();
+                if current_indent > 0 {
+                    // Parse as block structure
+                    crate::parser::document::parse_document_contents(source, current_indent)?
+                } else {
+                    // No indented content, treat as null
+                    Node::None
                 }
             }
             Some(_) => parse_value(source)?,

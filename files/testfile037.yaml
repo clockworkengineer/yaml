@@ -199,10 +199,10 @@ gif_file: !!binary |
  AgjoEwnuNAFOhpEMTRiggcz4BNJHrv/zCFcLiwMWYNG84BwwEeECcgggoBADs=
 
 # YAML also has a set type, which looks like this:
-# set:
-#  ? item1
-#  ? item2
-#  ? item3
+set:
+ ? item1
+ ? item2
+ ? item3
 # or: { item1, item2, item3 }
 
 # Sets are just maps with null values; the above is equivalent to:

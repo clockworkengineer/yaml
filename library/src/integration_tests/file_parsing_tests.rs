@@ -290,6 +290,9 @@ mod tests {
                                 Node::Array(_) => {
                                     assert!(true, "Valid array structure in {}", file_path)
                                 }
+                                Node::Set(_) => {
+                                    assert!(true, "Valid set structure in {}", file_path)
+                                }
                                 Node::Mapping(_) => {
                                     assert!(true, "Valid mapping structure in {}", file_path)
                                 }

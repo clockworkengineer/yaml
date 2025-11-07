@@ -16,6 +16,8 @@ mod constants;
 mod error;
 /// Module for detecting and handling different Unicode text file formats
 mod file;
+/// Module containing tests for the YAML library
+mod integration_tests;
 /// Module providing input/output operations for reading and writing YAML data
 mod io;
 /// Module containing utility functions and helpers for YAML processing
@@ -26,8 +28,6 @@ mod nodes;
 mod parser;
 /// Module for converting YAML structures to formatted strings
 mod stringify;
-/// Module containing tests for the YAML library
-mod integration_tests;
 /// Module containing  utility functions for the YAML library
 mod utils;
 
@@ -64,6 +64,8 @@ pub use nodes::node::Node;
 pub use nodes::node::Numeric;
 /// Helper function to create a Node from any value that can be converted into a Node
 pub use nodes::node::make_node;
+/// Helper function to create a Set node from a vector, ensuring uniqueness
+pub use nodes::node::make_set;
 /// Parses json data into a Node tree structure
 pub use parser::document::parse;
 /// Converts a Node tree to bencode format
@@ -73,9 +75,9 @@ pub use stringify::default::stringify;
 /// Converts a Node tree to JSON format
 pub use stringify::json::stringify as to_json;
 pub use stringify::json::stringify_pretty as to_json_pretty;
-/// Converts a Node tree to XML format
-pub use stringify::xml::stringify as to_xml;
-pub use stringify::xml::stringify_pretty as to_xml_pretty;
 /// Converts a Node tree to TOML format
 pub use stringify::toml::stringify as to_toml;
 pub use stringify::toml::stringify_pretty as to_toml_pretty;
+/// Converts a Node tree to XML format
+pub use stringify::xml::stringify as to_xml;
+pub use stringify::xml::stringify_pretty as to_xml_pretty;

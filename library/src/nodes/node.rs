@@ -51,6 +51,9 @@ pub enum Node {
     /// Represents an array of other nodes
     /// Used for YAML sequences/lists where order matters
     Array(Vec<Node>),
+    /// Represents a set of unique nodes
+    /// Used for YAML sets where order doesn't matter and duplicates are not allowed
+    Set(Vec<Node>),
     /// Represents a mapping where keys are Nodes (allowing quoted metadata)
     /// Stores an ordered sequence of (key, value) node pairs
     Mapping(Vec<(Node, Node)>),
@@ -84,7 +87,8 @@ impl Index<usize> for Node {
     fn index(&self, index: usize) -> &Self::Output {
         match self {
             Node::Array(arr) => &arr[index],
-            _ => panic!("Cannot index non-array node with integer"),
+            Node::Set(set) => &set[index],
+            _ => panic!("Cannot index non-array/set node with integer"),
         }
     }
 }
@@ -117,7 +121,8 @@ impl IndexMut<usize> for Node {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         match self {
             Node::Array(arr) => &mut arr[index],
-            _ => panic!("Cannot index non-array node with integer"),
+            Node::Set(set) => &mut set[index],
+            _ => panic!("Cannot index non-array/set node with integer"),
         }
     }
 }
@@ -275,6 +280,23 @@ impl From<String> for Node {
     }
 }
 
+/// Helper function to create a Set node from a vector, ensuring uniqueness
+pub fn make_set<T>(values: Vec<T>) -> Node
+where
+    T: Into<Node> + Clone,
+{
+    let mut unique_nodes = Vec::new();
+
+    for value in values {
+        let node = value.into();
+        if !unique_nodes.contains(&node) {
+            unique_nodes.push(node);
+        }
+    }
+
+    Node::Set(unique_nodes)
+}
+
 /// Helper functions to create a Node from any value that can be converted into a Node
 pub fn make_node<T>(value: T) -> Node
 where
@@ -354,7 +376,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Cannot index non-array node with integer")]
+    #[should_panic(expected = "Cannot index non-array/set node with integer")]
     fn test_invalid_array_indexing() {
         let node = Node::Boolean(true);
         let _value = &node[0];
@@ -384,7 +406,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Cannot index non-array node with integer")]
+    #[should_panic(expected = "Cannot index non-array/set node with integer")]
     fn test_invalid_array_mut_indexing() {
         let mut node = Node::Boolean(true);
         node[0] = Node::from(42);
@@ -498,11 +520,91 @@ mod tests {
             )]),
         )]);
 
-
         assert_eq!(obj["outer"]["inner"], Node::from(5));
-
 
         obj["outer"]["inner"] = Node::from(10);
         assert_eq!(obj["outer"]["inner"], Node::from(10));
+    }
+
+    #[test]
+    fn test_set_node_creation() {
+        let set = Node::Set(vec![Node::from(1), Node::from(2), Node::from(3)]);
+        match set {
+            Node::Set(items) => {
+                assert_eq!(items.len(), 3);
+                assert_eq!(items[0], Node::Number(Numeric::Int32(1)));
+                assert_eq!(items[1], Node::Number(Numeric::Int32(2)));
+                assert_eq!(items[2], Node::Number(Numeric::Int32(3)));
+            }
+            _ => panic!("Expected Set node"),
+        }
+    }
+
+    #[test]
+    fn test_set_indexing() {
+        let set = Node::Set(vec![Node::from(1), Node::from(2)]);
+        assert_eq!(set[0], Node::Number(Numeric::Int32(1)));
+        assert_eq!(set[1], Node::Number(Numeric::Int32(2)));
+    }
+
+    #[test]
+    fn test_set_mut_indexing() {
+        let mut set = Node::Set(vec![Node::from(1), Node::from(2)]);
+        set[0] = Node::from(42);
+        assert_eq!(set[0], Node::Number(Numeric::Int32(42)));
+    }
+
+    #[test]
+    #[should_panic(expected = "Cannot index non-array/set node with integer")]
+    fn test_invalid_set_indexing() {
+        let node = Node::Boolean(true);
+        let _value = &node[0];
+    }
+
+    #[test]
+    fn test_make_set_function() {
+        let set = make_set(vec![1, 2, 3]);
+        match set {
+            Node::Set(items) => {
+                assert_eq!(items.len(), 3);
+                assert_eq!(items[0], Node::Number(Numeric::Int32(1)));
+                assert_eq!(items[1], Node::Number(Numeric::Int32(2)));
+                assert_eq!(items[2], Node::Number(Numeric::Int32(3)));
+            }
+            _ => panic!("Expected Set node"),
+        }
+    }
+
+    #[test]
+    fn test_make_set_with_duplicates() {
+        let set = make_set(vec![1, 2, 2, 3, 1]);
+        match set {
+            Node::Set(items) => {
+                assert_eq!(items.len(), 3); // Duplicates should be removed
+                assert_eq!(items[0], Node::Number(Numeric::Int32(1)));
+                assert_eq!(items[1], Node::Number(Numeric::Int32(2)));
+                assert_eq!(items[2], Node::Number(Numeric::Int32(3)));
+            }
+            _ => panic!("Expected Set node"),
+        }
+    }
+
+    #[test]
+    fn test_make_set_with_strings() {
+        let set = make_set(vec!["apple", "banana", "apple"]);
+        match set {
+            Node::Set(items) => {
+                assert_eq!(items.len(), 2); // Duplicate "apple" removed
+                assert_eq!(
+                    items[0],
+                    Node::Str("apple".to_string(), QuoteType::Unquoted, BlockStyle::None)
+                );
+                assert_eq!(
+                    items[1],
+                    Node::Str("banana".to_string(), QuoteType::Unquoted, BlockStyle::None)
+                );
+            }
+            _ => panic!("Expected Set node"),
+        }
     }
 }

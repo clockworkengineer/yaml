@@ -235,6 +235,36 @@ fn stringify_document_with_indent(
             }
         }
 
+        Node::Set(items) => {
+            // Render sets with !!set tag in block format
+            destination.add_bytes(&format!("{indent_str}!!set"));
+            if items.is_empty() {
+                destination.add_bytes(" {}\n");
+            } else {
+                destination.add_bytes(&CHAR_NEWLINE.to_string());
+                for item in items {
+                    match item {
+                        // Complex items (mappings, arrays, sets) require explicit-key style
+                        Node::Mapping(_) | Node::Array(_) | Node::Set(_) => {
+                            destination.add_bytes(&format!("{indent_str}? "));
+                            destination.add_bytes(&CHAR_NEWLINE.to_string());
+                            stringify_document_with_indent(item, destination, indent + 1)?;
+                        }
+                        // Simple scalar keys can be rendered as key: null entries which are
+                        // easier for the parser to round-trip.
+                        _ => {
+                            // Serialize the key into a temporary buffer to obtain its text
+                            let mut key_buf = crate::io::destinations::buffer::Buffer::new();
+                            stringify_document_with_indent(item, &mut key_buf, 0)?;
+                            let key_str = key_buf.to_string();
+                            destination
+                                .add_bytes(&format!("{indent_str}{key_str}: null{CHAR_NEWLINE}"));
+                        }
+                    }
+                }
+            }
+        }
+
         Node::Mapping(pairs) => {
             for (key_node, value) in pairs {
                 let key_str = match key_node {
@@ -250,7 +280,7 @@ fn stringify_document_with_indent(
                 destination.add_bytes(&format!("{indent_str}{key_str}{CHAR_COLON}{CHAR_SPACE}"));
 
                 match value {
-                    Node::Array(_) | Node::Mapping(_) => {
+                    Node::Array(_) | Node::Mapping(_) | Node::Set(_) => {
                         destination.add_bytes(&CHAR_NEWLINE.to_string());
                         stringify_document_with_indent(value, destination, indent + 1)?;
                     }
@@ -306,6 +336,7 @@ fn node_is_blank(node: &Node) -> bool {
         Node::Str(s, _, _) => s.is_empty(),
         Node::Tagged(inner, _tag) => node_is_blank(inner),
         Node::Array(items) => items.iter().all(node_is_blank),
+        Node::Set(items) => !items.is_empty() && items.iter().all(node_is_blank),
         Node::Mapping(pairs) => pairs.is_empty(),
         Node::Document(nodes) => nodes.iter().all(node_is_blank),
         _ => false,
@@ -444,5 +475,46 @@ mod tests {
         let mut buf = Buffer::new();
         stringify(&lit, &mut buf).expect("stringify failed");
         assert_eq!(buf.to_string(), "--- |\nline1\nline2\n...\n");
+    }
+
+    #[test]
+    fn test_stringify_set_simple() {
+        let set_doc = Node::Documents(vec![Node::Document(vec![Node::Set(vec![
+            Node::from("item1"),
+            Node::from("item2"),
+            Node::from("item3"),
+        ])])]);
+
+        let mut buf = Buffer::new();
+        stringify(&set_doc, &mut buf).expect("stringify failed");
+        assert_eq!(
+            buf.to_string(),
+            "---\n!!set\nitem1: null\nitem2: null\nitem3: null\n...\n"
+        );
+    }
+
+    #[test]
+    fn test_stringify_set_empty() {
+        let set_doc = Node::Documents(vec![Node::Document(vec![Node::Set(vec![])])]);
+
+        let mut buf = Buffer::new();
+        stringify(&set_doc, &mut buf).expect("stringify failed");
+        assert_eq!(buf.to_string(), "---\n!!set {}\n...\n");
+    }
+
+    #[test]
+    fn test_stringify_set_with_numbers() {
+        let set_doc = Node::Documents(vec![Node::Document(vec![Node::Set(vec![
+            Node::Number(Numeric::Integer(1)),
+            Node::Number(Numeric::Integer(2)),
+            Node::Number(Numeric::Integer(3)),
+        ])])]);
+
+        let mut buf = Buffer::new();
+        stringify(&set_doc, &mut buf).expect("stringify failed");
+        assert_eq!(
+            buf.to_string(),
+            "---\n!!set\n1: null\n2: null\n3: null\n...\n"
+        );
     }
 }

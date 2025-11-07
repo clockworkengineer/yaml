@@ -3,7 +3,7 @@
 ///
 #[cfg(test)]
 mod tests {
-    use crate::{BufferSource, parse};
+    use crate::{BufferSource, Node, parse};
 
     #[test]
     fn test_parse_undefined_alias_errors() {
@@ -145,11 +145,22 @@ mod tests {
 
     #[test]
     fn test_error_on_invalid_tag() {
+        // Unknown/custom tags should be preserved as Tagged nodes, not cause errors
         let mut source = BufferSource::new(b"---\n!!invalid-tag-name value");
         let res = parse(&mut source);
-        assert!(res.is_err());
-        let err = res.unwrap_err();
-        assert!(err.contains("Invalid") || err.contains("Unexpected"));
+        assert!(
+            res.is_ok(),
+            "Unknown tags should be preserved, not cause errors"
+        );
+
+        // Verify the tag is preserved
+        if let Ok(Node::Documents(docs)) = res {
+            if let Node::Document(nodes) = &docs[0] {
+                if let Node::Tagged(_, tag) = &nodes[0] {
+                    assert_eq!(tag, "!!invalid-tag-name");
+                }
+            }
+        }
     }
 
     #[test]
