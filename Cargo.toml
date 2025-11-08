@@ -4,7 +4,7 @@ members = [
     "examples/yaml_fibonacci",
     "examples/yaml_parse_and_stringify",
     "examples/yaml_to_bencode",
-    "examples/yaml_to_json",
+    "examples/yaml_to_json", "examples/yaml_to_toml",
     "examples/yaml_to_xml",
     "examples/yaml_utility_lib",
     "library",
