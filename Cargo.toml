@@ -3,7 +3,7 @@ resolver = "3"
 members = [
     # New examples (need API fixes to compile):
 
-    # "examples/yaml_error_handling",
+#     "examples/yaml_error_handling",
      "examples/yaml_multi_document",
 
     

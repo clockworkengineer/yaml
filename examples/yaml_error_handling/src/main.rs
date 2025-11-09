@@ -151,26 +151,26 @@ fn validate_user_structure(node: &Node) -> Result<(), String> {
     // Check required fields
     let required_fields = vec!["name", "age", "email"];
     for field in required_fields {
-        if !obj.contains_key(field) {
+        if !obj.iter().any(|(k, _)| matches!(k, Node::Str(s, _, _) if s == field)) {
             return Err(format!("Missing required field: {}", field));
         }
     }
 
     // Validate field types
-    if let Some(name_node) = obj.get("name") {
-        if !matches!(name_node, Node::String(_)) {
+    if let Some((_, name_node)) = obj.iter().find(|(k, _)| matches!(k, Node::Str(s, _, _) if s == "name")) {
+        if !matches!(name_node, Node::Str(_,_,_)) {
             return Err("Field 'name' must be a string".to_string());
         }
     }
 
-    if let Some(age_node) = obj.get("age") {
+    if let Some((_, age_node)) = obj.iter().find(|(k, _)| matches!(k, Node::Str(s, _, _) if s == "age")) {
         if !matches!(age_node, Node::Number(_)) {
             return Err("Field 'age' must be a number".to_string());
         }
     }
 
-    if let Some(email_node) = obj.get("email") {
-        if let Node::String(email) = email_node {
+    if let Some((_, email_node)) = obj.iter().find(|(k, _)| matches!(k, Node::Str(s, _, _) if s == "email")) {
+        if let Node::Str(email, _0, _1) = email_node {
             if !email.contains('@') {
                 return Err("Field 'email' must be a valid email address".to_string());
             }
@@ -295,14 +295,15 @@ fn get_nested_string<'a>(node: &'a Node, path: &[&str]) -> Option<&'a str> {
     for (i, key) in path.iter().enumerate() {
         match current {
             Node::Mapping(map) => {
-                current = map.get(*key)?;
+                current = map.iter()
+                    .find_map(|(k, v)| if matches!(k, Node::Str(s, _, _) if s == *key) { Some(v) } else { None })?;
             }
             _ => return None,
         }
     }
 
     match current {
-        Node::String(s) => Some(s),
+        Node::Str(s, _0, _1) => Some(s),
         _ => None,
     }
 }
@@ -314,7 +315,8 @@ fn get_nested_number(node: &Node, path: &[&str]) -> Option<i64> {
     for key in path {
         match current {
             Node::Mapping(map) => {
-                current = map.get(*key)?;
+                current = map.iter()
+                    .find_map(|(k, v)| if matches!(k, Node::Str(s, _, _) if s == *key) { Some(v) } else { None })?;
             }
             _ => return None,
         }
