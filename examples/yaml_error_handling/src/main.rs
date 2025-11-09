@@ -7,7 +7,7 @@
 //! - Provide helpful error messages
 //! - Implement defensive programming patterns
 
-use yaml_lib::{get_document, parse, stringify, BufferDestination, BufferSource, FileSource, Node};
+use yaml_lib::{get_document, parse, BufferSource, FileSource, Node};
 
 fn main() {
     println!("=== YAML Error Handling Example ===\n");
@@ -151,25 +151,37 @@ fn validate_user_structure(node: &Node) -> Result<(), String> {
     // Check required fields
     let required_fields = vec!["name", "age", "email"];
     for field in required_fields {
-        if !obj.iter().any(|(k, _)| matches!(k, Node::Str(s, _, _) if s == field)) {
+        if !obj
+            .iter()
+            .any(|(k, _)| matches!(k, Node::Str(s, _, _) if s == field))
+        {
             return Err(format!("Missing required field: {}", field));
         }
     }
 
     // Validate field types
-    if let Some((_, name_node)) = obj.iter().find(|(k, _)| matches!(k, Node::Str(s, _, _) if s == "name")) {
-        if !matches!(name_node, Node::Str(_,_,_)) {
+    if let Some((_, name_node)) = obj
+        .iter()
+        .find(|(k, _)| matches!(k, Node::Str(s, _, _) if s == "name"))
+    {
+        if !matches!(name_node, Node::Str(_, _, _)) {
             return Err("Field 'name' must be a string".to_string());
         }
     }
 
-    if let Some((_, age_node)) = obj.iter().find(|(k, _)| matches!(k, Node::Str(s, _, _) if s == "age")) {
+    if let Some((_, age_node)) = obj
+        .iter()
+        .find(|(k, _)| matches!(k, Node::Str(s, _, _) if s == "age"))
+    {
         if !matches!(age_node, Node::Number(_)) {
             return Err("Field 'age' must be a number".to_string());
         }
     }
 
-    if let Some((_, email_node)) = obj.iter().find(|(k, _)| matches!(k, Node::Str(s, _, _) if s == "email")) {
+    if let Some((_, email_node)) = obj
+        .iter()
+        .find(|(k, _)| matches!(k, Node::Str(s, _, _) if s == "email"))
+    {
         if let Node::Str(email, _0, _1) = email_node {
             if !email.contains('@') {
                 return Err("Field 'email' must be a valid email address".to_string());
@@ -292,11 +304,16 @@ user:
 fn get_nested_string<'a>(node: &'a Node, path: &[&str]) -> Option<&'a str> {
     let mut current = node;
 
-    for (i, key) in path.iter().enumerate() {
+    for key in path.iter() {
         match current {
             Node::Mapping(map) => {
-                current = map.iter()
-                    .find_map(|(k, v)| if matches!(k, Node::Str(s, _, _) if s == *key) { Some(v) } else { None })?;
+                current = map.iter().find_map(|(k, v)| {
+                    if matches!(k, Node::Str(s, _, _) if s == *key) {
+                        Some(v)
+                    } else {
+                        None
+                    }
+                })?;
             }
             _ => return None,
         }
@@ -315,8 +332,13 @@ fn get_nested_number(node: &Node, path: &[&str]) -> Option<i64> {
     for key in path {
         match current {
             Node::Mapping(map) => {
-                current = map.iter()
-                    .find_map(|(k, v)| if matches!(k, Node::Str(s, _, _) if s == *key) { Some(v) } else { None })?;
+                current = map.iter().find_map(|(k, v)| {
+                    if matches!(k, Node::Str(s, _, _) if s == *key) {
+                        Some(v)
+                    } else {
+                        None
+                    }
+                })?;
             }
             _ => return None,
         }
@@ -354,7 +376,13 @@ another_field: another_value
 
             if let Node::Mapping(map) = &node {
                 // Check number field
-                if let Some(num_node) = map.get("number_field") {
+                if let Some(num_node) = map.iter().find_map(|(k, v)| {
+                    if matches!(k, Node::Str(s, _, _) if s == "number_field") {
+                        Some(v)
+                    } else {
+                        None
+                    }
+                }) {
                     match num_node {
                         Node::Number(_) => println!("✓ number_field is valid"),
                         _ => println!("✗ number_field is not a number, using default: 0"),
@@ -362,8 +390,14 @@ another_field: another_value
                 }
 
                 // Check email field
-                if let Some(email_node) = map.get("email_field") {
-                    if let Node::String(email) = email_node {
+                if let Some(email_node) = map.iter().find_map(|(k, v)| {
+                    if matches!(k, Node::Str(s, _, _) if s == "email_field") {
+                        Some(v)
+                    } else {
+                        None
+                    }
+                }) {
+                    if let Node::Str(email, _, _) = email_node {
                         if email.contains('@') {
                             println!("✓ email_field is valid");
                         } else {
