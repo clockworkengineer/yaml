@@ -2,13 +2,15 @@
 resolver = "3"
 members = [
     # New examples (need API fixes to compile):
-    # "examples/yaml_anchors_aliases",
-    # "examples/yaml_advanced_tags",
+
     # "examples/yaml_error_handling",
     # "examples/yaml_multi_document",
-    # "examples/yaml_node_manipulation",
+
     
     # Working examples:
+    "examples/yaml_anchors_aliases",
+    "examples/yaml_node_manipulation",
+    "examples/yaml_advanced_tags",
     "examples/yaml_fibonacci",
     "examples/yaml_parse_and_stringify",
     "examples/yaml_to_bencode",
