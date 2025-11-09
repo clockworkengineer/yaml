@@ -320,7 +320,9 @@ data:
                             Node::Number(_) => "Number",
                             Node::Boolean(_) => "Boolean",
                             Node::Null => "Null",
-                            _ => "Other",
+                            _ => {
+                                "Other"
+                            },
                         };
                         println!("Document {} - Type: {}", i, doc_type);
                         print_node(&doc);
