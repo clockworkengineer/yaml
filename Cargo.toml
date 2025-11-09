@@ -4,7 +4,7 @@ members = [
     # New examples (need API fixes to compile):
 
     # "examples/yaml_error_handling",
-    # "examples/yaml_multi_document",
+     "examples/yaml_multi_document",
 
     
     # Working examples:

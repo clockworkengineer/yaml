@@ -107,7 +107,10 @@ activity:
     let mut source = BufferSource::new(yaml.as_bytes());
     match parse(&mut source) {
         Ok(node) => {
-            println!("Total documents: {}", get_number_of_documents(&node));
+            match get_number_of_documents(&node) {
+                Ok(count) => println!("Total documents: {}", count),
+                Err(e) => eprintln!("Error counting documents: {}", e),
+            };
 
             // Access specific documents
             println!("\nAccessing Document 0 (User Data):");
@@ -191,7 +194,10 @@ logging:
     match parse(&mut source) {
         Ok(node) => {
             let count = get_number_of_documents(&node);
-            println!("Loaded {} environment configurations", count);
+            match count {
+                Ok(count) => println!("Loaded {} environment configurations", count),
+                Err(e) => eprintln!("Error counting documents: {}", e)
+            }
 
             let environments = vec!["development", "staging", "production"];
             for (i, env) in environments.iter().enumerate() {
@@ -249,15 +255,20 @@ records:
     let mut source = BufferSource::new(yaml.as_bytes());
     match parse(&mut source) {
         Ok(node) => {
-            let count = get_number_of_documents(&node);
-            println!("Processing {} data batches\n", count);
+            let doc_count = get_number_of_documents(&node);
+            match doc_count {
+                Ok(num) => {
+                    println!("Processing {} data batches\n", num);
 
-            for i in 0..count {
-                println!("Batch {}:", i + 1);
-                if let Ok(doc) = get_document(&node, i) {
-                    print_node(&doc);
-                }
-                println!();
+                    for i in 0..num {
+                        println!("Batch {}:", i + 1);
+                        if let Ok(doc) = get_document(&node, i) {
+                            print_node(&doc);
+                        }
+                        println!();
+                    }
+                },
+                Err(e) => eprintln!("Error counting documents: {}", e)
             }
         }
         Err(e) => eprintln!("Parse error: {}", e),
@@ -307,19 +318,23 @@ data:
     let mut source = BufferSource::new(yaml.as_bytes());
     match parse(&mut source) {
         Ok(node) => {
-            let count = get_number_of_documents(&node);
-            println!("Parsed {} documents of different types\n", count);
+            let doc_count = get_number_of_documents(&node);
+            match &doc_count {
+                Ok(count) => println!("Parsed {} documents of different types\n", count),
+                Err(e) => eprintln!("Error counting documents: {}", e),
+            }
 
-            for i in 0..count {
-                match get_document(&node, i) {
+            if let Ok(num) = doc_count {
+                for i in 0..num {
+                    match get_document(&node, i) {
                     Ok(doc) => {
                         let doc_type = match &doc {
-                            Node::Object(_) => "Mapping",
+                            Node::Mapping(_) => "Mapping",
                             Node::Array(_) => "Sequence",
-                            Node::String(_) => "String",
+                            Node::Str(_,_,_) => "String",
                             Node::Number(_) => "Number",
                             Node::Boolean(_) => "Boolean",
-                            Node::Null => "Null",
+                            Node::None => "Null",
                             _ => {
                                 "Other"
                             },
@@ -329,6 +344,7 @@ data:
                         println!();
                     }
                     Err(e) => eprintln!("Error accessing document {}: {}", i, e),
+                }
                 }
             }
         }
