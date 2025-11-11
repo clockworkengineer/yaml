@@ -45,7 +45,7 @@ mod tests {
     use crate::parse;
     #[test]
     fn test_get_version_env() {
-        assert_eq!(get_version(), "0.1.0");
+        assert_eq!(get_version(), "0.1.6");
     }
     #[test]
     fn test_get_number_of_documents() {

@@ -1,6 +1,6 @@
 [package]
 name = "yaml_to_bencode"
-version = "0.1.0"
+version = "0.1.6"
 edition = "2024"
 
 [dependencies]
