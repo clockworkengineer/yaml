@@ -708,7 +708,7 @@ impl Node {
     /// let bool_node = Node::from(true);
     /// assert!(bool_node.is_boolean());
     /// let number = Node::from(42);
-    /// assert!(!bool_node.is_boolean());
+    /// assert!(!number.is_boolean());
     /// ```
     pub fn is_boolean(&self) -> bool {
         matches!(self, Node::Boolean(_))
@@ -882,7 +882,7 @@ impl Node {
     ///     count += 1;
     ///     true // continue traversal
     /// });
-    /// assert_eq!(count, 4); // root array + 1 + nested array + 2 + 3
+    /// assert_eq!(count, 5); // root array + 1 + nested array + 2 + 3
     /// ```
     pub fn visit<F>(&self, mut visitor: F)
     where
@@ -936,10 +936,14 @@ impl Node {
     /// # Example
     /// ```
     /// # use yaml_lib::Node;
+    /// # use yaml_lib::Numeric;
     /// let mut doc = Node::Array(vec![Node::from(1), Node::from(2)]);
     /// doc.visit_mut(|node, _depth| {
-    ///     if let Node::Number(ref mut n) = node {
-    ///         *n = (*n).clone(); // Could modify number here
+    ///     if let Node::Number(n) = node {
+    ///         // Could modify number here
+    ///         if let Numeric::Int32(val) = n {
+    ///             *val *= 2; // Double the value
+    ///         }
     ///     }
     ///     true
     /// });
