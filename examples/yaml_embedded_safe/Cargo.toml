@@ -1,0 +1,8 @@
+[package]
+name = "yaml_embedded_safe"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+
+[dependencies]
+yaml_lib = { path = "../../library", features = ["embedded", "alloc"] }

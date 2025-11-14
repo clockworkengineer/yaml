@@ -13,5 +13,6 @@ members = [
     "examples/yaml_to_toml",
     "examples/yaml_to_xml",
     "examples/yaml_utility_lib",
+    "examples/yaml_embedded_safe",
     "library",
 ]

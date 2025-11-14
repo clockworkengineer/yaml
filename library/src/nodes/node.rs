@@ -7,7 +7,7 @@ use std::ops::{Index, IndexMut};
 use core::ops::{Index, IndexMut};
 
 /// Represents different numeric types that can be stored in a YAML node
-/// 
+///
 /// For embedded systems, consider using smaller numeric types (i32/f32)
 /// to reduce memory footprint. The full enum provides maximum flexibility.
 #[derive(Clone, Debug, PartialEq)]
@@ -234,10 +234,10 @@ impl From<i8> for Numeric {
 #[cfg(feature = "embedded")]
 impl Numeric {
     /// Convert to i32, recommended for embedded systems
-    /// 
+    ///
     /// This method provides safe conversion of all numeric types to i32,
     /// which is typically the most efficient integer type on 32-bit embedded platforms.
-    /// 
+    ///
     /// Returns None if the value cannot fit in an i32.
     pub fn to_i32(&self) -> Option<i32> {
         match self {
@@ -260,10 +260,10 @@ impl Numeric {
     }
 
     /// Convert to f32, recommended for embedded systems
-    /// 
+    ///
     /// This method provides conversion of all numeric types to f32,
     /// which is typically the most efficient floating-point type on embedded platforms.
-    /// 
+    ///
     /// Note: Conversion from 64-bit types may lose precision.
     pub fn to_f32(&self) -> f32 {
         match self {
@@ -280,14 +280,14 @@ impl Numeric {
     }
 
     /// Check if this numeric value fits in i32 range
-    /// 
+    ///
     /// Returns true if the value can be safely converted to i32 without loss.
     pub fn fits_in_i32(&self) -> bool {
         self.to_i32().is_some()
     }
 
     /// Get the memory size of this numeric variant in bytes
-    /// 
+    ///
     /// Useful for memory accounting in embedded systems.
     pub fn size_bytes(&self) -> usize {
         match self {
@@ -379,6 +379,141 @@ impl From<bool> for Node {
 impl From<alloc::string::String> for Node {
     fn from(value: alloc::string::String) -> Self {
         Node::Str(value, QuoteType::Unquoted, BlockStyle::None)
+    }
+}
+
+/// Safe indexing and access methods for Node (embedded-safe, panic-free)
+#[cfg(feature = "embedded")]
+impl Node {
+    /// Safely get an array element by index without panicking
+    ///
+    /// Returns None if the index is out of bounds or if the node is not an array/set.
+    /// This is the recommended method for embedded systems to avoid panics.
+    pub fn get(&self, index: usize) -> Option<&Node> {
+        match self {
+            Node::Array(arr) => arr.get(index),
+            Node::Set(set) => set.get(index),
+            _ => None,
+        }
+    }
+
+    /// Safely get a mapping value by key without panicking
+    ///
+    /// Returns None if the key doesn't exist or if the node is not a mapping.
+    /// This is the recommended method for embedded systems to avoid panics.
+    pub fn get_key(&self, key: &str) -> Option<&Node> {
+        match self {
+            Node::Mapping(pairs) => {
+                for (k, v) in pairs {
+                    if let Node::Str(s, _, _) = k {
+                        if s == key {
+                            return Some(v);
+                        }
+                    }
+                }
+                None
+            }
+            _ => None,
+        }
+    }
+
+    /// Safely get a mutable array element by index without panicking
+    ///
+    /// Returns None if the index is out of bounds or if the node is not an array/set.
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut Node> {
+        match self {
+            Node::Array(arr) => arr.get_mut(index),
+            Node::Set(set) => set.get_mut(index),
+            _ => None,
+        }
+    }
+
+    /// Safely get a mutable mapping value by key without panicking
+    ///
+    /// Returns None if the key doesn't exist or if the node is not a mapping.
+    pub fn get_key_mut(&mut self, key: &str) -> Option<&mut Node> {
+        match self {
+            Node::Mapping(pairs) => {
+                for (k, v) in pairs.iter_mut() {
+                    if let Node::Str(s, _, _) = k {
+                        if s == key {
+                            return Some(v);
+                        }
+                    }
+                }
+                None
+            }
+            _ => None,
+        }
+    }
+
+    /// Check if this node is an array or set
+    pub fn is_sequence(&self) -> bool {
+        matches!(self, Node::Array(_) | Node::Set(_))
+    }
+
+    /// Check if this node is a mapping
+    pub fn is_mapping(&self) -> bool {
+        matches!(self, Node::Mapping(_))
+    }
+
+    /// Get the length of an array, set, or mapping
+    ///
+    /// Returns None if the node is not a collection type.
+    pub fn len(&self) -> Option<usize> {
+        match self {
+            Node::Array(arr) => Some(arr.len()),
+            Node::Set(set) => Some(set.len()),
+            Node::Mapping(pairs) => Some(pairs.len()),
+            _ => None,
+        }
+    }
+
+    /// Check if a collection is empty
+    ///
+    /// Returns true if the node is a collection and is empty, false otherwise.
+    pub fn is_empty(&self) -> bool {
+        self.len().map_or(false, |l| l == 0)
+    }
+
+    /// Safely convert a numeric node to i32
+    ///
+    /// Returns None if the node is not numeric or if conversion fails.
+    pub fn as_i32(&self) -> Option<i32> {
+        match self {
+            Node::Number(num) => num.to_i32(),
+            _ => None,
+        }
+    }
+
+    /// Safely convert a numeric node to f32
+    ///
+    /// Returns None if the node is not numeric.
+    pub fn as_f32(&self) -> Option<f32> {
+        match self {
+            Node::Number(num) => Some(num.to_f32()),
+            _ => None,
+        }
+    }
+
+    /// Safely get a string value from a string node
+    ///
+    /// Returns None if the node is not a string.
+    pub fn as_str(&self) -> Option<&str> {
+        match self {
+            Node::Str(s, _, _) => Some(s.as_str()),
+            _ => None,
+        }
+    }
+
+    /// Safely get a boolean value
+    ///
+    /// Returns None if the node is not a boolean.
+    pub fn as_bool(&self) -> Option<bool> {
+        match self {
+            Node::Boolean(b) => Some(*b),
+            _ => None,
+        }
     }
 }
 

@@ -129,6 +129,109 @@ pub fn check_anchor_count(count: usize) -> Result<(), LimitError> {
     }
 }
 
+/// Validates a Node structure against embedded system limits
+///
+/// This validator recursively checks a Node tree to ensure it stays within
+/// the configured limits for embedded systems.
+#[cfg(feature = "alloc")]
+pub struct NodeValidator {
+    max_depth_seen: usize,
+    anchor_count: usize,
+}
+
+#[cfg(feature = "alloc")]
+impl NodeValidator {
+    /// Create a new validator
+    pub fn new() -> Self {
+        Self {
+            max_depth_seen: 0,
+            anchor_count: 0,
+        }
+    }
+
+    /// Validate a node and all its children
+    ///
+    /// Returns Ok(()) if the node structure is valid, or the first LimitError encountered.
+    pub fn validate(&mut self, node: &crate::nodes::node::Node) -> Result<(), LimitError> {
+        self.validate_recursive(node, 0)
+    }
+
+    fn validate_recursive(
+        &mut self,
+        node: &crate::nodes::node::Node,
+        depth: usize,
+    ) -> Result<(), LimitError> {
+        check_nesting_depth(depth)?;
+
+        if depth > self.max_depth_seen {
+            self.max_depth_seen = depth;
+        }
+
+        match node {
+            crate::nodes::node::Node::Str(s, _, _) => {
+                check_string_length(s.len())?;
+            }
+            crate::nodes::node::Node::Array(items) => {
+                check_sequence_items(items.len())?;
+                for item in items {
+                    self.validate_recursive(item, depth + 1)?;
+                }
+            }
+            crate::nodes::node::Node::Set(items) => {
+                check_sequence_items(items.len())?;
+                for item in items {
+                    self.validate_recursive(item, depth + 1)?;
+                }
+            }
+            crate::nodes::node::Node::Mapping(pairs) => {
+                check_mapping_pairs(pairs.len())?;
+                for (key, value) in pairs {
+                    self.validate_recursive(key, depth + 1)?;
+                    self.validate_recursive(value, depth + 1)?;
+                }
+            }
+            crate::nodes::node::Node::Anchored(inner, _) => {
+                self.anchor_count += 1;
+                check_anchor_count(self.anchor_count)?;
+                self.validate_recursive(inner, depth)?;
+            }
+            crate::nodes::node::Node::Tagged(inner, _) => {
+                self.validate_recursive(inner, depth)?;
+            }
+            crate::nodes::node::Node::Document(nodes) => {
+                for node in nodes {
+                    self.validate_recursive(node, depth + 1)?;
+                }
+            }
+            crate::nodes::node::Node::Documents(docs) => {
+                for doc in docs {
+                    self.validate_recursive(doc, depth + 1)?;
+                }
+            }
+            _ => {} // Boolean, Number, None, Comment, Alias don't need validation
+        }
+
+        Ok(())
+    }
+
+    /// Get the maximum nesting depth seen during validation
+    pub fn max_depth(&self) -> usize {
+        self.max_depth_seen
+    }
+
+    /// Get the number of anchors counted during validation
+    pub fn anchor_count(&self) -> usize {
+        self.anchor_count
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl Default for NodeValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
