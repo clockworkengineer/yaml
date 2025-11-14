@@ -1,0 +1,11 @@
+[package]
+name = "yaml_embedded_systems"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+yaml_lib = { path = "../../library", default-features = false, features = ["embedded", "alloc"] }
+
+[features]
+default = ["std"]
+std = ["yaml_lib/std"]

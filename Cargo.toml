@@ -14,5 +14,9 @@ members = [
     "examples/yaml_to_xml",
     "examples/yaml_utility_lib",
     "examples/yaml_embedded_safe",
+    "examples/yaml_safe_access",
+    "examples/yaml_performance",
+    "examples/yaml_tree_traversal",
+    "examples/yaml_embedded_systems",
     "library",
 ]
