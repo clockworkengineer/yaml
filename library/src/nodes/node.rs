@@ -845,4 +845,224 @@ mod tests {
             _ => panic!("Expected Set node"),
         }
     }
+
+    // Embedded feature tests
+    #[test]
+    #[cfg(feature = "embedded")]
+    fn test_numeric_to_i32() {
+        let num_i32 = Numeric::Int32(42);
+        assert_eq!(num_i32.to_i32(), Some(42));
+
+        let num_i64 = Numeric::Integer(1000);
+        assert_eq!(num_i64.to_i32(), Some(1000));
+
+        let num_large = Numeric::Integer(i64::MAX);
+        assert_eq!(num_large.to_i32(), None);
+
+        let num_float = Numeric::Float(42.7);
+        assert_eq!(num_float.to_i32(), Some(42));
+
+        let num_byte = Numeric::Byte(255);
+        assert_eq!(num_byte.to_i32(), Some(255));
+    }
+
+    #[test]
+    #[cfg(feature = "embedded")]
+    fn test_numeric_to_f32() {
+        let num_i32 = Numeric::Int32(42);
+        assert_eq!(num_i32.to_f32(), 42.0f32);
+
+        let num_float = Numeric::Float(3.14159);
+        assert!((num_float.to_f32() - 3.14159f32).abs() < 0.0001);
+
+        let num_i64 = Numeric::Integer(1000);
+        assert_eq!(num_i64.to_f32(), 1000.0f32);
+    }
+
+    #[test]
+    #[cfg(feature = "embedded")]
+    fn test_numeric_fits_in_i32() {
+        assert!(Numeric::Int32(42).fits_in_i32());
+        assert!(Numeric::Integer(1000).fits_in_i32());
+        assert!(!Numeric::Integer(i64::MAX).fits_in_i32());
+        assert!(Numeric::Float(100.5).fits_in_i32());
+        assert!(Numeric::Byte(255).fits_in_i32());
+        assert!(Numeric::Int16(1000).fits_in_i32());
+    }
+
+    #[test]
+    #[cfg(feature = "embedded")]
+    fn test_numeric_size_bytes() {
+        assert_eq!(Numeric::Integer(0).size_bytes(), 8);
+        assert_eq!(Numeric::Float(0.0).size_bytes(), 8);
+        assert_eq!(Numeric::UInteger(0).size_bytes(), 8);
+        assert_eq!(Numeric::Int32(0).size_bytes(), 4);
+        assert_eq!(Numeric::UInt32(0).size_bytes(), 4);
+        assert_eq!(Numeric::Int16(0).size_bytes(), 2);
+        assert_eq!(Numeric::UInt16(0).size_bytes(), 2);
+        assert_eq!(Numeric::Byte(0).size_bytes(), 1);
+        assert_eq!(Numeric::Int8(0).size_bytes(), 1);
+    }
+
+    #[test]
+    #[cfg(feature = "embedded")]
+    fn test_node_get_safe() {
+        let arr = Node::Array(vec![
+            Node::Number(Numeric::Int32(1)),
+            Node::Number(Numeric::Int32(2)),
+            Node::Number(Numeric::Int32(3)),
+        ]);
+
+        assert_eq!(arr.get(0), Some(&Node::Number(Numeric::Int32(1))));
+        assert_eq!(arr.get(1), Some(&Node::Number(Numeric::Int32(2))));
+        assert_eq!(arr.get(2), Some(&Node::Number(Numeric::Int32(3))));
+        assert_eq!(arr.get(3), None);
+
+        let not_array = Node::Boolean(true);
+        assert_eq!(not_array.get(0), None);
+    }
+
+    #[test]
+    #[cfg(feature = "embedded")]
+    fn test_node_get_key_safe() {
+        let mut pairs = alloc::vec::Vec::new();
+        pairs.push((
+            Node::Str("name".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            Node::Str("test".to_string(), QuoteType::Unquoted, BlockStyle::None),
+        ));
+        pairs.push((
+            Node::Str("age".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            Node::Number(Numeric::Int32(42)),
+        ));
+        let mapping = Node::Mapping(pairs);
+
+        assert_eq!(
+            mapping.get_key("name"),
+            Some(&Node::Str("test".to_string(), QuoteType::Unquoted, BlockStyle::None))
+        );
+        assert_eq!(
+            mapping.get_key("age"),
+            Some(&Node::Number(Numeric::Int32(42)))
+        );
+        assert_eq!(mapping.get_key("nonexistent"), None);
+
+        let not_mapping = Node::Boolean(true);
+        assert_eq!(not_mapping.get_key("key"), None);
+    }
+
+    #[test]
+    #[cfg(feature = "embedded")]
+    fn test_node_get_mut_safe() {
+        let mut arr = Node::Array(vec![
+            Node::Number(Numeric::Int32(1)),
+            Node::Number(Numeric::Int32(2)),
+        ]);
+
+        if let Some(node) = arr.get_mut(0) {
+            *node = Node::Number(Numeric::Int32(99));
+        }
+
+        assert_eq!(arr.get(0), Some(&Node::Number(Numeric::Int32(99))));
+        assert_eq!(arr.get_mut(10), None);
+    }
+
+    #[test]
+    #[cfg(feature = "embedded")]
+    fn test_node_is_sequence() {
+        let arr = Node::Array(vec![Node::None]);
+        let set = Node::Set(vec![Node::None]);
+        let mapping = Node::Mapping(vec![]);
+        let boolean = Node::Boolean(true);
+
+        assert!(arr.is_sequence());
+        assert!(set.is_sequence());
+        assert!(!mapping.is_sequence());
+        assert!(!boolean.is_sequence());
+    }
+
+    #[test]
+    #[cfg(feature = "embedded")]
+    fn test_node_is_mapping() {
+        let mapping = Node::Mapping(vec![]);
+        let arr = Node::Array(vec![]);
+        let boolean = Node::Boolean(true);
+
+        assert!(mapping.is_mapping());
+        assert!(!arr.is_mapping());
+        assert!(!boolean.is_mapping());
+    }
+
+    #[test]
+    #[cfg(feature = "embedded")]
+    fn test_node_len() {
+        let arr = Node::Array(vec![Node::None, Node::None, Node::None]);
+        let set = Node::Set(vec![Node::None, Node::None]);
+        let mapping = Node::Mapping(vec![]);
+        let boolean = Node::Boolean(true);
+
+        assert_eq!(arr.len(), Some(3));
+        assert_eq!(set.len(), Some(2));
+        assert_eq!(mapping.len(), Some(0));
+        assert_eq!(boolean.len(), None);
+    }
+
+    #[test]
+    #[cfg(feature = "embedded")]
+    fn test_node_is_empty() {
+        let arr_empty = Node::Array(vec![]);
+        let arr_full = Node::Array(vec![Node::None]);
+        let mapping_empty = Node::Mapping(vec![]);
+        let boolean = Node::Boolean(true);
+
+        assert!(arr_empty.is_empty());
+        assert!(!arr_full.is_empty());
+        assert!(mapping_empty.is_empty());
+        assert!(!boolean.is_empty());
+    }
+
+    #[test]
+    #[cfg(feature = "embedded")]
+    fn test_node_as_i32() {
+        let num = Node::Number(Numeric::Int32(42));
+        let large = Node::Number(Numeric::Integer(i64::MAX));
+        let string = Node::Str("test".to_string(), QuoteType::Unquoted, BlockStyle::None);
+
+        assert_eq!(num.as_i32(), Some(42));
+        assert_eq!(large.as_i32(), None);
+        assert_eq!(string.as_i32(), None);
+    }
+
+    #[test]
+    #[cfg(feature = "embedded")]
+    fn test_node_as_f32() {
+        let num = Node::Number(Numeric::Float(3.14));
+        let int = Node::Number(Numeric::Int32(42));
+        let string = Node::Str("test".to_string(), QuoteType::Unquoted, BlockStyle::None);
+
+        assert!((num.as_f32().unwrap() - 3.14f32).abs() < 0.01);
+        assert_eq!(int.as_f32(), Some(42.0f32));
+        assert_eq!(string.as_f32(), None);
+    }
+
+    #[test]
+    #[cfg(feature = "embedded")]
+    fn test_node_as_str() {
+        let string = Node::Str("test".to_string(), QuoteType::Unquoted, BlockStyle::None);
+        let number = Node::Number(Numeric::Int32(42));
+
+        assert_eq!(string.as_str(), Some("test"));
+        assert_eq!(number.as_str(), None);
+    }
+
+    #[test]
+    #[cfg(feature = "embedded")]
+    fn test_node_as_bool() {
+        let bool_true = Node::Boolean(true);
+        let bool_false = Node::Boolean(false);
+        let number = Node::Number(Numeric::Int32(42));
+
+        assert_eq!(bool_true.as_bool(), Some(true));
+        assert_eq!(bool_false.as_bool(), Some(false));
+        assert_eq!(number.as_bool(), None);
+    }
 }

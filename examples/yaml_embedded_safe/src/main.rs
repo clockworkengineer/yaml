@@ -7,7 +7,7 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 use yaml_lib::embedded::limits::{LimitError, NodeValidator};
-use yaml_lib::{Node, Numeric, parse, BufferSource};
+use yaml_lib::{parse, BufferSource, Node, Numeric};
 
 fn main() {
     println!("=== Embedded-Safe YAML Example ===\n");
@@ -56,7 +56,7 @@ config:
                     _ => break,
                 }
             }
-            
+
             // Safe key access - returns Option instead of panicking
             if let Some(name) = node.get_key("name") {
                 if let Some(name_str) = name.as_str() {

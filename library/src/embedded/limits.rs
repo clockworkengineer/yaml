@@ -292,4 +292,201 @@ mod tests {
             }
         );
     }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_node_validator_simple_node() {
+        use crate::nodes::node::{Node, Numeric};
+        let node = Node::Number(Numeric::Int32(42));
+        let mut validator = NodeValidator::new();
+        assert!(validator.validate(&node).is_ok());
+        assert_eq!(validator.max_depth(), 0);
+        assert_eq!(validator.anchor_count(), 0);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_node_validator_array() {
+        use crate::nodes::node::{Node, Numeric};
+        let arr = Node::Array(vec![
+            Node::Number(Numeric::Int32(1)),
+            Node::Number(Numeric::Int32(2)),
+            Node::Number(Numeric::Int32(3)),
+        ]);
+        let mut validator = NodeValidator::new();
+        assert!(validator.validate(&arr).is_ok());
+        assert_eq!(validator.max_depth(), 1);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_node_validator_mapping() {
+        use crate::nodes::node::{Node, Numeric, QuoteType, BlockStyle};
+        let mapping = Node::Mapping(vec![
+            (
+                Node::Str("key1".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Number(Numeric::Int32(1)),
+            ),
+            (
+                Node::Str("key2".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Number(Numeric::Int32(2)),
+            ),
+        ]);
+        let mut validator = NodeValidator::new();
+        assert!(validator.validate(&mapping).is_ok());
+        assert_eq!(validator.max_depth(), 1);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_node_validator_nested_structure() {
+        use crate::nodes::node::{Node, Numeric};
+        let nested = Node::Array(vec![
+            Node::Array(vec![Node::Number(Numeric::Int32(1))]),
+            Node::Array(vec![Node::Number(Numeric::Int32(2))]),
+        ]);
+        let mut validator = NodeValidator::new();
+        assert!(validator.validate(&nested).is_ok());
+        assert_eq!(validator.max_depth(), 2);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_node_validator_excessive_nesting() {
+        use crate::nodes::node::Node;
+        let mut deep = Node::None;
+        for _ in 0..35 {
+            deep = Node::Array(alloc::vec![deep]);
+        }
+        let mut validator = NodeValidator::new();
+        let result = validator.validate(&deep);
+        assert!(result.is_err());
+        match result {
+            Err(LimitError::NestingDepthExceeded { current, max }) => {
+                assert!(current > max);
+                assert_eq!(max, MAX_NESTING_DEPTH);
+            }
+            _ => panic!("Expected NestingDepthExceeded error"),
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_node_validator_long_string() {
+        use crate::nodes::node::{Node, QuoteType, BlockStyle};
+        let long_str = "x".repeat(MAX_STRING_LENGTH + 1);
+        let node = Node::Str(long_str.clone(), QuoteType::Unquoted, BlockStyle::None);
+        let mut validator = NodeValidator::new();
+        let result = validator.validate(&node);
+        assert!(result.is_err());
+        match result {
+            Err(LimitError::StringLengthExceeded { current, max }) => {
+                assert_eq!(current, long_str.len());
+                assert_eq!(max, MAX_STRING_LENGTH);
+            }
+            _ => panic!("Expected StringLengthExceeded error"),
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_node_validator_too_many_sequence_items() {
+        use crate::nodes::node::{Node, Numeric};
+        let mut items = alloc::vec::Vec::new();
+        for i in 0..=(MAX_SEQUENCE_ITEMS + 1) {
+            items.push(Node::Number(Numeric::Int32(i as i32)));
+        }
+        let arr = Node::Array(items);
+        let mut validator = NodeValidator::new();
+        let result = validator.validate(&arr);
+        assert!(result.is_err());
+        match result {
+            Err(LimitError::SequenceItemsExceeded { current, max }) => {
+                assert!(current > max);
+                assert_eq!(max, MAX_SEQUENCE_ITEMS);
+            }
+            _ => panic!("Expected SequenceItemsExceeded error"),
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_node_validator_too_many_mapping_pairs() {
+        use crate::nodes::node::{Node, Numeric, QuoteType, BlockStyle};
+        let mut pairs = alloc::vec::Vec::new();
+        for i in 0..=(MAX_MAPPING_PAIRS + 1) {
+            pairs.push((
+                Node::Str(format!("key{}", i), QuoteType::Unquoted, BlockStyle::None),
+                Node::Number(Numeric::Int32(i as i32)),
+            ));
+        }
+        let mapping = Node::Mapping(pairs);
+        let mut validator = NodeValidator::new();
+        let result = validator.validate(&mapping);
+        assert!(result.is_err());
+        match result {
+            Err(LimitError::MappingPairsExceeded { current, max }) => {
+                assert!(current > max);
+                assert_eq!(max, MAX_MAPPING_PAIRS);
+            }
+            _ => panic!("Expected MappingPairsExceeded error"),
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_node_validator_anchors() {
+        use crate::nodes::node::{Node, Numeric};
+        let anchored = Node::Anchored(
+            alloc::boxed::Box::new(Node::Number(Numeric::Int32(42))),
+            "anchor1".to_string(),
+        );
+        let mut validator = NodeValidator::new();
+        assert!(validator.validate(&anchored).is_ok());
+        assert_eq!(validator.anchor_count(), 1);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_node_validator_too_many_anchors() {
+        use crate::nodes::node::{Node, Numeric};
+        let mut node = Node::None;
+        for i in 0..=(MAX_ANCHORS + 1) {
+            node = Node::Anchored(
+                alloc::boxed::Box::new(node),
+                format!("anchor{}", i),
+            );
+        }
+        let mut validator = NodeValidator::new();
+        let result = validator.validate(&node);
+        assert!(result.is_err());
+        match result {
+            Err(LimitError::AnchorsExceeded { current, max }) => {
+                assert!(current > max);
+                assert_eq!(max, MAX_ANCHORS);
+            }
+            _ => panic!("Expected AnchorsExceeded error"),
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_node_validator_documents() {
+        use crate::nodes::node::{Node, Numeric};
+        let docs = Node::Documents(vec![
+            Node::Number(Numeric::Int32(1)),
+            Node::Number(Numeric::Int32(2)),
+        ]);
+        let mut validator = NodeValidator::new();
+        assert!(validator.validate(&docs).is_ok());
+        assert_eq!(validator.max_depth(), 1);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_node_validator_default() {
+        let validator = NodeValidator::default();
+        assert_eq!(validator.max_depth(), 0);
+        assert_eq!(validator.anchor_count(), 0);
+    }
 }
