@@ -28,7 +28,7 @@ extern crate alloc;
 /// Module containing constants for the library
 mod constants;
 /// Module defining error types and handling for YAML operations.
-mod error;
+pub mod error;
 /// Module for detecting and handling different Unicode text file formats
 #[cfg(feature = "file-io")]
 mod file;
