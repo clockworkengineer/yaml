@@ -97,6 +97,17 @@ pub use parser::document::parse;
 pub use parser::config::ParserConfig;
 /// Parser configuration builder
 pub use parser::config::ParserConfigBuilder;
+/// Document statistics for performance analysis
+pub use utils::performance::DocumentStats;
+/// Simple timer for measuring operation duration
+#[cfg(feature = "std")]
+pub use utils::performance::Timer;
+/// Performance profiler for measuring multiple operations
+#[cfg(all(feature = "std", feature = "alloc"))]
+pub use utils::performance::Profiler;
+/// Utility to compare performance of different approaches
+#[cfg(feature = "std")]
+pub use utils::performance::compare_performance;
 /// Converts a Node tree to bencode format
 #[cfg(feature = "format-converters")]
 pub use stringify::bencode::stringify as to_bencode;

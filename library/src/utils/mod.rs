@@ -1,5 +1,8 @@
 //! Module: utils/mod.rs
 
+/// Performance measurement and optimization utilities
+pub mod performance;
+
 use crate::constants::{CHAR_HASH, CHAR_NEWLINE};
 use crate::io::traits::ISource;
 use crate::{Node, Numeric};
