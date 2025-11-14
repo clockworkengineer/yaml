@@ -714,6 +714,36 @@ impl Node {
         matches!(self, Node::Boolean(_))
     }
 
+    /// Alias for is_string() for consistency with as_str()
+    ///
+    /// Returns true for Node::Str variants.
+    pub fn is_str(&self) -> bool {
+        self.is_string()
+    }
+
+    /// Check if this node is an array
+    ///
+    /// Returns true for Node::Array variants.
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let array = Node::Array(vec![Node::from(1)]);
+    /// assert!(array.is_array());
+    /// let number = Node::from(42);
+    /// assert!(!number.is_array());
+    /// ```
+    pub fn is_array(&self) -> bool {
+        matches!(self, Node::Array(_))
+    }
+
+    /// Check if this node is a set
+    ///
+    /// Returns true for Node::Set variants.
+    pub fn is_set(&self) -> bool {
+        matches!(self, Node::Set(_))
+    }
+
     /// Check if this node is None (null)
     ///
     /// Returns true for Node::None variants.
@@ -813,6 +843,366 @@ impl Node {
                 })
                 .collect(),
             _ => alloc::vec::Vec::new(),
+        }
+    }
+
+    // ==================== Tree Traversal Methods ====================
+
+    /// Iterate over all immediate child nodes
+    ///
+    /// Returns an iterator over references to child nodes. Does not recurse.
+    /// For recursive traversal, use `visit()` or `iter_all()`.
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let array = Node::Array(vec![Node::from(1), Node::from(2)]);
+    /// let children: Vec<_> = array.children().collect();
+    /// assert_eq!(children.len(), 2);
+    /// ```
+    pub fn children(&self) -> NodeChildIterator {
+        NodeChildIterator::new(self)
+    }
+
+    /// Visit all nodes in the tree with a closure (depth-first, pre-order)
+    ///
+    /// The closure receives a reference to each node and its depth in the tree.
+    /// Root node is at depth 0. Returns early if the closure returns false.
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let doc = Node::Array(vec![
+    ///     Node::from(1),
+    ///     Node::Array(vec![Node::from(2), Node::from(3)])
+    /// ]);
+    ///
+    /// let mut count = 0;
+    /// doc.visit(|node, depth| {
+    ///     count += 1;
+    ///     true // continue traversal
+    /// });
+    /// assert_eq!(count, 4); // root array + 1 + nested array + 2 + 3
+    /// ```
+    pub fn visit<F>(&self, mut visitor: F)
+    where
+        F: FnMut(&Node, usize) -> bool,
+    {
+        self.visit_internal(&mut visitor, 0);
+    }
+
+    fn visit_internal<F>(&self, visitor: &mut F, depth: usize) -> bool
+    where
+        F: FnMut(&Node, usize) -> bool,
+    {
+        // Visit this node first (pre-order)
+        if !visitor(self, depth) {
+            return false;
+        }
+
+        // Then visit children
+        match self {
+            Node::Array(items) | Node::Set(items) | Node::Document(items) | Node::Documents(items) => {
+                for item in items {
+                    if !item.visit_internal(visitor, depth + 1) {
+                        return false;
+                    }
+                }
+            }
+            Node::Mapping(pairs) => {
+                for (key, value) in pairs {
+                    if !key.visit_internal(visitor, depth + 1) {
+                        return false;
+                    }
+                    if !value.visit_internal(visitor, depth + 1) {
+                        return false;
+                    }
+                }
+            }
+            Node::Anchored(inner, _) | Node::Tagged(inner, _) => {
+                return inner.visit_internal(visitor, depth + 1);
+            }
+            _ => {}
+        }
+
+        true
+    }
+
+    /// Visit all nodes in the tree with mutable access (depth-first, pre-order)
+    ///
+    /// The closure receives a mutable reference to each node and its depth.
+    /// Allows modification of nodes during traversal.
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let mut doc = Node::Array(vec![Node::from(1), Node::from(2)]);
+    /// doc.visit_mut(|node, _depth| {
+    ///     if let Node::Number(ref mut n) = node {
+    ///         *n = (*n).clone(); // Could modify number here
+    ///     }
+    ///     true
+    /// });
+    /// ```
+    pub fn visit_mut<F>(&mut self, mut visitor: F)
+    where
+        F: FnMut(&mut Node, usize) -> bool,
+    {
+        self.visit_mut_internal(&mut visitor, 0);
+    }
+
+    fn visit_mut_internal<F>(&mut self, visitor: &mut F, depth: usize) -> bool
+    where
+        F: FnMut(&mut Node, usize) -> bool,
+    {
+        // Visit this node first (pre-order)
+        if !visitor(self, depth) {
+            return false;
+        }
+
+        // Then visit children
+        match self {
+            Node::Array(items) | Node::Set(items) | Node::Document(items) | Node::Documents(items) => {
+                for item in items {
+                    if !item.visit_mut_internal(visitor, depth + 1) {
+                        return false;
+                    }
+                }
+            }
+            Node::Mapping(pairs) => {
+                for (key, value) in pairs {
+                    if !key.visit_mut_internal(visitor, depth + 1) {
+                        return false;
+                    }
+                    if !value.visit_mut_internal(visitor, depth + 1) {
+                        return false;
+                    }
+                }
+            }
+            Node::Anchored(inner, _) | Node::Tagged(inner, _) => {
+                return inner.visit_mut_internal(visitor, depth + 1);
+            }
+            _ => {}
+        }
+
+        true
+    }
+
+    /// Count all nodes in the tree (including this node)
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let doc = Node::Array(vec![
+    ///     Node::from(1),
+    ///     Node::Array(vec![Node::from(2)])
+    /// ]);
+    /// assert_eq!(doc.count_nodes(), 4); // array + 1 + nested array + 2
+    /// ```
+    pub fn count_nodes(&self) -> usize {
+        let mut count = 0;
+        self.visit(|_, _| {
+            count += 1;
+            true
+        });
+        count
+    }
+
+    /// Find the maximum depth of the tree
+    ///
+    /// Returns 0 for leaf nodes, 1+ for nodes with children.
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let leaf = Node::from(42);
+    /// assert_eq!(leaf.max_depth(), 0);
+    ///
+    /// let nested = Node::Array(vec![
+    ///     Node::Array(vec![Node::from(1)])
+    /// ]);
+    /// assert_eq!(nested.max_depth(), 2);
+    /// ```
+    pub fn max_depth(&self) -> usize {
+        let mut max = 0;
+        self.visit(|_, depth| {
+            if depth > max {
+                max = depth;
+            }
+            true
+        });
+        max
+    }
+
+    /// Collect all nodes matching a predicate
+    ///
+    /// Returns a vector of references to nodes that match the predicate.
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let doc = Node::Array(vec![
+    ///     Node::from(1),
+    ///     Node::from("text"),
+    ///     Node::from(2)
+    /// ]);
+    ///
+    /// let numbers = doc.find_all(|node| node.is_number());
+    /// assert_eq!(numbers.len(), 2);
+    /// ```
+    pub fn find_all<F>(&self, mut predicate: F) -> alloc::vec::Vec<&Node>
+    where
+        F: FnMut(&Node) -> bool,
+    {
+        let mut results = alloc::vec::Vec::new();
+        self.find_all_internal(&mut predicate, &mut results);
+        results
+    }
+
+    fn find_all_internal<'a, F>(&'a self, predicate: &mut F, results: &mut alloc::vec::Vec<&'a Node>)
+    where
+        F: FnMut(&Node) -> bool,
+    {
+        if predicate(self) {
+            results.push(self);
+        }
+
+        match self {
+            Node::Array(items) | Node::Set(items) | Node::Document(items) | Node::Documents(items) => {
+                for item in items {
+                    item.find_all_internal(predicate, results);
+                }
+            }
+            Node::Mapping(pairs) => {
+                for (key, value) in pairs {
+                    key.find_all_internal(predicate, results);
+                    value.find_all_internal(predicate, results);
+                }
+            }
+            Node::Anchored(inner, _) | Node::Tagged(inner, _) => {
+                inner.find_all_internal(predicate, results);
+            }
+            _ => {}
+        }
+    }
+
+    /// Find the first node matching a predicate
+    ///
+    /// Returns None if no matching node is found.
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let doc = Node::Array(vec![
+    ///     Node::from("text"),
+    ///     Node::from(42)
+    /// ]);
+    ///
+    /// let first_num = doc.find_first(|node| node.is_number());
+    /// assert!(first_num.is_some());
+    /// ```
+    pub fn find_first<F>(&self, mut predicate: F) -> Option<&Node>
+    where
+        F: FnMut(&Node) -> bool,
+    {
+        self.find_first_internal(&mut predicate)
+    }
+
+    fn find_first_internal<F>(&self, predicate: &mut F) -> Option<&Node>
+    where
+        F: FnMut(&Node) -> bool,
+    {
+        if predicate(self) {
+            return Some(self);
+        }
+
+        match self {
+            Node::Array(items) | Node::Set(items) | Node::Document(items) | Node::Documents(items) => {
+                for item in items {
+                    if let Some(found) = item.find_first_internal(predicate) {
+                        return Some(found);
+                    }
+                }
+            }
+            Node::Mapping(pairs) => {
+                for (key, value) in pairs {
+                    if let Some(found) = key.find_first_internal(predicate) {
+                        return Some(found);
+                    }
+                    if let Some(found) = value.find_first_internal(predicate) {
+                        return Some(found);
+                    }
+                }
+            }
+            Node::Anchored(inner, _) | Node::Tagged(inner, _) => {
+                return inner.find_first_internal(predicate);
+            }
+            _ => {}
+        }
+
+        None
+    }
+}
+
+/// Iterator over immediate child nodes
+pub struct NodeChildIterator<'a> {
+    node: &'a Node,
+    index: usize,
+    mapping_phase: usize, // 0 = keys, 1 = values, 2 = done
+}
+
+impl<'a> NodeChildIterator<'a> {
+    fn new(node: &'a Node) -> Self {
+        Self {
+            node,
+            index: 0,
+            mapping_phase: 0,
+        }
+    }
+}
+
+impl<'a> Iterator for NodeChildIterator<'a> {
+    type Item = &'a Node;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.node {
+            Node::Array(items) | Node::Set(items) | Node::Document(items) | Node::Documents(items) => {
+                let result = items.get(self.index);
+                self.index += 1;
+                result
+            }
+            Node::Mapping(pairs) => {
+                if self.mapping_phase == 0 {
+                    // Return keys first
+                    if let Some((key, _)) = pairs.get(self.index) {
+                        self.index += 1;
+                        return Some(key);
+                    } else {
+                        // Done with keys, move to values
+                        self.mapping_phase = 1;
+                        self.index = 0;
+                    }
+                }
+                if self.mapping_phase == 1 {
+                    // Return values
+                    if let Some((_, value)) = pairs.get(self.index) {
+                        self.index += 1;
+                        return Some(value);
+                    } else {
+                        self.mapping_phase = 2;
+                    }
+                }
+                None
+            }
+            Node::Anchored(inner, _) | Node::Tagged(inner, _) => {
+                if self.index == 0 {
+                    self.index = 1;
+                    Some(inner.as_ref())
+                } else {
+                    None
+                }
+            }
+            _ => None,
         }
     }
 }
@@ -1507,5 +1897,271 @@ mod tests {
             mapping.get_key("key"),
             Some(&Node::Str("new_value".to_string(), QuoteType::Unquoted, BlockStyle::None))
         );
+    }
+
+    // ==================== Tree Traversal Tests ====================
+
+    #[test]
+    fn test_children_iterator_array() {
+        let array = Node::Array(vec![Node::from(1), Node::from(2), Node::from(3)]);
+        let children: Vec<_> = array.children().collect();
+        assert_eq!(children.len(), 3);
+        assert_eq!(children[0], &Node::Number(Numeric::Int32(1)));
+        assert_eq!(children[1], &Node::Number(Numeric::Int32(2)));
+        assert_eq!(children[2], &Node::Number(Numeric::Int32(3)));
+    }
+
+    #[test]
+    fn test_children_iterator_mapping() {
+        let mapping = Node::Mapping(vec![
+            (Node::from("key1"), Node::from(1)),
+            (Node::from("key2"), Node::from(2)),
+        ]);
+        let children: Vec<_> = mapping.children().collect();
+        // Should return all keys first, then all values
+        assert_eq!(children.len(), 4); // 2 keys + 2 values
+    }
+
+    #[test]
+    fn test_children_iterator_leaf() {
+        let leaf = Node::from(42);
+        let children: Vec<_> = leaf.children().collect();
+        assert_eq!(children.len(), 0);
+    }
+
+    #[test]
+    fn test_visit_simple_tree() {
+        let doc = Node::Array(vec![
+            Node::from(1),
+            Node::from(2),
+            Node::from(3),
+        ]);
+
+        let mut visited = Vec::new();
+        doc.visit(|node, depth| {
+            visited.push((node.clone(), depth));
+            true
+        });
+
+        assert_eq!(visited.len(), 4); // root + 3 children
+        assert_eq!(visited[0].1, 0); // root at depth 0
+        assert_eq!(visited[1].1, 1); // children at depth 1
+    }
+
+    #[test]
+    fn test_visit_nested_tree() {
+        let doc = Node::Array(vec![
+            Node::from(1),
+            Node::Array(vec![Node::from(2), Node::from(3)]),
+        ]);
+
+        let mut count = 0;
+        let mut max_depth = 0;
+        doc.visit(|_, depth| {
+            count += 1;
+            if depth > max_depth {
+                max_depth = depth;
+            }
+            true
+        });
+
+        assert_eq!(count, 5); // root + 1 + nested array + 2 + 3
+        assert_eq!(max_depth, 2);
+    }
+
+    #[test]
+    fn test_visit_early_termination() {
+        let doc = Node::Array(vec![
+            Node::from(1),
+            Node::from(2),
+            Node::from(3),
+        ]);
+
+        let mut count = 0;
+        doc.visit(|_, _| {
+            count += 1;
+            count < 3 // stop after visiting 2 nodes
+        });
+
+        assert_eq!(count, 3); // visited 3 nodes before stopping
+    }
+
+    #[test]
+    fn test_visit_mut_modification() {
+        let mut doc = Node::Array(vec![
+            Node::from(1),
+            Node::from(2),
+            Node::from(3),
+        ]);
+
+        doc.visit_mut(|node, _| {
+            if let Node::Number(Numeric::Int32(n)) = node {
+                *n *= 2; // double all numbers
+            }
+            true
+        });
+
+        assert_eq!(doc[0], Node::Number(Numeric::Int32(2)));
+        assert_eq!(doc[1], Node::Number(Numeric::Int32(4)));
+        assert_eq!(doc[2], Node::Number(Numeric::Int32(6)));
+    }
+
+    #[test]
+    fn test_count_nodes() {
+        let leaf = Node::from(42);
+        assert_eq!(leaf.count_nodes(), 1);
+
+        let array = Node::Array(vec![Node::from(1), Node::from(2)]);
+        assert_eq!(array.count_nodes(), 3); // array + 2 numbers
+
+        let nested = Node::Array(vec![
+            Node::from(1),
+            Node::Array(vec![Node::from(2), Node::from(3)]),
+        ]);
+        assert_eq!(nested.count_nodes(), 5); // outer array + 1 + inner array + 2 + 3
+    }
+
+    #[test]
+    fn test_max_depth() {
+        let leaf = Node::from(42);
+        assert_eq!(leaf.max_depth(), 0);
+
+        let array = Node::Array(vec![Node::from(1), Node::from(2)]);
+        assert_eq!(array.max_depth(), 1);
+
+        let nested = Node::Array(vec![
+            Node::Array(vec![
+                Node::Array(vec![Node::from(1)])
+            ])
+        ]);
+        assert_eq!(nested.max_depth(), 3);
+    }
+
+    #[test]
+    fn test_find_all() {
+        let doc = Node::Array(vec![
+            Node::from(1),
+            Node::from("text"),
+            Node::from(2),
+            Node::Array(vec![Node::from(3)]),
+        ]);
+
+        let numbers = doc.find_all(|node| node.is_number());
+        assert_eq!(numbers.len(), 3); // 1, 2, 3
+
+        let strings = doc.find_all(|node| node.is_str());
+        assert_eq!(strings.len(), 1); // "text"
+
+        let arrays = doc.find_all(|node| node.is_array());
+        assert_eq!(arrays.len(), 2); // outer and inner array
+    }
+
+    #[test]
+    fn test_find_first() {
+        let doc = Node::Array(vec![
+            Node::from("first"),
+            Node::from(1),
+            Node::from("second"),
+        ]);
+
+        let first_str = doc.find_first(|node| node.is_str());
+        assert!(first_str.is_some());
+        if let Some(Node::Str(s, _, _)) = first_str {
+            assert_eq!(s, "first"); // should find "first", not "second"
+        } else {
+            panic!("Expected string node");
+        }
+
+        let first_bool = doc.find_first(|node| node.is_boolean());
+        assert!(first_bool.is_none());
+    }
+
+    #[test]
+    fn test_find_all_with_mapping() {
+        let doc = Node::Mapping(vec![
+            (Node::from("key1"), Node::from(1)),
+            (Node::from("key2"), Node::from("value")),
+        ]);
+
+        let numbers = doc.find_all(|node| node.is_number());
+        assert_eq!(numbers.len(), 1); // just the number value
+
+        let strings = doc.find_all(|node| node.is_str());
+        assert_eq!(strings.len(), 3); // 2 keys + 1 value
+    }
+
+    #[test]
+    fn test_children_with_anchored() {
+        let anchored = Node::Anchored(
+            alloc::boxed::Box::new(Node::from(42)),
+            "anchor".to_string(),
+        );
+        let children: Vec<_> = anchored.children().collect();
+        assert_eq!(children.len(), 1);
+        assert_eq!(children[0], &Node::Number(Numeric::Int32(42)));
+    }
+
+    #[test]
+    fn test_visit_with_tagged() {
+        let tagged = Node::Tagged(
+            alloc::boxed::Box::new(Node::Array(vec![Node::from(1), Node::from(2)])),
+            "!custom".to_string(),
+        );
+
+        let mut count = 0;
+        tagged.visit(|_, _| {
+            count += 1;
+            true
+        });
+
+        assert_eq!(count, 4); // tagged + array + 2 numbers
+    }
+
+    #[test]
+    fn test_find_deeply_nested() {
+        let doc = Node::Mapping(vec![
+            (
+                Node::from("level1"),
+                Node::Mapping(vec![
+                    (
+                        Node::from("level2"),
+                        Node::Array(vec![
+                            Node::from(1),
+                            Node::from(42), // target
+                            Node::from(3),
+                        ]),
+                    ),
+                ]),
+            ),
+        ]);
+
+        let target = doc.find_first(|node| {
+            if let Node::Number(Numeric::Int32(n)) = node {
+                *n == 42
+            } else {
+                false
+            }
+        });
+
+        assert!(target.is_some());
+    }
+
+    #[test]
+    fn test_visit_mapping_order() {
+        let mapping = Node::Mapping(vec![
+            (Node::from("key1"), Node::from(1)),
+            (Node::from("key2"), Node::from(2)),
+        ]);
+
+        let mut visited_order = Vec::new();
+        mapping.visit(|node, _| {
+            if let Node::Number(Numeric::Int32(n)) = node {
+                visited_order.push(*n);
+            }
+            true
+        });
+
+        // Numbers should be visited in mapping value order
+        assert_eq!(visited_order, vec![1, 2]);
     }
 }
