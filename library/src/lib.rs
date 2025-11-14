@@ -93,6 +93,10 @@ pub use nodes::node::make_node;
 pub use nodes::node::make_set;
 /// Parses json data into a Node tree structure
 pub use parser::document::parse;
+/// Parser configuration with builder pattern
+pub use parser::config::ParserConfig;
+/// Parser configuration builder
+pub use parser::config::ParserConfigBuilder;
 /// Converts a Node tree to bencode format
 #[cfg(feature = "format-converters")]
 pub use stringify::bencode::stringify as to_bencode;
