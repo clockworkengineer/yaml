@@ -12,7 +12,7 @@ use yaml_lib::{parse, BufferSource, Node};
 
 #[cfg(feature = "std")]
 use yaml_lib::embedded::{
-    allocator::{BumpAllocator, FixedSizePool},
+    allocator::BumpAllocator,
     config::*,
     limits::NodeValidator,
     lightweight_node::{LightNode, NodeArena},
