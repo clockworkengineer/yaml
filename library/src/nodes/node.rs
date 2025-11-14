@@ -1,8 +1,15 @@
 //! Module: nodes/node.rs
 
+#[cfg(feature = "std")]
 use std::ops::{Index, IndexMut};
 
+#[cfg(not(feature = "std"))]
+use core::ops::{Index, IndexMut};
+
 /// Represents different numeric types that can be stored in a YAML node
+/// 
+/// For embedded systems, consider using smaller numeric types (i32/f32)
+/// to reduce memory footprint. The full enum provides maximum flexibility.
 #[derive(Clone, Debug, PartialEq)]
 /// Numeric
 pub enum Numeric {
@@ -38,6 +45,7 @@ pub enum BlockStyle {
 /// A node in the YAML data structure that can represent different types of values.
 #[derive(Clone, Debug, PartialEq)]
 /// Node
+#[cfg(feature = "alloc")]
 pub enum Node {
     /// Represents a boolean value (true/false)
     /// Used for YAML boolean values like true/false, yes/no, on/off
@@ -47,39 +55,49 @@ pub enum Node {
     Number(Numeric),
     /// Represents a string value and how it was quoted in the source
     /// Used for text content in YAML including multi-line strings
-    Str(String, QuoteType, BlockStyle),
+    Str(alloc::string::String, QuoteType, BlockStyle),
     /// Represents an array of other nodes
     /// Used for YAML sequences/lists where order matters
-    Array(Vec<Node>),
+    Array(alloc::vec::Vec<Node>),
     /// Represents a set of unique nodes
     /// Used for YAML sets where order doesn't matter and duplicates are not allowed
-    Set(Vec<Node>),
+    Set(alloc::vec::Vec<Node>),
     /// Represents a mapping where keys are Nodes (allowing quoted metadata)
     /// Stores an ordered sequence of (key, value) node pairs
-    Mapping(Vec<(Node, Node)>),
+    Mapping(alloc::vec::Vec<(Node, Node)>),
     /// Represents a comment
     /// Stores documentation and descriptive text that doesn't affect the data structure
-    Comment(String),
+    Comment(alloc::string::String),
     /// Represents a document node
     /// Contains a sequence of top-level nodes making up a YAML document
-    Document(Vec<Node>),
+    Document(alloc::vec::Vec<Node>),
     /// Represents an anchored node: a node with an associated anchor name
     /// Stores the inner node and the anchor name (e.g., &anchor)
-    Anchored(Box<Node>, String),
+    Anchored(alloc::boxed::Box<Node>, alloc::string::String),
     /// Represents a tagged node using YAML tag syntax (e.g., !!str, !mytag)
     /// Stores the inner node and the tag string
-    Tagged(Box<Node>, String),
+    Tagged(alloc::boxed::Box<Node>, alloc::string::String),
     /// Represents an alias node that references a previously anchored node
     /// Stores the anchor name (e.g., *alias)
-    Alias(String),
+    Alias(alloc::string::String),
     /// Represents a sequence of documents
-    Documents(Vec<Node>),
+    Documents(alloc::vec::Vec<Node>),
     /// Represents a null value or uninitialized node
     /// Used for explicit null values in YAML or missing/undefined values
     None,
 }
 
+/// Minimal node for no-alloc environments (embedded only)
+#[derive(Clone, Debug, PartialEq)]
+#[cfg(not(feature = "alloc"))]
+pub enum Node {
+    Boolean(bool),
+    Number(Numeric),
+    None,
+}
+
 /// Implements array-style indexing for Node using integer indices
+#[cfg(feature = "alloc")]
 impl Index<usize> for Node {
     type Output = Node;
 
@@ -94,6 +112,7 @@ impl Index<usize> for Node {
 }
 
 /// Implements mapping-style indexing for Node using string keys
+#[cfg(feature = "alloc")]
 impl Index<&str> for Node {
     type Output = Node;
 
@@ -116,6 +135,7 @@ impl Index<&str> for Node {
 }
 
 /// Implements mutable array-style indexing for Node
+#[cfg(feature = "alloc")]
 impl IndexMut<usize> for Node {
     /// Allows modifying array elements using array[index] = value syntax
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
@@ -128,6 +148,7 @@ impl IndexMut<usize> for Node {
 }
 
 /// Implements mutable mapping-style indexing for Node
+#[cfg(feature = "alloc")]
 impl IndexMut<&str> for Node {
     /// Allows modifying mapping properties using mapping["key"] = value syntax
     fn index_mut(&mut self, key: &str) -> &mut Self::Output {
@@ -148,6 +169,7 @@ impl IndexMut<&str> for Node {
 }
 
 /// Converts a vector of values into an array node
+#[cfg(feature = "alloc")]
 impl<T: Into<Node>> From<Vec<T>> for Node {
     fn from(value: Vec<T>) -> Self {
         Node::Array(value.into_iter().map(|x| x.into()).collect())
@@ -208,15 +230,94 @@ impl From<i8> for Numeric {
     }
 }
 
+/// Embedded systems helper methods for Numeric
+#[cfg(feature = "embedded")]
+impl Numeric {
+    /// Convert to i32, recommended for embedded systems
+    /// 
+    /// This method provides safe conversion of all numeric types to i32,
+    /// which is typically the most efficient integer type on 32-bit embedded platforms.
+    /// 
+    /// Returns None if the value cannot fit in an i32.
+    pub fn to_i32(&self) -> Option<i32> {
+        match self {
+            Numeric::Integer(v) => i32::try_from(*v).ok(),
+            Numeric::Float(v) => {
+                if v.is_finite() && *v >= i32::MIN as f64 && *v <= i32::MAX as f64 {
+                    Some(*v as i32)
+                } else {
+                    None
+                }
+            }
+            Numeric::UInteger(v) => i32::try_from(*v).ok(),
+            Numeric::Byte(v) => Some(*v as i32),
+            Numeric::Int32(v) => Some(*v),
+            Numeric::UInt32(v) => i32::try_from(*v).ok(),
+            Numeric::Int16(v) => Some(*v as i32),
+            Numeric::UInt16(v) => Some(*v as i32),
+            Numeric::Int8(v) => Some(*v as i32),
+        }
+    }
+
+    /// Convert to f32, recommended for embedded systems
+    /// 
+    /// This method provides conversion of all numeric types to f32,
+    /// which is typically the most efficient floating-point type on embedded platforms.
+    /// 
+    /// Note: Conversion from 64-bit types may lose precision.
+    pub fn to_f32(&self) -> f32 {
+        match self {
+            Numeric::Integer(v) => *v as f32,
+            Numeric::Float(v) => *v as f32,
+            Numeric::UInteger(v) => *v as f32,
+            Numeric::Byte(v) => *v as f32,
+            Numeric::Int32(v) => *v as f32,
+            Numeric::UInt32(v) => *v as f32,
+            Numeric::Int16(v) => *v as f32,
+            Numeric::UInt16(v) => *v as f32,
+            Numeric::Int8(v) => *v as f32,
+        }
+    }
+
+    /// Check if this numeric value fits in i32 range
+    /// 
+    /// Returns true if the value can be safely converted to i32 without loss.
+    pub fn fits_in_i32(&self) -> bool {
+        self.to_i32().is_some()
+    }
+
+    /// Get the memory size of this numeric variant in bytes
+    /// 
+    /// Useful for memory accounting in embedded systems.
+    pub fn size_bytes(&self) -> usize {
+        match self {
+            Numeric::Integer(_) => 8,
+            Numeric::Float(_) => 8,
+            Numeric::UInteger(_) => 8,
+            Numeric::Byte(_) => 1,
+            Numeric::Int32(_) => 4,
+            Numeric::UInt32(_) => 4,
+            Numeric::Int16(_) => 2,
+            Numeric::UInt16(_) => 2,
+            Numeric::Int8(_) => 1,
+        }
+    }
+}
+
 impl From<i64> for Node {
     fn from(value: i64) -> Self {
         Node::Number(Numeric::Integer(value))
     }
 }
 
+#[cfg(feature = "alloc")]
 impl From<&str> for Node {
     fn from(value: &str) -> Self {
-        Node::Str(String::from(value), QuoteType::Unquoted, BlockStyle::None)
+        Node::Str(
+            alloc::string::String::from(value),
+            QuoteType::Unquoted,
+            BlockStyle::None,
+        )
     }
 }
 
@@ -274,18 +375,20 @@ impl From<bool> for Node {
     }
 }
 
-impl From<String> for Node {
-    fn from(value: String) -> Self {
+#[cfg(feature = "alloc")]
+impl From<alloc::string::String> for Node {
+    fn from(value: alloc::string::String) -> Self {
         Node::Str(value, QuoteType::Unquoted, BlockStyle::None)
     }
 }
 
 /// Helper function to create a Set node from a vector, ensuring uniqueness
-pub fn make_set<T>(values: Vec<T>) -> Node
+#[cfg(feature = "alloc")]
+pub fn make_set<T>(values: alloc::vec::Vec<T>) -> Node
 where
     T: Into<Node> + Clone,
 {
-    let mut unique_nodes = Vec::new();
+    let mut unique_nodes = alloc::vec::Vec::new();
 
     for value in values {
         let node = value.into();
