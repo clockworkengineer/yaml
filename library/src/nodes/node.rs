@@ -382,13 +382,25 @@ impl From<alloc::string::String> for Node {
     }
 }
 
-/// Safe indexing and access methods for Node (embedded-safe, panic-free)
-#[cfg(feature = "embedded")]
+/// Safe indexing and access methods for Node (panic-free)
+///
+/// These methods provide safe access to Node contents without panicking.
+/// They return Option types to handle missing values or type mismatches gracefully.
+/// These methods are recommended for production code and required for embedded systems.
+#[cfg(feature = "alloc")]
 impl Node {
     /// Safely get an array element by index without panicking
     ///
     /// Returns None if the index is out of bounds or if the node is not an array/set.
-    /// This is the recommended method for embedded systems to avoid panics.
+    /// This is the recommended method to avoid panics in production code.
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let array = Node::Array(vec![Node::from(1), Node::from(2)]);
+    /// assert!(array.get(0).is_some());
+    /// assert!(array.get(5).is_none());
+    /// ```
     pub fn get(&self, index: usize) -> Option<&Node> {
         match self {
             Node::Array(arr) => arr.get(index),
@@ -400,7 +412,17 @@ impl Node {
     /// Safely get a mapping value by key without panicking
     ///
     /// Returns None if the key doesn't exist or if the node is not a mapping.
-    /// This is the recommended method for embedded systems to avoid panics.
+    /// This is the recommended method to avoid panics in production code.
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let mapping = Node::Mapping(vec![
+    ///     (Node::from("key"), Node::from("value"))
+    /// ]);
+    /// assert!(mapping.get_key("key").is_some());
+    /// assert!(mapping.get_key("nonexistent").is_none());
+    /// ```
     pub fn get_key(&self, key: &str) -> Option<&Node> {
         match self {
             Node::Mapping(pairs) => {
@@ -420,6 +442,15 @@ impl Node {
     /// Safely get a mutable array element by index without panicking
     ///
     /// Returns None if the index is out of bounds or if the node is not an array/set.
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let mut array = Node::Array(vec![Node::from(1), Node::from(2)]);
+    /// if let Some(node) = array.get_mut(0) {
+    ///     *node = Node::from(10);
+    /// }
+    /// ```
     pub fn get_mut(&mut self, index: usize) -> Option<&mut Node> {
         match self {
             Node::Array(arr) => arr.get_mut(index),
@@ -431,6 +462,17 @@ impl Node {
     /// Safely get a mutable mapping value by key without panicking
     ///
     /// Returns None if the key doesn't exist or if the node is not a mapping.
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let mut mapping = Node::Mapping(vec![
+    ///     (Node::from("key"), Node::from("value"))
+    /// ]);
+    /// if let Some(node) = mapping.get_key_mut("key") {
+    ///     *node = Node::from("new_value");
+    /// }
+    /// ```
     pub fn get_key_mut(&mut self, key: &str) -> Option<&mut Node> {
         match self {
             Node::Mapping(pairs) => {
@@ -448,11 +490,33 @@ impl Node {
     }
 
     /// Check if this node is an array or set
+    ///
+    /// Returns true for Node::Array and Node::Set variants.
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let array = Node::Array(vec![]);
+    /// assert!(array.is_sequence());
+    /// let mapping = Node::Mapping(vec![]);
+    /// assert!(!mapping.is_sequence());
+    /// ```
     pub fn is_sequence(&self) -> bool {
         matches!(self, Node::Array(_) | Node::Set(_))
     }
 
     /// Check if this node is a mapping
+    ///
+    /// Returns true for Node::Mapping variants.
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let mapping = Node::Mapping(vec![]);
+    /// assert!(mapping.is_mapping());
+    /// let array = Node::Array(vec![]);
+    /// assert!(!array.is_mapping());
+    /// ```
     pub fn is_mapping(&self) -> bool {
         matches!(self, Node::Mapping(_))
     }
@@ -460,6 +524,15 @@ impl Node {
     /// Get the length of an array, set, or mapping
     ///
     /// Returns None if the node is not a collection type.
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let array = Node::Array(vec![Node::from(1), Node::from(2)]);
+    /// assert_eq!(array.len(), Some(2));
+    /// let scalar = Node::from(42);
+    /// assert_eq!(scalar.len(), None);
+    /// ```
     pub fn len(&self) -> Option<usize> {
         match self {
             Node::Array(arr) => Some(arr.len()),
@@ -472,6 +545,15 @@ impl Node {
     /// Check if a collection is empty
     ///
     /// Returns true if the node is a collection and is empty, false otherwise.
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let array = Node::Array(vec![]);
+    /// assert!(array.is_empty());
+    /// let array = Node::Array(vec![Node::from(1)]);
+    /// assert!(!array.is_empty());
+    /// ```
     pub fn is_empty(&self) -> bool {
         self.len().map_or(false, |l| l == 0)
     }
@@ -479,9 +561,37 @@ impl Node {
     /// Safely convert a numeric node to i32
     ///
     /// Returns None if the node is not numeric or if conversion fails.
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let num = Node::from(42);
+    /// assert_eq!(num.as_i32(), Some(42));
+    /// let string = Node::from("text");
+    /// assert_eq!(string.as_i32(), None);
+    /// ```
     pub fn as_i32(&self) -> Option<i32> {
         match self {
+            #[cfg(feature = "embedded")]
             Node::Number(num) => num.to_i32(),
+            #[cfg(not(feature = "embedded"))]
+            Node::Number(num) => match num {
+                Numeric::Integer(v) => i32::try_from(*v).ok(),
+                Numeric::Float(v) => {
+                    if v.is_finite() && *v >= i32::MIN as f64 && *v <= i32::MAX as f64 {
+                        Some(*v as i32)
+                    } else {
+                        None
+                    }
+                }
+                Numeric::UInteger(v) => i32::try_from(*v).ok(),
+                Numeric::Byte(v) => Some(*v as i32),
+                Numeric::Int32(v) => Some(*v),
+                Numeric::UInt32(v) => i32::try_from(*v).ok(),
+                Numeric::Int16(v) => Some(*v as i32),
+                Numeric::UInt16(v) => Some(*v as i32),
+                Numeric::Int8(v) => Some(*v as i32),
+            },
             _ => None,
         }
     }
@@ -489,9 +599,31 @@ impl Node {
     /// Safely convert a numeric node to f32
     ///
     /// Returns None if the node is not numeric.
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let num = Node::from(3.14);
+    /// assert_eq!(num.as_f32(), Some(3.14_f32));
+    /// let string = Node::from("text");
+    /// assert_eq!(string.as_f32(), None);
+    /// ```
     pub fn as_f32(&self) -> Option<f32> {
         match self {
+            #[cfg(feature = "embedded")]
             Node::Number(num) => Some(num.to_f32()),
+            #[cfg(not(feature = "embedded"))]
+            Node::Number(num) => Some(match num {
+                Numeric::Integer(v) => *v as f32,
+                Numeric::Float(v) => *v as f32,
+                Numeric::UInteger(v) => *v as f32,
+                Numeric::Byte(v) => *v as f32,
+                Numeric::Int32(v) => *v as f32,
+                Numeric::UInt32(v) => *v as f32,
+                Numeric::Int16(v) => *v as f32,
+                Numeric::UInt16(v) => *v as f32,
+                Numeric::Int8(v) => *v as f32,
+            }),
             _ => None,
         }
     }
@@ -499,6 +631,15 @@ impl Node {
     /// Safely get a string value from a string node
     ///
     /// Returns None if the node is not a string.
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let string = Node::from("hello");
+    /// assert_eq!(string.as_str(), Some("hello"));
+    /// let number = Node::from(42);
+    /// assert_eq!(number.as_str(), None);
+    /// ```
     pub fn as_str(&self) -> Option<&str> {
         match self {
             Node::Str(s, _, _) => Some(s.as_str()),
@@ -509,10 +650,169 @@ impl Node {
     /// Safely get a boolean value
     ///
     /// Returns None if the node is not a boolean.
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let bool_node = Node::from(true);
+    /// assert_eq!(bool_node.as_bool(), Some(true));
+    /// let number = Node::from(42);
+    /// assert_eq!(number.as_bool(), None);
+    /// ```
     pub fn as_bool(&self) -> Option<bool> {
         match self {
             Node::Boolean(b) => Some(*b),
             _ => None,
+        }
+    }
+
+    /// Check if this node is a string
+    ///
+    /// Returns true for Node::Str variants.
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let string = Node::from("hello");
+    /// assert!(string.is_string());
+    /// let number = Node::from(42);
+    /// assert!(!number.is_string());
+    /// ```
+    pub fn is_string(&self) -> bool {
+        matches!(self, Node::Str(_, _, _))
+    }
+
+    /// Check if this node is a number
+    ///
+    /// Returns true for Node::Number variants.
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let number = Node::from(42);
+    /// assert!(number.is_number());
+    /// let string = Node::from("text");
+    /// assert!(!string.is_number());
+    /// ```
+    pub fn is_number(&self) -> bool {
+        matches!(self, Node::Number(_))
+    }
+
+    /// Check if this node is a boolean
+    ///
+    /// Returns true for Node::Boolean variants.
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let bool_node = Node::from(true);
+    /// assert!(bool_node.is_boolean());
+    /// let number = Node::from(42);
+    /// assert!(!bool_node.is_boolean());
+    /// ```
+    pub fn is_boolean(&self) -> bool {
+        matches!(self, Node::Boolean(_))
+    }
+
+    /// Check if this node is None (null)
+    ///
+    /// Returns true for Node::None variants.
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let none = Node::None;
+    /// assert!(none.is_none());
+    /// let number = Node::from(42);
+    /// assert!(!number.is_none());
+    /// ```
+    pub fn is_none(&self) -> bool {
+        matches!(self, Node::None)
+    }
+
+    /// Try to get an array/set as a slice
+    ///
+    /// Returns None if the node is not an array or set.
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let array = Node::Array(vec![Node::from(1), Node::from(2)]);
+    /// assert_eq!(array.as_slice().map(|s| s.len()), Some(2));
+    /// let mapping = Node::Mapping(vec![]);
+    /// assert!(mapping.as_slice().is_none());
+    /// ```
+    pub fn as_slice(&self) -> Option<&[Node]> {
+        match self {
+            Node::Array(arr) => Some(arr.as_slice()),
+            Node::Set(set) => Some(set.as_slice()),
+            _ => None,
+        }
+    }
+
+    /// Try to get a mapping as a slice of key-value pairs
+    ///
+    /// Returns None if the node is not a mapping.
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let mapping = Node::Mapping(vec![
+    ///     (Node::from("key"), Node::from("value"))
+    /// ]);
+    /// assert_eq!(mapping.as_mapping().map(|m| m.len()), Some(1));
+    /// let array = Node::Array(vec![]);
+    /// assert!(array.as_mapping().is_none());
+    /// ```
+    pub fn as_mapping(&self) -> Option<&[(Node, Node)]> {
+        match self {
+            Node::Mapping(pairs) => Some(pairs.as_slice()),
+            _ => None,
+        }
+    }
+
+    /// Check if a mapping contains a specific key
+    ///
+    /// Returns false if the node is not a mapping.
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let mapping = Node::Mapping(vec![
+    ///     (Node::from("key"), Node::from("value"))
+    /// ]);
+    /// assert!(mapping.contains_key("key"));
+    /// assert!(!mapping.contains_key("nonexistent"));
+    /// ```
+    pub fn contains_key(&self, key: &str) -> bool {
+        self.get_key(key).is_some()
+    }
+
+    /// Get all keys from a mapping as strings
+    ///
+    /// Returns an empty vector if the node is not a mapping or if keys are not strings.
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let mapping = Node::Mapping(vec![
+    ///     (Node::from("key1"), Node::from("value1")),
+    ///     (Node::from("key2"), Node::from("value2"))
+    /// ]);
+    /// let keys = mapping.keys();
+    /// assert_eq!(keys.len(), 2);
+    /// assert!(keys.contains(&"key1"));
+    /// ```
+    pub fn keys(&self) -> alloc::vec::Vec<&str> {
+        match self {
+            Node::Mapping(pairs) => pairs
+                .iter()
+                .filter_map(|(k, _)| match k {
+                    Node::Str(s, _, _) => Some(s.as_str()),
+                    _ => None,
+                })
+                .collect(),
+            _ => alloc::vec::Vec::new(),
         }
     }
 }
@@ -905,7 +1205,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "embedded")]
     fn test_node_get_safe() {
         let arr = Node::Array(vec![
             Node::Number(Numeric::Int32(1)),
@@ -923,7 +1222,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "embedded")]
     fn test_node_get_key_safe() {
         let mut pairs = alloc::vec::Vec::new();
         pairs.push((
@@ -951,7 +1249,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "embedded")]
     fn test_node_get_mut_safe() {
         let mut arr = Node::Array(vec![
             Node::Number(Numeric::Int32(1)),
@@ -967,7 +1264,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "embedded")]
     fn test_node_is_sequence() {
         let arr = Node::Array(vec![Node::None]);
         let set = Node::Set(vec![Node::None]);
@@ -981,7 +1277,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "embedded")]
     fn test_node_is_mapping() {
         let mapping = Node::Mapping(vec![]);
         let arr = Node::Array(vec![]);
@@ -993,7 +1288,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "embedded")]
     fn test_node_len() {
         let arr = Node::Array(vec![Node::None, Node::None, Node::None]);
         let set = Node::Set(vec![Node::None, Node::None]);
@@ -1007,7 +1301,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "embedded")]
     fn test_node_is_empty() {
         let arr_empty = Node::Array(vec![]);
         let arr_full = Node::Array(vec![Node::None]);
@@ -1021,7 +1314,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "embedded")]
     fn test_node_as_i32() {
         let num = Node::Number(Numeric::Int32(42));
         let large = Node::Number(Numeric::Integer(i64::MAX));
@@ -1033,7 +1325,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "embedded")]
     fn test_node_as_f32() {
         let num = Node::Number(Numeric::Float(3.14));
         let int = Node::Number(Numeric::Int32(42));
@@ -1045,7 +1336,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "embedded")]
     fn test_node_as_str() {
         let string = Node::Str("test".to_string(), QuoteType::Unquoted, BlockStyle::None);
         let number = Node::Number(Numeric::Int32(42));
@@ -1055,7 +1345,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "embedded")]
     fn test_node_as_bool() {
         let bool_true = Node::Boolean(true);
         let bool_false = Node::Boolean(false);
@@ -1064,5 +1353,159 @@ mod tests {
         assert_eq!(bool_true.as_bool(), Some(true));
         assert_eq!(bool_false.as_bool(), Some(false));
         assert_eq!(number.as_bool(), None);
+    }
+
+    #[test]
+    fn test_node_is_string() {
+        let string = Node::Str("test".to_string(), QuoteType::Unquoted, BlockStyle::None);
+        let number = Node::Number(Numeric::Int32(42));
+        let boolean = Node::Boolean(true);
+
+        assert!(string.is_string());
+        assert!(!number.is_string());
+        assert!(!boolean.is_string());
+    }
+
+    #[test]
+    fn test_node_is_number() {
+        let number = Node::Number(Numeric::Int32(42));
+        let string = Node::Str("test".to_string(), QuoteType::Unquoted, BlockStyle::None);
+        let boolean = Node::Boolean(true);
+
+        assert!(number.is_number());
+        assert!(!string.is_number());
+        assert!(!boolean.is_number());
+    }
+
+    #[test]
+    fn test_node_is_boolean() {
+        let boolean = Node::Boolean(true);
+        let number = Node::Number(Numeric::Int32(42));
+        let string = Node::Str("test".to_string(), QuoteType::Unquoted, BlockStyle::None);
+
+        assert!(boolean.is_boolean());
+        assert!(!number.is_boolean());
+        assert!(!string.is_boolean());
+    }
+
+    #[test]
+    fn test_node_is_none() {
+        let none = Node::None;
+        let number = Node::Number(Numeric::Int32(42));
+        let string = Node::Str("test".to_string(), QuoteType::Unquoted, BlockStyle::None);
+
+        assert!(none.is_none());
+        assert!(!number.is_none());
+        assert!(!string.is_none());
+    }
+
+    #[test]
+    fn test_node_as_slice() {
+        let array = Node::Array(vec![
+            Node::Number(Numeric::Int32(1)),
+            Node::Number(Numeric::Int32(2)),
+            Node::Number(Numeric::Int32(3)),
+        ]);
+        let set = Node::Set(vec![Node::Number(Numeric::Int32(1))]);
+        let mapping = Node::Mapping(vec![]);
+
+        assert_eq!(array.as_slice().map(|s| s.len()), Some(3));
+        assert_eq!(set.as_slice().map(|s| s.len()), Some(1));
+        assert!(mapping.as_slice().is_none());
+    }
+
+    #[test]
+    fn test_node_as_mapping() {
+        let mapping = Node::Mapping(vec![
+            (Node::from("key1"), Node::from("value1")),
+            (Node::from("key2"), Node::from("value2")),
+        ]);
+        let array = Node::Array(vec![]);
+
+        assert_eq!(mapping.as_mapping().map(|m| m.len()), Some(2));
+        assert!(array.as_mapping().is_none());
+    }
+
+    #[test]
+    fn test_node_contains_key() {
+        let mapping = Node::Mapping(vec![
+            (Node::from("key1"), Node::from("value1")),
+            (Node::from("key2"), Node::from("value2")),
+        ]);
+        let array = Node::Array(vec![]);
+
+        assert!(mapping.contains_key("key1"));
+        assert!(mapping.contains_key("key2"));
+        assert!(!mapping.contains_key("key3"));
+        assert!(!array.contains_key("key1"));
+    }
+
+    #[test]
+    fn test_node_keys() {
+        let mapping = Node::Mapping(vec![
+            (Node::from("key1"), Node::from("value1")),
+            (Node::from("key2"), Node::from("value2")),
+            (Node::from("key3"), Node::from("value3")),
+        ]);
+        let array = Node::Array(vec![]);
+
+        let keys = mapping.keys();
+        assert_eq!(keys.len(), 3);
+        assert!(keys.contains(&"key1"));
+        assert!(keys.contains(&"key2"));
+        assert!(keys.contains(&"key3"));
+
+        let empty_keys = array.keys();
+        assert_eq!(empty_keys.len(), 0);
+    }
+
+    #[test]
+    fn test_safe_access_prevents_panics() {
+        // Test that safe methods don't panic on invalid access
+        let array = Node::Array(vec![Node::from(1), Node::from(2)]);
+        
+        // Out of bounds access returns None instead of panicking
+        assert!(array.get(100).is_none());
+        
+        // Wrong type access returns None instead of panicking
+        let mapping = Node::Mapping(vec![]);
+        assert!(mapping.get(0).is_none());
+        
+        // Nonexistent key returns None instead of panicking
+        assert!(mapping.get_key("nonexistent").is_none());
+        
+        // Type check before access
+        let scalar = Node::from(42);
+        if scalar.is_sequence() {
+            let _ = scalar.get(0); // Won't execute
+        }
+        assert!(!scalar.is_sequence());
+    }
+
+    #[test]
+    fn test_safe_mutable_access() {
+        let mut array = Node::Array(vec![Node::from(1), Node::from(2), Node::from(3)]);
+        
+        // Modify existing elements
+        if let Some(node) = array.get_mut(1) {
+            *node = Node::from(20);
+        }
+        assert_eq!(array.get(1), Some(&Node::Number(Numeric::Int32(20))));
+        
+        // Attempt to modify nonexistent element safely
+        assert!(array.get_mut(100).is_none());
+        
+        // Mapping mutation
+        let mut mapping = Node::Mapping(vec![
+            (Node::from("key"), Node::from("value"))
+        ]);
+        
+        if let Some(node) = mapping.get_key_mut("key") {
+            *node = Node::from("new_value");
+        }
+        assert_eq!(
+            mapping.get_key("key"),
+            Some(&Node::Str("new_value".to_string(), QuoteType::Unquoted, BlockStyle::None))
+        );
     }
 }
