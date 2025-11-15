@@ -85,7 +85,7 @@ impl From<&str> for InternedString {
 /// let mut interner = StringInterner::new();
 /// let s1 = interner.intern("name");
 /// let s2 = interner.intern("name");
-/// 
+///
 /// // Both references point to the same underlying string
 /// assert_eq!(s1.ref_count(), s2.ref_count());
 /// ```
@@ -131,7 +131,7 @@ impl StringInterner {
 
         // Need to insert - use write lock
         let mut cache = self.cache.write().unwrap();
-        
+
         // Double-check in case another thread inserted while we waited
         if let Some(existing) = cache.get(s) {
             let mut stats = self.stats.write().unwrap();
@@ -142,11 +142,11 @@ impl StringInterner {
         // Insert new string
         let arc = Arc::new(String::from(s));
         cache.insert(s.to_string(), Arc::clone(&arc));
-        
+
         let mut stats = self.stats.write().unwrap();
         stats.misses += 1;
         stats.unique_strings = cache.len();
-        
+
         InternedString(arc)
     }
 
@@ -178,10 +178,10 @@ impl StringInterner {
     pub fn memory_savings(&self) -> (usize, usize, usize, f64) {
         let cache = self.cache.read().unwrap();
         let stats = self.stats.read().unwrap();
-        
+
         let total_hits = stats.hits;
         let unique_count = cache.len();
-        
+
         if unique_count == 0 || total_hits == 0 {
             return (0, 0, 0, 0.0);
         }
@@ -192,14 +192,15 @@ impl StringInterner {
         for (key, value) in cache.iter() {
             let str_len = key.len();
             let ref_count = Arc::strong_count(value);
-            
+
             // Total bytes if each reference was a separate string
             // String overhead: capacity + length + pointer
             let string_overhead = core::mem::size_of::<String>();
             total_string_bytes += (str_len + string_overhead) * ref_count;
-            
+
             // Actual bytes: one copy of the string + Arc pointers for each reference
-            interned_bytes += str_len + string_overhead + (ref_count * core::mem::size_of::<*const String>());
+            interned_bytes +=
+                str_len + string_overhead + (ref_count * core::mem::size_of::<*const String>());
         }
 
         let savings = total_string_bytes.saturating_sub(interned_bytes);
@@ -389,10 +390,10 @@ mod tests {
         assert_eq!(s1.as_str(), "test");
         assert_eq!(s2.as_str(), "test");
         assert_eq!(s3.as_str(), "other");
-        
+
         // Same string should have same reference
         assert_eq!(s1.ref_count(), s2.ref_count());
-        
+
         assert_eq!(interner.len(), 2);
     }
 
@@ -400,7 +401,7 @@ mod tests {
     #[cfg(feature = "std")]
     fn test_interner_stats() {
         let interner = StringInterner::new();
-        
+
         interner.intern("a");
         interner.intern("b");
         interner.intern("a"); // hit
@@ -420,13 +421,13 @@ mod tests {
     #[cfg(feature = "alloc")]
     fn test_simple_interner() {
         let mut interner = SimpleInterner::new();
-        
+
         let s1 = interner.intern("test");
         let s2 = interner.intern("test");
-        
+
         assert_eq!(*s1, *s2);
         assert_eq!(interner.len(), 1);
-        
+
         let stats = interner.stats();
         assert_eq!(stats.hits, 1);
         assert_eq!(stats.misses, 1);
@@ -445,7 +446,7 @@ mod tests {
     #[cfg(feature = "std")]
     fn test_memory_savings() {
         let interner = StringInterner::new();
-        
+
         // Keep references alive to show memory savings
         let mut refs = Vec::new();
         for _ in 0..10 {
@@ -455,11 +456,16 @@ mod tests {
         }
 
         let (total, interned, savings, percent) = interner.memory_savings();
-        
+
         // Should show significant savings
         assert!(savings > 0, "Expected savings > 0, got {}", savings);
         assert!(percent > 0.0, "Expected percent > 0, got {}", percent);
-        assert!(interned < total, "Expected interned {} < total {}", interned, total);
+        assert!(
+            interned < total,
+            "Expected interned {} < total {}",
+            interned,
+            total
+        );
     }
 
     #[test]
@@ -477,7 +483,7 @@ mod tests {
         let interner = StringInterner::new();
         interner.intern("test");
         assert_eq!(interner.len(), 1);
-        
+
         interner.clear();
         assert_eq!(interner.len(), 0);
         assert!(interner.is_empty());
