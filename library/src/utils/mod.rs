@@ -3,6 +3,10 @@
 /// Performance measurement and optimization utilities
 pub mod performance;
 
+/// String interning for memory optimization
+#[cfg(feature = "alloc")]
+pub mod string_interner;
+
 use crate::constants::{CHAR_HASH, CHAR_NEWLINE};
 use crate::io::traits::ISource;
 use crate::{Node, Numeric};

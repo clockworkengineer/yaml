@@ -138,3 +138,18 @@ pub use utils::performance::Timer;
 /// Utility to compare performance of different approaches
 #[cfg(feature = "std")]
 pub use utils::performance::compare_performance;
+/// Reference-counted interned string for memory deduplication
+#[cfg(feature = "alloc")]
+pub use utils::string_interner::InternedString;
+/// Statistics about string interning performance
+#[cfg(feature = "alloc")]
+pub use utils::string_interner::InternerStats;
+/// Simple single-threaded string interner
+#[cfg(feature = "alloc")]
+pub use utils::string_interner::SimpleInterner;
+/// Thread-safe string interner with read-write lock
+#[cfg(feature = "alloc")]
+pub use utils::string_interner::StringInterner;
+/// Common pre-interned strings for typical YAML keys
+#[cfg(feature = "alloc")]
+pub use utils::string_interner::CommonStrings;
