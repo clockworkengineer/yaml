@@ -449,7 +449,7 @@ mod tests {
     #[test]
     #[cfg(feature = "alloc")]
     fn test_node_validator_too_many_anchors() {
-        use crate::nodes::node::{Node, Numeric};
+        use crate::nodes::node::Node;
         let mut node = Node::None;
         for i in 0..=(MAX_ANCHORS + 1) {
             node = Node::Anchored(

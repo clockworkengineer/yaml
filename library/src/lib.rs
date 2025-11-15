@@ -27,6 +27,9 @@ extern crate alloc;
 
 /// Module containing constants for the library
 mod constants;
+/// Module for embedded systems support
+#[cfg(any(feature = "embedded", doc))]
+pub mod embedded;
 /// Module defining error types and handling for YAML operations.
 pub mod error;
 /// Module for detecting and handling different Unicode text file formats
@@ -48,9 +51,6 @@ mod parser;
 mod stringify;
 /// Module containing  utility functions for the YAML library
 mod utils;
-/// Module for embedded systems support
-#[cfg(any(feature = "embedded", doc))]
-pub mod embedded;
 
 /// ============
 /// YAML_lib API
@@ -83,31 +83,29 @@ pub use misc::get_number_of_documents;
 
 /// Returns the current version of the YAML library
 pub use misc::get_version as version;
-/// Core data structure representing a JSON node and numerical node in the parsed tree
+/// Fluent builder for constructing Array nodes
+#[cfg(feature = "alloc")]
+pub use nodes::node::ArrayBuilder;
+/// Fluent builder for constructing Mapping nodes
+#[cfg(feature = "alloc")]
+pub use nodes::node::MappingBuilder;
+/// Core data structure representing a json node and numerical node in the parsed tree
 pub use nodes::node::Node;
 /// Core data structure representing a numeric value node in the parsed tree
 pub use nodes::node::Numeric;
+/// Fluent builder for constructing Set nodes
+#[cfg(feature = "alloc")]
+pub use nodes::node::SetBuilder;
 /// Helper function to create a Node from any value that can be converted into a Node
 pub use nodes::node::make_node;
 /// Helper function to create a Set node from a vector, ensuring uniqueness
 pub use nodes::node::make_set;
-/// Parses json data into a Node tree structure
-pub use parser::document::parse;
 /// Parser configuration with builder pattern
 pub use parser::config::ParserConfig;
 /// Parser configuration builder
 pub use parser::config::ParserConfigBuilder;
-/// Document statistics for performance analysis
-pub use utils::performance::DocumentStats;
-/// Simple timer for measuring operation duration
-#[cfg(feature = "std")]
-pub use utils::performance::Timer;
-/// Performance profiler for measuring multiple operations
-#[cfg(all(feature = "std", feature = "alloc"))]
-pub use utils::performance::Profiler;
-/// Utility to compare performance of different approaches
-#[cfg(feature = "std")]
-pub use utils::performance::compare_performance;
+/// Parses json data into a Node tree structure
+pub use parser::document::parse;
 /// Converts a Node tree to bencode format
 #[cfg(feature = "format-converters")]
 pub use stringify::bencode::stringify as to_bencode;
@@ -129,3 +127,14 @@ pub use stringify::toml::stringify_pretty as to_toml_pretty;
 pub use stringify::xml::stringify as to_xml;
 #[cfg(feature = "format-converters")]
 pub use stringify::xml::stringify_pretty as to_xml_pretty;
+/// Document statistics for performance analysis
+pub use utils::performance::DocumentStats;
+/// Performance profiler for measuring multiple operations
+#[cfg(all(feature = "std", feature = "alloc"))]
+pub use utils::performance::Profiler;
+/// Simple timer for measuring operation duration
+#[cfg(feature = "std")]
+pub use utils::performance::Timer;
+/// Utility to compare performance of different approaches
+#[cfg(feature = "std")]
+pub use utils::performance::compare_performance;

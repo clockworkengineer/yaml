@@ -902,7 +902,10 @@ impl Node {
 
         // Then visit children
         match self {
-            Node::Array(items) | Node::Set(items) | Node::Document(items) | Node::Documents(items) => {
+            Node::Array(items)
+            | Node::Set(items)
+            | Node::Document(items)
+            | Node::Documents(items) => {
                 for item in items {
                     if !item.visit_internal(visitor, depth + 1) {
                         return false;
@@ -966,7 +969,10 @@ impl Node {
 
         // Then visit children
         match self {
-            Node::Array(items) | Node::Set(items) | Node::Document(items) | Node::Documents(items) => {
+            Node::Array(items)
+            | Node::Set(items)
+            | Node::Document(items)
+            | Node::Documents(items) => {
                 for item in items {
                     if !item.visit_mut_internal(visitor, depth + 1) {
                         return false;
@@ -1063,8 +1069,11 @@ impl Node {
         results
     }
 
-    fn find_all_internal<'a, F>(&'a self, predicate: &mut F, results: &mut alloc::vec::Vec<&'a Node>)
-    where
+    fn find_all_internal<'a, F>(
+        &'a self,
+        predicate: &mut F,
+        results: &mut alloc::vec::Vec<&'a Node>,
+    ) where
         F: FnMut(&Node) -> bool,
     {
         if predicate(self) {
@@ -1072,7 +1081,10 @@ impl Node {
         }
 
         match self {
-            Node::Array(items) | Node::Set(items) | Node::Document(items) | Node::Documents(items) => {
+            Node::Array(items)
+            | Node::Set(items)
+            | Node::Document(items)
+            | Node::Documents(items) => {
                 for item in items {
                     item.find_all_internal(predicate, results);
                 }
@@ -1121,7 +1133,10 @@ impl Node {
         }
 
         match self {
-            Node::Array(items) | Node::Set(items) | Node::Document(items) | Node::Documents(items) => {
+            Node::Array(items)
+            | Node::Set(items)
+            | Node::Document(items)
+            | Node::Documents(items) => {
                 for item in items {
                     if let Some(found) = item.find_first_internal(predicate) {
                         return Some(found);
@@ -1170,7 +1185,10 @@ impl<'a> Iterator for NodeChildIterator<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.node {
-            Node::Array(items) | Node::Set(items) | Node::Document(items) | Node::Documents(items) => {
+            Node::Array(items)
+            | Node::Set(items)
+            | Node::Document(items)
+            | Node::Documents(items) => {
                 let result = items.get(self.index);
                 self.index += 1;
                 result
@@ -1235,6 +1253,321 @@ where
     T: Into<Node>,
 {
     value.into()
+}
+
+// ==================== Fluent Builder API ====================
+
+/// Builder for constructing Array nodes with a fluent API
+///
+/// Provides a chainable interface for building arrays without nested
+/// function calls or manual vector construction.
+///
+/// # Example
+/// ```
+/// # use yaml_lib::Node;
+/// let array = Node::array()
+///     .push(1)
+///     .push(2)
+///     .push("three")
+///     .build();
+/// ```
+#[cfg(feature = "alloc")]
+pub struct ArrayBuilder {
+    items: alloc::vec::Vec<Node>,
+}
+
+#[cfg(feature = "alloc")]
+impl ArrayBuilder {
+    /// Create a new empty array builder
+    pub fn new() -> Self {
+        Self {
+            items: alloc::vec::Vec::new(),
+        }
+    }
+
+    /// Add an item to the array
+    pub fn push<T: Into<Node>>(mut self, value: T) -> Self {
+        self.items.push(value.into());
+        self
+    }
+
+    /// Add multiple items to the array
+    pub fn extend<T: Into<Node>>(mut self, values: impl IntoIterator<Item = T>) -> Self {
+        self.items.extend(values.into_iter().map(|v| v.into()));
+        self
+    }
+
+    /// Add an item only if a condition is true
+    pub fn push_if<T: Into<Node>>(mut self, condition: bool, value: T) -> Self {
+        if condition {
+            self.items.push(value.into());
+        }
+        self
+    }
+
+    /// Add an item if Some, skip if None
+    pub fn push_opt<T: Into<Node>>(mut self, value: Option<T>) -> Self {
+        if let Some(v) = value {
+            self.items.push(v.into());
+        }
+        self
+    }
+
+    /// Build the final Array node
+    pub fn build(self) -> Node {
+        Node::Array(self.items)
+    }
+
+    /// Get the current number of items
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Check if the builder is empty
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl Default for ArrayBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Builder for constructing Mapping nodes with a fluent API
+///
+/// Provides a chainable interface for building mappings without nested
+/// function calls or manual vector construction.
+///
+/// # Example
+/// ```
+/// # use yaml_lib::Node;
+/// let config = Node::mapping()
+///     .insert("name", "MyApp")
+///     .insert("version", "1.0")
+///     .insert("port", 8080)
+///     .build();
+/// ```
+#[cfg(feature = "alloc")]
+pub struct MappingBuilder {
+    pairs: alloc::vec::Vec<(Node, Node)>,
+}
+
+#[cfg(feature = "alloc")]
+impl MappingBuilder {
+    /// Create a new empty mapping builder
+    pub fn new() -> Self {
+        Self {
+            pairs: alloc::vec::Vec::new(),
+        }
+    }
+
+    /// Insert a key-value pair
+    pub fn insert<K: Into<Node>, V: Into<Node>>(mut self, key: K, value: V) -> Self {
+        self.pairs.push((key.into(), value.into()));
+        self
+    }
+
+    /// Insert a pair only if a condition is true
+    pub fn insert_if<K: Into<Node>, V: Into<Node>>(
+        mut self,
+        condition: bool,
+        key: K,
+        value: V,
+    ) -> Self {
+        if condition {
+            self.pairs.push((key.into(), value.into()));
+        }
+        self
+    }
+
+    /// Insert a pair if value is Some, skip if None
+    pub fn insert_opt<K: Into<Node>, V: Into<Node>>(mut self, key: K, value: Option<V>) -> Self {
+        if let Some(v) = value {
+            self.pairs.push((key.into(), v.into()));
+        }
+        self
+    }
+
+    /// Insert or update a key-value pair (replaces existing key)
+    pub fn upsert<K: Into<Node>, V: Into<Node>>(mut self, key: K, value: V) -> Self {
+        let key_node = key.into();
+        let value_node = value.into();
+
+        // Find and replace existing key, or insert new
+        let mut found = false;
+        for (k, v) in self.pairs.iter_mut() {
+            if k == &key_node {
+                *v = value_node.clone();
+                found = true;
+                break;
+            }
+        }
+
+        if !found {
+            self.pairs.push((key_node, value_node));
+        }
+
+        self
+    }
+
+    /// Build the final Mapping node
+    pub fn build(self) -> Node {
+        Node::Mapping(self.pairs)
+    }
+
+    /// Get the current number of pairs
+    pub fn len(&self) -> usize {
+        self.pairs.len()
+    }
+
+    /// Check if the builder is empty
+    pub fn is_empty(&self) -> bool {
+        self.pairs.is_empty()
+    }
+
+    /// Check if a key exists
+    pub fn contains_key(&self, key: &str) -> bool {
+        self.pairs.iter().any(|(k, _)| {
+            if let Node::Str(s, _, _) = k {
+                s == key
+            } else {
+                false
+            }
+        })
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl Default for MappingBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Builder for constructing Set nodes with a fluent API
+///
+/// Automatically ensures uniqueness of elements.
+///
+/// # Example
+/// ```
+/// # use yaml_lib::Node;
+/// let set = Node::set()
+///     .insert(1)
+///     .insert(2)
+///     .insert(1) // duplicate, will be ignored
+///     .build();
+/// ```
+#[cfg(feature = "alloc")]
+pub struct SetBuilder {
+    items: alloc::vec::Vec<Node>,
+}
+
+#[cfg(feature = "alloc")]
+impl SetBuilder {
+    /// Create a new empty set builder
+    pub fn new() -> Self {
+        Self {
+            items: alloc::vec::Vec::new(),
+        }
+    }
+
+    /// Insert an item (duplicates are automatically ignored)
+    pub fn insert<T: Into<Node>>(mut self, value: T) -> Self {
+        let node = value.into();
+        if !self.items.contains(&node) {
+            self.items.push(node);
+        }
+        self
+    }
+
+    /// Insert multiple items (duplicates are automatically ignored)
+    pub fn extend<T: Into<Node>>(mut self, values: impl IntoIterator<Item = T>) -> Self {
+        for value in values {
+            let node = value.into();
+            if !self.items.contains(&node) {
+                self.items.push(node);
+            }
+        }
+        self
+    }
+
+    /// Build the final Set node
+    pub fn build(self) -> Node {
+        Node::Set(self.items)
+    }
+
+    /// Get the current number of unique items
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Check if the builder is empty
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// Check if a value exists in the set
+    pub fn contains(&self, value: &Node) -> bool {
+        self.items.contains(value)
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl Default for SetBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension methods on Node for creating builders
+#[cfg(feature = "alloc")]
+impl Node {
+    /// Create a new ArrayBuilder for fluent array construction
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let array = Node::array()
+    ///     .push(1)
+    ///     .push(2)
+    ///     .push(3)
+    ///     .build();
+    /// ```
+    pub fn array() -> ArrayBuilder {
+        ArrayBuilder::new()
+    }
+
+    /// Create a new MappingBuilder for fluent mapping construction
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let config = Node::mapping()
+    ///     .insert("host", "localhost")
+    ///     .insert("port", 8080)
+    ///     .build();
+    /// ```
+    pub fn mapping() -> MappingBuilder {
+        MappingBuilder::new()
+    }
+
+    /// Create a new SetBuilder for fluent set construction
+    ///
+    /// # Example
+    /// ```
+    /// # use yaml_lib::Node;
+    /// let set = Node::set()
+    ///     .insert(1)
+    ///     .insert(2)
+    ///     .insert(3)
+    ///     .build();
+    /// ```
+    pub fn set() -> SetBuilder {
+        SetBuilder::new()
+    }
 }
 
 #[cfg(test)]
@@ -1630,7 +1963,11 @@ mod tests {
 
         assert_eq!(
             mapping.get_key("name"),
-            Some(&Node::Str("test".to_string(), QuoteType::Unquoted, BlockStyle::None))
+            Some(&Node::Str(
+                "test".to_string(),
+                QuoteType::Unquoted,
+                BlockStyle::None
+            ))
         );
         assert_eq!(
             mapping.get_key("age"),
@@ -1857,17 +2194,17 @@ mod tests {
     fn test_safe_access_prevents_panics() {
         // Test that safe methods don't panic on invalid access
         let array = Node::Array(vec![Node::from(1), Node::from(2)]);
-        
+
         // Out of bounds access returns None instead of panicking
         assert!(array.get(100).is_none());
-        
+
         // Wrong type access returns None instead of panicking
         let mapping = Node::Mapping(vec![]);
         assert!(mapping.get(0).is_none());
-        
+
         // Nonexistent key returns None instead of panicking
         assert!(mapping.get_key("nonexistent").is_none());
-        
+
         // Type check before access
         let scalar = Node::from(42);
         if scalar.is_sequence() {
@@ -1879,27 +2216,29 @@ mod tests {
     #[test]
     fn test_safe_mutable_access() {
         let mut array = Node::Array(vec![Node::from(1), Node::from(2), Node::from(3)]);
-        
+
         // Modify existing elements
         if let Some(node) = array.get_mut(1) {
             *node = Node::from(20);
         }
         assert_eq!(array.get(1), Some(&Node::Number(Numeric::Int32(20))));
-        
+
         // Attempt to modify nonexistent element safely
         assert!(array.get_mut(100).is_none());
-        
+
         // Mapping mutation
-        let mut mapping = Node::Mapping(vec![
-            (Node::from("key"), Node::from("value"))
-        ]);
-        
+        let mut mapping = Node::Mapping(vec![(Node::from("key"), Node::from("value"))]);
+
         if let Some(node) = mapping.get_key_mut("key") {
             *node = Node::from("new_value");
         }
         assert_eq!(
             mapping.get_key("key"),
-            Some(&Node::Str("new_value".to_string(), QuoteType::Unquoted, BlockStyle::None))
+            Some(&Node::Str(
+                "new_value".to_string(),
+                QuoteType::Unquoted,
+                BlockStyle::None
+            ))
         );
     }
 
@@ -1935,11 +2274,7 @@ mod tests {
 
     #[test]
     fn test_visit_simple_tree() {
-        let doc = Node::Array(vec![
-            Node::from(1),
-            Node::from(2),
-            Node::from(3),
-        ]);
+        let doc = Node::Array(vec![Node::from(1), Node::from(2), Node::from(3)]);
 
         let mut visited = Vec::new();
         doc.visit(|node, depth| {
@@ -1975,11 +2310,7 @@ mod tests {
 
     #[test]
     fn test_visit_early_termination() {
-        let doc = Node::Array(vec![
-            Node::from(1),
-            Node::from(2),
-            Node::from(3),
-        ]);
+        let doc = Node::Array(vec![Node::from(1), Node::from(2), Node::from(3)]);
 
         let mut count = 0;
         doc.visit(|_, _| {
@@ -1992,11 +2323,7 @@ mod tests {
 
     #[test]
     fn test_visit_mut_modification() {
-        let mut doc = Node::Array(vec![
-            Node::from(1),
-            Node::from(2),
-            Node::from(3),
-        ]);
+        let mut doc = Node::Array(vec![Node::from(1), Node::from(2), Node::from(3)]);
 
         doc.visit_mut(|node, _| {
             if let Node::Number(Numeric::Int32(n)) = node {
@@ -2033,11 +2360,7 @@ mod tests {
         let array = Node::Array(vec![Node::from(1), Node::from(2)]);
         assert_eq!(array.max_depth(), 1);
 
-        let nested = Node::Array(vec![
-            Node::Array(vec![
-                Node::Array(vec![Node::from(1)])
-            ])
-        ]);
+        let nested = Node::Array(vec![Node::Array(vec![Node::Array(vec![Node::from(1)])])]);
         assert_eq!(nested.max_depth(), 3);
     }
 
@@ -2096,10 +2419,7 @@ mod tests {
 
     #[test]
     fn test_children_with_anchored() {
-        let anchored = Node::Anchored(
-            alloc::boxed::Box::new(Node::from(42)),
-            "anchor".to_string(),
-        );
+        let anchored = Node::Anchored(alloc::boxed::Box::new(Node::from(42)), "anchor".to_string());
         let children: Vec<_> = anchored.children().collect();
         assert_eq!(children.len(), 1);
         assert_eq!(children[0], &Node::Number(Numeric::Int32(42)));
@@ -2123,21 +2443,17 @@ mod tests {
 
     #[test]
     fn test_find_deeply_nested() {
-        let doc = Node::Mapping(vec![
-            (
-                Node::from("level1"),
-                Node::Mapping(vec![
-                    (
-                        Node::from("level2"),
-                        Node::Array(vec![
-                            Node::from(1),
-                            Node::from(42), // target
-                            Node::from(3),
-                        ]),
-                    ),
+        let doc = Node::Mapping(vec![(
+            Node::from("level1"),
+            Node::Mapping(vec![(
+                Node::from("level2"),
+                Node::Array(vec![
+                    Node::from(1),
+                    Node::from(42), // target
+                    Node::from(3),
                 ]),
-            ),
-        ]);
+            )]),
+        )]);
 
         let target = doc.find_first(|node| {
             if let Node::Number(Numeric::Int32(n)) = node {
@@ -2167,5 +2483,351 @@ mod tests {
 
         // Numbers should be visited in mapping value order
         assert_eq!(visited_order, vec![1, 2]);
+    }
+
+    // ==================== Fluent API Builder Tests ====================
+
+    #[test]
+    fn test_array_builder_basic() {
+        let array = Node::array().push(1).push(2).push(3).build();
+
+        assert!(array.is_array());
+        assert_eq!(array.len(), Some(3));
+        assert_eq!(array[0], Node::from(1));
+        assert_eq!(array[1], Node::from(2));
+        assert_eq!(array[2], Node::from(3));
+    }
+
+    #[test]
+    fn test_array_builder_mixed_types() {
+        let array = Node::array()
+            .push(42)
+            .push("text")
+            .push(true)
+            .push(3.14)
+            .build();
+
+        assert_eq!(array.len(), Some(4));
+        assert!(array[0].is_number());
+        assert!(array[1].is_string());
+        assert!(array[2].is_boolean());
+        assert!(array[3].is_number());
+    }
+
+    #[test]
+    fn test_array_builder_extend() {
+        let array = Node::array().push(1).extend(vec![2, 3, 4]).push(5).build();
+
+        assert_eq!(array.len(), Some(5));
+        assert_eq!(array[0], Node::from(1));
+        assert_eq!(array[4], Node::from(5));
+    }
+
+    #[test]
+    fn test_array_builder_conditional() {
+        let include_optional = true;
+        let array = Node::array()
+            .push(1)
+            .push_if(include_optional, 2)
+            .push_if(false, 999) // should not be added
+            .push(3)
+            .build();
+
+        assert_eq!(array.len(), Some(3));
+        assert_eq!(array[1], Node::from(2));
+        assert_eq!(array[2], Node::from(3));
+    }
+
+    #[test]
+    fn test_array_builder_optional() {
+        let some_value: Option<i32> = Some(42);
+        let none_value: Option<i32> = None;
+
+        let array = Node::array()
+            .push(1)
+            .push_opt(some_value)
+            .push_opt(none_value)
+            .push(2)
+            .build();
+
+        assert_eq!(array.len(), Some(3));
+        assert_eq!(array[1], Node::from(42));
+        assert_eq!(array[2], Node::from(2));
+    }
+
+    #[test]
+    fn test_array_builder_nested() {
+        let nested = Node::array()
+            .push(1)
+            .push(Node::array().push(2).push(3).build())
+            .push(4)
+            .build();
+
+        assert_eq!(nested.len(), Some(3));
+        assert!(nested[1].is_array());
+        assert_eq!(nested[1].len(), Some(2));
+    }
+
+    #[test]
+    fn test_array_builder_empty() {
+        let array = Node::array().build();
+        assert!(array.is_empty());
+        assert_eq!(array.len(), Some(0));
+    }
+
+    #[test]
+    fn test_mapping_builder_basic() {
+        let mapping = Node::mapping()
+            .insert("name", "Alice")
+            .insert("age", 30)
+            .insert("active", true)
+            .build();
+
+        assert!(mapping.is_mapping());
+        assert_eq!(mapping.len(), Some(3));
+        assert_eq!(mapping["name"], Node::from("Alice"));
+        assert_eq!(mapping["age"], Node::from(30));
+        assert_eq!(mapping["active"], Node::from(true));
+    }
+
+    #[test]
+    fn test_mapping_builder_nested() {
+        let config = Node::mapping()
+            .insert(
+                "database",
+                Node::mapping()
+                    .insert("host", "localhost")
+                    .insert("port", 5432)
+                    .build(),
+            )
+            .insert("debug", false)
+            .build();
+
+        assert_eq!(config.len(), Some(2));
+        assert!(config["database"].is_mapping());
+        assert_eq!(config["database"]["host"], Node::from("localhost"));
+    }
+
+    #[test]
+    fn test_mapping_builder_conditional() {
+        let include_debug = true;
+        let mapping = Node::mapping()
+            .insert("name", "app")
+            .insert_if(include_debug, "debug", true)
+            .insert_if(false, "should_not_exist", 999)
+            .build();
+
+        assert_eq!(mapping.len(), Some(2));
+        assert!(mapping.contains_key("debug"));
+        assert!(!mapping.contains_key("should_not_exist"));
+    }
+
+    #[test]
+    fn test_mapping_builder_optional() {
+        let some_value: Option<i32> = Some(42);
+        let none_value: Option<&str> = None;
+
+        let mapping = Node::mapping()
+            .insert("required", "value")
+            .insert_opt("optional1", some_value)
+            .insert_opt("optional2", none_value)
+            .build();
+
+        assert_eq!(mapping.len(), Some(2));
+        assert!(mapping.contains_key("optional1"));
+        assert!(!mapping.contains_key("optional2"));
+    }
+
+    #[test]
+    fn test_mapping_builder_upsert() {
+        let mapping = Node::mapping()
+            .insert("key", "original")
+            .insert("other", "value")
+            .upsert("key", "updated") // should replace
+            .upsert("new", "added") // should insert
+            .build();
+
+        assert_eq!(mapping.len(), Some(3));
+        assert_eq!(mapping["key"], Node::from("updated"));
+        assert_eq!(mapping["new"], Node::from("added"));
+    }
+
+    #[test]
+    fn test_mapping_builder_complex() {
+        let config = Node::mapping()
+            .insert("name", "MyApp")
+            .insert("version", "1.0.0")
+            .insert(
+                "servers",
+                Node::array().push("web1").push("web2").push("web3").build(),
+            )
+            .insert(
+                "database",
+                Node::mapping()
+                    .insert("host", "localhost")
+                    .insert("port", 5432)
+                    .insert("ssl", true)
+                    .build(),
+            )
+            .build();
+
+        assert_eq!(config.len(), Some(4));
+        assert!(config["servers"].is_array());
+        assert_eq!(config["servers"].len(), Some(3));
+        assert!(config["database"].is_mapping());
+        assert_eq!(config["database"]["port"], Node::from(5432));
+    }
+
+    #[test]
+    fn test_set_builder_basic() {
+        let set = Node::set().insert(1).insert(2).insert(3).build();
+
+        assert!(set.is_set());
+        assert_eq!(set.len(), Some(3));
+    }
+
+    #[test]
+    fn test_set_builder_duplicates() {
+        let set = Node::set()
+            .insert(1)
+            .insert(2)
+            .insert(1) // duplicate
+            .insert(3)
+            .insert(2) // duplicate
+            .build();
+
+        assert_eq!(set.len(), Some(3)); // should only have 3 unique items
+    }
+
+    #[test]
+    fn test_set_builder_extend() {
+        let set = Node::set()
+            .insert(1)
+            .extend(vec![2, 3, 2, 4]) // includes duplicate 2
+            .insert(5)
+            .build();
+
+        assert_eq!(set.len(), Some(5)); // 1, 2, 3, 4, 5
+    }
+
+    #[test]
+    fn test_set_builder_mixed_types() {
+        let set = Node::set().insert(1).insert("text").insert(true).build();
+
+        assert_eq!(set.len(), Some(3));
+    }
+
+    #[test]
+    fn test_builder_chaining_realistic_config() {
+        // Realistic configuration example
+        let config = Node::mapping()
+            .insert(
+                "application",
+                Node::mapping()
+                    .insert("name", "WebAPI")
+                    .insert("version", "2.1.0")
+                    .insert("environment", "production")
+                    .build(),
+            )
+            .insert(
+                "server",
+                Node::mapping()
+                    .insert("host", "0.0.0.0")
+                    .insert("port", 8080)
+                    .insert("workers", 4)
+                    .build(),
+            )
+            .insert(
+                "features",
+                Node::array()
+                    .push("auth")
+                    .push("logging")
+                    .push("metrics")
+                    .build(),
+            )
+            .insert(
+                "allowed_origins",
+                Node::set()
+                    .insert("https://example.com")
+                    .insert("https://api.example.com")
+                    .build(),
+            )
+            .build();
+
+        // Verify structure
+        assert_eq!(config.len(), Some(4));
+        assert_eq!(config["application"]["name"], Node::from("WebAPI"));
+        assert_eq!(config["server"]["port"], Node::from(8080));
+        assert_eq!(config["features"].len(), Some(3));
+        assert!(config["allowed_origins"].is_set());
+    }
+
+    #[test]
+    fn test_builder_readability_comparison() {
+        // Old way (verbose)
+        let _old_way = Node::Mapping(vec![
+            (
+                Node::from("database"),
+                Node::Mapping(vec![
+                    (Node::from("host"), Node::from("localhost")),
+                    (Node::from("port"), Node::from(5432)),
+                ]),
+            ),
+            (
+                Node::from("servers"),
+                Node::Array(vec![Node::from("web1"), Node::from("web2")]),
+            ),
+        ]);
+
+        // New way (fluent)
+        let _new_way = Node::mapping()
+            .insert(
+                "database",
+                Node::mapping()
+                    .insert("host", "localhost")
+                    .insert("port", 5432)
+                    .build(),
+            )
+            .insert("servers", Node::array().push("web1").push("web2").build())
+            .build();
+
+        // Both should produce equivalent structures
+        assert_eq!(_old_way, _new_way);
+    }
+
+    #[test]
+    fn test_array_builder_len() {
+        let builder = Node::array().push(1).push(2);
+
+        assert_eq!(builder.len(), 2);
+        assert!(!builder.is_empty());
+
+        let empty = Node::array();
+        assert_eq!(empty.len(), 0);
+        assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn test_mapping_builder_contains_key() {
+        let builder = Node::mapping()
+            .insert("key1", "value1")
+            .insert("key2", "value2");
+
+        assert!(builder.contains_key("key1"));
+        assert!(builder.contains_key("key2"));
+        assert!(!builder.contains_key("key3"));
+    }
+
+    #[test]
+    fn test_set_builder_contains() {
+        let node1 = Node::from(1);
+        let node2 = Node::from(2);
+        let node3 = Node::from(3);
+
+        let builder = Node::set().insert(1).insert(2);
+
+        assert!(builder.contains(&node1));
+        assert!(builder.contains(&node2));
+        assert!(!builder.contains(&node3));
     }
 }
