@@ -6,11 +6,25 @@
 //! - Recover from errors
 //! - Provide helpful error messages
 //! - Implement defensive programming patterns
+//!
+//! Run with `--features enhanced` to see enhanced error handling examples.
 
 use yaml_lib::{get_document, parse, BufferSource, FileSource, Node};
 
+mod enhanced;
+
 fn main() {
+    // Check if we should run enhanced examples
+    let args: Vec<String> = std::env::args().collect();
+    let show_enhanced = args.iter().any(|arg| arg == "--enhanced");
+
+    if show_enhanced {
+        enhanced::main();
+        return;
+    }
+
     println!("=== YAML Error Handling Example ===\n");
+    println!("Tip: Run with --enhanced to see new error handling features\n");
 
     // Example 1: Handling parse errors
     demo_parse_errors();

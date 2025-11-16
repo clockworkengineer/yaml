@@ -55,6 +55,17 @@ mod utils;
 /// ============
 /// YAML_lib API
 /// ============
+// Error handling types
+pub use error::ErrorKind;
+pub use error::YamlError;
+/// Enhanced error with suggestions and context
+#[cfg(feature = "alloc")]
+pub use error::enhanced::{EnhancedError, ErrorCode, ErrorSuggestion, Span, SuggestionBuilder};
+/// Error recovery strategies and collection
+#[cfg(feature = "alloc")]
+pub use error::recovery::{
+    ErrorCollection, ParserState, RecoveryContext, RecoveryHandler, RecoveryStrategy,
+};
 
 /// This enum represents different Unicode text file formats with their corresponding byte order marks (BOM)
 #[cfg(feature = "file-io")]
@@ -86,6 +97,8 @@ pub use misc::get_version as version;
 /// Fluent builder for constructing Array nodes
 #[cfg(feature = "alloc")]
 pub use nodes::node::ArrayBuilder;
+/// Block style for string nodes
+pub use nodes::node::BlockStyle;
 /// Fluent builder for constructing Mapping nodes
 #[cfg(feature = "alloc")]
 pub use nodes::node::MappingBuilder;
@@ -95,8 +108,6 @@ pub use nodes::node::Node;
 pub use nodes::node::Numeric;
 /// Quote type for string nodes
 pub use nodes::node::QuoteType;
-/// Block style for string nodes
-pub use nodes::node::BlockStyle;
 /// Fluent builder for constructing Set nodes
 #[cfg(feature = "alloc")]
 pub use nodes::node::SetBuilder;
@@ -131,6 +142,27 @@ pub use stringify::toml::stringify_pretty as to_toml_pretty;
 pub use stringify::xml::stringify as to_xml;
 #[cfg(feature = "format-converters")]
 pub use stringify::xml::stringify_pretty as to_xml_pretty;
+/// Capacity hints for optimizing allocations during parsing
+#[cfg(feature = "alloc")]
+pub use utils::optimization::CapacityHints;
+/// Fast path detector for common YAML patterns
+#[cfg(feature = "alloc")]
+pub use utils::optimization::FastPathDetector;
+/// Lazy tag that defers type coercion until accessed
+#[cfg(feature = "alloc")]
+pub use utils::optimization::LazyTag;
+/// Memory-efficient node builder that reuses allocations
+#[cfg(feature = "alloc")]
+pub use utils::optimization::NodeBuilder;
+/// Performance optimizer combining multiple optimization strategies
+#[cfg(feature = "alloc")]
+pub use utils::optimization::PerformanceOptimizer;
+/// String pool for deduplicating common strings during parsing
+#[cfg(all(feature = "std", feature = "alloc"))]
+pub use utils::optimization::StringPool;
+/// Zero-copy string wrapper
+#[cfg(feature = "alloc")]
+pub use utils::optimization::ZeroCopyStr;
 /// Document statistics for performance analysis
 pub use utils::performance::DocumentStats;
 /// Performance profiler for measuring multiple operations
@@ -157,24 +189,3 @@ pub use utils::string_interner::SimpleInterner;
 /// Thread-safe string interner with read-write lock
 #[cfg(feature = "alloc")]
 pub use utils::string_interner::StringInterner;
-/// Capacity hints for optimizing allocations during parsing
-#[cfg(feature = "alloc")]
-pub use utils::optimization::CapacityHints;
-/// Fast path detector for common YAML patterns
-#[cfg(feature = "alloc")]
-pub use utils::optimization::FastPathDetector;
-/// Lazy tag that defers type coercion until accessed
-#[cfg(feature = "alloc")]
-pub use utils::optimization::LazyTag;
-/// Memory-efficient node builder that reuses allocations
-#[cfg(feature = "alloc")]
-pub use utils::optimization::NodeBuilder;
-/// Performance optimizer combining multiple optimization strategies
-#[cfg(feature = "alloc")]
-pub use utils::optimization::PerformanceOptimizer;
-/// String pool for deduplicating common strings during parsing
-#[cfg(all(feature = "std", feature = "alloc"))]
-pub use utils::optimization::StringPool;
-/// Zero-copy string wrapper
-#[cfg(feature = "alloc")]
-pub use utils::optimization::ZeroCopyStr;

@@ -6,6 +6,16 @@
 /// Error message constants
 pub mod messages;
 
+/// Enhanced error handling with suggestions and recovery
+pub mod enhanced;
+
+/// Error recovery strategies
+pub mod recovery;
+
+// Re-export key types for convenience
+#[cfg(feature = "alloc")]
+pub use enhanced::RecoveryStrategy;
+
 #[cfg(feature = "std")]
 use std::fmt;
 
@@ -139,7 +149,7 @@ impl YamlError {
 impl fmt::Display for YamlError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}: {}", self.kind, self.message)?;
-        
+
         if let Some(line) = self.line {
             if let Some(col) = self.column {
                 write!(f, " at line {}, column {}", line, col)?;
@@ -147,7 +157,7 @@ impl fmt::Display for YamlError {
                 write!(f, " at line {}", line)?;
             }
         }
-        
+
         Ok(())
     }
 }
@@ -216,8 +226,7 @@ mod tests {
 
     #[test]
     fn test_error_with_position() {
-        let error = YamlError::new(ErrorKind::ParseError, "test")
-            .with_position(10, 5);
+        let error = YamlError::new(ErrorKind::ParseError, "test").with_position(10, 5);
         assert_eq!(error.line(), Some(10));
         assert_eq!(error.column(), Some(5));
     }
