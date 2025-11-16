@@ -7,7 +7,9 @@
 //! - Process large documents efficiently
 //! - Collect specific node types
 
-use yaml_lib::{parse, BufferSource, Node, NodeIteratorExt, NodePath, NodeStream, Numeric, PathSegment};
+use yaml_lib::{
+    parse, BufferSource, Node, NodeIteratorExt, NodePath, NodeStream, Numeric, PathSegment,
+};
 
 fn main() {
     println!("=== YAML Streaming and Iterator Example ===\n");
@@ -117,24 +119,21 @@ users:
         Ok(node) => {
             // Find first "admin" string
             println!("Finding first 'admin':");
-            if let Some(found) = node.find_node(|n| {
-                matches!(n, Node::Str(s, _, _) if s == "admin")
-            }) {
+            if let Some(found) = node.find_node(|n| matches!(n, Node::Str(s, _, _) if s == "admin"))
+            {
                 println!("  Found: {:?}", found);
             }
 
             // Filter all "admin" strings
             println!("\nFiltering all 'admin' roles:");
-            let admins = node.filter_nodes(|n| {
-                matches!(n, Node::Str(s, _, _) if s == "admin")
-            });
+            let admins = node.filter_nodes(|n| matches!(n, Node::Str(s, _, _) if s == "admin"));
             println!("  Found {} admin roles", admins.len());
 
             // Count specific node types
             let string_count = node.filter_nodes(|n| matches!(n, Node::Str(_, _, _))).len();
             let array_count = node.filter_nodes(|n| matches!(n, Node::Array(_))).len();
             let mapping_count = node.filter_nodes(|n| matches!(n, Node::Mapping(_))).len();
-            
+
             println!("\nNode type counts:");
             println!("  Strings: {}", string_count);
             println!("  Arrays: {}", array_count);
@@ -165,9 +164,7 @@ prices:
             println!("Prices over $20:");
             let stream = NodeStream::new(&node);
             let expensive: Vec<_> = stream
-                .filter(|n| {
-                    matches!(n, Node::Number(Numeric::Float(price)) if *price > 20.0)
-                })
+                .filter(|n| matches!(n, Node::Number(Numeric::Float(price)) if *price > 20.0))
                 .collect();
             println!("  Found {} expensive items", expensive.len());
 
@@ -222,7 +219,7 @@ config:
             path.push("config");
             path.push("database");
             path.push("host");
-            
+
             if let Some(found) = path.get(&node) {
                 println!("Database host: {:?}", found);
             }
@@ -239,9 +236,9 @@ items:
             if let Ok(node2) = parse(&mut source2) {
                 let mut path2 = NodePath::new();
                 path2.push("items");
-                path2.push(1usize);  // Second item
+                path2.push(1usize); // Second item
                 path2.push("name");
-                
+
                 if let Some(found) = path2.get(&node2) {
                     println!("Second item name: {:?}", found);
                 }
@@ -253,7 +250,7 @@ items:
                 PathSegment::from("server"),
                 PathSegment::from("port"),
             ]);
-            
+
             if let Some(found) = path3.get(&node) {
                 println!("Server port: {:?}", found);
             }
@@ -333,21 +330,17 @@ fn demo_large_document() {
             // Find specific items using stream
             let stream = NodeStream::new(&node);
             let high_value_count = stream
-                .filter(|n| {
-                    matches!(n, Node::Number(Numeric::Integer(v)) if *v > 5000)
-                })
+                .filter(|n| matches!(n, Node::Number(Numeric::Integer(v)) if *v > 5000))
                 .count();
             println!("  Items with value > 5000: {}", high_value_count);
 
             // Calculate statistics using fold
             let stream = NodeStream::new(&node);
-            let (sum, count) = stream.fold((0i64, 0usize), |(sum, count), n| {
-                match n {
-                    Node::Number(Numeric::Integer(v)) => (sum + v, count + 1),
-                    _ => (sum, count),
-                }
+            let (sum, count) = stream.fold((0i64, 0usize), |(sum, count), n| match n {
+                Node::Number(Numeric::Integer(v)) => (sum + v, count + 1),
+                _ => (sum, count),
             });
-            
+
             if count > 0 {
                 let average = sum as f64 / count as f64;
                 println!("  Average value: {:.2}", average);

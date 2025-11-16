@@ -51,6 +51,9 @@ mod parser;
 mod stringify;
 /// Module containing  utility functions for the YAML library
 mod utils;
+/// Module for YAML validation and schema support
+#[cfg(feature = "alloc")]
+pub mod validation;
 
 /// ============
 /// YAML_lib API
@@ -207,3 +210,17 @@ pub use utils::string_interner::SimpleInterner;
 /// Thread-safe string interner with read-write lock
 #[cfg(feature = "alloc")]
 pub use utils::string_interner::StringInterner;
+
+// Validation API
+/// Validation engine and error types
+#[cfg(feature = "alloc")]
+pub use validation::engine::{SchemaValidator, ValidationContext, ValidationError};
+/// Schema types for defining validation rules
+#[cfg(feature = "alloc")]
+pub use validation::schema::{ArraySchema, ObjectSchema, PropertySchema, Schema, SchemaType};
+/// Built-in validators
+#[cfg(feature = "alloc")]
+pub use validation::validators::{
+    CustomValidator, EnumValidator, LengthValidator, PatternValidator, RangeValidator,
+    RequiredValidator, TypeValidator, ValidationResult, Validator,
+};
