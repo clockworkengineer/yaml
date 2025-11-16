@@ -93,6 +93,10 @@ pub use nodes::node::MappingBuilder;
 pub use nodes::node::Node;
 /// Core data structure representing a numeric value node in the parsed tree
 pub use nodes::node::Numeric;
+/// Quote type for string nodes
+pub use nodes::node::QuoteType;
+/// Block style for string nodes
+pub use nodes::node::BlockStyle;
 /// Fluent builder for constructing Set nodes
 #[cfg(feature = "alloc")]
 pub use nodes::node::SetBuilder;
@@ -153,3 +157,24 @@ pub use utils::string_interner::SimpleInterner;
 /// Thread-safe string interner with read-write lock
 #[cfg(feature = "alloc")]
 pub use utils::string_interner::StringInterner;
+/// Capacity hints for optimizing allocations during parsing
+#[cfg(feature = "alloc")]
+pub use utils::optimization::CapacityHints;
+/// Fast path detector for common YAML patterns
+#[cfg(feature = "alloc")]
+pub use utils::optimization::FastPathDetector;
+/// Lazy tag that defers type coercion until accessed
+#[cfg(feature = "alloc")]
+pub use utils::optimization::LazyTag;
+/// Memory-efficient node builder that reuses allocations
+#[cfg(feature = "alloc")]
+pub use utils::optimization::NodeBuilder;
+/// Performance optimizer combining multiple optimization strategies
+#[cfg(feature = "alloc")]
+pub use utils::optimization::PerformanceOptimizer;
+/// String pool for deduplicating common strings during parsing
+#[cfg(all(feature = "std", feature = "alloc"))]
+pub use utils::optimization::StringPool;
+/// Zero-copy string wrapper
+#[cfg(feature = "alloc")]
+pub use utils::optimization::ZeroCopyStr;

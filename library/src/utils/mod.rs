@@ -7,6 +7,10 @@ pub mod performance;
 #[cfg(feature = "alloc")]
 pub mod string_interner;
 
+/// Performance optimization utilities (lazy evaluation, capacity hints, zero-copy)
+#[cfg(feature = "alloc")]
+pub mod optimization;
+
 use crate::constants::{CHAR_HASH, CHAR_NEWLINE};
 use crate::io::traits::ISource;
 use crate::{Node, Numeric};
