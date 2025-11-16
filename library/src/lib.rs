@@ -174,6 +174,24 @@ pub use utils::performance::Timer;
 /// Utility to compare performance of different approaches
 #[cfg(feature = "std")]
 pub use utils::performance::compare_performance;
+/// Iterator for traversing node trees
+#[cfg(feature = "alloc")]
+pub use utils::streaming::NodeIterator;
+/// Extension trait for Node providing iterator methods
+#[cfg(feature = "alloc")]
+pub use utils::streaming::NodeIteratorExt;
+/// Path for accessing nested nodes
+#[cfg(feature = "alloc")]
+pub use utils::streaming::NodePath;
+/// Stream processor for efficient large document handling
+#[cfg(feature = "alloc")]
+pub use utils::streaming::NodeStream;
+/// Path segment (key or index) for node access
+#[cfg(feature = "alloc")]
+pub use utils::streaming::PathSegment;
+/// Traversal order for iterating through nodes
+#[cfg(feature = "alloc")]
+pub use utils::streaming::TraversalOrder;
 /// Common pre-interned strings for typical YAML keys
 #[cfg(feature = "alloc")]
 pub use utils::string_interner::CommonStrings;

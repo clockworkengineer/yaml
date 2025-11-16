@@ -11,6 +11,10 @@ pub mod string_interner;
 #[cfg(feature = "alloc")]
 pub mod optimization;
 
+/// Streaming and iterator support for efficient YAML processing
+#[cfg(feature = "alloc")]
+pub mod streaming;
+
 use crate::constants::{CHAR_HASH, CHAR_NEWLINE};
 use crate::io::traits::ISource;
 use crate::{Node, Numeric};

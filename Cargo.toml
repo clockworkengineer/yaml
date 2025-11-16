@@ -20,5 +20,6 @@ members = [
     "examples/yaml_embedded_systems",
     "examples/yaml_string_interning",
     "examples/yaml_performance_opts",
+    "examples/yaml_streaming",
     "library",
 ]
