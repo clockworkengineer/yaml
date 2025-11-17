@@ -16,11 +16,15 @@ use crate::utils::*;
 /// # Arguments
 ///
 /// * `source` - A mutable reference to a source implementing ISource trait
+/// * `directives` - Directive context for tag resolution
 ///
 /// # Returns
 ///
 /// Result containing a Mapping Node with null values (for set coercion) or an error string
-pub(crate) fn parse_inline_set(source: &mut dyn ISource) -> Result<Node, String> {
+pub(crate) fn parse_inline_set(
+    source: &mut dyn ISource,
+    directives: &crate::parser::directives::DirectiveContext,
+) -> Result<Node, String> {
     let mut pairs: Vec<(Node, Node)> = Vec::new();
     source.next(); // Skip the opening '{'
     skip_whitespace(source);
@@ -36,8 +40,8 @@ pub(crate) fn parse_inline_set(source: &mut dyn ISource) -> Result<Node, String>
                 let raw = parse_quoted_scalar(source)?;
                 parse_scalar(raw.trim())
             }
-            Some(CHAR_LBRACE) => parse_inline_mapping(source)?,
-            Some(CHAR_LBRACKET) => parse_inline_sequence(source)?,
+            Some(CHAR_LBRACE) => parse_inline_mapping(source, directives)?,
+            Some(CHAR_LBRACKET) => parse_inline_sequence(source, directives)?,
             Some(_) => {
                 let val = collect_until(source, |c| {
                     c == CHAR_COMMA || c == CHAR_RBRACE || c == CHAR_HASH
@@ -88,11 +92,15 @@ pub(crate) fn parse_inline_set(source: &mut dyn ISource) -> Result<Node, String>
 /// # Arguments
 ///
 /// * `source` - A mutable reference to a source implementing ISource trait
+/// * `directives` - Directive context for tag resolution
 ///
 /// # Returns
 ///
 /// Result containing a Mapping Node or an error string
-pub(crate) fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, String> {
+pub(crate) fn parse_inline_mapping(
+    source: &mut dyn ISource,
+    directives: &crate::parser::directives::DirectiveContext,
+) -> Result<Node, String> {
     // Save the current position to potentially backtrack
     let saved_state = source.save_state();
 
@@ -133,13 +141,16 @@ pub(crate) fn parse_inline_mapping(source: &mut dyn ISource) -> Result<Node, Str
     source.restore_state(saved_state);
 
     if has_colons {
-        parse_inline_mapping_with_colons(source)
+        parse_inline_mapping_with_colons(source, directives)
     } else {
-        parse_inline_set(source)
+        parse_inline_set(source, directives)
     }
 }
 /// Parses an inline YAML mapping with key-value pairs (original implementation).
-fn parse_inline_mapping_with_colons(source: &mut dyn ISource) -> Result<Node, String> {
+fn parse_inline_mapping_with_colons(
+    source: &mut dyn ISource,
+    directives: &crate::parser::directives::DirectiveContext,
+) -> Result<Node, String> {
     let mut pairs: Vec<(Node, Node)> = Vec::new();
     source.next();
     skip_whitespace(source);
@@ -166,8 +177,8 @@ fn parse_inline_mapping_with_colons(source: &mut dyn ISource) -> Result<Node, St
         skip_whitespace(source);
 
         let value_node = match source.current() {
-            Some(CHAR_LBRACE) => parse_inline_mapping(source)?,
-            Some(CHAR_LBRACKET) => parse_inline_sequence(source)?,
+            Some(CHAR_LBRACE) => parse_inline_mapping(source, directives)?,
+            Some(CHAR_LBRACKET) => parse_inline_sequence(source, directives)?,
             Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
                 let raw = parse_quoted_scalar(source)?;
                 parse_scalar(raw.trim())
@@ -217,11 +228,15 @@ fn parse_inline_mapping_with_colons(source: &mut dyn ISource) -> Result<Node, St
 /// # Arguments
 ///
 /// * `source` - A mutable reference to a source implementing ISource trait
+/// * `directives` - Directive context for tag resolution
 ///
 /// # Returns
 ///
 /// Result containing an Array Node or an error string
-pub(crate) fn parse_inline_sequence(source: &mut dyn ISource) -> Result<Node, String> {
+pub(crate) fn parse_inline_sequence(
+    source: &mut dyn ISource,
+    directives: &crate::parser::directives::DirectiveContext,
+) -> Result<Node, String> {
     let mut items: Vec<Node> = Vec::new();
     source.next();
     skip_whitespace(source);
@@ -234,11 +249,11 @@ pub(crate) fn parse_inline_sequence(source: &mut dyn ISource) -> Result<Node, St
     loop {
         match source.current() {
             Some(CHAR_LBRACKET) => {
-                let nested = parse_inline_sequence(source)?;
+                let nested = parse_inline_sequence(source, directives)?;
                 items.push(nested);
             }
             Some(CHAR_LBRACE) => {
-                let nested_map = parse_inline_mapping(source)?;
+                let nested_map = parse_inline_mapping(source, directives)?;
                 items.push(nested_map);
             }
             Some(_) => {

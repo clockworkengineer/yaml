@@ -556,4 +556,43 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_parse_document_with_tag_directives() {
+        // Test tag prefix resolution
+        let mut source = BufferSource::new(
+            b"%TAG !e! tag:example.com,2000:app/\n\
+            ---\n\
+            item: !e!custom value",
+        );
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(docs) = &result {
+            assert_eq!(docs.len(), 1);
+            if let Document(nodes) = &docs[0] {
+                assert!(!nodes.is_empty());
+                // Check that the tag was resolved
+                if let Node::Mapping(pairs) = &nodes[0] {
+                    if let Node::Tagged(_, tag) = &pairs[0].1 {
+                        // Tag should be resolved from !e!custom to tag:example.com,2000:app/custom
+                        assert_eq!(tag, "tag:example.com,2000:app/custom");
+                    } else {
+                        panic!("Expected tagged node");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_document_with_yaml_version() {
+        // Test YAML version directive
+        let mut source = BufferSource::new(
+            b"%YAML 1.2\n\
+            ---\n\
+            key: value",
+        );
+        let result = parse(&mut source);
+        assert!(result.is_ok());
+    }
 }

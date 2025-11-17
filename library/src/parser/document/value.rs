@@ -14,12 +14,12 @@ fn is_base64(s: &str) -> bool {
     if s.is_empty() {
         return true;
     }
-    
+
     // Check length (must be multiple of 4 for proper base64)
     if s.len() % 4 != 0 {
         return false;
     }
-    
+
     // Check characters (only A-Z, a-z, 0-9, +, /, and = for padding)
     for c in s.chars() {
         match c {
@@ -28,13 +28,13 @@ fn is_base64(s: &str) -> bool {
             _ => return false,
         }
     }
-    
+
     // Check padding rules
     let padding_count = s.chars().rev().take_while(|&c| c == '=').count();
     if padding_count > 2 {
         return false;
     }
-    
+
     true
 }
 ///
@@ -172,7 +172,11 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
                 if is_base64(&clean_input) {
                     // Store as a tagged string node to preserve the binary nature
                     return Some(Node::Tagged(
-                        Box::new(Node::Str(clean_input, QuoteType::Unquoted, BlockStyle::None)),
+                        Box::new(Node::Str(
+                            clean_input,
+                            QuoteType::Unquoted,
+                            BlockStyle::None,
+                        )),
                         "!!binary".to_string(),
                     ));
                 }
@@ -256,7 +260,7 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
             }
             _ => None,
         },
-        // Support for octal integers  
+        // Support for octal integers
         "!!int:oct" | "!int:oct" => match node {
             Node::Str(s, _, _) => {
                 let clean = s.trim_start_matches("0o").trim_start_matches("0");
@@ -278,14 +282,20 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
 /// aliases (*alias), inline collections, quoted scalars, and plain scalars.
 /// Handles type coercion based on tags and resolves anchors and aliases.
 ///
+/// Tag handles are resolved using the directive context.
+///
 /// # Arguments
 ///
 /// * `source` - A mutable reference to a source implementing ISource trait
+/// * `directives` - Directive context for tag resolution
 ///
 /// # Returns
 ///
 /// Result containing the parsed Node value or an error string
-pub(crate) fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
+pub(crate) fn parse_value(
+    source: &mut dyn ISource,
+    directives: &crate::parser::directives::DirectiveContext,
+) -> Result<Node, String> {
     if source.current() == Some('!') {
         source.next();
 
@@ -294,11 +304,15 @@ pub(crate) fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
         if tag.trim().is_empty() {
             return Err(parse_error(source, "Empty tag"));
         }
+
+        // Resolve tag handle using directive context
+        let resolved_tag = directives.resolve_tag(&tag);
+
         skip_whitespace(source);
 
         let inner = match source.current() {
-            Some(CHAR_LBRACE) => parse_inline_mapping(source)?,
-            Some(CHAR_LBRACKET) => parse_inline_sequence(source)?,
+            Some(CHAR_LBRACE) => parse_inline_mapping(source, directives)?,
+            Some(CHAR_LBRACKET) => parse_inline_sequence(source, directives)?,
             Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
                 let raw = parse_quoted_scalar(source)?;
                 parse_scalar(raw.trim())
@@ -312,9 +326,9 @@ pub(crate) fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
                 if let Some(ch) = next_ch {
                     if source.is_whitespace(ch) || ch == CHAR_NEWLINE {
                         let nested_indent = source.get_current_indent_level();
-                        crate::parser::document::parse_sequence(source, nested_indent)?
+                        crate::parser::document::parse_sequence(source, nested_indent, directives)?
                     } else {
-                        parse_value(source)?
+                        parse_value(source, directives)?
                     }
                 } else {
                     return Err(parse_error(source, ERR_UNEXPECTED_EOF_AFTER_ANCHOR));
@@ -329,21 +343,26 @@ pub(crate) fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
                 let current_indent = source.get_current_indent_level();
                 if current_indent > 0 {
                     // Parse as block structure
-                    crate::parser::document::parse_document_contents(source, current_indent)?
+                    crate::parser::document::parse_document_contents(
+                        source,
+                        current_indent,
+                        directives,
+                    )?
                 } else {
                     // No indented content, treat as null
                     Node::None
                 }
             }
-            Some(_) => parse_value(source)?,
+            Some(_) => parse_value(source, directives)?,
             None => return Err(parse_error(source, ERR_UNEXPECTED_EOF_AFTER_ANCHOR)),
         };
 
-        if let Some(coerced) = try_coerce_tag(&tag, inner.clone()) {
+        // Use resolved tag for coercion and storage
+        if let Some(coerced) = try_coerce_tag(&resolved_tag, inner.clone()) {
             return Ok(coerced);
         }
 
-        return Ok(Node::Tagged(Box::new(inner), tag));
+        return Ok(Node::Tagged(Box::new(inner), resolved_tag));
     }
 
     if source.current() == Some(CHAR_ASTERISK) {
@@ -370,25 +389,29 @@ pub(crate) fn parse_value(source: &mut dyn ISource) -> Result<Node, String> {
             source.next();
             skip_whitespace(source);
             let nested_indent = source.get_current_indent_level();
-            let node = crate::parser::document::parse_document_contents(source, nested_indent)?;
+            let node = crate::parser::document::parse_document_contents(
+                source,
+                nested_indent,
+                directives,
+            )?;
             return Ok(Node::Anchored(Box::new(node), name));
         }
         let node = match source.current() {
-            Some(CHAR_LBRACE) => parse_inline_mapping(source)?,
-            Some(CHAR_LBRACKET) => parse_inline_sequence(source)?,
+            Some(CHAR_LBRACE) => parse_inline_mapping(source, directives)?,
+            Some(CHAR_LBRACKET) => parse_inline_sequence(source, directives)?,
             Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
                 let raw = parse_quoted_scalar(source)?;
                 parse_scalar(raw.trim())
             }
-            Some(_) => parse_value(source)?,
+            Some(_) => parse_value(source, directives)?,
             None => return Err(parse_error(source, ERR_UNEXPECTED_EOF_AFTER_ANCHOR)),
         };
         return Ok(Node::Anchored(Box::new(node), name));
     }
 
     match source.current() {
-        Some(CHAR_LBRACE) => parse_inline_mapping(source),
-        Some(CHAR_LBRACKET) => parse_inline_sequence(source),
+        Some(CHAR_LBRACE) => parse_inline_mapping(source, directives),
+        Some(CHAR_LBRACKET) => parse_inline_sequence(source, directives),
         Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
             let raw = parse_quoted_scalar(source)?;
             let trimmed = raw.trim();

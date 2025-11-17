@@ -17,11 +17,16 @@ use crate::parser::document::value::parse_value;
 ///
 /// * `source` - A mutable reference to a source implementing ISource trait
 /// * `indent_level` - The expected indentation level for mapping entries
+/// * `directives` - Directive context for tag resolution
 ///
 /// # Returns
 ///
 /// Result containing a Mapping Node or an error string
-pub(crate) fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Result<Node, String> {
+pub(crate) fn parse_mapping(
+    source: &mut dyn ISource,
+    indent_level: usize,
+    directives: &crate::parser::directives::DirectiveContext,
+) -> Result<Node, String> {
     /// Checks if a string value can be safely represented as plain (unquoted) YAML.
     ///
     /// Returns false if the string contains characters that require quoting
@@ -82,11 +87,15 @@ pub(crate) fn parse_mapping(source: &mut dyn ISource, indent_level: usize) -> Re
                 if next_indent > indent_level && newline {
                     pairs.push((
                         key_node,
-                        crate::parser::document::parse_document_contents(source, next_indent)?,
+                        crate::parser::document::parse_document_contents(
+                            source,
+                            next_indent,
+                            directives,
+                        )?,
                     ));
                     continue;
                 } else {
-                    let mut value_node = parse_value(source)?;
+                    let mut value_node = parse_value(source, directives)?;
                     if let Node::Str(ref mut s, ref mut qt, ref mut style) = value_node {
                         if matches!(*qt, QuoteType::Single | QuoteType::Double)
                             && is_plain_safe_value(s)

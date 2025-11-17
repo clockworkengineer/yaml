@@ -27,7 +27,7 @@ use crate::io::traits::ISource;
 use crate::nodes::node::BlockStyle;
 use crate::nodes::node::Node;
 use crate::nodes::node::Node::Document;
-use crate::parser::directives::parse_directives;
+use crate::parser::directives::{DirectiveContext, parse_directives};
 use std::collections::HashMap;
 
 use helpers::node_is_blank;
@@ -103,29 +103,33 @@ fn parse_multiple_explicit_keys(
 /// # Arguments
 ///
 /// * `source` - A mutable reference to a source implementing ISource trait
-/// * `indent_level` - The current indentation level for proper nesting
+/// * `indent_level` - The indentation level for proper nesting
+/// * `directives` - Directive context for tag resolution and version-specific parsing
 ///
 /// # Returns
 ///
-/// Result containing the parsed Node or an error string
+/// Result containing a Node or an error string
 pub fn parse_document_contents(
     source: &mut dyn ISource,
     indent_level: usize,
+    directives: &DirectiveContext,
 ) -> Result<Node, String> {
     match source.current() {
         Some(c) if c == '-' => {
             let indent_level = source.get_current_indent_level();
-            Ok(parse_sequence(source, indent_level)?)
+            Ok(parse_sequence(source, indent_level, directives)?)
         }
         Some(c) if c == '#' => {
             parse_comment(source);
             skip_whitespace(source);
-            parse_document_contents(source, indent_level)
+            parse_document_contents(source, indent_level, directives)
         }
-        Some(c) if c == '{' => Ok(parse_inline_mapping(source)?),
-        Some(c) if c == '[' => Ok(parse_inline_sequence(source)?),
+        Some(c) if c == '{' => Ok(parse_inline_mapping(source, directives)?),
+        Some(c) if c == '[' => Ok(parse_inline_sequence(source, directives)?),
         // Support tagged values at the start of a nested block (e.g. indented "!!set" lines)
-        Some(c) if c == '!' => Ok(crate::parser::document::value::parse_value(source)?),
+        Some(c) if c == '!' => Ok(crate::parser::document::value::parse_value(
+            source, directives,
+        )?),
         Some(c) if c == '?' => {
             // Check if we have multiple explicit keys at this indentation level (likely a set)
             let current_indent = source.get_current_indent_level();
@@ -158,10 +162,10 @@ pub fn parse_document_contents(
                 let mut key_node: Node;
 
                 if source.current() == Some('[') {
-                    key_node = parse_inline_sequence(source)?;
+                    key_node = parse_inline_sequence(source, directives)?;
                 } else if source.current() == Some('-') {
                     let nested_indent = source.get_current_indent_level();
-                    key_node = parse_sequence(source, nested_indent)?;
+                    key_node = parse_sequence(source, nested_indent, directives)?;
                 } else if matches!(source.current(), Some('|') | Some('>')) {
                     let is_folded = source.current() == Some('>');
 
@@ -248,7 +252,7 @@ pub fn parse_document_contents(
                         crate::nodes::node::BlockStyle::None,
                     );
                 } else if matches!(source.current(), Some('"') | Some('\'')) {
-                    key_node = crate::parser::document::value::parse_value(source)?;
+                    key_node = crate::parser::document::value::parse_value(source, directives)?;
                 } else if source.current() == Some('#') || source.current() == Some('\n') {
                     let st = source.save_state();
                     let _ = crate::utils::read_line_trimmed_into_string(source);
@@ -258,7 +262,7 @@ pub fn parse_document_contents(
                     skip_whitespace(source);
                     if source.current() == Some('-') {
                         let nested_indent = source.get_current_indent_level();
-                        key_node = parse_sequence(source, nested_indent)?;
+                        key_node = parse_sequence(source, nested_indent, directives)?;
                     } else {
                         source.restore_state(st);
                         key_node = Node::Str(
@@ -360,13 +364,13 @@ pub fn parse_document_contents(
                 }
                 skip_whitespace(source);
                 let mut value_node = match source.current() {
-                    Some('[') => parse_inline_sequence(source)?,
-                    Some('{') => parse_inline_mapping(source)?,
+                    Some('[') => parse_inline_sequence(source, directives)?,
+                    Some('{') => parse_inline_mapping(source, directives)?,
                     Some('-') => {
                         let nested_indent = source.get_current_indent_level();
-                        parse_sequence(source, nested_indent)?
+                        parse_sequence(source, nested_indent, directives)?
                     }
-                    Some(_) => parse_value(source)?,
+                    Some(_) => parse_value(source, directives)?,
                     None => {
                         return Err(helpers::parse_error(
                             source,
@@ -380,7 +384,7 @@ pub fn parse_document_contents(
                     crate::utils::skip_whitespace_and_comments(source);
                     if source.current() == Some('-') {
                         let nested_indent = source.get_current_indent_level();
-                        value_node = parse_sequence(source, nested_indent)?;
+                        value_node = parse_sequence(source, nested_indent, directives)?;
                     } else {
                         source.restore_state(st_peek);
                     }
@@ -393,7 +397,7 @@ pub fn parse_document_contents(
         }
         Some(c) if c.is_alphanumeric() => {
             if peek_ahead_for_mapping_key(source) {
-                Ok(parse_mapping(source, indent_level)?)
+                Ok(parse_mapping(source, indent_level, directives)?)
             } else if indent_level > 0 {
                 let base_indent = source.get_current_indent_level();
                 let mut parts: Vec<String> = Vec::new();
@@ -427,24 +431,24 @@ pub fn parse_document_contents(
                     crate::nodes::node::BlockStyle::None,
                 ))
             } else {
-                Ok(parse_mapping(source, indent_level)?)
+                Ok(parse_mapping(source, indent_level, directives)?)
             }
         }
         Some(c) if c.is_whitespace() => {
             source.next();
-            Ok(parse_document_contents(source, indent_level)?)
+            Ok(parse_document_contents(source, indent_level, directives)?)
         }
         Some('\0') => {
             source.next();
-            Ok(parse_document_contents(source, indent_level)?)
+            Ok(parse_document_contents(source, indent_level, directives)?)
         }
         Some(c) if matches!(c, '<' | '>' | '"' | '\'' | '|') => {
             if matches!(source.current(), Some('"') | Some('\''))
                 && peek_ahead_for_mapping_key(source)
             {
-                Ok(parse_mapping(source, indent_level)?)
+                Ok(parse_mapping(source, indent_level, directives)?)
             } else {
-                Ok(parse_value(source)?)
+                Ok(parse_value(source, directives)?)
             }
         }
         Some(c) => Err(helpers::parse_error(
@@ -469,11 +473,16 @@ pub fn parse_document_contents(
 ///
 /// * `source` - A mutable reference to a source implementing ISource trait
 /// * `indent_level` - The indentation level for the document
+/// * `directives` - Directive context for tag resolution and version-specific parsing
 ///
 /// # Returns
 ///
 /// Result containing a Document Node or an error string
-pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<Node, String> {
+pub fn parse_document(
+    source: &mut dyn ISource,
+    indent_level: usize,
+    directives: &DirectiveContext,
+) -> Result<Node, String> {
     skip_whitespace(source);
 
     let mut document_nodes = Vec::new();
@@ -494,7 +503,7 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
                 continue;
             }
             _ => {
-                let node = parse_document_contents(source, indent_level)?;
+                let node = parse_document_contents(source, indent_level, directives)?;
                 if !node_is_blank(&node) {
                     document_nodes.push(node);
                 }
@@ -549,12 +558,11 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
 /// Result containing a Documents Node with all parsed documents or an error string
 pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
     let mut docs: Vec<Node> = Vec::new();
-    
+
     while source.more() {
         // Parse directives before this document
-        let _directives = parse_directives(source)?;
-        // TODO: Pass directives to parse_document for tag resolution
-        
+        let directives = parse_directives(source)?;
+
         // Check for document start marker (---)
         if helpers::peek_ahead_for_document_start_end(source, '-') {
             source.next();
@@ -564,9 +572,9 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
                 source.next();
             }
         }
-        
-        // Parse the document
-        let document = parse_document(source, 0);
+
+        // Parse the document with directive context
+        let document = parse_document(source, 0, &directives);
         match document {
             Ok(doc) => {
                 let is_blank_doc = match &doc {
@@ -579,7 +587,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
             }
             Err(err) => return Err(err),
         }
-        
+
         // Check for document end marker (...)
         skip_whitespace(source);
         if helpers::peek_ahead_for_document_start_end(source, '.') {
@@ -590,13 +598,13 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
                 source.next();
             }
         }
-        
+
         // If no more content, stop
         if !source.more() {
             break;
         }
     }
-    
+
     if docs.is_empty() {
         docs.push(Document(Vec::new()))
     }
@@ -686,8 +694,9 @@ mod tests {
 
     #[test]
     fn test_parse_inline_sequence_simple_and_empty() {
+        let directives = DirectiveContext::new();
         let mut src = Buffer::new(b"[1, 'two', 3]");
-        let node = parse_inline_sequence(&mut src).unwrap();
+        let node = parse_inline_sequence(&mut src, &directives).unwrap();
         assert!(matches!(node, Node::Array(_)));
         if let Node::Array(items) = node {
             assert_eq!(items.len(), 3);
@@ -706,14 +715,15 @@ mod tests {
         }
 
         let mut empty = Buffer::new(b"[]");
-        let node = parse_inline_sequence(&mut empty).unwrap();
+        let node = parse_inline_sequence(&mut empty, &directives).unwrap();
         assert!(matches!(node, Node::Array(ref v) if v.is_empty()));
     }
 
     #[test]
     fn test_parse_inline_mapping_simple_and_empty() {
+        let directives = DirectiveContext::new();
         let mut src = Buffer::new(b"{key1: 1, 'key2': \"two\"}");
-        let node = parse_inline_mapping(&mut src).unwrap();
+        let node = parse_inline_mapping(&mut src, &directives).unwrap();
         assert!(matches!(node, Node::Mapping(_)));
         if let Node::Mapping(pairs) = node {
             assert_eq!(pairs.len(), 2);
@@ -733,7 +743,7 @@ mod tests {
         }
 
         let mut empty = Buffer::new(b"{}");
-        let node = parse_inline_mapping(&mut empty).unwrap();
+        let node = parse_inline_mapping(&mut empty, &directives).unwrap();
         assert!(matches!(node, Node::Mapping(ref v) if v.is_empty()));
     }
 
@@ -746,12 +756,13 @@ mod tests {
 
     #[test]
     fn test_parse_value_alias_and_anchor() {
+        let directives = DirectiveContext::new();
         let mut a = Buffer::new(b"*myalias");
-        let n = parse_value(&mut a).unwrap();
+        let n = parse_value(&mut a, &directives).unwrap();
         assert!(matches!(n, Node::Alias(ref name) if name == "myalias"));
 
         let mut b = Buffer::new(b"&aname 42");
-        let n = parse_value(&mut b).unwrap();
+        let n = parse_value(&mut b, &directives).unwrap();
         if let Node::Anchored(inner, name) = n {
             assert_eq!(*name, "aname".to_string());
             assert!(matches!(
@@ -765,8 +776,9 @@ mod tests {
 
     #[test]
     fn test_parse_document_contents_empty_line() {
+        let directives = DirectiveContext::new();
         let mut src = Buffer::new(b"key: value\n\n");
-        let n = parse_document_contents(&mut src, 0).unwrap();
+        let n = parse_document_contents(&mut src, 0, &directives).unwrap();
         assert!(matches!(n, Node::Mapping(_)));
     }
 }

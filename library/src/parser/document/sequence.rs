@@ -18,6 +18,7 @@ use crate::parser::document::value::parse_value;
 ///
 /// * `source` - A mutable reference to a source implementing ISource trait
 /// * `indent_level` - The expected indentation level for sequence items
+/// * `directives` - Directive context for tag resolution
 ///
 /// # Returns
 ///
@@ -25,6 +26,7 @@ use crate::parser::document::value::parse_value;
 pub(crate) fn parse_sequence(
     source: &mut dyn ISource,
     indent_level: usize,
+    directives: &crate::parser::directives::DirectiveContext,
 ) -> Result<Node, String> {
     let mut items = Vec::new();
     while let Some(c) = source.current() {
@@ -59,11 +61,12 @@ pub(crate) fn parse_sequence(
                             items.push(crate::parser::document::parse_document_contents(
                                 source,
                                 nested_indent,
+                                directives,
                             )?);
                             continue;
                         }
                         CHAR_LBRACKET | CHAR_LBRACE => {
-                            items.push(parse_value(source)?);
+                            items.push(parse_value(source, directives)?);
                             continue;
                         }
                         _ => {
@@ -73,10 +76,11 @@ pub(crate) fn parse_sequence(
                                 items.push(crate::parser::document::parse_document_contents(
                                     source,
                                     nested_indent,
+                                    directives,
                                 )?);
                                 continue;
                             } else {
-                                items.push(parse_value(source)?);
+                                items.push(parse_value(source, directives)?);
                             }
                         }
                     }
