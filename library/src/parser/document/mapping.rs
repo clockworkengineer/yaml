@@ -4,7 +4,9 @@ use crate::constants::*;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::nodes::node::{BlockStyle, QuoteType};
-use crate::parser::document::helpers::{parse_comment, parse_error, parse_mapping_key, skip_whitespace};
+use crate::parser::document::helpers::{
+    parse_comment, parse_error, parse_mapping_key, skip_whitespace,
+};
 use crate::parser::document::value::parse_value;
 
 /// Parses a YAML mapping (dictionary) with the specified indentation level.
@@ -83,10 +85,10 @@ pub(crate) fn parse_mapping(
                         *qt = QuoteType::Unquoted;
                     }
                 }
-                
+
                 // Check for sequence on same line as mapping key (error case)
                 if !newline {
-                    skip_whitespace(source);
+                    crate::parser::document::helpers::skip_whitespace_no_tabs(source)?;
                     if source.current() == Some('-') {
                         let state = source.save_state();
                         source.next();
@@ -94,13 +96,16 @@ pub(crate) fn parse_mapping(
                             if c.is_whitespace() || c == '\n' {
                                 // This is a sequence item on the same line as a key - error
                                 source.restore_state(state);
-                                return Err(parse_error(source, "Sequence cannot start on same line as mapping key"));
+                                return Err(parse_error(
+                                    source,
+                                    "Sequence cannot start on same line as mapping key",
+                                ));
                             }
                         }
                         source.restore_state(state);
                     }
                 }
-                
+
                 let next_indent = source.get_current_indent_level();
                 if next_indent > indent_level && newline {
                     pairs.push((
@@ -137,7 +142,7 @@ pub(crate) fn parse_mapping(
         }
         if !last_was_nested {
             crate::utils::skip_until_newline(source);
-            skip_whitespace(source);
+            crate::parser::document::helpers::skip_whitespace_no_tabs(source)?;
         }
     }
     Ok(Node::Mapping(pairs))

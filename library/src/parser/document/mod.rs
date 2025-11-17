@@ -114,6 +114,11 @@ pub fn parse_document_contents(
     indent_level: usize,
     directives: &DirectiveContext,
 ) -> Result<Node, String> {
+    // Check for tabs in indentation (not allowed in YAML)
+    if helpers::has_tabs_in_indentation(source) {
+        return Err(parse_error(source, "Tabs are not allowed as indentation"));
+    }
+
     match source.current() {
         Some(c) if c == '-' => {
             // Check if this is a document marker (---)
@@ -515,8 +520,7 @@ pub fn parse_document(
         if (c == '-' || c == '.')
             && crate::parser::document::helpers::peek_ahead_for_document_start_end(source, c)
         {
-            crate::utils::skip_until_newline(source);
-            skip_whitespace(source);
+            // Found document marker - just break, let parse() handle it
             break;
         }
 

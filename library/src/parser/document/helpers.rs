@@ -45,7 +45,7 @@ pub(crate) fn parse_error(source: &mut dyn ISource, msg: &str) -> String {
 /// true if tabs are found in indentation, false otherwise
 pub(crate) fn has_tabs_in_indentation(source: &mut dyn ISource) -> bool {
     let state = source.save_state();
-    
+
     // Check from start of line for any tabs before non-whitespace
     while let Some(c) = source.current() {
         if c == '\t' {
@@ -58,7 +58,7 @@ pub(crate) fn has_tabs_in_indentation(source: &mut dyn ISource) -> bool {
         }
         break;
     }
-    
+
     source.restore_state(state);
     false
 }
@@ -79,6 +79,30 @@ pub(crate) fn skip_whitespace(source: &mut dyn ISource) {
             break;
         }
     }
+}
+
+/// Skips whitespace but returns an error if tabs are found as line indentation
+/// Only checks for tabs that appear as indentation (at column positions after newline)
+pub(crate) fn skip_whitespace_no_tabs(source: &mut dyn ISource) -> Result<(), String> {
+    let mut is_line_start = true;  // Assume we're at line start (called after newline)
+    while let Some(c) = source.current() {
+        if c == '\t' && is_line_start {
+            // Tab found as indentation at start of line - not allowed
+            return Err(crate::parser::document::parse_error(
+                source,
+                "Tabs are not allowed as indentation in YAML",
+            ));
+        }
+        if source.is_whitespace(c) {
+            if c != ' ' && c != '\t' {
+                is_line_start = false;  // Non-space/tab whitespace means not indentation
+            }
+            source.next();
+        } else {
+            break;
+        }
+    }
+    Ok(())
 }
 
 /// Determines if a node represents blank or empty content.
@@ -173,7 +197,7 @@ pub(crate) fn parse_quoted_scalar(source: &mut dyn ISource) -> Result<String, St
 
     // Validate escape sequences in double-quoted strings
     if quote == CHAR_DOUBLE_QUOTE && out.len() >= 2 {
-        let inner = &out[1..out.len()-1];
+        let inner = &out[1..out.len() - 1];
         if let Err(e) = crate::utils::validate_double_quoted_escapes(inner) {
             return Err(parse_error(source, &e));
         }
@@ -278,7 +302,7 @@ pub(crate) fn parse_mapping_key(
             newline = c == CHAR_NEWLINE;
             if newline {
                 source.next();
-                skip_whitespace(source);
+                skip_whitespace_no_tabs(source)?;
             }
         }
     }
@@ -288,7 +312,10 @@ pub(crate) fn parse_mapping_key(
             Node::Str(v.to_string(), QuoteType::Unquoted, BlockStyle::None),
             newline,
         )),
-        v => Ok((crate::parser::document::scalar::parse_scalar(v, directives), newline)),
+        v => Ok((
+            crate::parser::document::scalar::parse_scalar(v, directives),
+            newline,
+        )),
     }
 }
 
