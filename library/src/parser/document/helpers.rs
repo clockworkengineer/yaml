@@ -220,11 +220,15 @@ pub(crate) fn peek_ahead_for_mapping_key(source: &mut dyn ISource) -> bool {
 /// # Arguments
 ///
 /// * `source` - A mutable reference to a source implementing ISource trait
+/// * `directives` - Directive context for version-aware parsing
 ///
 /// # Returns
 ///
 /// Result containing a tuple of (key_node, is_complex_key) or an error string
-pub(crate) fn parse_mapping_key(source: &mut dyn ISource) -> Result<(Node, bool), String> {
+pub(crate) fn parse_mapping_key(
+    source: &mut dyn ISource,
+    directives: &crate::parser::directives::DirectiveContext,
+) -> Result<(Node, bool), String> {
     let raw = collect_until(source, |c| c == CHAR_COLON || c == CHAR_NEWLINE);
     let mut newline = false;
     source.next();
@@ -247,7 +251,7 @@ pub(crate) fn parse_mapping_key(source: &mut dyn ISource) -> Result<(Node, bool)
             Node::Str(v.to_string(), QuoteType::Unquoted, BlockStyle::None),
             newline,
         )),
-        v => Ok((crate::parser::document::scalar::parse_scalar(v), newline)),
+        v => Ok((crate::parser::document::scalar::parse_scalar(v, directives), newline)),
     }
 }
 

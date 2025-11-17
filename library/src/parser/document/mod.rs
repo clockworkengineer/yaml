@@ -618,20 +618,21 @@ mod tests {
 
     #[test]
     fn test_parse_scalar() {
-        assert_eq!(parse_scalar("null"), Node::None);
-        assert_eq!(parse_scalar("~"), Node::None);
-        assert_eq!(parse_scalar("true"), Node::Boolean(true));
-        assert_eq!(parse_scalar("false"), Node::Boolean(false));
+        let directives = crate::parser::directives::DirectiveContext::new();
+        assert_eq!(parse_scalar("null", &directives), Node::None);
+        assert_eq!(parse_scalar("~", &directives), Node::None);
+        assert_eq!(parse_scalar("true", &directives), Node::Boolean(true));
+        assert_eq!(parse_scalar("false", &directives), Node::Boolean(false));
         assert_eq!(
-            parse_scalar("42"),
+            parse_scalar("42", &directives),
             Node::Number(crate::nodes::node::Numeric::Integer(42))
         );
         assert_eq!(
-            parse_scalar("3.14"),
+            parse_scalar("3.14", &directives),
             Node::Number(crate::nodes::node::Numeric::Float(3.14))
         );
         assert_eq!(
-            parse_scalar("hello"),
+            parse_scalar("hello", &directives),
             Node::Str(
                 "hello".to_string(),
                 crate::nodes::node::QuoteType::Unquoted,
@@ -639,7 +640,7 @@ mod tests {
             )
         );
         assert_eq!(
-            parse_scalar("#comment"),
+            parse_scalar("#comment", &directives),
             Node::Str(
                 "#comment".to_string(),
                 crate::nodes::node::QuoteType::Unquoted,

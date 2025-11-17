@@ -38,7 +38,7 @@ pub(crate) fn parse_inline_set(
         let item_node = match source.current() {
             Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
                 let raw = parse_quoted_scalar(source)?;
-                parse_scalar(raw.trim())
+                parse_scalar(raw.trim(), directives)
             }
             Some(CHAR_LBRACE) => parse_inline_mapping(source, directives)?,
             Some(CHAR_LBRACKET) => parse_inline_sequence(source, directives)?,
@@ -50,7 +50,7 @@ pub(crate) fn parse_inline_set(
                 if trimmed.is_empty() {
                     return Err(parse_error(source, "Empty item in inline set"));
                 }
-                parse_scalar(trimmed)
+                parse_scalar(trimmed, directives)
             }
             None => return Err(parse_error(source, "Unexpected EOF in inline set")),
         };
@@ -171,7 +171,7 @@ fn parse_inline_mapping_with_colons(
             }
             source.next();
             let trimmed = raw.trim();
-            parse_scalar(trimmed)
+            parse_scalar(trimmed, directives)
         };
 
         skip_whitespace(source);
@@ -181,13 +181,13 @@ fn parse_inline_mapping_with_colons(
             Some(CHAR_LBRACKET) => parse_inline_sequence(source, directives)?,
             Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
                 let raw = parse_quoted_scalar(source)?;
-                parse_scalar(raw.trim())
+                parse_scalar(raw.trim(), directives)
             }
             Some(_) => {
                 let val = collect_until(source, |c| {
                     c == CHAR_COMMA || c == CHAR_RBRACE || c == CHAR_HASH
                 });
-                parse_scalar(val.trim())
+                parse_scalar(val.trim(), directives)
             }
             None => return Err(parse_error(source, ERR_EOF_INLINE_MAPPING)),
         };
@@ -260,7 +260,7 @@ pub(crate) fn parse_inline_sequence(
                 let node = match source.current() {
                     Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
                         let raw = parse_quoted_scalar(source)?;
-                        parse_scalar(raw.trim())
+                        parse_scalar(raw.trim(), directives)
                     }
                     _ => {
                         let val = collect_until(source, |c| {
@@ -270,7 +270,7 @@ pub(crate) fn parse_inline_sequence(
                         if trimmed.is_empty() {
                             Node::None
                         } else {
-                            parse_scalar(trimmed)
+                            parse_scalar(trimmed, directives)
                         }
                     }
                 };

@@ -76,7 +76,7 @@ pub(crate) fn parse_mapping(
                 if source.get_current_indent_level() < indent_level {
                     break;
                 }
-                let (mut key_node, newline) = parse_mapping_key(source)?;
+                let (mut key_node, newline) = parse_mapping_key(source, directives)?;
                 if let Node::Str(ref mut s, ref mut qt, ref mut _style) = key_node {
                     if matches!(*qt, QuoteType::Single | QuoteType::Double) && is_plain_safe_key(s)
                     {

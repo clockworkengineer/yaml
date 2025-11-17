@@ -2,6 +2,7 @@
 
 use crate::nodes::node::Node;
 use crate::nodes::node::{BlockStyle, Numeric, QuoteType};
+use crate::parser::directives::DirectiveContext;
 
 /// Parses a scalar value string into the appropriate YAML Node type.
 ///
@@ -10,20 +11,47 @@ use crate::nodes::node::{BlockStyle, Numeric, QuoteType};
 /// escape sequence handling and quote style preservation. Determines the
 /// appropriate BlockStyle and QuoteType based on content analysis.
 ///
+/// Version-specific behavior:
+/// - YAML 1.1: Accepts yes/no/on/off as booleans, octal with 0 prefix
+/// - YAML 1.2: Only true/false as booleans, octal with 0o prefix
+///
 /// # Arguments
 ///
 /// * `value` - The string value to parse as a scalar
+/// * `directives` - Directive context for version-aware parsing
 ///
 /// # Returns
 ///
 /// A Node representing the parsed scalar value
-pub(crate) fn parse_scalar(value: &str) -> Node {
+pub(crate) fn parse_scalar(value: &str, directives: &DirectiveContext) -> Node {
     match value {
         v if v.starts_with('#') => Node::Str(v.to_string(), QuoteType::Unquoted, BlockStyle::None),
         "null" | "~" => Node::None,
         "true" => Node::Boolean(true),
         "false" => Node::Boolean(false),
+        // YAML 1.1 specific boolean values
+        "yes" | "Yes" | "YES" if directives.is_yaml_11() => Node::Boolean(true),
+        "no" | "No" | "NO" if directives.is_yaml_11() => Node::Boolean(false),
+        "on" | "On" | "ON" if directives.is_yaml_11() => Node::Boolean(true),
+        "off" | "Off" | "OFF" if directives.is_yaml_11() => Node::Boolean(false),
         v => {
+            // Try parsing as octal first (version-specific)
+            if v.starts_with('0') && v.len() > 1 {
+                // YAML 1.2: 0o prefix for octal
+                if v.starts_with("0o") || v.starts_with("0O") {
+                    if let Ok(i) = i64::from_str_radix(&v[2..], 8) {
+                        return Node::Number(Numeric::Integer(i));
+                    }
+                }
+                // YAML 1.1: plain 0 prefix for octal (e.g., 0755)
+                else if directives.is_yaml_11() && v.chars().skip(1).all(|c| c >= '0' && c <= '7') {
+                    if let Ok(i) = i64::from_str_radix(&v[1..], 8) {
+                        return Node::Number(Numeric::Integer(i));
+                    }
+                }
+            }
+            
+            // Try standard integer parsing
             if let Ok(i) = v.parse::<i64>() {
                 Node::Number(Numeric::Integer(i))
             } else if let Ok(f) = v.parse::<f64>() {

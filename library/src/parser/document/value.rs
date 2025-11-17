@@ -315,7 +315,7 @@ pub(crate) fn parse_value(
             Some(CHAR_LBRACKET) => parse_inline_sequence(source, directives)?,
             Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
                 let raw = parse_quoted_scalar(source)?;
-                parse_scalar(raw.trim())
+                parse_scalar(raw.trim(), directives)
             }
             Some('-') => {
                 let st = source.save_state();
@@ -401,7 +401,7 @@ pub(crate) fn parse_value(
             Some(CHAR_LBRACKET) => parse_inline_sequence(source, directives)?,
             Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
                 let raw = parse_quoted_scalar(source)?;
-                parse_scalar(raw.trim())
+                parse_scalar(raw.trim(), directives)
             }
             Some(_) => parse_value(source, directives)?,
             None => return Err(parse_error(source, ERR_UNEXPECTED_EOF_AFTER_ANCHOR)),
@@ -419,7 +419,7 @@ pub(crate) fn parse_value(
                 && trimmed.ends_with(CHAR_DOUBLE_QUOTE)
                 && trimmed.contains('\n')
             {
-                let parsed = parse_scalar(trimmed);
+                let parsed = parse_scalar(trimmed, directives);
                 return if let Node::Str(content, QuoteType::Double, _style) = parsed {
                     let had_indent_after_newline = trimmed.contains("\n ");
                     let had_explicit_escaped_nl_at_end = trimmed.ends_with("\\\n\"");
@@ -432,7 +432,7 @@ pub(crate) fn parse_value(
                     Ok(parsed)
                 };
             }
-            Ok(parse_scalar(trimmed))
+            Ok(parse_scalar(trimmed, directives))
         }
         Some(_) => {
             let value = collect_until(source, |c| c == CHAR_NEWLINE || c == CHAR_HASH);
@@ -446,7 +446,7 @@ pub(crate) fn parse_value(
                     .all(|c| c.is_ascii_digit() || c == '+' || c == '-');
                 if !valid_header_rest {
                     if !trimmed.is_empty() {
-                        return Ok(parse_scalar(trimmed));
+                        return Ok(parse_scalar(trimmed, directives));
                     } else {
                         return Ok(Node::None);
                     }
@@ -574,7 +574,7 @@ pub(crate) fn parse_value(
                 ));
             }
             if !trimmed.is_empty() {
-                Ok(parse_scalar(trimmed))
+                Ok(parse_scalar(trimmed, directives))
             } else {
                 Ok(Node::None)
             }
