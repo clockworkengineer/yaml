@@ -299,9 +299,17 @@ pub(crate) fn parse_mapping_key(
     let raw = collect_until(source, |c| c == CHAR_COLON || c == CHAR_NEWLINE);
     
     // Check if we stopped at a colon or newline
-    if source.current() == Some(CHAR_NEWLINE) || source.current().is_none() {
-        // We reached end of line or EOF without finding a colon - invalid mapping key
+    if source.current() == Some(CHAR_NEWLINE) {
+        // We reached end of line without finding a colon - invalid mapping key
         return Err(parse_error(source, "Mapping key must be followed by a colon"));
+    }
+    
+    // Check if we hit EOF without a colon
+    if source.current().is_none() {
+        // EOF without colon - could be valid scalar, not a mapping
+        // But we're in parse_mapping_key, so this shouldn't happen
+        // Let the caller handle it
+        return Err(parse_error(source, "Unexpected end of input in mapping key"));
     }
     
     let mut newline = false;

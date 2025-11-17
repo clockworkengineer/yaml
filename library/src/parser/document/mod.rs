@@ -455,7 +455,13 @@ pub fn parse_document_contents(
                     crate::nodes::node::BlockStyle::None,
                 ))
             } else {
-                Ok(parse_mapping(source, indent_level, directives)?)
+                // At root level (indent_level == 0) without a colon, parse as plain scalar
+                let scalar_value = crate::utils::read_line_trimmed_into_string(source);
+                Ok(Node::Str(
+                    scalar_value,
+                    crate::nodes::node::QuoteType::Unquoted,
+                    crate::nodes::node::BlockStyle::None,
+                ))
             }
         }
         Some(c) if c.is_whitespace() => {
