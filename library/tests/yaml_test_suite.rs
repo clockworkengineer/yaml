@@ -1,0 +1,230 @@
+//! Official YAML 1.2 Test Suite Integration
+//!
+//! This test suite runs the official YAML test cases from:
+//! https://github.com/yaml/yaml-test-suite (data-2022-01-17 release)
+//!
+//! The test suite contains 351+ test cases covering all aspects of YAML 1.2 specification.
+
+use std::fs;
+use std::path::{Path, PathBuf};
+use yaml_lib::{parse, BufferSource};
+
+#[derive(Debug)]
+struct TestCase {
+    id: String,
+    name: String,
+    yaml: String,
+    has_error_file: bool,
+}
+
+/// Load a test case from the data release format
+/// Each test is in a directory with: ===, in.yaml, and optionally error
+fn load_test_case(test_dir: &Path) -> Option<TestCase> {
+    // Read test name
+    let name_file = test_dir.join("===");
+    let name = fs::read_to_string(&name_file)
+        .ok()?
+        .trim()
+        .to_string();
+    
+    // Read input YAML
+    let yaml_file = test_dir.join("in.yaml");
+    let yaml = fs::read_to_string(&yaml_file).ok()?;
+    
+    // Check if this is an error test
+    let error_file = test_dir.join("error");
+    let has_error_file = error_file.exists();
+    
+    // Get test ID from directory name
+    let id = test_dir
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("UNKNOWN")
+        .to_string();
+    
+    Some(TestCase {
+        id,
+        name,
+        yaml,
+        has_error_file,
+    })
+}
+
+/// Get all test directories (both single and multi-test)
+fn get_all_test_dirs(suite_dir: &Path) -> Vec<PathBuf> {
+    let mut test_dirs = Vec::new();
+    
+    let entries = match fs::read_dir(suite_dir) {
+        Ok(e) => e,
+        Err(_) => return test_dirs,
+    };
+    
+    for entry in entries.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        
+        // Check if this directory has test files directly
+        if path.join("in.yaml").exists() {
+            test_dirs.push(path);
+        } else {
+            // Check for numbered subdirectories (multi-test case)
+            if let Ok(sub_entries) = fs::read_dir(&path) {
+                for sub_entry in sub_entries.filter_map(|e| e.ok()) {
+                    let sub_path = sub_entry.path();
+                    if sub_path.is_dir() && sub_path.join("in.yaml").exists() {
+                        test_dirs.push(sub_path);
+                    }
+                }
+            }
+        }
+    }
+    
+    test_dirs
+}
+
+/// Run all YAML test suite cases
+#[test]
+fn run_yaml_test_suite() {
+    let suite_dir = Path::new("../tests/yaml-test-suite");
+    
+    if !suite_dir.exists() {
+        println!("YAML test suite not found at {:?}", suite_dir);
+        println!("Run: git clone https://github.com/yaml/yaml-test-suite.git -b data-2022-01-17 ../tests/yaml-test-suite");
+        return;
+    }
+    
+    let mut passed = 0;
+    let mut failed = 0;
+    let mut skipped = 0;
+    let mut failures = Vec::new();
+    
+    // Get all test directories
+    let test_dirs = get_all_test_dirs(suite_dir);
+    
+    if test_dirs.is_empty() {
+        println!("No test directories found. Make sure you're using the data release branch.");
+        println!("Run: cd ../tests/yaml-test-suite && git checkout data-2022-01-17");
+        return;
+    }
+    
+    for test_dir in test_dirs {
+        // Load test case
+        let test = match load_test_case(&test_dir) {
+            Some(t) => t,
+            None => {
+                skipped += 1;
+                continue;
+            }
+        };
+        
+        // Run the test
+        let mut source = BufferSource::new(test.yaml.as_bytes());
+        let result = parse(&mut source);
+        
+        // Determine if test passed
+        // Error tests should fail to parse, non-error tests should succeed
+        let test_passed = match (result.is_ok(), test.has_error_file) {
+            (true, false) => true,  // Should pass and did pass
+            (false, true) => true,   // Should fail and did fail
+            _ => false,              // Mismatch
+        };
+        
+        if test_passed {
+            passed += 1;
+        } else {
+            failed += 1;
+            let expected = if test.has_error_file { "error" } else { "success" };
+            let got = if result.is_ok() { "success" } else { "error" };
+            failures.push(format!(
+                "{}: {} (expected: {}, got: {})",
+                test.id, test.name, expected, got
+            ));
+        }
+    }
+    
+    // Print summary
+    println!("\n=== YAML Test Suite Results ===");
+    println!("Passed:  {}", passed);
+    println!("Failed:  {}", failed);
+    println!("Skipped: {}", skipped);
+    println!("Total:   {}", passed + failed + skipped);
+    
+    if !failures.is_empty() {
+        println!("\n=== Failures (showing first 30) ===");
+        for (i, failure) in failures.iter().enumerate().take(30) {
+            println!("{}. {}", i + 1, failure);
+        }
+        if failures.len() > 30 {
+            println!("... and {} more", failures.len() - 30);
+        }
+    }
+    
+    // Calculate pass rate
+    let total_tests = passed + failed;
+    if total_tests > 0 {
+        let pass_rate = (passed as f64 / total_tests as f64) * 100.0;
+        println!("\nPass Rate: {:.1}%", pass_rate);
+        
+        // Assert 80% pass rate (reasonable for initial integration)
+        assert!(
+            pass_rate >= 80.0,
+            "YAML test suite pass rate ({:.1}%) is below 80% threshold",
+            pass_rate
+        );
+    }
+}
+
+/// Test a specific YAML test case by ID
+#[allow(dead_code)]
+fn test_specific_case(test_id: &str) {
+    let test_dir = Path::new("../tests/yaml-test-suite").join(test_id);
+    
+    if !test_dir.exists() {
+        panic!("Test case {} not found at {:?}", test_id, test_dir);
+    }
+    
+    let test = load_test_case(&test_dir).expect("Failed to load test case");
+    
+    println!("Testing: {} - {}", test.id, test.name);
+    println!("Is error test: {}", test.has_error_file);
+    println!("\nYAML:\n{}", test.yaml);
+    
+    let mut source = BufferSource::new(test.yaml.as_bytes());
+    let result = parse(&mut source);
+    
+    match result {
+        Ok(doc) => {
+            println!("\n✓ Parsed successfully!");
+            if test.has_error_file {
+                println!("  WARNING: This is an error test but parsing succeeded");
+            }
+            // Don't print the full doc as it can be very large
+            println!("  Document type: {:?}", std::mem::discriminant(&doc));
+        }
+        Err(e) => {
+            println!("\n✗ Parse failed: {}", e);
+            if !test.has_error_file {
+                println!("  WARNING: This test should have succeeded");
+            }
+        }
+    }
+}
+
+#[test]
+#[ignore] // Run with: cargo test test_examples -- --ignored
+fn test_examples() {
+    // Test some specific examples
+    let examples = vec![
+        "229Q", // Spec Example 2.4. Sequence of Mappings
+        "236B", // Spec Example 2.3. Mapping Scalars to Scalars
+        "26DV", // Whitespace around colon
+        "27NA", // Spec Example 2.5. Sequence of Sequences
+    ];
+    
+    for id in examples {
+        println!("\n=== Testing {} ===", id);
+        test_specific_case(id);
+    }
+}
