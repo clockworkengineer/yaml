@@ -372,9 +372,14 @@ pub(crate) fn parse_value(
             // - Whitespace (space, tab, newline, carriage return)
             // - Flow indicators: [ ] { } ,
             // - Comment indicator: #
-            c == CHAR_NEWLINE || c == CHAR_HASH || c.is_whitespace() 
-                || c == CHAR_COMMA || c == CHAR_LBRACKET || c == CHAR_RBRACKET 
-                || c == CHAR_LBRACE || c == CHAR_RBRACE
+            c == CHAR_NEWLINE
+                || c == CHAR_HASH
+                || c.is_whitespace()
+                || c == CHAR_COMMA
+                || c == CHAR_LBRACKET
+                || c == CHAR_RBRACKET
+                || c == CHAR_LBRACE
+                || c == CHAR_RBRACE
         });
         if name.trim().is_empty() {
             return Err(parse_error(source, ERR_EMPTY_ALIAS_NAME));
@@ -389,10 +394,16 @@ pub(crate) fn parse_value(
             // - Whitespace (space, tab, newline, carriage return)
             // - Flow indicators: [ ] { } ,
             // - Comment indicator: #
-            c == CHAR_SPACE || c == CHAR_TAB || c == CHAR_NEWLINE || c == CHAR_CARRIAGE_RETURN
-                || c == CHAR_HASH || c == CHAR_COMMA 
-                || c == CHAR_LBRACKET || c == CHAR_RBRACKET 
-                || c == CHAR_LBRACE || c == CHAR_RBRACE
+            c == CHAR_SPACE
+                || c == CHAR_TAB
+                || c == CHAR_NEWLINE
+                || c == CHAR_CARRIAGE_RETURN
+                || c == CHAR_HASH
+                || c == CHAR_COMMA
+                || c == CHAR_LBRACKET
+                || c == CHAR_RBRACKET
+                || c == CHAR_LBRACE
+                || c == CHAR_RBRACE
         });
         if name.trim().is_empty() {
             return Err(parse_error(source, ERR_EMPTY_ANCHOR_NAME));
@@ -466,7 +477,7 @@ pub(crate) fn parse_value(
             if trimmed.starts_with(STR_LITERAL_BLOCK) || trimmed.starts_with(STR_FOLDED_BLOCK) {
                 let first_ch = trimmed.chars().next().unwrap();
                 let rest = trimmed[1..].trim();
-                
+
                 // Validate block scalar modifiers
                 // Format: |[1-9]?[+-]? or >[1-9]?[+-]?
                 let mut chars = rest.chars();
@@ -474,17 +485,23 @@ pub(crate) fn parse_value(
                     if first.is_ascii_digit() {
                         // Check if indent indicator is 0 (invalid)
                         if first == '0' {
-                            return Err(parse_error(source, "Block scalar indentation indicator must be between 1-9, not 0"));
+                            return Err(parse_error(
+                                source,
+                                "Block scalar indentation indicator must be between 1-9, not 0",
+                            ));
                         }
                         // Check if there's a second digit (invalid - must be single digit 1-9)
                         if let Some(second) = chars.clone().next() {
                             if second.is_ascii_digit() {
-                                return Err(parse_error(source, "Block scalar indentation indicator must be a single digit 1-9"));
+                                return Err(parse_error(
+                                    source,
+                                    "Block scalar indentation indicator must be a single digit 1-9",
+                                ));
                             }
                         }
                     }
                 }
-                
+
                 let valid_header_rest = rest
                     .chars()
                     .all(|c| c.is_ascii_digit() || c == '+' || c == '-');

@@ -198,18 +198,21 @@ pub fn parse_document_contents(
                     // Format: |[1-9]?[+-]? or >[1-9]?[+-]?
                     let mut has_indent_indicator = false;
                     let mut has_chomping_indicator = false;
-                    
+
                     // Check for indentation indicator (must be 1-9)
                     if let Some(c) = source.current() {
                         if c.is_ascii_digit() {
                             if c == '0' {
-                                return Err(helpers::parse_error(source, "Block scalar indentation indicator must be between 1-9, not 0"));
+                                return Err(helpers::parse_error(
+                                    source,
+                                    "Block scalar indentation indicator must be between 1-9, not 0",
+                                ));
                             }
                             has_indent_indicator = true;
                             source.next();
                         }
                     }
-                    
+
                     // Check for chomping indicator (+ or -)
                     if let Some(c) = source.current() {
                         if c == '+' || c == '-' {
@@ -217,7 +220,7 @@ pub fn parse_document_contents(
                             source.next();
                         }
                     }
-                    
+
                     // If we had indent indicator, optionally check for chomping after it
                     // Format can be: |1+, |1-, |+, |-, >2+, etc.
                     if has_indent_indicator && !has_chomping_indicator {
@@ -227,7 +230,7 @@ pub fn parse_document_contents(
                             }
                         }
                     }
-                    
+
                     // Validate: rest of line should be whitespace or comment
                     while let Some(c) = source.current() {
                         if c == '\n' {
@@ -239,10 +242,16 @@ pub fn parse_document_contents(
                             let _ = crate::utils::collect_until(source, |c| c == '\n');
                             break;
                         } else {
-                            return Err(helpers::parse_error(source, &format!("Invalid block scalar modifier: unexpected character '{}'", c)));
+                            return Err(helpers::parse_error(
+                                source,
+                                &format!(
+                                    "Invalid block scalar modifier: unexpected character '{}'",
+                                    c
+                                ),
+                            ));
                         }
                     }
-                    
+
                     if source.current() == Some('\n') {
                         source.next();
                     }
