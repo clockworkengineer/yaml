@@ -398,6 +398,10 @@ pub(crate) fn parse_value(
             return Err(parse_error(source, ERR_EMPTY_ANCHOR_NAME));
         }
         skip_whitespace(source);
+        // Handle both Unix (\n) and Windows (\r\n) line endings
+        if source.current() == Some(CHAR_CARRIAGE_RETURN) {
+            source.next();
+        }
         if source.current() == Some(CHAR_NEWLINE) {
             source.next();
             skip_whitespace(source);
