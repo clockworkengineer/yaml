@@ -1,0 +1,8 @@
+[package]
+name = "yaml_examples_guide"
+version = "0.1.0"
+edition = "2021"
+description = "Comprehensive guide to yaml-lib examples (documentation only)"
+
+# This is a documentation-only package
+# See README.md for links to all runnable examples in the workspace
