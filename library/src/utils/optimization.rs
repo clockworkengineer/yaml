@@ -63,30 +63,46 @@ impl LazyTag {
                 if let Ok(i) = self.raw_value.parse::<i64>() {
                     Node::Number(crate::Numeric::Integer(i))
                 } else {
-                    Node::Str(self.raw_value.clone(), crate::QuoteType::Unquoted, crate::BlockStyle::None)
+                    Node::Str(
+                        self.raw_value.clone(),
+                        crate::QuoteType::Unquoted,
+                        crate::BlockStyle::None,
+                    )
                 }
             }
             "!!float" | "tag:yaml.org,2002:float" => {
                 if let Ok(f) = self.raw_value.parse::<f64>() {
                     Node::Number(crate::Numeric::Float(f))
                 } else {
-                    Node::Str(self.raw_value.clone(), crate::QuoteType::Unquoted, crate::BlockStyle::None)
+                    Node::Str(
+                        self.raw_value.clone(),
+                        crate::QuoteType::Unquoted,
+                        crate::BlockStyle::None,
+                    )
                 }
             }
-            "!!bool" | "tag:yaml.org,2002:bool" => {
-                match self.raw_value.to_lowercase().as_str() {
-                    "true" | "yes" | "on" => Node::Boolean(true),
-                    "false" | "no" | "off" => Node::Boolean(false),
-                    _ => Node::Str(self.raw_value.clone(), crate::QuoteType::Unquoted, crate::BlockStyle::None),
-                }
-            }
+            "!!bool" | "tag:yaml.org,2002:bool" => match self.raw_value.to_lowercase().as_str() {
+                "true" | "yes" | "on" => Node::Boolean(true),
+                "false" | "no" | "off" => Node::Boolean(false),
+                _ => Node::Str(
+                    self.raw_value.clone(),
+                    crate::QuoteType::Unquoted,
+                    crate::BlockStyle::None,
+                ),
+            },
             "!!null" | "tag:yaml.org,2002:null" => Node::None,
-            "!!str" | "tag:yaml.org,2002:str" => {
-                Node::Str(self.raw_value.clone(), crate::QuoteType::Unquoted, crate::BlockStyle::None)
-            }
+            "!!str" | "tag:yaml.org,2002:str" => Node::Str(
+                self.raw_value.clone(),
+                crate::QuoteType::Unquoted,
+                crate::BlockStyle::None,
+            ),
             _ => {
                 // Unknown tag - preserve as string
-                Node::Str(self.raw_value.clone(), crate::QuoteType::Unquoted, crate::BlockStyle::None)
+                Node::Str(
+                    self.raw_value.clone(),
+                    crate::QuoteType::Unquoted,
+                    crate::BlockStyle::None,
+                )
             }
         }
     }
@@ -307,12 +323,16 @@ pub struct FastPathDetector;
 impl FastPathDetector {
     /// Check if a string is a simple unquoted scalar (no special characters)
     pub fn is_simple_scalar(s: &str) -> bool {
-        !s.is_empty() && s.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+        !s.is_empty()
+            && s.chars()
+                .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
     }
 
     /// Check if a string is a simple integer
     pub fn is_simple_int(s: &str) -> bool {
-        !s.is_empty() && s.chars().all(|c| c.is_ascii_digit() || (c == '-' && s.starts_with('-')))
+        !s.is_empty()
+            && s.chars()
+                .all(|c| c.is_ascii_digit() || (c == '-' && s.starts_with('-')))
     }
 
     /// Check if a line is likely to be a simple key-value pair
@@ -340,6 +360,7 @@ pub struct NodeBuilder {
     /// Reusable string buffer
     string_buffer: String,
     /// Reusable vec buffer for sequences
+    #[allow(dead_code)]
     vec_buffer: Vec<Node>,
 }
 
@@ -411,7 +432,7 @@ mod tests {
     fn test_lazy_tag_int() {
         let mut lazy = LazyTag::new("42".to_string(), "!!int".to_string());
         assert!(!lazy.is_coerced());
-        
+
         {
             let node = lazy.get_or_coerce();
             assert!(matches!(node, Node::Number(crate::Numeric::Integer(42))));
@@ -451,10 +472,10 @@ mod tests {
     #[cfg(feature = "std")]
     fn test_string_pool() {
         let mut pool = StringPool::new();
-        
+
         let s1 = pool.get_or_insert("test");
         let s2 = pool.get_or_insert("test");
-        
+
         assert_eq!(*s1, *s2);
         assert_eq!(pool.len(), 1);
     }
@@ -464,11 +485,11 @@ mod tests {
         assert!(FastPathDetector::is_simple_scalar("hello"));
         assert!(FastPathDetector::is_simple_scalar("hello_world"));
         assert!(!FastPathDetector::is_simple_scalar("hello world"));
-        
+
         assert!(FastPathDetector::is_simple_int("123"));
         assert!(FastPathDetector::is_simple_int("-456"));
         assert!(!FastPathDetector::is_simple_int("12.34"));
-        
+
         assert!(FastPathDetector::is_simple_mapping_line("key: value"));
         assert!(!FastPathDetector::is_simple_mapping_line("key: [1, 2, 3]"));
     }

@@ -49,14 +49,14 @@ mod parser;
 /// Module for converting YAML structures to formatted strings
 #[cfg(feature = "stringify")]
 mod stringify;
+/// Module for testing infrastructure (fuzzing, property testing, safety)
+#[cfg(feature = "alloc")]
+pub mod testing;
 /// Module containing  utility functions for the YAML library
 mod utils;
 /// Module for YAML validation and schema support
 #[cfg(feature = "alloc")]
 pub mod validation;
-/// Module for testing infrastructure (fuzzing, property testing, safety)
-#[cfg(feature = "alloc")]
-pub mod testing;
 
 /// ============
 /// YAML_lib API
@@ -242,10 +242,12 @@ pub use stringify::streaming::StreamingSerializer;
 // Testing API
 /// Fuzzing infrastructure for discovering bugs
 #[cfg(feature = "alloc")]
-pub use testing::fuzzing::{fuzz_parse, fuzz_roundtrip, FuzzResult, FuzzRng, YamlFuzzer};
+pub use testing::fuzzing::{FuzzResult, FuzzRng, YamlFuzzer, fuzz_parse, fuzz_roundtrip};
 /// Property-based testing for checking invariants
 #[cfg(feature = "alloc")]
 pub use testing::property::{Property, PropertyResult, PropertySuite};
 /// Memory safety auditing tools
 #[cfg(feature = "alloc")]
-pub use testing::safety::{audit_node, calculate_memory_stats, MemoryStats, SafetyAudit, SafetyIssue};
+pub use testing::safety::{
+    MemoryStats, SafetyAudit, SafetyIssue, audit_node, calculate_memory_stats,
+};

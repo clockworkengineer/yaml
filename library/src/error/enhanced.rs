@@ -16,7 +16,10 @@ use core::fmt;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use crate::error::{ErrorKind, YamlError};
+use crate::error::YamlError;
+
+#[cfg(test)]
+use crate::error::ErrorKind;
 
 /// Error code for programmatic error handling
 ///

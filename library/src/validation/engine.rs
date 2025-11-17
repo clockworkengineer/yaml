@@ -296,6 +296,7 @@ fn node_type_name(node: &Node) -> &'static str {
 }
 
 /// Convert node to string representation for uniqueness checking
+#[allow(dead_code)]
 fn node_to_string(node: &Node) -> String {
     match node {
         Node::Boolean(b) => b.to_string(),
