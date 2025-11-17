@@ -37,4 +37,26 @@ mod tests {
         let result = parse(&mut source);
         assert!(result.is_err(), "Should reject mapping key without colon");
     }
+
+    #[test]
+    fn test_2g84_00_block_scalar_indent_zero() {
+        let yaml = b"--- |0\n";
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source);
+        assert!(result.is_err(), "Should reject block scalar with indentation indicator 0");
+        if let Err(e) = result {
+            assert!(e.contains("indentation indicator") && e.contains("1-9"), "Error: {}", e);
+        }
+    }
+
+    #[test]
+    fn test_2g84_01_block_scalar_indent_ten() {
+        let yaml = b"--- |10\n";
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source);
+        assert!(result.is_err(), "Should reject block scalar with indentation indicator 10");
+        if let Err(e) = result {
+            assert!(e.contains("single digit") && e.contains("1-9"), "Error: {}", e);
+        }
+    }
 }

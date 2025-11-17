@@ -466,6 +466,25 @@ pub(crate) fn parse_value(
             if trimmed.starts_with(STR_LITERAL_BLOCK) || trimmed.starts_with(STR_FOLDED_BLOCK) {
                 let first_ch = trimmed.chars().next().unwrap();
                 let rest = trimmed[1..].trim();
+                
+                // Validate block scalar modifiers
+                // Format: |[1-9]?[+-]? or >[1-9]?[+-]?
+                let mut chars = rest.chars();
+                if let Some(first) = chars.next() {
+                    if first.is_ascii_digit() {
+                        // Check if indent indicator is 0 (invalid)
+                        if first == '0' {
+                            return Err(parse_error(source, "Block scalar indentation indicator must be between 1-9, not 0"));
+                        }
+                        // Check if there's a second digit (invalid - must be single digit 1-9)
+                        if let Some(second) = chars.clone().next() {
+                            if second.is_ascii_digit() {
+                                return Err(parse_error(source, "Block scalar indentation indicator must be a single digit 1-9"));
+                            }
+                        }
+                    }
+                }
+                
                 let valid_header_rest = rest
                     .chars()
                     .all(|c| c.is_ascii_digit() || c == '+' || c == '-');
