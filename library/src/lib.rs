@@ -54,6 +54,9 @@ mod utils;
 /// Module for YAML validation and schema support
 #[cfg(feature = "alloc")]
 pub mod validation;
+/// Module for testing infrastructure (fuzzing, property testing, safety)
+#[cfg(feature = "alloc")]
+pub mod testing;
 
 /// ============
 /// YAML_lib API
@@ -224,3 +227,25 @@ pub use validation::validators::{
     CustomValidator, EnumValidator, LengthValidator, PatternValidator, RangeValidator,
     RequiredValidator, TypeValidator, ValidationResult, Validator,
 };
+
+// Serialization API
+/// Formatting options for YAML output
+#[cfg(feature = "alloc")]
+pub use stringify::format::{CollectionStyle, FormatContext, FormatOptions, QuoteStyle};
+/// Custom serializer support
+#[cfg(feature = "alloc")]
+pub use stringify::serializer::{Serializer, SerializerRegistry, TaggedSerializer, TypeSerializer};
+/// Streaming serialization
+#[cfg(feature = "alloc")]
+pub use stringify::streaming::StreamingSerializer;
+
+// Testing API
+/// Fuzzing infrastructure for discovering bugs
+#[cfg(feature = "alloc")]
+pub use testing::fuzzing::{fuzz_parse, fuzz_roundtrip, FuzzResult, FuzzRng, YamlFuzzer};
+/// Property-based testing for checking invariants
+#[cfg(feature = "alloc")]
+pub use testing::property::{Property, PropertyResult, PropertySuite};
+/// Memory safety auditing tools
+#[cfg(feature = "alloc")]
+pub use testing::safety::{audit_node, calculate_memory_stats, MemoryStats, SafetyAudit, SafetyIssue};
