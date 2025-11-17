@@ -6,6 +6,7 @@ use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::parser::document::helpers::{parse_error, parse_quoted_scalar, skip_whitespace};
 use crate::parser::document::scalar::parse_scalar;
+use crate::parser::document::value::parse_value;
 use crate::utils::*;
 
 /// Parses an inline YAML set enclosed in curly braces {} without colons.
@@ -276,6 +277,11 @@ pub(crate) fn parse_inline_sequence(
             Some(CHAR_LBRACE) => {
                 let nested_map = parse_inline_mapping(source, directives)?;
                 items.push(nested_map);
+            }
+            // Support anchors and aliases in flow sequences
+            Some(CHAR_AMPERSAND) | Some(CHAR_ASTERISK) => {
+                let node = parse_value(source, directives)?;
+                items.push(node);
             }
             Some(_) => {
                 let node = match source.current() {

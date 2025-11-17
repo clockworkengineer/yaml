@@ -34,13 +34,19 @@ mod tests {
 
     #[test]
     fn test_error_on_duplicate_anchor() {
-        use crate::error::messages::ERR_DUPLICATE_ANCHOR_PREFIX;
-        let yaml = b"---\na: &dup\n  x: 1\nb: &dup\n  y: 2\n";
+        // According to YAML 1.2 spec, duplicate anchors are allowed
+        // The later definition overrides the earlier one
+        let yaml = b"---\na: &dup\n  x: 1\nb: &dup\n  y: 2\nc: *dup\n";
         let mut source = BufferSource::new(yaml);
         let res = parse(&mut source);
-        assert!(res.is_err());
-        let err = res.unwrap_err();
-        assert!(err.contains(ERR_DUPLICATE_ANCHOR_PREFIX));
+        assert!(res.is_ok(), "Duplicate anchors should be allowed, later definition wins");
+        
+        // The alias *dup should resolve to the second definition (y: 2)
+        let doc = res.unwrap();
+        if let Node::Documents(docs) = &doc {
+            assert!(!docs.is_empty());
+            // Can verify structure if needed, but main point is it should parse
+        }
     }
 
     #[test]

@@ -130,6 +130,14 @@ pub fn parse_document_contents(
         Some(c) if c == '!' => Ok(crate::parser::document::value::parse_value(
             source, directives,
         )?),
+        // Support anchors at document level (e.g. "&anchor key: value")
+        Some(c) if c == '&' => Ok(crate::parser::document::value::parse_value(
+            source, directives,
+        )?),
+        // Support aliases at document level (e.g. "*anchor")
+        Some(c) if c == '*' => Ok(crate::parser::document::value::parse_value(
+            source, directives,
+        )?),
         Some(c) if c == '?' => {
             // Check if we have multiple explicit keys at this indentation level (likely a set)
             let current_indent = source.get_current_indent_level();

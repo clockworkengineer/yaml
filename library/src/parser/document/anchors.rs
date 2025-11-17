@@ -26,13 +26,8 @@ pub(crate) fn collect_anchors(
             if name.trim().is_empty() {
                 return Err(crate::error::messages::ERR_EMPTY_ANCHOR_NAME.to_string());
             }
-            if anchors.contains_key(name) {
-                return Err(format!(
-                    "{}{}",
-                    crate::error::messages::ERR_DUPLICATE_ANCHOR_PREFIX,
-                    name
-                ));
-            }
+            // According to YAML spec, later anchor definitions override earlier ones
+            // So we don't error on duplicate anchors, we just replace them
             anchors.insert(name.clone(), (**inner).clone());
             collect_anchors(inner, anchors)?;
             Ok(())

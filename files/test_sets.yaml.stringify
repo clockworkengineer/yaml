@@ -1,0 +1,20 @@
+---
+test_set: 
+  - apple
+  - banana
+  - cherry
+empty_set: 
+number_set: 
+  - 1
+  - 2
+  - 3
+explicit_set: 
+  item1: null
+  item2: null
+  item3: null
+inline_set: 
+  - apple
+  - banana
+  - cherry
+inline_empty_set: 
+...

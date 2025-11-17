@@ -368,7 +368,13 @@ pub(crate) fn parse_value(
     if source.current() == Some(CHAR_ASTERISK) {
         source.next();
         let name = collect_until(source, |c| {
-            c == CHAR_NEWLINE || c == CHAR_HASH || c.is_whitespace()
+            // Alias names can contain any character except:
+            // - Whitespace (space, tab, newline, carriage return)
+            // - Flow indicators: [ ] { } ,
+            // - Comment indicator: #
+            c == CHAR_NEWLINE || c == CHAR_HASH || c.is_whitespace() 
+                || c == CHAR_COMMA || c == CHAR_LBRACKET || c == CHAR_RBRACKET 
+                || c == CHAR_LBRACE || c == CHAR_RBRACE
         });
         if name.trim().is_empty() {
             return Err(parse_error(source, ERR_EMPTY_ALIAS_NAME));
@@ -379,7 +385,14 @@ pub(crate) fn parse_value(
     if source.current() == Some(CHAR_AMPERSAND) {
         source.next();
         let name = collect_until(source, |c| {
-            c == CHAR_SPACE || c == CHAR_NEWLINE || c == CHAR_HASH
+            // Anchor names can contain any character except:
+            // - Whitespace (space, tab, newline, carriage return)
+            // - Flow indicators: [ ] { } ,
+            // - Comment indicator: #
+            c == CHAR_SPACE || c == CHAR_TAB || c == CHAR_NEWLINE || c == CHAR_CARRIAGE_RETURN
+                || c == CHAR_HASH || c == CHAR_COMMA 
+                || c == CHAR_LBRACKET || c == CHAR_RBRACKET 
+                || c == CHAR_LBRACE || c == CHAR_RBRACE
         });
         if name.trim().is_empty() {
             return Err(parse_error(source, ERR_EMPTY_ANCHOR_NAME));
