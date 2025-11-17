@@ -407,6 +407,10 @@ pub(crate) fn parse_value(
                 nested_indent,
                 directives,
             )?;
+            // Check for nested anchors (not allowed)
+            if matches!(node, Node::Anchored(_, _)) {
+                return Err(parse_error(source, "A node cannot have multiple anchors"));
+            }
             return Ok(Node::Anchored(Box::new(node), name));
         }
         let node = match source.current() {
@@ -419,6 +423,10 @@ pub(crate) fn parse_value(
             Some(_) => parse_value(source, directives)?,
             None => return Err(parse_error(source, ERR_UNEXPECTED_EOF_AFTER_ANCHOR)),
         };
+        // Check for nested anchors (not allowed)
+        if matches!(node, Node::Anchored(_, _)) {
+            return Err(parse_error(source, "A node cannot have multiple anchors"));
+        }
         return Ok(Node::Anchored(Box::new(node), name));
     }
 

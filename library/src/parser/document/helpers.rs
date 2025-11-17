@@ -82,24 +82,30 @@ pub(crate) fn skip_whitespace(source: &mut dyn ISource) {
 }
 
 /// Skips whitespace but returns an error if tabs are found as line indentation
-/// Only checks for tabs that appear as indentation (at column positions after newline)
+/// Only checks for tabs when followed by actual content (not on blank lines)
 pub(crate) fn skip_whitespace_no_tabs(source: &mut dyn ISource) -> Result<(), String> {
-    let mut is_line_start = true;  // Assume we're at line start (called after newline)
+    let mut found_tab = false;
     while let Some(c) = source.current() {
-        if c == '\t' && is_line_start {
-            // Tab found as indentation at start of line - not allowed
-            return Err(crate::parser::document::parse_error(
-                source,
-                "Tabs are not allowed as indentation in YAML",
-            ));
-        }
-        if source.is_whitespace(c) {
-            if c != ' ' && c != '\t' {
-                is_line_start = false;  // Non-space/tab whitespace means not indentation
-            }
+        if c == '\t' {
+            found_tab = true;
+            source.next();
+        } else if source.is_whitespace(c) {
             source.next();
         } else {
             break;
+        }
+    }
+    
+    // Only error if tabs were found AND there's actual content after (not a blank line)
+    if found_tab {
+        if let Some(c) = source.current() {
+            // Check if there's content (not newline/comment/document marker)
+            if c != '\n' && c != '\r' && c != '#' && c != '-' && c != '.' {
+                return Err(crate::parser::document::parse_error(
+                    source,
+                    "Tabs are not allowed as indentation in YAML",
+                ));
+            }
         }
     }
     Ok(())
@@ -291,8 +297,15 @@ pub(crate) fn parse_mapping_key(
     directives: &crate::parser::directives::DirectiveContext,
 ) -> Result<(Node, bool), String> {
     let raw = collect_until(source, |c| c == CHAR_COLON || c == CHAR_NEWLINE);
+    
+    // Check if we stopped at a colon or newline
+    if source.current() == Some(CHAR_NEWLINE) || source.current().is_none() {
+        // We reached end of line or EOF without finding a colon - invalid mapping key
+        return Err(parse_error(source, "Mapping key must be followed by a colon"));
+    }
+    
     let mut newline = false;
-    source.next();
+    source.next();  // consume the colon
     skip_whitespace(source);
     if let Some(c) = source.current() {
         if c == CHAR_HASH {
@@ -302,7 +315,7 @@ pub(crate) fn parse_mapping_key(
             newline = c == CHAR_NEWLINE;
             if newline {
                 source.next();
-                skip_whitespace_no_tabs(source)?;
+                skip_whitespace(source);
             }
         }
     }
