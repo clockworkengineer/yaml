@@ -9,11 +9,19 @@
 
 ## Summary Results
 
-| Metric | Count | Percentage |
-|--------|-------|------------|
-| **Passed** | 240 | 59.7% |
-| **Failed** | 162 | 40.3% |
-| **Total** | 402 | 100% |
+| Metric | Count | Percentage | Notes |
+|--------|-------|------------|-------|
+| **Passed** | 251 | 62.4% | +11 from initial (240) |
+| **Failed** | 151 | 37.6% | -11 from initial (162) |
+| **Total** | 402 | 100% | |
+
+### Recent Improvements
+
+**v0.1.7 (Current):**
+- Added %YAML and %TAG directive parsing (+11 tests, 59.7% → 62.4%)
+- Directives no longer cause parse errors
+- Multi-document directive support implemented
+- 611 internal tests passing (was 600)
 
 ## Analysis
 
@@ -40,16 +48,22 @@ The library performs well in these areas:
 - `3GZX`: Spec Example 7.1. Alias Nodes  
 - `3R3P`: Single block sequence with anchor
 
-#### 2. Directives (Estimated ~20% pass rate)
-**Symptoms:**
-- %YAML version directives cause parse errors
-- %TAG directives not implemented
-- Reserved directives not handled
+#### 2. Directives (Estimated ~50% pass rate) ✅ PARTIALLY IMPROVED
+**Status:** Basic directive parsing implemented (v0.1.7)
 
-**Examples of Failing Tests:**
-- `27NA`: Spec Example 5.9. Directive Indicator
-- `2LFX`: Spec Example 6.13. Reserved Directives
-- `5TYM`: Spec Example 6.21. Local Tag Prefix
+**What Works:**
+- %YAML version directives parse without error
+- %TAG prefix directives parse and store mappings
+- Reserved directives are ignored (per spec)
+- Multi-document directive support
+- Version validation (1.1, 1.2)
+
+**Still Needed:**
+- Tag prefix application during tag resolution
+- Full tag handle expansion in document content
+
+**Examples of Still-Failing Tests:**
+- `5TYM`: Spec Example 6.21. Local Tag Prefix (tags not resolved with prefixes)
 
 #### 3. Complex Indentation (Estimated ~50% pass rate)
 **Symptoms:**

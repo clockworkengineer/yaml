@@ -27,6 +27,7 @@ use crate::io::traits::ISource;
 use crate::nodes::node::BlockStyle;
 use crate::nodes::node::Node;
 use crate::nodes::node::Node::Document;
+use crate::parser::directives::parse_directives;
 use std::collections::HashMap;
 
 use helpers::node_is_blank;
@@ -537,6 +538,8 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
 /// separators and creating a Documents node containing all parsed documents.
 /// Empty or blank documents are filtered out automatically.
 ///
+/// Also parses directives (%YAML and %TAG) that appear before each document.
+///
 /// # Arguments
 ///
 /// * `source` - A mutable reference to a source implementing ISource trait
@@ -546,15 +549,23 @@ pub fn parse_document(source: &mut dyn ISource, indent_level: usize) -> Result<N
 /// Result containing a Documents Node with all parsed documents or an error string
 pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
     let mut docs: Vec<Node> = Vec::new();
-    if helpers::peek_ahead_for_document_start_end(source, '-') {
-        source.next();
-        source.next();
-        source.next();
-        if source.current() == Some(' ') {
-            source.next();
-        }
-    }
+    
     while source.more() {
+        // Parse directives before this document
+        let _directives = parse_directives(source)?;
+        // TODO: Pass directives to parse_document for tag resolution
+        
+        // Check for document start marker (---)
+        if helpers::peek_ahead_for_document_start_end(source, '-') {
+            source.next();
+            source.next();
+            source.next();
+            if source.current() == Some(' ') {
+                source.next();
+            }
+        }
+        
+        // Parse the document
         let document = parse_document(source, 0);
         match document {
             Ok(doc) => {
@@ -568,7 +579,24 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
             }
             Err(err) => return Err(err),
         }
+        
+        // Check for document end marker (...)
+        skip_whitespace(source);
+        if helpers::peek_ahead_for_document_start_end(source, '.') {
+            source.next();
+            source.next();
+            source.next();
+            if source.current() == Some('\n') {
+                source.next();
+            }
+        }
+        
+        // If no more content, stop
+        if !source.more() {
+            break;
+        }
     }
+    
     if docs.is_empty() {
         docs.push(Document(Vec::new()))
     }
