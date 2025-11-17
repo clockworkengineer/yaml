@@ -132,6 +132,8 @@ pub(crate) fn parse_inline_mapping(
                 has_colons = true;
                 break;
             }
+            // Skip whitespace and newlines in flow context
+            c if !in_quotes && (c == ' ' || c == '\t' || c == '\n' || c == '\r') => {}
             _ => {}
         }
         source.next();
@@ -161,11 +163,18 @@ fn parse_inline_mapping_with_colons(
     }
 
     loop {
+        // Skip whitespace, newlines, and comments before parsing key
+        skip_whitespace_and_comments(source);
+        
         let key_node = {
             let raw = match source.current() {
                 Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => parse_quoted_scalar(source)?,
                 _ => collect_until(source, |c| c == CHAR_COLON || c == CHAR_RBRACE),
             };
+            
+            // In flow context, whitespace including newlines and comments are allowed between key and colon
+            skip_whitespace_and_comments(source);
+            
             if source.current() != Some(CHAR_COLON) {
                 return Err(parse_error(source, ERR_EXPECT_COLON_INLINE_MAPPING));
             }
@@ -199,7 +208,7 @@ fn parse_inline_mapping_with_colons(
         match source.current() {
             Some(CHAR_COMMA) => {
                 source.next();
-                skip_whitespace(source);
+                skip_whitespace_and_comments(source);
                 continue;
             }
             Some(CHAR_RBRACE) => {

@@ -55,7 +55,7 @@ where
 pub fn skip_whitespace_and_comments(source: &mut dyn ISource) {
     loop {
         while let Some(c) = source.current() {
-            if source.is_whitespace(c) {
+            if source.is_whitespace(c) || c == CHAR_NEWLINE || c == '\r' {
                 source.next();
             } else {
                 break;
@@ -64,6 +64,7 @@ pub fn skip_whitespace_and_comments(source: &mut dyn ISource) {
         if source.current() == Some(CHAR_HASH) {
             while let Some(c) = source.current() {
                 if c == CHAR_NEWLINE {
+                    source.next(); // consume the newline after comment
                     break;
                 }
                 source.next();
