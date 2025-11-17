@@ -116,8 +116,24 @@ pub fn parse_document_contents(
 ) -> Result<Node, String> {
     match source.current() {
         Some(c) if c == '-' => {
+            // Check if this is a document marker (---)
+            if helpers::peek_ahead_for_document_start_end(source, '-') {
+                return Ok(Node::None);
+            }
             let indent_level = source.get_current_indent_level();
             Ok(parse_sequence(source, indent_level, directives)?)
+        }
+        Some(c) if c == '.' => {
+            // Check if this is a document end marker (...)
+            if helpers::peek_ahead_for_document_start_end(source, '.') {
+                return Ok(Node::None);
+            }
+            // Otherwise treat as regular content
+            if peek_ahead_for_mapping_key(source) {
+                Ok(parse_mapping(source, indent_level, directives)?)
+            } else {
+                Ok(parse_value(source, directives)?)
+            }
         }
         Some(c) if c == '#' => {
             parse_comment(source);
@@ -510,6 +526,10 @@ pub fn parse_document(
                 skip_whitespace(source);
                 continue;
             }
+            '%' => {
+                // Directive at this point means we've reached the next document
+                break;
+            }
             _ => {
                 let node = parse_document_contents(source, indent_level, directives)?;
                 if !node_is_blank(&node) {
@@ -602,16 +622,20 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
             source.next();
             source.next();
             source.next();
-            
+
             // Check for invalid content after document end marker
             skip_whitespace(source);
             if let Some(c) = source.current() {
-                if c != '\n' && c != '\r' && c != '#' {
-                    // There's non-whitespace, non-comment content after ...
-                    return Err(parse_error(source, "Invalid content after document end marker (...)"));
+                // Allow newline, carriage return, comments, and directives (%)
+                if c != '\n' && c != '\r' && c != '#' && c != '%' {
+                    // There's non-whitespace, non-comment, non-directive content after ...
+                    return Err(parse_error(
+                        source,
+                        "Invalid content after document end marker (...)",
+                    ));
                 }
             }
-            
+
             if source.current() == Some('\n') {
                 source.next();
             }

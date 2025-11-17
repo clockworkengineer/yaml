@@ -6,6 +6,7 @@ mod toml_tests;
 // New organized integration test modules (split from parser_stringify_integration)
 mod anchor_tests;
 mod basic_parsing_tests;
+mod directive_tests;
 mod document_structure_tests;
 mod error_handling_tests;
 mod file_parsing_tests;

@@ -96,13 +96,13 @@ impl DirectiveContext {
 pub fn parse_directives(source: &mut dyn ISource) -> Result<DirectiveContext, String> {
     let mut context = DirectiveContext::new();
 
-    // Skip any leading whitespace
-    skip_whitespace(source);
+    // Skip any leading whitespace and comments
+    crate::utils::skip_whitespace_and_comments(source);
 
     // Parse all directives
     while let Some('%') = source.current() {
         parse_single_directive(source, &mut context)?;
-        skip_whitespace(source);
+        crate::utils::skip_whitespace_and_comments(source);
     }
 
     Ok(context)

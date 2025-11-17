@@ -204,14 +204,14 @@ pub fn node_to_inline_string(node: &Node) -> String {
 /// Result with Ok(()) if valid, or Err with error message if invalid
 pub fn validate_double_quoted_escapes(s: &str) -> Result<(), String> {
     let mut chars = s.chars().peekable();
-    
+
     while let Some(c) = chars.next() {
         if c == '\\' {
             match chars.peek() {
-                Some('u') | Some('U') | Some('x') | Some('n') | Some('r') | Some('t') | Some('b') 
-                | Some('"') | Some('\\') | Some('/') | Some(' ') | Some('0')
-                | Some('a') | Some('v') | Some('f') | Some('e') | Some('N')
-                | Some('_') | Some('L') | Some('P') => {
+                Some('u') | Some('U') | Some('x') | Some('n') | Some('r') | Some('t')
+                | Some('b') | Some('"') | Some('\\') | Some('/') | Some(' ') | Some('0')
+                | Some('a') | Some('v') | Some('f') | Some('e') | Some('N') | Some('_')
+                | Some('L') | Some('P') => {
                     // Valid escape
                 }
                 Some(other) => {
