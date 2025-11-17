@@ -44,13 +44,14 @@ pub(crate) fn parse_scalar(value: &str, directives: &DirectiveContext) -> Node {
                     }
                 }
                 // YAML 1.1: plain 0 prefix for octal (e.g., 0755)
-                else if directives.is_yaml_11() && v.chars().skip(1).all(|c| c >= '0' && c <= '7') {
+                else if directives.is_yaml_11() && v.chars().skip(1).all(|c| c >= '0' && c <= '7')
+                {
                     if let Ok(i) = i64::from_str_radix(&v[1..], 8) {
                         return Node::Number(Numeric::Integer(i));
                     }
                 }
             }
-            
+
             // Try standard integer parsing
             if let Ok(i) = v.parse::<i64>() {
                 Node::Number(Numeric::Integer(i))

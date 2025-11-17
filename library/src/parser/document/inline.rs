@@ -204,6 +204,18 @@ fn parse_inline_mapping_with_colons(
             }
             Some(CHAR_RBRACE) => {
                 source.next();
+                
+                // Check for invalid text immediately after closing brace (no space)
+                // Valid characters: whitespace, newline, comma, another closing bracket/brace, colon, or comment
+                if let Some(c) = source.current() {
+                    if !c.is_whitespace() && c != '\n' && c != '\r' && c != ',' && c != ']' && c != '}' && c != '#' && c != ':' {
+                        // Check if it's an alphanumeric character which would be clearly invalid
+                        if c.is_alphanumeric() {
+                            return Err(parse_error(source, "Invalid character after flow mapping - expected whitespace or newline"));
+                        }
+                    }
+                }
+                
                 break;
             }
             Some(c) => {

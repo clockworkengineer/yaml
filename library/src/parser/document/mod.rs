@@ -14,7 +14,7 @@ mod value;
 pub(crate) use anchors::{collect_anchors, expand_merge_keys, replace_aliases};
 #[cfg(test)]
 pub(crate) use helpers::parse_quoted_scalar;
-pub(crate) use helpers::{parse_comment, peek_ahead_for_mapping_key};
+pub(crate) use helpers::{parse_comment, parse_error, peek_ahead_for_mapping_key};
 pub(crate) use inline::{parse_inline_mapping, parse_inline_sequence};
 pub(crate) use mapping::parse_mapping;
 #[cfg(test)]
@@ -594,6 +594,16 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
             source.next();
             source.next();
             source.next();
+            
+            // Check for invalid content after document end marker
+            skip_whitespace(source);
+            if let Some(c) = source.current() {
+                if c != '\n' && c != '\r' && c != '#' {
+                    // There's non-whitespace, non-comment content after ...
+                    return Err(parse_error(source, "Invalid content after document end marker (...)"));
+                }
+            }
+            
             if source.current() == Some('\n') {
                 source.next();
             }

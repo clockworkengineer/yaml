@@ -274,16 +274,20 @@ mod tests {
                     }
                 }
             }
-            assert!(found_content, "Should have at least one document with content");
+            assert!(
+                found_content,
+                "Should have at least one document with content"
+            );
         }
     }
 
     #[test]
     fn test_parse_document_with_yaml_version_directive() {
         // Note: YAML directives are not supported by this parser, so we test without them
-        let mut source = BufferSource::new(b"# YAML version would be %YAML 1.2 here\n---\nkey: value");
+        let mut source =
+            BufferSource::new(b"# YAML version would be %YAML 1.2 here\n---\nkey: value");
         let result = parse(&mut source).unwrap();
-        
+
         if let Node::Documents(docs) = &result {
             assert_eq!(docs.len(), 1);
             if let Document(nodes) = &docs[0] {
@@ -295,7 +299,9 @@ mod tests {
     #[test]
     fn test_parse_document_with_tag_directive() {
         // Note: TAG directives are not supported by this parser, so we test without them
-        let mut source = BufferSource::new(b"# TAG directive would be %TAG ! tag:example.com,2000:app/ here\n---\nkey: value");
+        let mut source = BufferSource::new(
+            b"# TAG directive would be %TAG ! tag:example.com,2000:app/ here\n---\nkey: value",
+        );
         let result = parse(&mut source).unwrap();
 
         if let Node::Documents(docs) = &result {
@@ -390,7 +396,8 @@ mod tests {
 
     #[test]
     fn test_parse_document_markers_with_comments_inline() {
-        let mut source = BufferSource::new(b"--- # Start of document\nkey: value\n# End of document");
+        let mut source =
+            BufferSource::new(b"--- # Start of document\nkey: value\n# End of document");
         let result = parse(&mut source).unwrap();
 
         if let Node::Documents(docs) = &result {
@@ -609,45 +616,49 @@ mod tests {
         );
         let result = parse(&mut source);
         assert!(result.is_ok());
-        
+
         if let Ok(Node::Documents(docs)) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
-                // Check yes -> true
-                if let Some((_, Node::Boolean(true))) = pairs.iter().find(|(k, _)| {
-                    matches!(k, Node::Str(s, _, _) if s == "yes_value")
-                }) {
-                    // Passed
-                } else {
-                    panic!("Expected 'yes' to be parsed as boolean true in YAML 1.1");
-                }
-                
-                // Check no -> false
-                if let Some((_, Node::Boolean(false))) = pairs.iter().find(|(k, _)| {
-                    matches!(k, Node::Str(s, _, _) if s == "no_value")
-                }) {
-                    // Passed
-                } else {
-                    panic!("Expected 'no' to be parsed as boolean false in YAML 1.1");
-                }
-                
-                // Check on -> true
-                if let Some((_, Node::Boolean(true))) = pairs.iter().find(|(k, _)| {
-                    matches!(k, Node::Str(s, _, _) if s == "on_value")
-                }) {
-                    // Passed
-                } else {
-                    panic!("Expected 'on' to be parsed as boolean true in YAML 1.1");
-                }
-                
-                // Check off -> false
-                if let Some((_, Node::Boolean(false))) = pairs.iter().find(|(k, _)| {
-                    matches!(k, Node::Str(s, _, _) if s == "off_value")
-                }) {
-                    // Passed
-                } else {
-                    panic!("Expected 'off' to be parsed as boolean false in YAML 1.1");
-                }
+                    // Check yes -> true
+                    if let Some((_, Node::Boolean(true))) = pairs
+                        .iter()
+                        .find(|(k, _)| matches!(k, Node::Str(s, _, _) if s == "yes_value"))
+                    {
+                        // Passed
+                    } else {
+                        panic!("Expected 'yes' to be parsed as boolean true in YAML 1.1");
+                    }
+
+                    // Check no -> false
+                    if let Some((_, Node::Boolean(false))) = pairs
+                        .iter()
+                        .find(|(k, _)| matches!(k, Node::Str(s, _, _) if s == "no_value"))
+                    {
+                        // Passed
+                    } else {
+                        panic!("Expected 'no' to be parsed as boolean false in YAML 1.1");
+                    }
+
+                    // Check on -> true
+                    if let Some((_, Node::Boolean(true))) = pairs
+                        .iter()
+                        .find(|(k, _)| matches!(k, Node::Str(s, _, _) if s == "on_value"))
+                    {
+                        // Passed
+                    } else {
+                        panic!("Expected 'on' to be parsed as boolean true in YAML 1.1");
+                    }
+
+                    // Check off -> false
+                    if let Some((_, Node::Boolean(false))) = pairs
+                        .iter()
+                        .find(|(k, _)| matches!(k, Node::Str(s, _, _) if s == "off_value"))
+                    {
+                        // Passed
+                    } else {
+                        panic!("Expected 'off' to be parsed as boolean false in YAML 1.1");
+                    }
                 }
             }
         }
@@ -666,44 +677,48 @@ mod tests {
         );
         let result = parse(&mut source);
         assert!(result.is_ok());
-        
+
         if let Ok(Node::Documents(docs)) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
-                // Check yes remains string
-                if let Some((_, Node::Str(s, _, _))) = pairs.iter().find(|(k, _)| {
-                    matches!(k, Node::Str(key, _, _) if key == "yes_value")
-                }) {
-                    assert_eq!(s, "yes", "Expected 'yes' to remain a string in YAML 1.2");
-                } else {
-                    panic!("Expected 'yes' to be parsed as string in YAML 1.2");
-                }
-                
-                // Check no remains string
-                if let Some((_, Node::Str(s, _, _))) = pairs.iter().find(|(k, _)| {
-                    matches!(k, Node::Str(key, _, _) if key == "no_value")
-                }) {
-                    assert_eq!(s, "no", "Expected 'no' to remain a string in YAML 1.2");
-                } else {
-                    panic!("Expected 'no' to be parsed as string in YAML 1.2");
-                }
-                
-                // Check true/false still work
-                if let Some((_, Node::Boolean(true))) = pairs.iter().find(|(k, _)| {
-                    matches!(k, Node::Str(key, _, _) if key == "true_value")
-                }) {
-                    // Passed
-                } else {
-                    panic!("Expected 'true' to be parsed as boolean in YAML 1.2");
-                }
-                
-                if let Some((_, Node::Boolean(false))) = pairs.iter().find(|(k, _)| {
-                    matches!(k, Node::Str(key, _, _) if key == "false_value")
-                }) {
-                    // Passed
-                } else {
-                    panic!("Expected 'false' to be parsed as boolean in YAML 1.2");
-                }
+                    // Check yes remains string
+                    if let Some((_, Node::Str(s, _, _))) = pairs
+                        .iter()
+                        .find(|(k, _)| matches!(k, Node::Str(key, _, _) if key == "yes_value"))
+                    {
+                        assert_eq!(s, "yes", "Expected 'yes' to remain a string in YAML 1.2");
+                    } else {
+                        panic!("Expected 'yes' to be parsed as string in YAML 1.2");
+                    }
+
+                    // Check no remains string
+                    if let Some((_, Node::Str(s, _, _))) = pairs
+                        .iter()
+                        .find(|(k, _)| matches!(k, Node::Str(key, _, _) if key == "no_value"))
+                    {
+                        assert_eq!(s, "no", "Expected 'no' to remain a string in YAML 1.2");
+                    } else {
+                        panic!("Expected 'no' to be parsed as string in YAML 1.2");
+                    }
+
+                    // Check true/false still work
+                    if let Some((_, Node::Boolean(true))) = pairs
+                        .iter()
+                        .find(|(k, _)| matches!(k, Node::Str(key, _, _) if key == "true_value"))
+                    {
+                        // Passed
+                    } else {
+                        panic!("Expected 'true' to be parsed as boolean in YAML 1.2");
+                    }
+
+                    if let Some((_, Node::Boolean(false))) = pairs
+                        .iter()
+                        .find(|(k, _)| matches!(k, Node::Str(key, _, _) if key == "false_value"))
+                    {
+                        // Passed
+                    } else {
+                        panic!("Expected 'false' to be parsed as boolean in YAML 1.2");
+                    }
                 }
             }
         }
@@ -719,17 +734,21 @@ mod tests {
         );
         let result = parse(&mut source);
         assert!(result.is_ok());
-        
+
         if let Ok(Node::Documents(docs)) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
-                if let Some((_, Node::Number(Numeric::Integer(i)))) = pairs.iter().find(|(k, _)| {
-                    matches!(k, Node::Str(s, _, _) if s == "permissions")
-                }) {
-                    assert_eq!(*i, 493, "Expected 0755 (octal) to be parsed as 493 (decimal) in YAML 1.1");
-                } else {
-                    panic!("Expected '0755' to be parsed as octal number in YAML 1.1");
-                }
+                    if let Some((_, Node::Number(Numeric::Integer(i)))) = pairs
+                        .iter()
+                        .find(|(k, _)| matches!(k, Node::Str(s, _, _) if s == "permissions"))
+                    {
+                        assert_eq!(
+                            *i, 493,
+                            "Expected 0755 (octal) to be parsed as 493 (decimal) in YAML 1.1"
+                        );
+                    } else {
+                        panic!("Expected '0755' to be parsed as octal number in YAML 1.1");
+                    }
                 }
             }
         }
@@ -745,14 +764,18 @@ mod tests {
         );
         let result = parse(&mut source);
         assert!(result.is_ok());
-        
+
         if let Ok(Node::Documents(docs)) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
-                    if let Some((_, Node::Number(Numeric::Integer(i)))) = pairs.iter().find(|(k, _)| {
-                        matches!(k, Node::Str(s, _, _) if s == "permissions")
-                    }) {
-                        assert_eq!(*i, 493, "Expected 0o755 (octal) to be parsed as 493 (decimal) in YAML 1.2");
+                    if let Some((_, Node::Number(Numeric::Integer(i)))) = pairs
+                        .iter()
+                        .find(|(k, _)| matches!(k, Node::Str(s, _, _) if s == "permissions"))
+                    {
+                        assert_eq!(
+                            *i, 493,
+                            "Expected 0o755 (octal) to be parsed as 493 (decimal) in YAML 1.2"
+                        );
                     } else {
                         panic!("Expected '0o755' to be parsed as octal number in YAML 1.2");
                     }

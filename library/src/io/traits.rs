@@ -23,6 +23,11 @@ pub trait ISource {
         c == ' ' || c == '\t'
     }
 
+    /// Check if character is a tab (used for validation)
+    fn is_tab(&self, c: char) -> bool {
+        c == '\t'
+    }
+
     fn get_current_indent_level(&self) -> usize;
 }
 

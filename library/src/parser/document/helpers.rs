@@ -34,6 +34,35 @@ pub(crate) fn parse_error(source: &mut dyn ISource, msg: &str) -> String {
     )
 }
 
+/// Checks if the current line has tabs in indentation (YAML error)
+///
+/// # Arguments
+///
+/// * `source` - A mutable reference to a source implementing ISource trait
+///
+/// # Returns
+///
+/// true if tabs are found in indentation, false otherwise
+pub(crate) fn has_tabs_in_indentation(source: &mut dyn ISource) -> bool {
+    let state = source.save_state();
+    
+    // Check from start of line for any tabs before non-whitespace
+    while let Some(c) = source.current() {
+        if c == '\t' {
+            source.restore_state(state);
+            return true;
+        }
+        if c == ' ' {
+            source.next();
+            continue;
+        }
+        break;
+    }
+    
+    source.restore_state(state);
+    false
+}
+
 /// Skips whitespace characters in the source.
 ///
 /// Advances the source position past all consecutive whitespace characters
@@ -139,6 +168,14 @@ pub(crate) fn parse_quoted_scalar(source: &mut dyn ISource) -> Result<String, St
             None => {
                 return Err(parse_error(source, ERR_UNTERMINATED_QUOTED_FLOW));
             }
+        }
+    }
+
+    // Validate escape sequences in double-quoted strings
+    if quote == CHAR_DOUBLE_QUOTE && out.len() >= 2 {
+        let inner = &out[1..out.len()-1];
+        if let Err(e) = crate::utils::validate_double_quoted_escapes(inner) {
+            return Err(parse_error(source, &e));
         }
     }
 

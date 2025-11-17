@@ -192,6 +192,45 @@ pub fn node_to_inline_string(node: &Node) -> String {
 ///
 /// * `s` - A string slice containing the potentially escaped string
 ///
+/// Validates that a double-quoted string contains only valid escape sequences
+///
+/// # Arguments
+///
+/// * `s` - The string content (without surrounding quotes) to validate
+///
+/// # Returns
+///
+/// Result with Ok(()) if valid, or Err with error message if invalid
+pub fn validate_double_quoted_escapes(s: &str) -> Result<(), String> {
+    let mut chars = s.chars().peekable();
+    
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            match chars.peek() {
+                Some('u') | Some('U') | Some('x') | Some('n') | Some('r') | Some('t') | Some('b') 
+                | Some('"') | Some('\\') | Some('/') | Some(' ') | Some('0')
+                | Some('a') | Some('v') | Some('f') | Some('e') | Some('N')
+                | Some('_') | Some('L') | Some('P') => {
+                    // Valid escape
+                }
+                Some(other) => {
+                    return Err(format!("Invalid escape sequence: \\{}", other));
+                }
+                None => {
+                    return Err("Trailing backslash in string".to_string());
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Unescapes a double-quoted string by processing escape sequences.
+///
+/// # Arguments
+///
+/// * `s` - The string content to unescape
+///
 /// # Returns
 ///
 /// A new String with escape sequences processed
@@ -225,6 +264,32 @@ pub fn unescape_double_quoted(s: &str) -> String {
 
                     result.push('\\');
                     result.push('u');
+                    result.push_str(&hex);
+                }
+
+                Some('U') => {
+                    let mut hex = String::new();
+                    for _ in 0..8 {
+                        if let Some(h) = chars.peek().copied() {
+                            if h.is_ascii_hexdigit() {
+                                hex.push(h);
+                                chars.next();
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                    if hex.len() == 8 {
+                        if let Ok(code) = u32::from_str_radix(&hex, 16) {
+                            if let Some(ch) = char::from_u32(code) {
+                                result.push(ch);
+                                continue;
+                            }
+                        }
+                    }
+
+                    result.push('\\');
+                    result.push('U');
                     result.push_str(&hex);
                 }
 
@@ -263,8 +328,21 @@ pub fn unescape_double_quoted(s: &str) -> String {
 
                 Some('"') => result.push('"'),
                 Some('\\') => result.push('\\'),
+                Some('/') => result.push('/'),
+                Some(' ') => result.push(' '),
+                Some('0') => result.push('\0'),
+                Some('a') => result.push('\x07'),
+                Some('v') => result.push('\x0B'),
+                Some('f') => result.push('\x0C'),
+                Some('e') => result.push('\x1B'),
+                Some('N') => result.push('\u{0085}'),
+                Some('_') => result.push('\u{00A0}'),
+                Some('L') => result.push('\u{2028}'),
+                Some('P') => result.push('\u{2029}'),
 
                 Some(other) => {
+                    // Invalid escape sequence - this should cause an error
+                    // For now, we'll preserve it literally, but parsers should reject this
                     result.push('\\');
                     result.push(other);
                 }
