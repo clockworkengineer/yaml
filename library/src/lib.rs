@@ -27,6 +27,9 @@ extern crate alloc;
 
 /// Module containing constants for the library
 mod constants;
+/// Module for developer tools (debugging, inspection, diffing, tracing)
+#[cfg(feature = "alloc")]
+pub mod devtools;
 /// Module for embedded systems support
 #[cfg(any(feature = "embedded", doc))]
 pub mod embedded;
@@ -251,3 +254,22 @@ pub use testing::property::{Property, PropertyResult, PropertySuite};
 pub use testing::safety::{
     MemoryStats, SafetyAudit, SafetyIssue, audit_node, calculate_memory_stats,
 };
+
+// Developer Tools API
+/// Debugging utilities
+#[cfg(feature = "alloc")]
+pub use devtools::debug::{DebugAssert, DebugContext, DebugLevel, NodeDebugger};
+/// Node diffing and comparison
+#[cfg(feature = "alloc")]
+pub use devtools::diff::{Diff, DiffResult, DiffType, diff_nodes};
+/// Node inspection and introspection
+#[cfg(feature = "alloc")]
+pub use devtools::inspect::{
+    NodeInfo, NodeType, find_by_type, has_anchor, has_tag, node_depth, node_size, node_summary,
+    node_type, print_tree,
+};
+#[cfg(all(feature = "alloc", feature = "std"))]
+pub use devtools::trace::TracedTimer;
+/// Execution tracing
+#[cfg(feature = "alloc")]
+pub use devtools::trace::{TraceEntry, TraceEvent, TraceGuard, Tracer};
