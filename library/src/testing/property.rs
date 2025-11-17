@@ -114,7 +114,10 @@ pub mod properties {
         if repr1 == repr2 {
             PropertyResult::Pass
         } else {
-            PropertyResult::Fail("Round-trip changed structure".to_string())
+            PropertyResult::Fail(format!(
+                "Round-trip changed structure:\nFirst:  {:?}\nSecond: {:?}\nYAML1: {}\nYAML2: {}",
+                node1, node2, yaml1, yaml2
+            ))
         }
     }
 
@@ -333,6 +336,9 @@ mod tests {
     fn test_roundtrip_simple() {
         let node = Node::from("test");
         let result = properties::roundtrip_preserves_structure(&node);
+        if !matches!(result, PropertyResult::Pass | PropertyResult::Skip(_)) {
+            eprintln!("Roundtrip failed: {:?}", result);
+        }
         assert!(matches!(result, PropertyResult::Pass | PropertyResult::Skip(_)));
     }
 }

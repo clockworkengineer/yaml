@@ -390,6 +390,10 @@ pub fn stringify(node: &Node, destination: &mut dyn IDestination) -> Result<(), 
 
                 destination.add_bytes("---\n");
                 stringify_document(doc, destination)?;
+                // Add newline before ... if not already present
+                if destination.last() != Some(b'\n') {
+                    destination.add_bytes("\n");
+                }
                 destination.add_bytes("...\n");
             }
         }
