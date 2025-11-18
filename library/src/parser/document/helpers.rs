@@ -43,6 +43,7 @@ pub(crate) fn parse_error(source: &mut dyn ISource, msg: &str) -> String {
 /// # Returns
 ///
 /// true if tabs are found in indentation, false otherwise
+#[allow(dead_code)]
 pub(crate) fn has_tabs_in_indentation(source: &mut dyn ISource) -> bool {
     let state = source.save_state();
 

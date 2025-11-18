@@ -5,7 +5,7 @@ use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::nodes::node::{BlockStyle, QuoteType};
 use crate::parser::document::helpers::{
-    parse_comment, parse_error, parse_mapping_key, skip_whitespace,
+    parse_comment, parse_error, parse_mapping_key,
 };
 use crate::parser::document::value::parse_value;
 

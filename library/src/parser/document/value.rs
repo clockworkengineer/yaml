@@ -478,7 +478,7 @@ pub(crate) fn parse_value(
             // We need to look back to find the line's actual indentation
             // For now, use a simple heuristic: count leading spaces in the collected value
             // If value starts without leading space, line indent was 0 or we're inline
-            let value_line_indent = value.len() - value.trim_start().len();
+            let _value_line_indent = value.len() - value.trim_start().len();
 
             if trimmed.starts_with(STR_LITERAL_BLOCK) || trimmed.starts_with(STR_FOLDED_BLOCK) {
                 let first_ch = trimmed.chars().next().unwrap();

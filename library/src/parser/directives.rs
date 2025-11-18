@@ -79,6 +79,7 @@ impl DirectiveContext {
     }
 
     /// Check if this is YAML 1.2 (default if no version specified)
+    #[allow(dead_code)]
     pub fn is_yaml_12(&self) -> bool {
         match self.yaml_version {
             Some((1, 2)) | None => true,
@@ -307,6 +308,7 @@ fn skip_to_end_of_line(source: &mut dyn ISource) {
 }
 
 /// Skip whitespace including newlines
+#[allow(dead_code)]
 fn skip_whitespace(source: &mut dyn ISource) {
     while let Some(c) = source.current() {
         if c.is_whitespace() {

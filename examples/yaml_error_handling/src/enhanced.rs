@@ -8,7 +8,7 @@
 //! - Multiple error collection
 
 use yaml_lib::{
-    EnhancedError, ErrorCode, ErrorCollection, ErrorKind, ErrorSuggestion, ParserState,
+    EnhancedError, ErrorCode, ErrorCollection, ErrorKind, ErrorSuggestion,
     RecoveryContext, RecoveryHandler, RecoveryStrategy, Span, SuggestionBuilder, YamlError,
 };
 

@@ -3,7 +3,7 @@
 //! Provides debugging tools including breakpoints, logging, and trace capabilities.
 
 use alloc::format;
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::vec::Vec;
 
 use crate::nodes::node::Node;
