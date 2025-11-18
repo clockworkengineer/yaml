@@ -65,6 +65,11 @@ pub(crate) fn parse_inline_set(
             Some(CHAR_COMMA) => {
                 source.next();
                 skip_whitespace(source);
+                // Check for trailing comma (comma followed by closing brace)
+                if source.current() == Some(CHAR_RBRACE) {
+                    source.next();
+                    break;
+                }
                 continue;
             }
             Some(CHAR_RBRACE) => {
@@ -130,8 +135,20 @@ pub(crate) fn parse_inline_mapping(
                 quote_char = '\0';
             }
             CHAR_COLON if !in_quotes && brace_depth == 0 && bracket_depth == 0 => {
-                has_colons = true;
-                break;
+                // Check if this is a key-value colon (followed by whitespace, comma, closing brace, or newline)
+                // vs part of a scalar value like a URL (e.g., http://)
+                source.next(); // Move to next character
+                let next_char = source.current();
+                let is_separator = matches!(next_char, 
+                    Some(' ') | Some('\t') | Some('\n') | Some('\r') | 
+                    Some(',') | Some('}') | Some(']') | Some('#') | None
+                );
+                if is_separator {
+                    has_colons = true;
+                    break; // Found a valid separator colon
+                }
+                // Continue scanning - this colon is part of a scalar (like http://)
+                continue; // Skip the source.next() at end of loop since we already advanced
             }
             // Skip whitespace and newlines in flow context
             c if !in_quotes && (c == ' ' || c == '\t' || c == '\n' || c == '\r') => {}
@@ -187,6 +204,8 @@ fn parse_inline_mapping_with_colons(
         skip_whitespace(source);
 
         let value_node = match source.current() {
+            // Handle omitted value (key followed immediately by comma or closing brace)
+            Some(CHAR_COMMA) | Some(CHAR_RBRACE) => Node::None,
             Some(CHAR_LBRACE) => parse_inline_mapping(source, directives)?,
             Some(CHAR_LBRACKET) => parse_inline_sequence(source, directives)?,
             Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
@@ -210,6 +229,11 @@ fn parse_inline_mapping_with_colons(
             Some(CHAR_COMMA) => {
                 source.next();
                 skip_whitespace_and_comments(source);
+                // Check if there's a closing brace after the comma (trailing comma)
+                if source.current() == Some(CHAR_RBRACE) {
+                    source.next();
+                    break;
+                }
                 continue;
             }
             Some(CHAR_RBRACE) => {
@@ -314,6 +338,11 @@ pub(crate) fn parse_inline_sequence(
             Some(CHAR_COMMA) => {
                 source.next();
                 skip_whitespace(source);
+                // Check for trailing comma (comma followed by closing bracket)
+                if source.current() == Some(CHAR_RBRACKET) {
+                    source.next();
+                    break;
+                }
                 continue;
             }
             Some(CHAR_RBRACKET) => {
