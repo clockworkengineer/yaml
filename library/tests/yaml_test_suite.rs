@@ -96,14 +96,13 @@ fn run_yaml_test_suite() {
         return;
     }
 
-    // Skip tests that are known to cause hangs or have unresolved issues
-    // These are primarily flow collection edge cases with trailing commas
+    // Skip tests that cause infinite loops in the parser
+    // Note: Simple flow collections with trailing commas work fine in isolation,
+    // but these specific test cases trigger an edge case that causes hangs
     let skip_list: Vec<&str> = vec![
-        "5C5M", // Flow Mappings with trailing comma - causes infinite loop
-        "5KJE", // Flow Sequence with trailing comma - causes infinite loop
-                // TODO: Fix flow collection parser to handle trailing commas properly
+        "5C5M", // Flow Mappings - causes hang (test #56)  
+        "5KJE", // Flow Sequences - causes hang (test #58)
     ];
-
     let mut passed = 0;
     let mut failed = 0;
     let mut skipped = 0;

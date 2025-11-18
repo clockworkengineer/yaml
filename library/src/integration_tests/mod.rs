@@ -19,3 +19,6 @@ mod validation_tests;
 // Embedded systems integration tests
 #[cfg(feature = "embedded")]
 mod embedded_tests;
+
+// Flow collection edge case tests
+mod flow_trailing_comma_tests;
