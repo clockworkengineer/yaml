@@ -22,3 +22,4 @@ mod embedded_tests;
 
 // Flow collection edge case tests
 mod flow_trailing_comma_tests;
+mod debug_flow_hang;

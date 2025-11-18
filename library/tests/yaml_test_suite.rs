@@ -96,12 +96,9 @@ fn run_yaml_test_suite() {
         return;
     }
 
-    // Skip tests that cause infinite loops in the parser
-    // Note: Simple flow collections with trailing commas work fine in isolation,
-    // but these specific test cases trigger an edge case that causes hangs
+    // Skip tests that are known to cause issues
     let skip_list: Vec<&str> = vec![
-        "5C5M", // Flow Mappings - causes hang (test #56)  
-        "5KJE", // Flow Sequences - causes hang (test #58)
+        // All flow trailing comma tests now pass! (5C5M and 5KJE fixed)
     ];
     let mut passed = 0;
     let mut failed = 0;
@@ -120,15 +117,15 @@ fn run_yaml_test_suite() {
     // Sort for consistent ordering
     test_dirs.sort();
 
-    // For initial testing, limit to first 50 tests to get baseline
+    // For initial testing, limit to first 60 tests to include 5C5M and 5KJE
     // Remove this limit to run all 402 tests
-    if test_dirs.len() > 50 {
+    if test_dirs.len() > 60 {
         println!(
-            "NOTE: Running first 50 tests only (out of {})",
+            "NOTE: Running first 60 tests only (out of {})",
             test_dirs.len()
         );
-        println!("      Remove limit in yaml_test_suite.rs to run all tests");
-        test_dirs.truncate(50);
+        println!("      Remove limit in yaml_test_suite.rs to run all 402 tests");
+        test_dirs.truncate(60);
     }
 
     let total_dirs = test_dirs.len();
