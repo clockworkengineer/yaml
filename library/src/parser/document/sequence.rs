@@ -78,7 +78,6 @@ pub(crate) fn parse_sequence(
                                     nested_indent,
                                     directives,
                                 )?);
-                                continue;
                             } else {
                                 items.push(parse_value(source, directives)?);
                             }
@@ -86,22 +85,21 @@ pub(crate) fn parse_sequence(
                     }
                 }
             }
-            _ if !c.is_whitespace() => {
-                // If we encounter a non-dash, non-whitespace character, check the indentation
-                // If at or below the sequence's indentation, we've reached the end of the sequence
+            c if c.is_whitespace() => {
+                source.next();
+            }
+            _ => {
+                // Unexpected character - check if we should break or error
                 if source.get_current_indent_level() <= indent_level {
                     break;
                 }
-                // Otherwise, it's an error (unexpected content within the sequence)
                 return Err(format!(
-                    "Expected sequence item starting with CHAR_DASH, got '{c}'"
+                    "Expected sequence item starting with CHAR_DASH, got '{}' at indent {}",
+                    source.current().unwrap_or('\0'),
+                    source.get_current_indent_level()
                 ));
             }
-            _ => (),
         }
-
-        crate::utils::skip_until_newline(source);
-        skip_whitespace(source);
     }
     Ok(Node::Array(items))
 }
