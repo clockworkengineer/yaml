@@ -154,6 +154,44 @@ pub fn parse_document_contents(
         Some(c) if c == '*' => Ok(crate::parser::document::value::parse_value(
             source, directives,
         )?),
+        // Handle explicit value indicator (: value) with missing/null key
+        Some(c) if c == ':' => {
+            let current_indent = source.get_current_indent_level();
+            let mut pairs: Vec<(Node, Node)> = Vec::new();
+            
+            // Parse all consecutive mapping entries with omitted keys at this indent level
+            loop {
+                // Check if we're still at the same indent and have a colon
+                if source.get_current_indent_level() != current_indent || source.current() != Some(':') {
+                    break;
+                }
+                
+                source.next(); // Skip ':'
+                skip_whitespace(source);
+                
+                // Parse the value
+                let value_node = if source.current() == Some('\n') || source.current().is_none() {
+                    // Just ":" with no value - null key and null value
+                    if source.current() == Some('\n') {
+                        source.next();
+                    }
+                    Node::None
+                } else {
+                    parse_value(source, directives)?
+                };
+                
+                pairs.push((Node::None, value_node));
+                
+                // Move to next line
+                crate::utils::skip_until_newline(source);
+                if source.current() == Some('\n') {
+                    source.next();
+                }
+                skip_whitespace(source);
+            }
+            
+            Ok(Node::Mapping(pairs))
+        }
         Some(c) if c == '?' => {
             // Check if we have multiple explicit keys at this indentation level (likely a set)
             let current_indent = source.get_current_indent_level();
