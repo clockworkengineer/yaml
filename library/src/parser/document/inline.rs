@@ -139,10 +139,10 @@ pub(crate) fn parse_inline_mapping(
                 // 1. It's preceded by whitespace, quotes, or flow collection delimiters
                 // 2. OR it's followed by whitespace, end markers, or flow collection delimiters
                 // But NOT if it's part of a URL-like pattern (e.g., http://)
-                
+
                 source.next(); // Move to next character
                 let next_char = source.current();
-                
+
                 // Check for http:// or similar patterns - if followed by //, it's not a separator
                 if next_char == Some('/') {
                     source.next();
@@ -153,7 +153,7 @@ pub(crate) fn parse_inline_mapping(
                     }
                     // Just a single slash - this could be a separator followed by value
                 }
-                
+
                 // If followed by whitespace or flow markers, it's a separator
                 // If followed by non-whitespace, it's still a separator in flow context (e.g., key:value)
                 // The only exception is the URL pattern we checked above
@@ -193,16 +193,16 @@ fn parse_inline_mapping_with_colons(
     loop {
         // Skip whitespace, newlines, and comments before parsing key
         skip_whitespace_and_comments(source);
-        
+
         let key_node = {
             let raw = match source.current() {
                 Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => parse_quoted_scalar(source)?,
                 _ => collect_until(source, |c| c == CHAR_COLON || c == CHAR_RBRACE),
             };
-            
+
             // In flow context, whitespace including newlines and comments are allowed between key and colon
             skip_whitespace_and_comments(source);
-            
+
             if source.current() != Some(CHAR_COLON) {
                 return Err(parse_error(source, ERR_EXPECT_COLON_INLINE_MAPPING));
             }
@@ -248,18 +248,29 @@ fn parse_inline_mapping_with_colons(
             }
             Some(CHAR_RBRACE) => {
                 source.next();
-                
+
                 // Check for invalid text immediately after closing brace (no space)
                 // Valid characters: whitespace, newline, comma, another closing bracket/brace, colon, or comment
                 if let Some(c) = source.current() {
-                    if !c.is_whitespace() && c != '\n' && c != '\r' && c != ',' && c != ']' && c != '}' && c != '#' && c != ':' {
+                    if !c.is_whitespace()
+                        && c != '\n'
+                        && c != '\r'
+                        && c != ','
+                        && c != ']'
+                        && c != '}'
+                        && c != '#'
+                        && c != ':'
+                    {
                         // Check if it's an alphanumeric character which would be clearly invalid
                         if c.is_alphanumeric() {
-                            return Err(parse_error(source, "Invalid character after flow mapping - expected whitespace or newline"));
+                            return Err(parse_error(
+                                source,
+                                "Invalid character after flow mapping - expected whitespace or newline",
+                            ));
                         }
                     }
                 }
-                
+
                 break;
             }
             Some(c) => {

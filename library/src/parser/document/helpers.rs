@@ -95,7 +95,7 @@ pub(crate) fn skip_whitespace_no_tabs(source: &mut dyn ISource) -> Result<(), St
             break;
         }
     }
-    
+
     // Only error if tabs were found AND there's actual content after (not a blank line)
     if found_tab {
         if let Some(c) = source.current() {
@@ -259,22 +259,72 @@ pub(crate) fn peek_ahead_for_document_start_end(source: &mut dyn ISource, c: cha
 pub(crate) fn peek_ahead_for_mapping_key(source: &mut dyn ISource) -> bool {
     let mut found = false;
     let state = source.save_state();
-    while let Some(c) = source.current() {
-        match c {
-            CHAR_COLON => {
-                found = true;
+    
+    // Handle quoted strings specially - they can span multiple lines
+    if matches!(source.current(), Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE)) {
+        let quote = source.current().unwrap();
+        source.next(); // Skip opening quote
+        
+        // Scan until we find the closing quote
+        let mut prev_was_backslash = false;
+        while let Some(c) = source.current() {
+            source.next(); // Move past current character
+            
+            if c == quote {
+                if quote == CHAR_SINGLE_QUOTE {
+                    // Check for doubled single quote (escape mechanism)
+                    if source.current() == Some(CHAR_SINGLE_QUOTE) {
+                        source.next(); // Skip the second quote
+                        prev_was_backslash = false;
+                        continue;
+                    } else {
+                        break; // Found true closing quote
+                    }
+                } else if !prev_was_backslash {
+                    break; // Found true closing double quote
+                }
+            }
+            
+            if quote == CHAR_DOUBLE_QUOTE && c == CHAR_BACKSLASH {
+                prev_was_backslash = !prev_was_backslash;
+            } else {
+                prev_was_backslash = false;
+            }
+        }
+        
+        // After the quoted string, skip whitespace (not newlines) and check for colon
+        while let Some(c) = source.current() {
+            if c == CHAR_SPACE || c == CHAR_TAB {
+                source.next();
+            } else {
                 break;
             }
-            CHAR_NEWLINE => {
-                break;
-            }
-            _ => {
-                if source.more() {
-                    source.next();
+        }
+        
+        // Check for colon (not after newline)
+        if source.current() == Some(CHAR_COLON) {
+            found = true;
+        }
+    } else {
+        // Non-quoted case: look for colon before newline
+        while let Some(c) = source.current() {
+            match c {
+                CHAR_COLON => {
+                    found = true;
+                    break;
+                }
+                CHAR_NEWLINE => {
+                    break;
+                }
+                _ => {
+                    if source.more() {
+                        source.next();
+                    }
                 }
             }
         }
     }
+    
     source.restore_state(state);
     found
 }
@@ -297,23 +347,29 @@ pub(crate) fn parse_mapping_key(
     directives: &crate::parser::directives::DirectiveContext,
 ) -> Result<(Node, bool), String> {
     let raw = collect_until(source, |c| c == CHAR_COLON || c == CHAR_NEWLINE);
-    
+
     // Check if we stopped at a colon or newline
     if source.current() == Some(CHAR_NEWLINE) {
         // We reached end of line without finding a colon - invalid mapping key
-        return Err(parse_error(source, "Mapping key must be followed by a colon"));
+        return Err(parse_error(
+            source,
+            "Mapping key must be followed by a colon",
+        ));
     }
-    
+
     // Check if we hit EOF without a colon
     if source.current().is_none() {
         // EOF without colon - could be valid scalar, not a mapping
         // But we're in parse_mapping_key, so this shouldn't happen
         // Let the caller handle it
-        return Err(parse_error(source, "Unexpected end of input in mapping key"));
+        return Err(parse_error(
+            source,
+            "Unexpected end of input in mapping key",
+        ));
     }
-    
+
     let mut newline = false;
-    source.next();  // consume the colon
+    source.next(); // consume the colon
     skip_whitespace(source);
     if let Some(c) = source.current() {
         if c == CHAR_HASH {

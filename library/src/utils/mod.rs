@@ -344,7 +344,7 @@ pub fn unescape_double_quoted(s: &str) -> String {
                 Some('_') => result.push('\u{00A0}'),
                 Some('L') => result.push('\u{2028}'),
                 Some('P') => result.push('\u{2029}'),
-                
+
                 Some('\n') => {
                     // Line continuation: \<newline> removes the newline and any leading whitespace on next line
                     // Skip any following whitespace

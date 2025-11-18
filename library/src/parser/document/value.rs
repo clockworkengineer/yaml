@@ -564,19 +564,16 @@ pub(crate) fn parse_value(
 
                 let fi = first_indent.unwrap_or(0);
                 let mut norm_lines: Vec<String> = Vec::with_capacity(raw_lines.len());
-                if is_folded {
-                    for l in raw_lines.iter() {
-                        if l.is_empty() {
-                            norm_lines.push(String::new());
-                        } else {
-                            let lead = l.chars().take_while(|&ch| ch == CHAR_SPACE).count();
-                            let strip = fi.min(lead);
-                            let stripped: String = l.chars().skip(strip).collect();
-                            norm_lines.push(stripped);
-                        }
+                // Strip base indentation from all lines (both literal and folded)
+                for l in raw_lines.iter() {
+                    if l.is_empty() {
+                        norm_lines.push(String::new());
+                    } else {
+                        let lead = l.chars().take_while(|&ch| ch == CHAR_SPACE).count();
+                        let strip = fi.min(lead);
+                        let stripped: String = l.chars().skip(strip).collect();
+                        norm_lines.push(stripped);
                     }
-                } else {
-                    norm_lines = raw_lines.clone();
                 }
 
                 let out = if is_folded {

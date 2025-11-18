@@ -73,17 +73,39 @@ pub(crate) fn parse_scalar(value: &str, directives: &DirectiveContext) -> Node {
                         while let Some(ch) = chars.next() {
                             if ch == '\n' {
                                 saw_multiline = true;
-                                let mut space_count = 0usize;
-                                while let Some(' ') = chars.peek().copied() {
-                                    space_count += 1;
-                                    chars.next();
+                                // Skip leading whitespace and count empty lines
+                                let mut empty_line_count = 0;
+                                loop {
+                                    // Skip whitespace
+                                    while let Some(&next_ch) = chars.peek() {
+                                        if next_ch == ' ' || next_ch == '\t' {
+                                            chars.next();
+                                        } else {
+                                            break;
+                                        }
+                                    }
+                                    
+                                    // Check if this is an empty line
+                                    if chars.peek() == Some(&'\n') {
+                                        empty_line_count += 1;
+                                        chars.next(); // Consume the newline
+                                    } else {
+                                        break;
+                                    }
                                 }
-                                if space_count > 0 {
+                                
+                                // Apply folding rules based on empty lines
+                                if empty_line_count > 0 {
+                                    // One or more empty lines: preserve as single line break
+                                    folded.push('\n');
+                                } else if chars.peek().is_none() {
+                                    // End of string after whitespace
+                                    // Don't add anything
+                                } else {
+                                    // Non-empty continuation line with no empty lines: fold to space
                                     if !folded.ends_with(' ') && !folded.is_empty() {
                                         folded.push(' ');
                                     }
-                                } else if chars.peek().is_some() {
-                                    folded.push('\n');
                                 }
                             } else {
                                 folded.push(ch);
