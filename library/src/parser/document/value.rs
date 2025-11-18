@@ -473,7 +473,7 @@ pub(crate) fn parse_value(
         Some(_) => {
             let value = collect_until(source, |c| c == CHAR_NEWLINE || c == CHAR_HASH);
             let trimmed = value.trim();
-            
+
             // Get the indent level of the LINE where the value started (not character position)
             // We need to look back to find the line's actual indentation
             // For now, use a simple heuristic: count leading spaces in the collected value
@@ -642,50 +642,65 @@ pub(crate) fn parse_value(
                 // Check if this plain scalar continues on subsequent lines
                 let mut parts = vec![value.clone()];
                 let mut has_empty_line = false;
-                
+
                 // Collect continuation lines
                 loop {
                     // Check if we're at a newline
                     if source.current() != Some(CHAR_NEWLINE) {
                         break;
                     }
-                    
+
                     // Save state to potentially restore
                     let state = source.save_state();
                     source.next(); // Skip newline
-                    
+
                     // Check indent of next line
                     let next_indent = source.get_current_indent_level();
-                    
+
                     // Empty line - this might end the scalar or be part of it
                     if source.current() == Some(CHAR_NEWLINE) {
                         has_empty_line = true;
                         source.restore_state(state);
                         break;
                     }
-                    
+
                     // EOF ends the scalar
                     if source.current().is_none() {
                         source.restore_state(state);
                         break;
                     }
-                    
+
                     // Line with indent 0 ends the scalar
                     // (Continuation lines must be indented)
                     if next_indent == 0 {
                         source.restore_state(state);
                         break;
                     }
-                    
+
                     // Check for special indicators that would end the scalar
                     if let Some(c) = source.current() {
                         // Dash at start of line (sequence item), colon, or other indicators
-                        if matches!(c, '-' | '?' | ':' | '#' | '&' | '*' | '!' | '|' | '>' | '\'' | '"' | '%' | '@' | '`') {
+                        if matches!(
+                            c,
+                            '-' | '?'
+                                | ':'
+                                | '#'
+                                | '&'
+                                | '*'
+                                | '!'
+                                | '|'
+                                | '>'
+                                | '\''
+                                | '"'
+                                | '%'
+                                | '@'
+                                | '`'
+                        ) {
                             source.restore_state(state);
                             break;
                         }
                     }
-                    
+
                     // This is a continuation line - collect it (DON'T restore state)
                     let cont_line = collect_until(source, |c| c == CHAR_NEWLINE || c == CHAR_HASH);
                     if !cont_line.trim().is_empty() {
@@ -693,7 +708,7 @@ pub(crate) fn parse_value(
                     }
                     // Now we're at the newline after the continuation line, loop will check again
                 }
-                
+
                 // Join lines with space folding
                 if parts.len() == 1 && !has_empty_line {
                     Ok(parse_scalar(trimmed, directives))

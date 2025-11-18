@@ -259,17 +259,20 @@ pub(crate) fn peek_ahead_for_document_start_end(source: &mut dyn ISource, c: cha
 pub(crate) fn peek_ahead_for_mapping_key(source: &mut dyn ISource) -> bool {
     let mut found = false;
     let state = source.save_state();
-    
+
     // Handle quoted strings specially - they can span multiple lines
-    if matches!(source.current(), Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE)) {
+    if matches!(
+        source.current(),
+        Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE)
+    ) {
         let quote = source.current().unwrap();
         source.next(); // Skip opening quote
-        
+
         // Scan until we find the closing quote
         let mut prev_was_backslash = false;
         while let Some(c) = source.current() {
             source.next(); // Move past current character
-            
+
             if c == quote {
                 if quote == CHAR_SINGLE_QUOTE {
                     // Check for doubled single quote (escape mechanism)
@@ -284,14 +287,14 @@ pub(crate) fn peek_ahead_for_mapping_key(source: &mut dyn ISource) -> bool {
                     break; // Found true closing double quote
                 }
             }
-            
+
             if quote == CHAR_DOUBLE_QUOTE && c == CHAR_BACKSLASH {
                 prev_was_backslash = !prev_was_backslash;
             } else {
                 prev_was_backslash = false;
             }
         }
-        
+
         // After the quoted string, skip whitespace (not newlines) and check for colon
         while let Some(c) = source.current() {
             if c == CHAR_SPACE || c == CHAR_TAB {
@@ -300,7 +303,7 @@ pub(crate) fn peek_ahead_for_mapping_key(source: &mut dyn ISource) -> bool {
                 break;
             }
         }
-        
+
         // Check for colon (not after newline)
         if source.current() == Some(CHAR_COLON) {
             found = true;
@@ -324,7 +327,7 @@ pub(crate) fn peek_ahead_for_mapping_key(source: &mut dyn ISource) -> bool {
             }
         }
     }
-    
+
     source.restore_state(state);
     found
 }

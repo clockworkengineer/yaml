@@ -84,7 +84,7 @@ pub(crate) fn parse_scalar(value: &str, directives: &DirectiveContext) -> Node {
                                             break;
                                         }
                                     }
-                                    
+
                                     // Check if this is an empty line
                                     if chars.peek() == Some(&'\n') {
                                         empty_line_count += 1;
@@ -93,7 +93,7 @@ pub(crate) fn parse_scalar(value: &str, directives: &DirectiveContext) -> Node {
                                         break;
                                     }
                                 }
-                                
+
                                 // Apply folding rules based on empty lines
                                 if empty_line_count > 0 {
                                     // One or more empty lines: preserve as single line break
