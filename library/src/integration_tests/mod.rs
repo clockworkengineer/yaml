@@ -21,5 +21,8 @@ mod validation_tests;
 mod embedded_tests;
 
 // Flow collection edge case tests
-mod flow_trailing_comma_tests;
 mod debug_flow_hang;
+mod flow_trailing_comma_tests;
+
+// Official YAML test suite failing cases
+mod official_suite_fixes;

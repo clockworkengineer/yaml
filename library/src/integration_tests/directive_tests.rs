@@ -13,10 +13,13 @@ mod tests {
         let yaml = b"%TAG !m! !my-\n--- # Bulb here\n!m!light fluorescent\n...\n%TAG !m! !my-\n--- # Color here\n!m!light green\n";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        
+
         println!("5TYM Result: {:?}", result);
-        
-        assert!(result.is_ok(), "Should parse TAG directive with local prefix");
+
+        assert!(
+            result.is_ok(),
+            "Should parse TAG directive with local prefix"
+        );
     }
 
     #[test]
@@ -25,9 +28,9 @@ mod tests {
         let yaml = b"# Private\n---\n!foo \"bar\"\n...\n# Global\n%TAG ! tag:example.com,2000:app/\n---\n!foo \"bar\"\n";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        
+
         println!("6WLZ Result: {:?}", result);
-        
+
         assert!(result.is_ok(), "Should parse primary TAG handle directive");
     }
 
@@ -36,7 +39,7 @@ mod tests {
         let yaml = b"%YAML 1.2\n---\ntest: value\n";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        
+
         assert!(result.is_ok(), "Should parse YAML version directive");
     }
 
@@ -45,9 +48,9 @@ mod tests {
         let yaml = b"%TAG !e! tag:example.com,2000:\n---\n!e!type value\n";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        
+
         println!("Simple TAG Result: {:?}", result);
-        
+
         assert!(result.is_ok(), "Should parse simple TAG directive");
     }
 }

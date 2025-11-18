@@ -94,11 +94,30 @@ mod tests {
 
     #[test]
     fn test_error_on_invalid_sequence_item() {
+        // Note: This test was updated because according to YAML spec,
+        // plain scalars CAN span multiple lines with proper indentation.
+        // The text "invalid item without dash" is a valid continuation
+        // of the plain scalar "item1".
         let mut source = BufferSource::new(b"---\n- item1\n  invalid item without dash");
         let res = parse(&mut source);
-        assert!(res.is_err());
-        let err = res.unwrap_err();
-        assert!(err.contains("Expected") || err.contains("Unexpected"));
+        
+        // This should now parse successfully as a multiline plain scalar
+        assert!(res.is_ok(), "Multiline plain scalars should be valid: {:?}", res.err());
+        
+        if let Ok(doc) = res {
+            if let Node::Documents(docs) = doc {
+                if let Some(Node::Document(items)) = docs.first() {
+                    if let Some(Node::Array(arr)) = items.first() {
+                        assert_eq!(arr.len(), 1, "Should have one sequence item");
+                        // The value should be the folded multiline plain scalar
+                        if let Some(Node::Str(value, _, _)) = arr.first() {
+                            assert!(value.contains("item1"));
+                            assert!(value.contains("invalid item without dash"));
+                        }
+                    }
+                }
+            }
+        }
     }
 
     #[test]

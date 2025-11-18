@@ -654,8 +654,16 @@ pub(crate) fn parse_value(
                     let state = source.save_state();
                     source.next(); // Skip newline
 
-                    // Check indent of next line
-                    let next_indent = source.get_current_indent_level();
+                    // Count leading whitespace to determine indent
+                    let mut next_indent = 0;
+                    while let Some(c) = source.current() {
+                        if c == ' ' || c == '\t' {
+                            next_indent += 1;
+                            source.next();
+                        } else {
+                            break;
+                        }
+                    }
 
                     // Empty line - this might end the scalar or be part of it
                     if source.current() == Some(CHAR_NEWLINE) {
@@ -699,6 +707,13 @@ pub(crate) fn parse_value(
                             source.restore_state(state);
                             break;
                         }
+                    }
+                    
+                    // Check if this line looks like a mapping key (has a colon)
+                    // This prevents us from consuming what should be a new mapping entry
+                    if crate::parser::document::helpers::peek_ahead_for_mapping_key(source) {
+                        source.restore_state(state);
+                        break;
                     }
 
                     // This is a continuation line - collect it (DON'T restore state)
