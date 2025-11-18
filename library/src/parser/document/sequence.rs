@@ -87,6 +87,12 @@ pub(crate) fn parse_sequence(
                 }
             }
             _ if !c.is_whitespace() => {
+                // If we encounter a non-dash, non-whitespace character, check the indentation
+                // If at or below the sequence's indentation, we've reached the end of the sequence
+                if source.get_current_indent_level() <= indent_level {
+                    break;
+                }
+                // Otherwise, it's an error (unexpected content within the sequence)
                 return Err(format!(
                     "Expected sequence item starting with CHAR_DASH, got '{c}'"
                 ));
