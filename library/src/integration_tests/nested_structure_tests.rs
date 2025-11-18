@@ -521,7 +521,7 @@ mod tests {
 
     #[test]
     fn test_parse_nested_with_escaped_strings() {
-        let yaml = b"escaped:\n  strings:\n    - \"Hello\\nWorld\"\n    - 'Can\\'t stop'\n    - \"Tab\\tSeparated\"\n  nested:\n    paths:\n      windows: \"C:\\\\Users\\\\Name\"\n      unix: \"/home/user\"\n    quotes:\n      - \"He said \\\"Hello\\\"\"\n      - 'She replied \\'Hi\\''\n";
+        let yaml = b"escaped:\n  strings:\n    - \"Hello\\nWorld\"\n    - 'Can''t stop'\n    - \"Tab\\tSeparated\"\n  nested:\n    paths:\n      windows: \"C:\\\\Users\\\\Name\"\n      unix: \"/home/user\"\n    quotes:\n      - \"He said \\\"Hello\\\"\"\n      - 'She replied ''Hi'''\n";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source).unwrap();
 
