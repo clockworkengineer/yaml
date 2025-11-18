@@ -2,7 +2,6 @@
 
 use crate::io::sources::buffer::Buffer as BufferSource;
 use crate::parse;
-use crate::Node;
 
 #[cfg(test)]
 mod tests {
