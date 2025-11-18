@@ -85,8 +85,12 @@ pub(crate) fn parse_sequence(
                     }
                 }
             }
-            c if c.is_whitespace() => {
+            CHAR_NEWLINE => {
                 source.next();
+                skip_whitespace(source);
+            }
+            c if c.is_whitespace() => {
+                skip_whitespace(source);
             }
             _ => {
                 // Unexpected character - check if we should break or error
