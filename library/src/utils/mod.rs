@@ -214,6 +214,10 @@ pub fn validate_double_quoted_escapes(s: &str) -> Result<(), String> {
                 | Some('L') | Some('P') => {
                     // Valid escape
                 }
+                Some('\n') | Some('\r') => {
+                    // Line continuation: \<newline> is valid (backslash escapes the line break)
+                    // This allows for line folding in double-quoted strings
+                }
                 Some(other) => {
                     return Err(format!("Invalid escape sequence: \\{}", other));
                 }
@@ -340,6 +344,32 @@ pub fn unescape_double_quoted(s: &str) -> String {
                 Some('_') => result.push('\u{00A0}'),
                 Some('L') => result.push('\u{2028}'),
                 Some('P') => result.push('\u{2029}'),
+                
+                Some('\n') => {
+                    // Line continuation: \<newline> removes the newline and any leading whitespace on next line
+                    // Skip any following whitespace
+                    while let Some(&c) = chars.peek() {
+                        if c == ' ' || c == '\t' {
+                            chars.next();
+                        } else {
+                            break;
+                        }
+                    }
+                }
+                Some('\r') => {
+                    // Handle Windows line endings: \<CR><LF>
+                    if chars.peek() == Some(&'\n') {
+                        chars.next(); // consume the \n
+                    }
+                    // Skip any following whitespace
+                    while let Some(&c) = chars.peek() {
+                        if c == ' ' || c == '\t' {
+                            chars.next();
+                        } else {
+                            break;
+                        }
+                    }
+                }
 
                 Some(other) => {
                     // Invalid escape sequence - this should cause an error
