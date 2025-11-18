@@ -135,20 +135,30 @@ pub(crate) fn parse_inline_mapping(
                 quote_char = '\0';
             }
             CHAR_COLON if !in_quotes && brace_depth == 0 && bracket_depth == 0 => {
-                // Check if this is a key-value colon (followed by whitespace, comma, closing brace, or newline)
-                // vs part of a scalar value like a URL (e.g., http://)
+                // In flow context, a colon can be a mapping separator if:
+                // 1. It's preceded by whitespace, quotes, or flow collection delimiters
+                // 2. OR it's followed by whitespace, end markers, or flow collection delimiters
+                // But NOT if it's part of a URL-like pattern (e.g., http://)
+                
                 source.next(); // Move to next character
                 let next_char = source.current();
-                let is_separator = matches!(next_char, 
-                    Some(' ') | Some('\t') | Some('\n') | Some('\r') | 
-                    Some(',') | Some('}') | Some(']') | Some('#') | None
-                );
-                if is_separator {
-                    has_colons = true;
-                    break; // Found a valid separator colon
+                
+                // Check for http:// or similar patterns - if followed by //, it's not a separator
+                if next_char == Some('/') {
+                    source.next();
+                    if source.current() == Some('/') {
+                        // This is a URL-like pattern (://), not a mapping separator
+                        source.next();
+                        continue;
+                    }
+                    // Just a single slash - this could be a separator followed by value
                 }
-                // Continue scanning - this colon is part of a scalar (like http://)
-                continue; // Skip the source.next() at end of loop since we already advanced
+                
+                // If followed by whitespace or flow markers, it's a separator
+                // If followed by non-whitespace, it's still a separator in flow context (e.g., key:value)
+                // The only exception is the URL pattern we checked above
+                has_colons = true;
+                break; // Found a mapping separator colon
             }
             // Skip whitespace and newlines in flow context
             c if !in_quotes && (c == ' ' || c == '\t' || c == '\n' || c == '\r') => {}
