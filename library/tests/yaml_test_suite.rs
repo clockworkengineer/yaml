@@ -92,12 +92,12 @@ fn run_yaml_test_suite() {
         Path::new("../../tests/yaml-test-suite"),
         Path::new("tests/yaml-test-suite"),
     ];
-    
+
     let suite_dir = possible_paths
         .iter()
         .find(|p| p.exists() && p.join("229Q").exists())
         .cloned();
-    
+
     let suite_dir = match suite_dir {
         Some(dir) => dir,
         None => {
@@ -105,12 +105,14 @@ fn run_yaml_test_suite() {
             for path in &possible_paths {
                 println!("  - {:?}", path);
             }
-            println!("\nRun: git clone https://github.com/yaml/yaml-test-suite.git -b data-2022-01-17 C:\\Projects\\tests\\yaml-test-suite");
+            println!(
+                "\nRun: git clone https://github.com/yaml/yaml-test-suite.git -b data-2022-01-17 C:\\Projects\\tests\\yaml-test-suite"
+            );
             return;
         }
     };
 
-    // Skip tests that are known to cause issues  
+    // Skip tests that are known to cause issues
     // These tests pass individually but hang when run in the full test suite
     // The hang appears to be related to CRLF (Windows) line endings in the test data
     // Root cause: State pollution or buffering issue between tests - needs investigation
@@ -138,17 +140,20 @@ fn run_yaml_test_suite() {
     test_dirs.sort();
 
     let total_dirs = test_dirs.len();
-    
+
     println!("Running all {} YAML test suite tests...", total_dirs);
-    
+
     let mut test_num = 0;
 
     for (idx, test_dir) in test_dirs.iter().enumerate() {
         // Print progress every 50 tests
         if idx > 0 && idx % 50 == 0 {
-            println!("\n--- Progress: {}/{} tests processed ---\n", idx, total_dirs);
+            println!(
+                "\n--- Progress: {}/{} tests processed ---\n",
+                idx, total_dirs
+            );
         }
-        
+
         let test_dir = test_dir.clone();
         // Load test case
         let test = match load_test_case(&test_dir) {

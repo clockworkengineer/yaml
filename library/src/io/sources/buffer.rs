@@ -45,12 +45,32 @@ impl Buffer {
 impl ISource for Buffer {
     /// Moves to the next character in the buffer
     fn next(&mut self) {
+        if !self.more() {
+            return;
+        }
+        
+        let current_byte = self.buffer[self.position];
         self.position += 1;
-        if self.more() {
-            self.column += 1;
-            if self.buffer[self.position - 1] == b'\n' {
+        
+        // Handle line breaks: both \n (LF) and \r\n (CRLF) and \r (CR)
+        match current_byte {
+            b'\n' => {
                 self.line += 1;
                 self.column = 0;
+            }
+            b'\r' => {
+                // Check if this is part of CRLF sequence
+                if self.more() && self.buffer[self.position] == b'\n' {
+                    // CRLF - don't increment line yet, let the \n handle it
+                    // But don't increment column either
+                } else {
+                    // Standalone CR - treat as line break
+                    self.line += 1;
+                    self.column = 0;
+                }
+            }
+            _ => {
+                self.column += 1;
             }
         }
     }
