@@ -18,22 +18,20 @@ impl File {
     pub fn new(path: &str) -> std::io::Result<Self> {
         let mut file = StdFile::open(path)?;
 
+        // Read first byte and handle CRLF
         let mut first = [0u8; 1];
-        let has_first = file.read(&mut first)? == 1;
-        let current_byte = if has_first {
+        let current_byte = if file.read(&mut first)? == 1 {
             if first[0] == b'\r' {
-
+                // Check if this is CRLF
                 let mut next = [0u8; 1];
-                if file.read(&mut next)? == 1 {
-                    if next[0] == b'\n' {
-
-                        Some(b'\n')
-                    } else {
-
-                        file.seek(SeekFrom::Current(-1))?;
-                        Some(first[0])
-                    }
+                if file.read(&mut next)? == 1 && next[0] == b'\n' {
+                    // CRLF - treat as \n
+                    Some(b'\n')
                 } else {
+                    // Standalone CR or CR followed by non-LF
+                    if next[0] != 0 {
+                        file.seek(SeekFrom::Current(-1))?;
+                    }
                     Some(first[0])
                 }
             } else {
@@ -54,8 +52,10 @@ impl File {
 
 impl ISource for File {
     fn next(&mut self) {
+        // Read next byte
         let mut byte1 = [0u8; 1];
-        let mut byte2 = [0u8; 1];
+        
+        // Update position for current character before moving
         if self.current_byte.is_some() {
             self.column += 1;
             if self.current_byte.unwrap() == b'\n' {
@@ -63,23 +63,23 @@ impl ISource for File {
                 self.column = 0;
             }
         }
+        
         if self.file.read(&mut byte1).unwrap_or(0) == 1 {
             if byte1[0] == b'\r' {
-
+                // Check if followed by \n (CRLF sequence)
+                let mut byte2 = [0u8; 1];
                 match self.file.read(&mut byte2) {
-                    Ok(1) => {
-
-                        if byte2[0] == b'\n' {
-                            self.line += 1;
-                            self.column = 0;
-                            self.current_byte = Some(b'\n');
-                        } else {
-                            self.current_byte = Some(byte1[0]);
-                            self.file.seek(SeekFrom::Current(-1)).unwrap();
-                        }
+                    Ok(1) if byte2[0] == b'\n' => {
+                        // CRLF - treat as single \n
+                        self.current_byte = Some(b'\n');
+                        self.column = 0; // Newlines have column 0
                     }
-                    Ok(_) | Err(_) => {
-
+                    Ok(1) => {
+                        // Standalone CR
+                        self.current_byte = Some(byte1[0]);
+                        self.file.seek(SeekFrom::Current(-1)).unwrap();
+                    }
+                    _ => {
                         self.current_byte = Some(byte1[0]);
                     }
                 }
