@@ -11,6 +11,7 @@ mod directive_tests;
 mod document_structure_tests;
 mod error_handling_tests;
 mod file_parsing_tests;
+mod flow_sequence_key_test;
 mod inline_flow_tests;
 mod nested_structure_tests;
 mod set_tests;

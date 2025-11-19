@@ -247,41 +247,62 @@ fn parse_inline_mapping_with_colons(
             return Err(parse_error(source, ERR_EOF_INLINE_MAPPING));
         }
 
-        let key_node = {
-            let raw = match source.current() {
-                Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => parse_quoted_scalar(source)?,
-                Some(CHAR_RBRACE) => {
-                    // Empty key before closing brace - invalid
-                    return Err(parse_error(source, "Empty key in flow mapping"));
+        let key_node = match source.current() {
+            Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
+                let raw = parse_quoted_scalar(source)?;
+                skip_whitespace_and_comments(source);
+                if source.current() != Some(CHAR_COLON) {
+                    return Err(parse_error(source, ERR_EXPECT_COLON_INLINE_MAPPING));
                 }
-                Some(CHAR_COMMA) => {
-                    // Comma without key - invalid
-                    return Err(parse_error(source, "Unexpected comma in flow mapping"));
-                }
-                _ => {
-                    let collected = collect_until(source, |c| {
-                        c == CHAR_COLON || c == CHAR_RBRACE || c == CHAR_COMMA
-                    });
-                    if collected.trim().is_empty() && source.current() != Some(CHAR_COLON) {
-                        // Empty key and no colon - likely malformed
-                        return Err(parse_error(source, "Expected key in flow mapping"));
-                    }
-                    collected
-                }
-            };
-
-            // In flow context, whitespace including newlines and comments are allowed between key and colon
-            skip_whitespace_and_comments(source);
-
-            if source.current() != Some(CHAR_COLON) {
-                return Err(parse_error(source, ERR_EXPECT_COLON_INLINE_MAPPING));
+                source.next();
+                parse_scalar(raw.trim(), directives)
             }
-            source.next();
-            let trimmed = raw.trim();
-            if trimmed.is_empty() {
+            Some(CHAR_LBRACKET) => {
+                // Flow sequence as key
+                let key = parse_inline_sequence(source, directives)?;
+                skip_whitespace_and_comments(source);
+                if source.current() != Some(CHAR_COLON) {
+                    return Err(parse_error(source, ERR_EXPECT_COLON_INLINE_MAPPING));
+                }
+                source.next();
+                key
+            }
+            Some(CHAR_LBRACE) => {
+                // Flow mapping as key (nested)
+                let key = parse_inline_mapping(source, directives)?;
+                skip_whitespace_and_comments(source);
+                if source.current() != Some(CHAR_COLON) {
+                    return Err(parse_error(source, ERR_EXPECT_COLON_INLINE_MAPPING));
+                }
+                source.next();
+                key
+            }
+            Some(CHAR_RBRACE) => {
+                // Empty key before closing brace - invalid
                 return Err(parse_error(source, "Empty key in flow mapping"));
             }
-            parse_scalar(trimmed, directives)
+            Some(CHAR_COMMA) => {
+                // Comma without key - invalid
+                return Err(parse_error(source, "Unexpected comma in flow mapping"));
+            }
+            _ => {
+                let collected = collect_until(source, |c| {
+                    c == CHAR_COLON || c == CHAR_RBRACE || c == CHAR_COMMA
+                });
+                skip_whitespace_and_comments(source);
+                if source.current() != Some(CHAR_COLON) {
+                    if collected.trim().is_empty() {
+                        return Err(parse_error(source, "Expected key in flow mapping"));
+                    }
+                    return Err(parse_error(source, ERR_EXPECT_COLON_INLINE_MAPPING));
+                }
+                source.next();
+                let trimmed = collected.trim();
+                if trimmed.is_empty() {
+                    return Err(parse_error(source, "Empty key in flow mapping"));
+                }
+                parse_scalar(trimmed, directives)
+            }
         };
 
         skip_whitespace(source);
