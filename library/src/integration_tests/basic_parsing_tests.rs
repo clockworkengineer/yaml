@@ -317,6 +317,21 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_5c5m_trailing_comma_in_flow_mapping() {
+        // Test case from 5C5M - Trailing commas in flow mappings should be allowed
+        let yaml = b"- { one : two , three: four , }\n- {five: six,seven : eight}";
+        let mut source = BufferSource::new(yaml);
+        let result = parse(&mut source);
+        
+        match &result {
+            Ok(_) => {},
+            Err(e) => println!("5C5M Error: {}", e),
+        }
+        
+        assert!(result.is_ok(), "Should parse flow mappings with trailing commas");
+    }
+
+    #[test]
     fn test_parse_unicode_content() {
         let mut source = BufferSource::new("name: José\ncity: 北京\nemoji: 🚀".as_bytes());
         let result = parse(&mut source).unwrap();

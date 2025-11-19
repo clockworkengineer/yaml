@@ -317,6 +317,13 @@ fn parse_inline_mapping_with_colons(
                     source.next();
                     break;
                 }
+                // Check for double comma
+                if source.current() == Some(CHAR_COMMA) {
+                    return Err(parse_error(
+                        source,
+                        "Flow mapping has consecutive commas",
+                    ));
+                }
                 continue;
             }
             Some(CHAR_RBRACE) => {
@@ -408,6 +415,14 @@ pub(crate) fn parse_inline_sequence(
             break;
         }
 
+        // Detect invalid leading comma: if we haven't parsed any items yet and see a comma
+        if items.is_empty() && source.current() == Some(CHAR_COMMA) {
+            return Err(parse_error(
+                source,
+                "Flow sequence cannot start with a comma",
+            ));
+        }
+
         match source.current() {
             Some(CHAR_LBRACKET) => {
                 let nested = parse_inline_sequence(source, directives)?;
@@ -421,6 +436,13 @@ pub(crate) fn parse_inline_sequence(
             Some(CHAR_AMPERSAND) | Some(CHAR_ASTERISK) => {
                 let node = parse_value(source, directives)?;
                 items.push(node);
+            }
+            Some(CHAR_COMMA) => {
+                // Double comma or missing item between commas
+                return Err(parse_error(
+                    source,
+                    "Flow sequence has missing item (consecutive commas or leading comma)",
+                ));
             }
             Some(_) => {
                 let node = match source.current() {
@@ -457,6 +479,13 @@ pub(crate) fn parse_inline_sequence(
                 if source.current() == Some(CHAR_RBRACKET) {
                     source.next();
                     break;
+                }
+                // Check for double comma
+                if source.current() == Some(CHAR_COMMA) {
+                    return Err(parse_error(
+                        source,
+                        "Flow sequence has consecutive commas",
+                    ));
                 }
                 continue;
             }
