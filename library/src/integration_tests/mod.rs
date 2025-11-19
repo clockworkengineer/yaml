@@ -8,6 +8,7 @@ mod anchor_tests;
 mod basic_parsing_tests;
 mod comma_validation_tests;
 mod directive_tests;
+mod document_marker_validation_tests;
 mod document_structure_tests;
 mod error_handling_tests;
 mod file_parsing_tests;

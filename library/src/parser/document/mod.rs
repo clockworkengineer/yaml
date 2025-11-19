@@ -699,7 +699,43 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
             source.next();
             source.next();
             source.next();
-            if source.current() == Some(' ') {
+            
+            // After ---, only whitespace/comments allowed until end of line
+            // Exception: block scalar indicators (>, |) and tags/anchors are allowed
+            skip_whitespace(source);
+            if let Some(c) = source.current() {
+                // Allow: newline, carriage return, comment, block scalar indicators, tags, anchors
+                if c != '\n' && c != '\r' && c != '#' && c != '>' && c != '|' && c != '!' && c != '&' {
+                    // Check if it's the start of a mapping key pattern (key:)
+                    // Save state to check ahead
+                    let state = source.save_state();
+                    let mut found_colon = false;
+                    while let Some(ch) = source.current() {
+                        if ch == ':' {
+                            found_colon = true;
+                            break;
+                        }
+                        if ch == '\n' || ch == '\r' {
+                            break;
+                        }
+                        source.next();
+                    }
+                    source.restore_state(state);
+                    
+                    // If we found a colon on same line, it's invalid mapping on --- line
+                    if found_colon {
+                        return Err(helpers::parse_error(
+                            source,
+                            "Document start marker (---) must be on its own line"
+                        ));
+                    }
+                }
+            }
+            // Skip comments and move to next line if appropriate
+            if source.current() == Some('#') {
+                helpers::parse_comment(source);
+            }
+            if source.current() == Some('\n') || source.current() == Some('\r') {
                 source.next();
             }
         }
