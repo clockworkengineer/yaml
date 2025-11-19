@@ -40,14 +40,14 @@ where
     let mut out = String::new();
     let mut iterations = 0;
     const MAX_ITERATIONS: usize = 100_000;
-    
+
     while let Some(c) = source.current() {
         if stop_pred(c) {
             break;
         }
         out.push(c);
         source.next();
-        
+
         iterations += 1;
         if iterations >= MAX_ITERATIONS {
             // Prevent infinite loop - return what we have so far
@@ -72,7 +72,7 @@ where
 pub fn skip_whitespace_and_comments(source: &mut dyn ISource) {
     let mut iterations = 0;
     const MAX_ITERATIONS: usize = 100_000;
-    
+
     loop {
         while let Some(c) = source.current() {
             if source.is_whitespace(c) || c == CHAR_NEWLINE || c == '\r' {

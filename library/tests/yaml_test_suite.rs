@@ -168,10 +168,7 @@ fn run_yaml_test_suite() {
         }
 
         test_num += 1;
-        println!(
-            "[{}/402] Testing: {} - {}",
-            test_num, test.id, test.name
-        );
+        println!("[{}/402] Testing: {} - {}", test_num, test.id, test.name);
         std::io::Write::flush(&mut std::io::stdout()).unwrap();
 
         // Run the test with panic protection
@@ -181,7 +178,7 @@ fn run_yaml_test_suite() {
             parse(&mut source)
         });
         let elapsed = start_time.elapsed();
-        
+
         print!("  Result: ");
         std::io::Write::flush(&mut std::io::stdout()).unwrap();
 

@@ -13,8 +13,6 @@ pub struct Buffer {
     column: usize,
     /// Current line position in the buffer
     line: usize,
-
-
 }
 
 impl Buffer {
@@ -48,10 +46,10 @@ impl ISource for Buffer {
         if !self.more() {
             return;
         }
-        
+
         let current_byte = self.buffer[self.position];
         self.position += 1;
-        
+
         // Handle line breaks: both \n (LF) and \r\n (CRLF) and \r (CR)
         match current_byte {
             b'\n' => {
@@ -90,7 +88,6 @@ impl ISource for Buffer {
     fn reset(&mut self) {
         self.position = 0;
     }
-
 
     fn get_current_indent_level(&self) -> usize {
         self.column
@@ -202,7 +199,6 @@ mod tests {
             Some('a') => assert!(true),
             _ => assert!(false),
         }
-
 
         source.next();
         let s = source.save_state();

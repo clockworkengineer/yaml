@@ -29,7 +29,7 @@ pub(crate) fn parse_inline_set(
     let mut pairs: Vec<(Node, Node)> = Vec::new();
     let mut iterations = 0;
     const MAX_ITEMS: usize = 10_000;
-    
+
     source.next(); // Skip the opening '{'
     skip_whitespace(source);
 
@@ -42,18 +42,21 @@ pub(crate) fn parse_inline_set(
         // Prevent infinite loop
         iterations += 1;
         if iterations >= MAX_ITEMS {
-            return Err(parse_error(source, "Flow set too large or malformed - possible infinite loop"));
+            return Err(parse_error(
+                source,
+                "Flow set too large or malformed - possible infinite loop",
+            ));
         }
-        
+
         // Skip whitespace before checking for items
         skip_whitespace(source);
-        
+
         // Check for closing brace (handles trailing comma case)
         if source.current() == Some(CHAR_RBRACE) {
             source.next();
             break;
         }
-        
+
         let item_node = match source.current() {
             Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
                 let raw = parse_quoted_scalar(source)?;
@@ -147,7 +150,7 @@ pub(crate) fn parse_inline_mapping(
             source.restore_state(saved_state);
             return parse_inline_mapping_with_colons(source, directives);
         }
-        
+
         match c {
             CHAR_RBRACE if brace_depth == 0 && !in_quotes => break,
             CHAR_LBRACE if !in_quotes => brace_depth += 1,
@@ -212,7 +215,7 @@ fn parse_inline_mapping_with_colons(
     let mut pairs: Vec<(Node, Node)> = Vec::new();
     let mut iterations = 0;
     const MAX_PAIRS: usize = 10_000;
-    
+
     source.next();
     skip_whitespace(source);
 
@@ -225,7 +228,10 @@ fn parse_inline_mapping_with_colons(
         // Prevent infinite loop
         iterations += 1;
         if iterations >= MAX_PAIRS {
-            return Err(parse_error(source, "Flow mapping too large or malformed - possible infinite loop"));
+            return Err(parse_error(
+                source,
+                "Flow mapping too large or malformed - possible infinite loop",
+            ));
         }
         // Skip whitespace, newlines, and comments before parsing key
         skip_whitespace_and_comments(source);
@@ -253,7 +259,9 @@ fn parse_inline_mapping_with_colons(
                     return Err(parse_error(source, "Unexpected comma in flow mapping"));
                 }
                 _ => {
-                    let collected = collect_until(source, |c| c == CHAR_COLON || c == CHAR_RBRACE || c == CHAR_COMMA);
+                    let collected = collect_until(source, |c| {
+                        c == CHAR_COLON || c == CHAR_RBRACE || c == CHAR_COMMA
+                    });
                     if collected.trim().is_empty() && source.current() != Some(CHAR_COLON) {
                         // Empty key and no colon - likely malformed
                         return Err(parse_error(source, "Expected key in flow mapping"));
@@ -372,7 +380,7 @@ pub(crate) fn parse_inline_sequence(
     let mut items: Vec<Node> = Vec::new();
     let mut iterations = 0;
     const MAX_ITEMS: usize = 10_000;
-    
+
     source.next();
     skip_whitespace(source);
 
@@ -385,18 +393,21 @@ pub(crate) fn parse_inline_sequence(
         // Prevent infinite loop
         iterations += 1;
         if iterations >= MAX_ITEMS {
-            return Err(parse_error(source, "Flow sequence too large or malformed - possible infinite loop"));
+            return Err(parse_error(
+                source,
+                "Flow sequence too large or malformed - possible infinite loop",
+            ));
         }
-        
+
         // Skip whitespace before checking for items
         skip_whitespace(source);
-        
+
         // Check for closing bracket (handles trailing comma case)
         if source.current() == Some(CHAR_RBRACKET) {
             source.next();
             break;
         }
-        
+
         match source.current() {
             Some(CHAR_LBRACKET) => {
                 let nested = parse_inline_sequence(source, directives)?;
