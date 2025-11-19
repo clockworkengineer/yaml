@@ -29,17 +29,30 @@ use crate::{Node, Numeric};
 /// # Returns
 ///
 /// A String containing all collected characters before the stop condition
+///
+/// # Safety
+///
+/// Has a maximum iteration limit of 100,000 characters to prevent infinite loops
 pub fn collect_until<F>(source: &mut dyn ISource, mut stop_pred: F) -> String
 where
     F: FnMut(char) -> bool,
 {
     let mut out = String::new();
+    let mut iterations = 0;
+    const MAX_ITERATIONS: usize = 100_000;
+    
     while let Some(c) = source.current() {
         if stop_pred(c) {
             break;
         }
         out.push(c);
         source.next();
+        
+        iterations += 1;
+        if iterations >= MAX_ITERATIONS {
+            // Prevent infinite loop - return what we have so far
+            break;
+        }
     }
     out
 }
@@ -52,11 +65,22 @@ where
 /// # Arguments
 ///
 /// * `source` - A mutable reference to a source implementing ISource trait
+///
+/// # Safety
+///
+/// Has a maximum iteration limit of 100,000 characters to prevent infinite loops
 pub fn skip_whitespace_and_comments(source: &mut dyn ISource) {
+    let mut iterations = 0;
+    const MAX_ITERATIONS: usize = 100_000;
+    
     loop {
         while let Some(c) = source.current() {
             if source.is_whitespace(c) || c == CHAR_NEWLINE || c == '\r' {
                 source.next();
+                iterations += 1;
+                if iterations >= MAX_ITERATIONS {
+                    return; // Prevent infinite loop
+                }
             } else {
                 break;
             }
@@ -68,6 +92,10 @@ pub fn skip_whitespace_and_comments(source: &mut dyn ISource) {
                     break;
                 }
                 source.next();
+                iterations += 1;
+                if iterations >= MAX_ITERATIONS {
+                    return; // Prevent infinite loop
+                }
             }
 
             continue;

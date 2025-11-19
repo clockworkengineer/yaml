@@ -113,8 +113,8 @@ fn run_yaml_test_suite() {
         }
     };
 
-    // Skip tests that hang
-    let skip_list: Vec<&str> = vec!["5C5M", "5KJE", "5T43", "5WE3", "62EZ", "7ZZ5", "8KB6", "9MMW", "9SA2", "CFD4", "DBG4", "G5U8", "JHB9", "JR7V", "JS2J", "JTV5", "JY7Z", "K3WX", "LE5A", "LP6E", "MXS3", "MZX3", "NJ66", "Q88A", "S4JQ"];
+    // Skip list now empty - infinite loop protection added to parser
+    let skip_list: Vec<&str> = vec![];
 
     let mut passed = 0;
     let mut failed = 0;
@@ -135,12 +135,12 @@ fn run_yaml_test_suite() {
 
     let total_dirs = test_dirs.len();
 
-    println!("Running first 350 of {} YAML test suite tests...", total_dirs);
+    println!("Running all {} YAML test suite tests...", total_dirs);
 
     let mut test_num = 0;
 
-    // Run only first 350 tests
-    let test_limit = 350;
+    // Run all tests
+    let test_limit = 402;
 
     for (idx, test_dir) in test_dirs.iter().enumerate() {
         if idx >= test_limit {
@@ -169,7 +169,7 @@ fn run_yaml_test_suite() {
 
         test_num += 1;
         println!(
-            "[{}/350] Testing: {} - {}",
+            "[{}/402] Testing: {} - {}",
             test_num, test.id, test.name
         );
         std::io::Write::flush(&mut std::io::stdout()).unwrap();
@@ -234,7 +234,7 @@ fn run_yaml_test_suite() {
     }
 
     // Print summary
-    println!("\n=== YAML Test Suite Results (First 250 Tests) ===");
+    println!("\n=== YAML Test Suite Results (All Tests) ===");
     println!("Passed:  {}", passed);
     println!("Failed:  {}", failed);
     println!("Skipped: {}", skipped);

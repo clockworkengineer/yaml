@@ -27,6 +27,9 @@ pub(crate) fn parse_inline_set(
     directives: &crate::parser::directives::DirectiveContext,
 ) -> Result<Node, String> {
     let mut pairs: Vec<(Node, Node)> = Vec::new();
+    let mut iterations = 0;
+    const MAX_ITEMS: usize = 10_000;
+    
     source.next(); // Skip the opening '{'
     skip_whitespace(source);
 
@@ -36,6 +39,21 @@ pub(crate) fn parse_inline_set(
     }
 
     loop {
+        // Prevent infinite loop
+        iterations += 1;
+        if iterations >= MAX_ITEMS {
+            return Err(parse_error(source, "Flow set too large or malformed - possible infinite loop"));
+        }
+        
+        // Skip whitespace before checking for items
+        skip_whitespace(source);
+        
+        // Check for closing brace (handles trailing comma case)
+        if source.current() == Some(CHAR_RBRACE) {
+            source.next();
+            break;
+        }
+        
         let item_node = match source.current() {
             Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
                 let raw = parse_quoted_scalar(source)?;
@@ -116,10 +134,20 @@ pub(crate) fn parse_inline_mapping(
     let mut bracket_depth = 0;
     let mut in_quotes = false;
     let mut quote_char = '\0';
+    let mut iterations = 0;
+    const MAX_LOOKAHEAD: usize = 10_000;
 
     source.next(); // Skip opening brace
 
     while let Some(c) = source.current() {
+        // Prevent infinite loop in lookahead
+        iterations += 1;
+        if iterations >= MAX_LOOKAHEAD {
+            // If we've scanned too far, assume it's malformed - restore and try as mapping
+            source.restore_state(saved_state);
+            return parse_inline_mapping_with_colons(source, directives);
+        }
+        
         match c {
             CHAR_RBRACE if brace_depth == 0 && !in_quotes => break,
             CHAR_LBRACE if !in_quotes => brace_depth += 1,
@@ -182,6 +210,9 @@ fn parse_inline_mapping_with_colons(
     directives: &crate::parser::directives::DirectiveContext,
 ) -> Result<Node, String> {
     let mut pairs: Vec<(Node, Node)> = Vec::new();
+    let mut iterations = 0;
+    const MAX_PAIRS: usize = 10_000;
+    
     source.next();
     skip_whitespace(source);
 
@@ -191,13 +222,44 @@ fn parse_inline_mapping_with_colons(
     }
 
     loop {
+        // Prevent infinite loop
+        iterations += 1;
+        if iterations >= MAX_PAIRS {
+            return Err(parse_error(source, "Flow mapping too large or malformed - possible infinite loop"));
+        }
         // Skip whitespace, newlines, and comments before parsing key
         skip_whitespace_and_comments(source);
+
+        // Check for closing brace after whitespace (handles trailing comma case)
+        if source.current() == Some(CHAR_RBRACE) {
+            source.next();
+            break;
+        }
+
+        // If we're at None (EOF) inside a flow mapping, that's an error
+        if source.current().is_none() {
+            return Err(parse_error(source, ERR_EOF_INLINE_MAPPING));
+        }
 
         let key_node = {
             let raw = match source.current() {
                 Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => parse_quoted_scalar(source)?,
-                _ => collect_until(source, |c| c == CHAR_COLON || c == CHAR_RBRACE),
+                Some(CHAR_RBRACE) => {
+                    // Empty key before closing brace - invalid
+                    return Err(parse_error(source, "Empty key in flow mapping"));
+                }
+                Some(CHAR_COMMA) => {
+                    // Comma without key - invalid
+                    return Err(parse_error(source, "Unexpected comma in flow mapping"));
+                }
+                _ => {
+                    let collected = collect_until(source, |c| c == CHAR_COLON || c == CHAR_RBRACE || c == CHAR_COMMA);
+                    if collected.trim().is_empty() && source.current() != Some(CHAR_COLON) {
+                        // Empty key and no colon - likely malformed
+                        return Err(parse_error(source, "Expected key in flow mapping"));
+                    }
+                    collected
+                }
             };
 
             // In flow context, whitespace including newlines and comments are allowed between key and colon
@@ -208,6 +270,9 @@ fn parse_inline_mapping_with_colons(
             }
             source.next();
             let trimmed = raw.trim();
+            if trimmed.is_empty() {
+                return Err(parse_error(source, "Empty key in flow mapping"));
+            }
             parse_scalar(trimmed, directives)
         };
 
@@ -305,6 +370,9 @@ pub(crate) fn parse_inline_sequence(
     directives: &crate::parser::directives::DirectiveContext,
 ) -> Result<Node, String> {
     let mut items: Vec<Node> = Vec::new();
+    let mut iterations = 0;
+    const MAX_ITEMS: usize = 10_000;
+    
     source.next();
     skip_whitespace(source);
 
@@ -314,6 +382,21 @@ pub(crate) fn parse_inline_sequence(
     }
 
     loop {
+        // Prevent infinite loop
+        iterations += 1;
+        if iterations >= MAX_ITEMS {
+            return Err(parse_error(source, "Flow sequence too large or malformed - possible infinite loop"));
+        }
+        
+        // Skip whitespace before checking for items
+        skip_whitespace(source);
+        
+        // Check for closing bracket (handles trailing comma case)
+        if source.current() == Some(CHAR_RBRACKET) {
+            source.next();
+            break;
+        }
+        
         match source.current() {
             Some(CHAR_LBRACKET) => {
                 let nested = parse_inline_sequence(source, directives)?;
