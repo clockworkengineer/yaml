@@ -110,13 +110,15 @@ fn run_yaml_test_suite() {
         }
     };
 
-    // Skip tests that are known to cause issues (infinite loops in flow collections)
+    // Skip tests that are known to cause issues  
+    // These tests pass individually but hang when run in the full test suite
+    // The hang appears to be related to CRLF (Windows) line endings in the test data
+    // Root cause: State pollution or buffering issue between tests - needs investigation
     let skip_list: Vec<&str> = vec![
-        "5C5M", // Flow mapping with trailing comma
-        "5KJE", // Flow sequence with trailing comma  
-        "5T43", // Colon at beginning of adjacent flow scalar
-        "7ZZ5", // Empty flow collections
-        // More hanging tests likely exist but need proper timeout mechanism to detect
+        "5C5M", // Flow mapping with trailing comma - hangs only in full suite with CRLF
+        "5KJE", // Flow sequence with trailing comma - hangs only in full suite with CRLF
+        "5T43", // Colon at beginning of adjacent flow scalar - hangs only in full suite
+        "7ZZ5", // Empty flow collections - hangs only in full suite
     ];
     let mut passed = 0;
     let mut failed = 0;

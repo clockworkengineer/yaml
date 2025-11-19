@@ -23,6 +23,7 @@ mod embedded_tests;
 // Flow collection edge case tests
 mod debug_flow_hang;
 mod flow_trailing_comma_tests;
+mod flow_debug;
 
 // Official YAML test suite failing cases
 mod official_suite_fixes;
