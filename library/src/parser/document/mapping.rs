@@ -59,7 +59,16 @@ pub(crate) fn parse_mapping(
 
     let mut pairs: Vec<(Node, Node)> = Vec::new();
     let mut last_was_nested: bool;
+    let mut iterations = 0;
+    const MAX_ITERATIONS: usize = 100_000;
+    
     while let Some(c) = source.current() {
+        // Prevent infinite loop
+        iterations += 1;
+        if iterations >= MAX_ITERATIONS {
+            return Err("Mapping parsing exceeded maximum iterations - possible infinite loop".to_string());
+        }
+        
         last_was_nested = false;
         match c {
             CHAR_DASH | CHAR_DOT
