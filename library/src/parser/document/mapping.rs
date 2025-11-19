@@ -59,14 +59,22 @@ pub(crate) fn parse_mapping(
 
     let mut pairs: Vec<(Node, Node)> = Vec::new();
     let mut last_was_nested: bool;
-    let mut iterations = 0;
-    const MAX_ITERATIONS: usize = 100_000;
+    let mut loop_iterations = 0;
+    const MAX_LOOP_ITERATIONS: usize = 100_000;
+    const MAX_PAIRS: usize = 50_000; // More reasonable limit on actual key-value pairs
     
     while let Some(c) = source.current() {
-        // Prevent infinite loop
-        iterations += 1;
-        if iterations >= MAX_ITERATIONS {
-            return Err("Mapping parsing exceeded maximum iterations - possible infinite loop".to_string());
+        // Prevent infinite loop - count loop iterations for safety
+        loop_iterations += 1;
+        if loop_iterations >= MAX_LOOP_ITERATIONS {
+            return Err("Mapping parsing exceeded maximum loop iterations - possible infinite loop".to_string());
+        }
+        
+        // Also check reasonable pair count limit
+        if pairs.len() >= MAX_PAIRS {
+            return Err(
+                format!("Mapping has too many pairs ({}+) - possible infinite loop", MAX_PAIRS)
+            );
         }
         
         last_was_nested = false;

@@ -308,6 +308,15 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_7zz5_nested_with_empty_collections() {
+        // Test case from 7ZZ5 - Empty flow collections with deeply nested sequences
+        let yaml = b"---\nnested sequences:\n- - - []\n- - - {}\nkey1: []\nkey2: {}";
+        let mut source = BufferSource::new(yaml);
+        let result = parse(&mut source);
+        assert!(result.is_ok(), "Should parse nested sequences with empty flow collections");
+    }
+
+    #[test]
     fn test_parse_unicode_content() {
         let mut source = BufferSource::new("name: José\ncity: 北京\nemoji: 🚀".as_bytes());
         let result = parse(&mut source).unwrap();

@@ -29,17 +29,26 @@ pub(crate) fn parse_sequence(
     directives: &crate::parser::directives::DirectiveContext,
 ) -> Result<Node, String> {
     let mut items = Vec::new();
-    let mut iterations = 0;
-    const MAX_ITERATIONS: usize = 100_000;
+    let mut loop_iterations = 0;
+    const MAX_LOOP_ITERATIONS: usize = 100_000;
+    const MAX_ITEMS: usize = 50_000; // More reasonable limit on actual items
 
     while let Some(c) = source.current() {
-        // Prevent infinite loop
-        iterations += 1;
-        if iterations >= MAX_ITERATIONS {
+        // Prevent infinite loop - count loop iterations for safety
+        loop_iterations += 1;
+        if loop_iterations >= MAX_LOOP_ITERATIONS {
             return Err(
-                "Sequence parsing exceeded maximum iterations - possible infinite loop".to_string(),
+                "Sequence parsing exceeded maximum loop iterations - possible infinite loop".to_string(),
             );
         }
+        
+        // Also check reasonable item count limit
+        if items.len() >= MAX_ITEMS {
+            return Err(
+                format!("Sequence has too many items ({}+) - possible infinite loop", MAX_ITEMS)
+            );
+        }
+        
         if source.get_current_indent_level() < indent_level {
             break;
         }
@@ -95,7 +104,7 @@ pub(crate) fn parse_sequence(
                     }
                 }
             }
-            CHAR_NEWLINE => {
+            CHAR_NEWLINE | CHAR_CARRIAGE_RETURN => {
                 source.next();
                 skip_whitespace(source);
             }

@@ -8,6 +8,12 @@
 - **Skipped:** 0
 - **Hangs:** 0
 
+### Recent Fix (Commit d99e9b8)
+✅ **Fixed escape sequence handling** - `\n`, `\r`, `\t`, `\b` now properly convert to actual characters
+- Modified `library/src/utils/mod.rs` - Changed `unescape_double_quoted()` to convert escape sequences
+- Modified `library/src/parser/document/scalar.rs` - Only apply line folding to strings with source newlines, not escaped newlines
+- Impact: Escape sequences now work correctly, but didn't change overall pass rate (some tests fixed, others newly broken due to corrected behavior)
+
 ## Failure Analysis
 
 The 131 failing tests break down into two categories:
