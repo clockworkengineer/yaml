@@ -340,8 +340,10 @@ mod tests {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
                     if let Node::Str(content, _, _) = &pairs[0].1 {
-                        assert!(content.contains("\\n"));
-                        assert!(content.contains("\\t"));
+                        // Should now contain actual newline and tab characters, not escaped versions
+                        assert!(content.contains('\n'), "Should contain actual newline character");
+                        assert!(content.contains('\t'), "Should contain actual tab character");
+                        assert_eq!(content, "Line 1\nLine 2\tTabbed");
                     }
                 }
             }

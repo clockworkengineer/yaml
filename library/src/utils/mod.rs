@@ -343,20 +343,16 @@ pub fn unescape_double_quoted(s: &str) -> String {
                 }
 
                 Some('n') => {
-                    result.push('\\');
-                    result.push('n');
+                    result.push('\n');
                 }
                 Some('r') => {
-                    result.push('\\');
-                    result.push('r');
+                    result.push('\r');
                 }
                 Some('t') => {
-                    result.push('\\');
-                    result.push('t');
+                    result.push('\t');
                 }
                 Some('b') => {
-                    result.push('\\');
-                    result.push('b');
+                    result.push('\x08');  // backspace
                 }
 
                 Some('"') => result.push('"'),
