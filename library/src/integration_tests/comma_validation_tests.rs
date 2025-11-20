@@ -8,7 +8,10 @@ mod test_comma_validation {
         let yaml = b"---\n[ , a, b, c ]\n";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        assert!(result.is_err(), "Should reject leading comma in flow sequence");
+        assert!(
+            result.is_err(),
+            "Should reject leading comma in flow sequence"
+        );
         if let Err(e) = result {
             assert!(e.contains("comma"), "Error should mention comma: {}", e);
         }
@@ -20,22 +23,50 @@ mod test_comma_validation {
         let yaml = b"---\n[ a, b, c, , ]\n";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        assert!(result.is_err(), "Should reject double comma in flow sequence");
+        assert!(
+            result.is_err(),
+            "Should reject double comma in flow sequence"
+        );
         if let Err(e) = result {
-            assert!(e.contains("comma") || e.contains("consecutive"), "Error should mention comma: {}", e);
+            assert!(
+                e.contains("comma") || e.contains("consecutive"),
+                "Error should mention comma: {}",
+                e
+            );
         }
     }
 
     #[test]
-    #[ignore] // TODO: Requires validating whitespace before comments
     fn test_cvw2_comment_without_space_after_comma() {
         // Test: Comment directly after comma with no space (invalid)
-        // Parser currently accepts # anywhere, but YAML spec requires whitespace before #
+        // YAML spec requires whitespace before #
         let yaml = b"---\n[ a, b, c,#invalid\n]\n";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        // This should be an error because # must be preceded by whitespace
-        assert!(result.is_err(), "Should reject comment without whitespace after comma");
+        if let Err(ref e) = result {
+            println!("Error (correct): {}", e);
+        }
+        assert!(
+            result.is_err(),
+            "Should reject comment without whitespace after comma"
+        );
+    }
+
+    #[test]
+    fn test_9jba_comment_without_space_after_bracket() {
+        // Test: Comment directly after ] with no space (invalid)
+        let yaml = b"---\n[ a, b, c, ]#invalid\n";
+        let mut source = BufferSource::new(yaml);
+        let result = parse(&mut source);
+        if let Err(ref e) = result {
+            println!("Error (correct): {}", e);
+        } else {
+            println!("Parsed (should be error): {:?}", result);
+        }
+        assert!(
+            result.is_err(),
+            "Should reject comment without whitespace after ]"
+        );
     }
 
     #[test]
@@ -50,7 +81,10 @@ mod test_comma_validation {
         if result.is_ok() {
             println!("Result: {:?}", result);
         }
-        assert!(result.is_err(), "Should reject flow mapping missing comma between pairs");
+        assert!(
+            result.is_err(),
+            "Should reject flow mapping missing comma between pairs"
+        );
     }
 
     #[test]
@@ -73,7 +107,10 @@ mod test_comma_validation {
         let yaml = b"- { one : two , three: four , }\n- {five: six,seven : eight}";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        assert!(result.is_ok(), "Should accept trailing comma in flow mapping");
+        assert!(
+            result.is_ok(),
+            "Should accept trailing comma in flow mapping"
+        );
     }
 
     #[test]
@@ -82,6 +119,9 @@ mod test_comma_validation {
         let yaml = b"[1, 2, 3,]";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        assert!(result.is_ok(), "Should accept trailing comma in flow sequence");
+        assert!(
+            result.is_ok(),
+            "Should accept trailing comma in flow sequence"
+        );
     }
 }

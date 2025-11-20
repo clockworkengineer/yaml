@@ -4,7 +4,9 @@ use crate::constants::*;
 use crate::error::messages::*;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
-use crate::parser::document::helpers::{parse_error, parse_quoted_scalar, skip_whitespace};
+use crate::parser::document::helpers::{
+    parse_error, parse_quoted_scalar, skip_whitespace, validate_comment_spacing,
+};
 use crate::parser::document::scalar::parse_scalar;
 use crate::parser::document::value::parse_value;
 use crate::utils::*;
@@ -340,10 +342,7 @@ fn parse_inline_mapping_with_colons(
                 }
                 // Check for double comma
                 if source.current() == Some(CHAR_COMMA) {
-                    return Err(parse_error(
-                        source,
-                        "Flow mapping has consecutive commas",
-                    ));
+                    return Err(parse_error(source, "Flow mapping has consecutive commas"));
                 }
                 continue;
             }
@@ -494,24 +493,29 @@ pub(crate) fn parse_inline_sequence(
 
         match source.current() {
             Some(CHAR_COMMA) => {
+                let prev = CHAR_COMMA;
                 source.next();
+                // Validate comment spacing after comma
+                validate_comment_spacing(source, Some(prev))?;
                 skip_whitespace(source);
                 // Check for trailing comma (comma followed by closing bracket)
                 if source.current() == Some(CHAR_RBRACKET) {
                     source.next();
+                    // Validate comment spacing after closing bracket
+                    validate_comment_spacing(source, Some(CHAR_RBRACKET))?;
                     break;
                 }
                 // Check for double comma
                 if source.current() == Some(CHAR_COMMA) {
-                    return Err(parse_error(
-                        source,
-                        "Flow sequence has consecutive commas",
-                    ));
+                    return Err(parse_error(source, "Flow sequence has consecutive commas"));
                 }
                 continue;
             }
             Some(CHAR_RBRACKET) => {
+                let prev = CHAR_RBRACKET;
                 source.next();
+                // Validate comment spacing after closing bracket
+                validate_comment_spacing(source, Some(prev))?;
                 break;
             }
             Some(c) => {

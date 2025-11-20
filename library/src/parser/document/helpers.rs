@@ -417,6 +417,37 @@ pub(crate) fn parse_comment(source: &mut dyn ISource) -> String {
     read_line_trimmed_into_string(source)
 }
 
+/// Validates that a comment indicator (#) is preceded by whitespace or at start of line.
+///
+/// According to YAML spec, # can only start a comment if preceded by whitespace
+/// or if it's at the beginning of a line.
+///
+/// # Arguments
+///
+/// * `source` - A mutable reference to a source implementing ISource trait
+/// * `prev_char` - The character that preceded the current position
+///
+/// # Returns
+///
+/// Result with Ok(()) if valid, Err with error message if invalid
+pub(crate) fn validate_comment_spacing(
+    source: &mut dyn ISource,
+    prev_char: Option<char>,
+) -> Result<(), String> {
+    if source.current() == Some('#') {
+        // # must be preceded by whitespace, newline, or be at start
+        if let Some(prev) = prev_char {
+            if !prev.is_whitespace() && prev != '\n' && prev != '\r' {
+                return Err(parse_error(
+                    source,
+                    "Comment indicator (#) must be preceded by whitespace",
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Converts a node to its inline string representation for display.
 ///
 /// Similar to the utility function but specifically tailored for parser
