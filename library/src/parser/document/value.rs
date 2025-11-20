@@ -474,6 +474,25 @@ pub(crate) fn parse_value(
             let value = collect_until(source, |c| c == CHAR_NEWLINE || c == CHAR_HASH);
             let trimmed = value.trim();
 
+            // Check if comment follows without whitespace (for block scalars like `>#`)
+            if source.current() == Some(CHAR_HASH) {
+                // Check if there's whitespace before the #
+                if !value.ends_with(' ') && !value.ends_with('\t') && !value.is_empty() {
+                    // Block scalar indicators need whitespace before comment
+                    if trimmed.ends_with('|') || trimmed.ends_with('>') || 
+                       trimmed.ends_with('+') || trimmed.ends_with('-') ||
+                       (trimmed.len() >= 2 && (trimmed.ends_with("|+") || trimmed.ends_with(">+") ||
+                                                trimmed.ends_with("|-") || trimmed.ends_with(">-") ||
+                                                (trimmed.chars().nth_back(1) == Some('|') || trimmed.chars().nth_back(1) == Some('>')) &&
+                                                 trimmed.chars().last().unwrap().is_ascii_digit())) {
+                        return Err(parse_error(
+                            source,
+                            "Comment indicator (#) must be preceded by whitespace",
+                        ));
+                    }
+                }
+            }
+
             // Get the indent level of the LINE where the value started (not character position)
             // We need to look back to find the line's actual indentation
             // For now, use a simple heuristic: count leading spaces in the collected value
@@ -482,7 +501,8 @@ pub(crate) fn parse_value(
 
             if trimmed.starts_with(STR_LITERAL_BLOCK) || trimmed.starts_with(STR_FOLDED_BLOCK) {
                 let first_ch = trimmed.chars().next().unwrap();
-                let rest = trimmed[1..].trim();
+                let rest_untrimmed = &trimmed[1..];
+                let rest = rest_untrimmed.trim();
 
                 // Validate block scalar modifiers
                 // Format: |[1-9]?[+-]? or >[1-9]?[+-]?
@@ -508,14 +528,33 @@ pub(crate) fn parse_value(
                     }
                 }
 
-                let valid_header_rest = rest
-                    .chars()
-                    .all(|c| c.is_ascii_digit() || c == '+' || c == '-');
-                if !valid_header_rest {
-                    if !trimmed.is_empty() {
-                        return Ok(parse_scalar(trimmed, directives));
+                // Validate block scalar header: after | or >, can have [1-9]?[+-]?,
+                // then optional whitespace and comment, but NOT a comment without whitespace
+                // Check rest_untrimmed to catch `>#` without space
+                let mut has_whitespace = rest_untrimmed.starts_with(' ') || rest_untrimmed.starts_with('\t');
+                for c in rest.chars() {
+                    if c.is_ascii_digit() || c == '+' || c == '-' {
+                        // Valid modifier
+                        continue;
+                    } else if c == ' ' || c == '\t' {
+                        has_whitespace = true;
+                        // Rest of line can be whitespace/comment
+                        break;
+                    } else if c == '#' {
+                        if !has_whitespace {
+                            return Err(parse_error(
+                                source,
+                                "Comment indicator (#) must be preceded by whitespace",
+                            ));
+                        }
+                        break;
                     } else {
-                        return Ok(Node::None);
+                        // Invalid character
+                        if !trimmed.is_empty() {
+                            return Ok(parse_scalar(trimmed, directives));
+                        } else {
+                            return Ok(Node::None);
+                        }
                     }
                 }
                 let is_folded = first_ch == STR_FOLDED_BLOCK.chars().next().unwrap();

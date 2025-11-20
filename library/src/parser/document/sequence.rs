@@ -32,6 +32,9 @@ pub(crate) fn parse_sequence(
     let mut loop_iterations = 0;
     const MAX_LOOP_ITERATIONS: usize = 100_000;
     const MAX_ITEMS: usize = 50_000; // More reasonable limit on actual items
+    
+    // Track the indentation of the first dash for validation
+    let mut first_dash_indent: Option<usize> = None;
 
     while let Some(c) = source.current() {
         // Prevent infinite loop - count loop iterations for safety
@@ -49,7 +52,8 @@ pub(crate) fn parse_sequence(
             );
         }
         
-        if source.get_current_indent_level() < indent_level {
+        let current_indent = source.get_current_indent_level();
+        if current_indent < indent_level {
             break;
         }
 
@@ -66,6 +70,32 @@ pub(crate) fn parse_sequence(
                 break;
             }
             CHAR_DASH => {
+                // Validate consistent indentation for all sequence items at THIS level
+                if let Some(first_indent) = first_dash_indent {
+                    // We've seen at least one dash - all subsequent dashes must match OR be nested
+                    if current_indent != first_indent {
+                        // If indentation changed, it's either:
+                        // 1. Less than first_indent: parent level (will be caught by break above)
+                        // 2. Greater than first_indent: nested sequence (break out)
+                        // 3. Between first_indent and indent_level: ERROR - misaligned
+                        if current_indent > first_indent {
+                            // Nested sequence - let parent recursion handle it
+                            break;
+                        } else {
+                            // Misaligned sequence item at same level
+                            return Err(crate::parser::document::helpers::parse_error(
+                                source,
+                                &format!(
+                                    "Inconsistent indentation in sequence: expected {}, got {}",
+                                    first_indent, current_indent
+                                ),
+                            ));
+                        }
+                    }
+                } else {
+                    first_dash_indent = Some(current_indent);
+                }
+                
                 source.next();
                 skip_whitespace(source);
                 if source.current() == Some(CHAR_NEWLINE) {

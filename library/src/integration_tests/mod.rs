@@ -31,3 +31,6 @@ mod flow_debug;
 
 // Official YAML test suite failing cases
 mod official_suite_fixes;
+
+// Phase 1 validation improvements
+mod phase1_validation_tests;

@@ -210,6 +210,12 @@ pub(crate) fn parse_quoted_scalar(source: &mut dyn ISource) -> Result<String, St
         }
     }
 
+    // Validate comment spacing after quoted scalar
+    // After closing quote, if next char is #, it's invalid (needs whitespace)
+    if source.current() == Some(CHAR_HASH) {
+        return Err(parse_error(source, "Comment indicator (#) must be preceded by whitespace"));
+    }
+
     Ok(out)
 }
 

@@ -272,12 +272,21 @@ pub fn parse_document_contents(
                     }
 
                     // Validate: rest of line should be whitespace or comment
+                    let mut last_was_whitespace = false;
                     while let Some(c) = source.current() {
                         if c == '\n' {
                             break;
                         } else if c == ' ' || c == '\t' {
+                            last_was_whitespace = true;
                             source.next();
                         } else if c == '#' {
+                            // Comment must be preceded by whitespace
+                            if !last_was_whitespace {
+                                return Err(helpers::parse_error(
+                                    source,
+                                    "Comment indicator (#) must be preceded by whitespace",
+                                ));
+                            }
                             // Comment - consume until newline
                             let _ = crate::utils::collect_until(source, |c| c == '\n');
                             break;

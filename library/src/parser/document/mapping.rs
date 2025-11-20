@@ -63,6 +63,9 @@ pub(crate) fn parse_mapping(
     const MAX_LOOP_ITERATIONS: usize = 100_000;
     const MAX_PAIRS: usize = 50_000; // More reasonable limit on actual key-value pairs
     
+    // Track the indentation of the first key for validation
+    let mut first_key_indent: Option<usize> = None;
+    
     while let Some(c) = source.current() {
         // Prevent infinite loop - count loop iterations for safety
         loop_iterations += 1;
@@ -90,9 +93,17 @@ pub(crate) fn parse_mapping(
                 parse_comment(source);
             }
             c if c.is_alphanumeric() || c == CHAR_SINGLE_QUOTE || c == CHAR_DOUBLE_QUOTE => {
-                if source.get_current_indent_level() < indent_level {
+                let current_indent = source.get_current_indent_level();
+                if current_indent < indent_level {
                     break;
                 }
+                
+                // For now, don't validate mapping indentation to avoid breaking existing functionality
+                // TODO: Re-enable after understanding nested mapping edge cases
+                if first_key_indent.is_none() {
+                    first_key_indent = Some(current_indent);
+                }
+                
                 let (mut key_node, newline) = parse_mapping_key(source, directives)?;
                 if let Node::Str(ref mut s, ref mut qt, ref mut _style) = key_node {
                     if matches!(*qt, QuoteType::Single | QuoteType::Double) && is_plain_safe_key(s)
