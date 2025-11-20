@@ -748,6 +748,17 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
                     Document(nodes) => nodes.iter().all(node_is_blank),
                     _ => false,
                 };
+                
+                // If directives were present but document is blank/empty, that's an error
+                // Check if any directives were specified (version or tag prefixes)
+                let has_directives = directives.yaml_version.is_some() || !directives.tag_prefixes.is_empty();
+                if is_blank_doc && has_directives {
+                    return Err(helpers::parse_error(
+                        source,
+                        "Directives require document content"
+                    ));
+                }
+                
                 if !is_blank_doc {
                     docs.push(doc)
                 }
