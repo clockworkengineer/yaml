@@ -11,7 +11,8 @@ mod scalar;
 mod sequence;
 mod value;
 
-pub(crate) use anchors::{collect_anchors, expand_merge_keys, replace_aliases};
+// Anchor resolution functions - currently not used during parsing
+// pub(crate) use anchors::{collect_anchors, expand_merge_keys, replace_aliases};
 #[cfg(test)]
 pub(crate) use helpers::parse_quoted_scalar;
 pub(crate) use helpers::{parse_comment, parse_error, peek_ahead_for_mapping_key};
@@ -28,7 +29,7 @@ use crate::nodes::node::BlockStyle;
 use crate::nodes::node::Node;
 use crate::nodes::node::Node::Document;
 use crate::parser::directives::{DirectiveContext, parse_directives};
-use std::collections::HashMap;
+// use std::collections::HashMap;
 
 use helpers::node_is_blank;
 use helpers::skip_whitespace;
@@ -670,13 +671,16 @@ pub fn parse_document(
         i += 1;
     }
 
-    let mut doc_node = Document(normalized_nodes);
+    let doc_node = Document(normalized_nodes);
 
-    let mut anchors: HashMap<String, Node> = HashMap::new();
-    collect_anchors(&doc_node, &mut anchors)?;
+    // TODO: Anchor/alias resolution should be optional or done separately
+    // Many use cases (like test suites) expect the raw parse tree with
+    // anchors and aliases preserved, not automatically resolved.
+    // let mut anchors: HashMap<String, Node> = HashMap::new();
+    // collect_anchors(&doc_node, &mut anchors)?;
 
-    expand_merge_keys(&mut doc_node, &anchors)?;
-    replace_aliases(&mut doc_node, &anchors)?;
+    // expand_merge_keys(&mut doc_node, &anchors)?;
+    // replace_aliases(&mut doc_node, &anchors)?;
 
     Ok(doc_node)
 }
