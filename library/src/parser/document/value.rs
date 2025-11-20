@@ -471,7 +471,12 @@ pub(crate) fn parse_value(
             Ok(parse_scalar(trimmed, directives))
         }
         Some(_) => {
-            let value = collect_until(source, |c| c == CHAR_NEWLINE || c == CHAR_HASH);
+            // Collect plain scalar, stopping at newline, comment, or flow indicators
+            // Flow indicators (,  ] }) signal end of value in flow context
+            let value = collect_until(source, |c| {
+                c == CHAR_NEWLINE || c == CHAR_HASH || 
+                c == CHAR_COMMA || c == CHAR_RBRACKET || c == CHAR_RBRACE
+            });
             let trimmed = value.trim();
 
             // Check if comment follows without whitespace (for block scalars like `>#`)
