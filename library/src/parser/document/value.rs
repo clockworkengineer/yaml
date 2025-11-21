@@ -423,6 +423,7 @@ pub(crate) fn parse_value(
                 directives,
             )?;
             // Check for nested anchors (not allowed)
+            // Note: Mappings/sequences can contain anchored elements, only direct nesting is invalid
             if matches!(node, Node::Anchored(_, _)) {
                 return Err(parse_error(source, "A node cannot have multiple anchors"));
             }
