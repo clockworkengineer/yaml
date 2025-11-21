@@ -1,8 +1,9 @@
 use yaml_lib::{parse, BufferSource};
 
 fn main() {
-    // Anchor on mapping key
-    let yaml = "&outer\n&key [a]: value";
+    // Test tab in double quoted string
+    let yaml = r#""2 leading
+    \	tab""#;
     let mut source = BufferSource::new(yaml.as_bytes());
     match parse(&mut source) {
         Ok(doc) => {

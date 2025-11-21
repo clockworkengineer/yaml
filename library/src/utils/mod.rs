@@ -242,9 +242,10 @@ pub fn validate_double_quoted_escapes(s: &str) -> Result<(), String> {
                 | Some('L') | Some('P') => {
                     // Valid escape
                 }
-                Some('\n') | Some('\r') => {
-                    // Line continuation: \<newline> is valid (backslash escapes the line break)
+                Some('\n') | Some('\r') | Some('\t') => {
+                    // Line continuation: \<newline> or \<tab> is valid (backslash escapes the line break)
                     // This allows for line folding in double-quoted strings
+                    // Tab after backslash is treated as whitespace continuation
                 }
                 Some(other) => {
                     return Err(format!("Invalid escape sequence: \\{}", other));
@@ -386,6 +387,17 @@ pub fn unescape_double_quoted(s: &str) -> String {
                         chars.next(); // consume the \n
                     }
                     // Skip any following whitespace
+                    while let Some(&c) = chars.peek() {
+                        if c == ' ' || c == '\t' {
+                            chars.next();
+                        } else {
+                            break;
+                        }
+                    }
+                }
+                Some('\t') => {
+                    // \<tab> is whitespace folding: the tab and following whitespace are consumed
+                    // This is similar to line continuation but with a tab
                     while let Some(&c) = chars.peek() {
                         if c == ' ' || c == '\t' {
                             chars.next();

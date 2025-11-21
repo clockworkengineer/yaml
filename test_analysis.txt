@@ -1,0 +1,959 @@
+﻿cargo : warning: value assigned to `has_whitespace` is never read
+At line:1 char:1
++ cargo test --test yaml_test_suite -- --nocapture 2>&1 | Out-File -Fil ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (warning: value ...` is never read:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+   --> library\src\parser\document\value.rs:545:25
+    |
+545 |                         has_whitespace = true;
+    |                         ^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` on by default
+
+warning: function `collect_anchors` is never used
+  --> library\src\parser\document\anchors.rs:20:15
+   |
+20 | pub(crate) fn collect_anchors(
+   |               ^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: function `replace_aliases` is never used
+  --> library\src\parser\document\anchors.rs:78:15
+   |
+78 | pub(crate) fn replace_aliases(
+   |               ^^^^^^^^^^^^^^^
+
+warning: function `expand_merge_keys` is never used
+   --> library\src\parser\document\anchors.rs:143:15
+    |
+143 | pub(crate) fn expand_merge_keys(
+    |               ^^^^^^^^^^^^^^^^^
+
+warning: `yaml_lib` (lib) generated 4 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.16s
+     Running tests\yaml_test_suite.rs (target\debug\deps\yaml_test_suite-d409c297e6966741.exe)
+
+running 1 test
+Running all 402 YAML test suite tests...
+[1/402] Testing: 229Q - Spec Example 2.4. Sequence of Mappings
+  Result: FAIL (expected: success, got: error)
+[2/402] Testing: 236B - Invalid value after mapping
+  Result: PASS
+[3/402] Testing: 26DV - Whitespace around colon in mappings
+  Result: FAIL (expected: success, got: error)
+[4/402] Testing: 27NA - Spec Example 5.9. Directive Indicator
+  Result: PASS
+[5/402] Testing: 2AUY - Tags in Block Sequence
+  Result: PASS
+[6/402] Testing: 2CMS - Invalid mapping in plain multiline
+  Result: FAIL (expected: error, got: success)
+[7/402] Testing: 2EBW - Allowed characters in keys
+  Result: PASS
+[8/402] Testing: 00 - Literal modifers
+  Result: PASS
+[9/402] Testing: 01 - Literal modifers
+  Result: PASS
+[10/402] Testing: 02 - Literal modifers
+  Result: PASS
+[11/402] Testing: 03 - Literal modifers
+  Result: PASS
+[12/402] Testing: 2JQS - Block Mapping with Missing Keys
+  Result: PASS
+[13/402] Testing: 2LFX - Spec Example 6.13. Reserved Directives [1.3]
+  Result: PASS
+[14/402] Testing: 2SXE - Anchors With Colon in Name
+  Result: PASS
+[15/402] Testing: 2XXW - Spec Example 2.25. Unordered Sets
+  Result: PASS
+[16/402] Testing: 33X3 - Three explicit integers in a block sequence
+  Result: PASS
+[17/402] Testing: 35KP - Tags for Root Objects
+  Result: PASS
+[18/402] Testing: 36F6 - Multiline plain scalar with empty line
+  Result: FAIL (expected: success, got: error)
+[19/402] Testing: 3ALJ - Block Sequence in Block Sequence
+  Result: PASS
+[20/402] Testing: 3GZX - Spec Example 7.1. Alias Nodes
+  Result: PASS
+[21/402] Testing: 3HFZ - Invalid content after document end marker
+  Result: PASS
+[22/402] Testing: 3MYT - Plain Scalar looking like key, comment, anchor and tag
+  Result: PASS
+[23/402] Testing: 3R3P - Single block sequence with anchor
+  Result: PASS
+[24/402] Testing: 00 - Leading tabs in double quoted
+  Result: PASS
+[25/402] Testing: 01 - Leading tabs in double quoted
+  Result: FAIL (expected: success, got: error)
+[26/402] Testing: 02 - Leading tabs in double quoted
+  Result: PASS
+[27/402] Testing: 03 - Leading tabs in double quoted
+  Result: PASS
+[28/402] Testing: 04 - Leading tabs in double quoted
+  Result: FAIL (expected: success, got: error)
+[29/402] Testing: 05 - Leading tabs in double quoted
+  Result: PASS
+[30/402] Testing: 3UYS - Escaped slash in double quotes
+  Result: PASS
+[31/402] Testing: 4ABK - Flow Mapping Separate Values
+  Result: PASS
+[32/402] Testing: 4CQQ - Spec Example 2.18. Multi-line Flow Scalars
+  Result: FAIL (expected: success, got: error)
+[33/402] Testing: 4EJS - Invalid tabs as indendation in a mapping
+  Result: PASS
+[34/402] Testing: 4FJ6 - Nested implicit complex keys
+  Result: FAIL (expected: success, got: error)
+[35/402] Testing: 4GC6 - Spec Example 7.7. Single Quoted Characters
+  Result: PASS
+[36/402] Testing: 4H7K - Flow sequence with invalid extra closing bracket
+  Result: PASS
+[37/402] Testing: 4HVU - Wrong indendation in Sequence
+  Result: FAIL (expected: error, got: success)
+[38/402] Testing: 4JVG - Scalar value with two anchors
+  Result: PASS
+[39/402] Testing: 00 - Flow mapping colon on line after key
+  Result: PASS
+[40/402] Testing: 01 - Flow mapping colon on line after key
+  Result: PASS
+[41/402] Testing: 02 - Flow mapping colon on line after key
+  Result: PASS
+[42/402] Testing: 4Q9F - Folded Block Scalar [1.3]
+  Result: PASS
+[43/402] Testing: 4QFQ - Spec Example 8.2. Block Indentation Indicator [1.3]
+  Result: PASS
+[44/402] Testing: 4RWC - Trailing spaces after flow collection
+  Result: PASS
+[45/402] Testing: 4UYU - Colon in Double Quoted String
+  Result: PASS
+[46/402] Testing: 4V8U - Plain scalar with backslashes
+  Result: PASS
+[47/402] Testing: 4WA9 - Literal scalars
+  Result: PASS
+[48/402] Testing: 4ZYM - Spec Example 6.4. Line Prefixes
+  Result: PASS
+[49/402] Testing: 52DL - Explicit Non-Specific Tag [1.3]
+  Result: PASS
+[50/402] Testing: 54T7 - Flow Mapping
+  Result: PASS
+[51/402] Testing: 55WF - Invalid escape in double quoted string
+  Result: PASS
+[52/402] Testing: 565N - Construct Binary
+  Result: FAIL (expected: success, got: error)
+[53/402] Testing: 57H4 - Spec Example 8.22. Block Collection Nodes
+  Result: PASS
+[54/402] Testing: 58MP - Flow mapping edge cases
+  Result: PASS
+[55/402] Testing: 5BVJ - Spec Example 5.7. Block Scalar Indicators
+  Result: PASS
+[56/402] Testing: 5C5M - Spec Example 7.15. Flow Mappings
+  Result: PASS
+[57/402] Testing: 5GBF - Spec Example 6.5. Empty Lines
+  Result: FAIL (expected: success, got: error)
+[58/402] Testing: 5KJE - Spec Example 7.13. Flow Sequence
+  Result: PASS
+[59/402] Testing: 5LLU - Block scalar with wrong indented line after spaces only
+  Result: FAIL (expected: error, got: success)
+[60/402] Testing: 5MUD - Colon and adjacent value on next line
+  Result: PASS
+[61/402] Testing: 5NYZ - Spec Example 6.9. Separated Comment
+  Result: PASS
+[62/402] Testing: 5T43 - Colon at the beginning of adjacent flow scalar
+  Result: PASS
+[63/402] Testing: 5TRB - Invalid document-start marker in doublequoted tring
+  Result: FAIL (expected: error, got: success)
+[64/402] Testing: 5TYM - Spec Example 6.21. Local Tag Prefix
+  Result: PASS
+[65/402] Testing: 5U3A - Sequence on same Line as Mapping Key
+  Result: PASS
+[66/402] Testing: 5WE3 - Spec Example 8.17. Explicit Block Mapping Entries
+  Result: PASS
+[67/402] Testing: 62EZ - Invalid block mapping key on same line as previous key
+  Result: PASS
+[68/402] Testing: 652Z - Question mark at start of flow key
+  Result: PASS
+[69/402] Testing: 65WH - Single Entry Block Sequence
+  Result: PASS
+[70/402] Testing: 6BCT - Spec Example 6.3. Separation Spaces
+  Result: PASS
+[71/402] Testing: 6BFJ - Mapping, key and flow sequence item anchors
+  Result: FAIL (expected: success, got: error)
+[72/402] Testing: 6CA3 - Tab indented top flow
+  Result: PASS
+[73/402] Testing: 6CK3 - Spec Example 6.26. Tag Shorthands
+  Result: PASS
+[74/402] Testing: 6FWR - Block Scalar Keep
+  Result: PASS
+[75/402] Testing: 6H3V - Backslashes in singlequotes
+  Result: PASS
+[76/402] Testing: 6HB6 - Spec Example 6.1. Indentation Spaces
+  Result: FAIL (expected: success, got: error)
+[77/402] Testing: 6JQW - Spec Example 2.13. In literals, newlines are preserved
+  Result: PASS
+[78/402] Testing: 6JTT - Flow sequence without closing bracket
+  Result: PASS
+[79/402] Testing: 6JWB - Tags for Block Objects
+  Result: PASS
+[80/402] Testing: 6KGN - Anchor for empty node
+  Result: PASS
+[81/402] Testing: 6LVF - Spec Example 6.13. Reserved Directives
+  Result: PASS
+[82/402] Testing: 6M2F - Aliases in Explicit Block Mapping
+  Result: PASS
+[83/402] Testing: 6PBE - Zero-indented sequences in explicit mapping keys
+  Result: PASS
+[84/402] Testing: 6S55 - Invalid scalar at the end of sequence
+  Result: FAIL (expected: error, got: success)
+[85/402] Testing: 6SLA - Allowed characters in quoted mapping key
+  Result: PASS
+[86/402] Testing: 6VJK - Spec Example 2.15. Folded newlines are preserved for "more indented" and blank lines
+  Result: PASS
+[87/402] Testing: 6WLZ - Spec Example 6.18. Primary Tag Handle [1.3]
+  Result: PASS
+[88/402] Testing: 6WPF - Spec Example 6.8. Flow Folding [1.3]
+  Result: PASS
+[89/402] Testing: 6XDY - Two document start markers
+  Result: PASS
+[90/402] Testing: 6ZKB - Spec Example 9.6. Stream
+  Result: PASS
+[91/402] Testing: 735Y - Spec Example 8.20. Block Node Types
+  Result: FAIL (expected: success, got: error)
+[92/402] Testing: 74H7 - Tags in Implicit Mapping
+  Result: PASS
+[93/402] Testing: 753E - Block Scalar Strip [1.3]
+  Result: PASS
+[94/402] Testing: 7A4E - Spec Example 7.6. Double Quoted Lines
+  Result: PASS
+[95/402] Testing: 7BMT - Node and Mapping Key Anchors [1.3]
+  Result: FAIL (expected: success, got: error)
+[96/402] Testing: 7BUB - Spec Example 2.10. Node for ÔÇ£Sammy SosaÔÇØ appears twice in this document
+  Result: PASS
+[97/402] Testing: 7FWL - Spec Example 6.24. Verbatim Tags
+  Result: PASS
+[98/402] Testing: 7LBH - Multiline double quoted implicit keys
+  Result: PASS
+[99/402] Testing: 7MNF - Missing colon
+  Result: PASS
+[100/402] Testing: 7T8X - Spec Example 8.10. Folded Lines - 8.13. Final Empty Lines
+  Result: PASS
+[101/402] Testing: 7TMG - Comment in flow sequence before comma
+  Result: PASS
+[102/402] Testing: 7W2P - Block Mapping with Missing Values
+  Result: PASS
+[103/402] Testing: 7Z25 - Bare document after document end marker
+  Result: PASS
+[104/402] Testing: 7ZZ5 - Empty flow collections
+  Result: PASS
+[105/402] Testing: 82AN - Three dashes and content without space
+  Result: PASS
+[106/402] Testing: 87E4 - Spec Example 7.8. Single Quoted Implicit Keys
+  Result: PASS
+[107/402] Testing: 8CWC - Plain mapping key ending with colon
+  Result: PASS
+[108/402] Testing: 8G76 - Spec Example 6.10. Comment Lines
+  Result: PASS
+[109/402] Testing: 8KB6 - Multiline plain flow mapping key without value
+  Result: FAIL (expected: success, got: error)
+[110/402] Testing: 8MK2 - Explicit Non-Specific Tag
+  Result: PASS
+[111/402] Testing: 8QBE - Block Sequence in Block Mapping
+  Result: PASS
+[112/402] Testing: 8UDB - Spec Example 7.14. Flow Sequence Entries
+  Result: PASS
+[113/402] Testing: 8XDJ - Comment in plain multiline value
+  Result: PASS
+[114/402] Testing: 8XYN - Anchor with unicode character
+  Result: PASS
+[115/402] Testing: 93JH - Block Mappings in Block Sequence
+  Result: FAIL (expected: success, got: error)
+[116/402] Testing: 93WF - Spec Example 6.6. Line Folding [1.3]
+  Result: PASS
+[117/402] Testing: 96L6 - Spec Example 2.14. In the folded scalars, newlines become spaces
+  Result: PASS
+[118/402] Testing: 00 - Leading tab content in literals
+  Result: PASS
+[119/402] Testing: 01 - Leading tab content in literals
+  Result: PASS
+[120/402] Testing: 98YD - Spec Example 5.5. Comment Indicator
+  Result: PASS
+[121/402] Testing: 9BXH - Multiline doublequoted flow mapping key without value
+  Result: FAIL (expected: success, got: error)
+[122/402] Testing: 9C9N - Wrong indented flow sequence
+  Result: FAIL (expected: error, got: success)
+[123/402] Testing: 9CWY - Invalid scalar at the end of mapping
+  Result: FAIL (expected: error, got: success)
+[124/402] Testing: 9DXL - Spec Example 9.6. Stream [1.3]
+  Result: PASS
+[125/402] Testing: 9FMG - Multi-level Mapping Indent
+  Result: PASS
+[126/402] Testing: 9HCY - Need document footer before directives
+  Result: PASS
+[127/402] Testing: 9J7A - Simple Mapping Indent
+  Result: PASS
+[128/402] Testing: 9JBA - Invalid comment after end of flow sequence
+  Result: PASS
+[129/402] Testing: 9KAX - Various combinations of tags and anchors
+  Result: PASS
+[130/402] Testing: 9KBC - Mapping starting at --- line
+  Result: PASS
+[131/402] Testing: 9MAG - Flow sequence with invalid comma at the beginning
+  Result: PASS
+[132/402] Testing: 9MMA - Directive by itself with no document
+  Result: PASS
+[133/402] Testing: 9MMW - Single Pair Implicit Entries
+  Result: FAIL (expected: success, got: error)
+[134/402] Testing: 00 - Scalar doc with '...' in content
+  Result: PASS
+[135/402] Testing: 01 - Scalar doc with '...' in content
+  Result: FAIL (expected: error, got: success)
+[136/402] Testing: 9SA2 - Multiline double quoted flow mapping key
+  Result: PASS
+[137/402] Testing: 9SHH - Spec Example 5.8. Quoted Scalar Indicators
+  Result: PASS
+[138/402] Testing: 9TFX - Spec Example 7.6. Double Quoted Lines [1.3]
+  Result: PASS
+[139/402] Testing: 9U5K - Spec Example 2.12. Compact Nested Mapping
+  Result: PASS
+[140/402] Testing: 9WXW - Spec Example 6.18. Primary Tag Handle
+  Result: PASS
+[141/402] Testing: 9YRD - Multiline Scalar at Top Level
+  Result: PASS
+[142/402] Testing: A2M4 - Spec Example 6.2. Indentation Indicators
+  Result: PASS
+[143/402] Testing: A6F9 - Spec Example 8.4. Chomping Final Line Break
+  Result: PASS
+[144/402] Testing: A984 - Multiline Scalar in Mapping
+  Result: FAIL (expected: success, got: error)
+[145/402] Testing: AB8U - Sequence entry that looks like two with wrong indentation
+  Result: PASS
+[146/402] Testing: AVM7 - Empty Stream
+  Result: PASS
+[147/402] Testing: AZ63 - Sequence With Same Indentation as Parent Mapping
+  Result: PASS
+[148/402] Testing: AZW3 - Lookahead test cases
+  Result: PASS
+[149/402] Testing: B3HG - Spec Example 8.9. Folded Scalar [1.3]
+  Result: PASS
+[150/402] Testing: B63P - Directive without document
+  Result: PASS
+[151/402] Testing: BD7L - Invalid mapping after sequence
+  Result: FAIL (expected: error, got: success)
+[152/402] Testing: BEC7 - Spec Example 6.14. ÔÇ£YAMLÔÇØ directive
+  Result: FAIL (expected: success, got: error)
+[153/402] Testing: BF9H - Trailing comment in multiline plain scalar
+  Result: PASS
+[154/402] Testing: BS4K - Comment between plain scalar lines
+  Result: FAIL (expected: error, got: success)
+[155/402] Testing: BU8L - Node Anchor and Tag on Seperate Lines
+  Result: PASS
+[156/402] Testing: C2DT - Spec Example 7.18. Flow Mapping Adjacent Values
+  Result: PASS
+[157/402] Testing: C2SP - Flow Mapping Key on two lines
+  Result: FAIL (expected: error, got: success)
+[158/402] Testing: C4HZ - Spec Example 2.24. Global Tags
+  Result: PASS
+[159/402] Testing: CC74 - Spec Example 6.20. Tag Handles
+  Result: PASS
+[160/402] Testing: CFD4 - Empty implicit key in single pair flow sequences
+  Result: PASS
+[161/402] Testing: CML9 - Missing comma in flow
+  Result: PASS
+[162/402] Testing: CN3R - Various location of anchors in flow sequence
+  Result: PASS
+[163/402] Testing: CPZ3 - Doublequoted scalar starting with a tab
+  Result: PASS
+[164/402] Testing: CQ3W - Double quoted string without closing quote
+  Result: PASS
+[165/402] Testing: CT4Q - Spec Example 7.20. Single Pair Explicit Entry
+  Result: PASS
+[166/402] Testing: CTN5 - Flow sequence with invalid extra comma
+  Result: PASS
+[167/402] Testing: CUP7 - Spec Example 5.6. Node Property Indicators
+  Result: PASS
+[168/402] Testing: CVW2 - Invalid comment after comma
+  Result: PASS
+[169/402] Testing: CXX2 - Mapping with anchor on document start line
+  Result: FAIL (expected: error, got: success)
+[170/402] Testing: D49Q - Multiline single quoted implicit keys
+  Result: PASS
+[171/402] Testing: D83L - Block scalar indicator order
+  Result: PASS
+[172/402] Testing: D88J - Flow Sequence in Block Mapping
+  Result: PASS
+[173/402] Testing: D9TU - Single Pair Block Mapping
+  Result: PASS
+[174/402] Testing: DBG4 - Spec Example 7.10. Plain Characters
+  Result: FAIL (expected: success, got: error)
+[175/402] Testing: DC7X - Various trailing tabs
+  Result: PASS
+[176/402] Testing: 00 - Trailing tabs in double quoted
+  Result: PASS
+[177/402] Testing: 01 - Trailing tabs in double quoted
+  Result: PASS
+[178/402] Testing: 02 - Trailing tabs in double quoted
+  Result: FAIL (expected: success, got: error)
+[179/402] Testing: 03 - Trailing tabs in double quoted
+  Result: FAIL (expected: success, got: error)
+[180/402] Testing: 04 - Trailing tabs in double quoted
+  Result: PASS
+[181/402] Testing: 05 - Trailing tabs in double quoted
+  Result: PASS
+[182/402] Testing: DFF7 - Spec Example 7.16. Flow Mapping Entries
+  Result: FAIL (expected: success, got: error)
+[183/402] Testing: DHP8 - Flow Sequence
+  Result: PASS
+[184/402] Testing: DK3J - Zero indented block scalar with line that looks like a comment
+  Result: PASS
+[185/402] Testing: DK4H - Implicit key followed by newline
+  Result: FAIL (expected: error, got: success)
+[186/402] Testing: 00 - Tabs that look like indentation
+  Result: FAIL (expected: success, got: error)
+[187/402] Testing: 01 - Tabs that look like indentation
+  Result: FAIL (expected: error, got: success)
+[188/402] Testing: 02 - Tabs that look like indentation
+  Result: PASS
+[189/402] Testing: 03 - Tabs that look like indentation
+  Result: PASS
+[190/402] Testing: 04 - Tabs that look like indentation
+  Result: PASS
+[191/402] Testing: 05 - Tabs that look like indentation
+  Result: PASS
+[192/402] Testing: 06 - Tabs that look like indentation
+  Result: PASS
+[193/402] Testing: 07 - Tabs that look like indentation
+  Result: FAIL (expected: success, got: error)
+[194/402] Testing: 08 - Tabs that look like indentation
+  Result: PASS
+[195/402] Testing: DMG6 - Wrong indendation in Map
+  Result: FAIL (expected: error, got: success)
+[196/402] Testing: DWX9 - Spec Example 8.8. Literal Content
+  Result: PASS
+[197/402] Testing: E76Z - Aliases in Implicit Block Mapping
+  Result: PASS
+[198/402] Testing: EB22 - Missing document-end marker before directive
+  Result: PASS
+[199/402] Testing: EHF6 - Tags for Flow Objects
+  Result: FAIL (expected: success, got: error)
+[200/402] Testing: EW3V - Wrong indendation in mapping
+  Result: FAIL (expected: error, got: success)
+[201/402] Testing: EX5H - Multiline Scalar at Top Level [1.3]
+  Result: PASS
+[202/402] Testing: EXG3 - Three dashes and content without space [1.3]
+  Result: PASS
+[203/402] Testing: F2C7 - Anchors and Tags
+  Result: PASS
+[204/402] Testing: F3CP - Nested flow collections on one line
+  Result: PASS
+[205/402] Testing: F6MC - More indented lines at the beginning of folded block scalars
+  Result: FAIL (expected: success, got: error)
+[206/402] Testing: F8F9 - Spec Example 8.5. Chomping Trailing Lines
+  Result: PASS
+[207/402] Testing: FBC9 - Allowed characters in plain scalars
+  Result: PASS
+[208/402] Testing: FH7J - Tags on Empty Scalars
+  Result: FAIL (expected: success, got: error)
+[209/402] Testing: FP8R - Zero indented block scalar
+  Result: PASS
+[210/402] Testing: FQ7F - Spec Example 2.1. Sequence of Scalars
+  Result: PASS
+[211/402] Testing: FRK4 - Spec Example 7.3. Completely Empty Flow Nodes
+  Result: FAIL (expected: success, got: error)
+[212/402] Testing: FTA2 - Single block sequence with anchor and explicit document start
+  Result: PASS
+[213/402] Testing: FUP4 - Flow Sequence in Flow Sequence
+  Result: PASS
+[214/402] Testing: G4RS - Spec Example 2.17. Quoted Scalars
+  Result: PASS
+[215/402] Testing: G5U8 - Plain dashes in flow sequence
+  Result: FAIL (expected: error, got: success)
+[216/402] Testing: G7JE - Multiline implicit keys
+  Result: PASS
+[217/402] Testing: G992 - Spec Example 8.9. Folded Scalar
+  Result: PASS
+[218/402] Testing: G9HC - Invalid anchor in zero indented sequence
+  Result: FAIL (expected: error, got: success)
+[219/402] Testing: GDY7 - Comment that looks like a mapping key
+  Result: FAIL (expected: error, got: success)
+[220/402] Testing: GH63 - Mixed Block Mapping (explicit to implicit)
+  Result: PASS
+[221/402] Testing: GT5M - Node anchor in sequence
+  Result: FAIL (expected: error, got: success)
+[222/402] Testing: H2RW - Blank lines
+  Result: FAIL (expected: success, got: error)
+[223/402] Testing: H3Z8 - Literal unicode
+  Result: PASS
+[224/402] Testing: H7J7 - Node anchor not indented
+  Result: FAIL (expected: error, got: success)
+[225/402] Testing: H7TQ - Extra words on %YAML directive
+  Result: PASS
+[226/402] Testing: 00 - Scalars in flow start with syntax char
+  Result: PASS
+[227/402] Testing: 01 - Scalars in flow start with syntax char
+  Result: PASS
+[228/402] Testing: HMK4 - Spec Example 2.16. Indentation determines scope
+  Result: PASS
+[229/402] Testing: HMQ5 - Spec Example 6.23. Node Properties
+  Result: PASS
+[230/402] Testing: HRE5 - Double quoted scalar with escaped single quote
+  Result: PASS
+[231/402] Testing: HS5T - Spec Example 7.12. Plain Lines
+  Result: PASS
+[232/402] Testing: HU3P - Invalid Mapping in plain scalar
+  Result: PASS
+[233/402] Testing: HWV9 - Document-end marker
+  Result: PASS
+[234/402] Testing: J3BT - Spec Example 5.12. Tabs and Spaces
+  Result: PASS
+[235/402] Testing: J5UC - Multiple Pair Block Mapping
+  Result: PASS
+[236/402] Testing: J7PZ - Spec Example 2.26. Ordered Mappings
+  Result: PASS
+[237/402] Testing: J7VC - Empty Lines Between Mapping Elements
+  Result: PASS
+[238/402] Testing: J9HZ - Spec Example 2.9. Single Document with Two Comments
+  Result: PASS
+[239/402] Testing: 00 - Trailing whitespace in streams
+  Result: PASS
+[240/402] Testing: 01 - Trailing whitespace in streams
+  Result: PASS
+[241/402] Testing: 02 - Trailing whitespace in streams
+  Result: PASS
+[242/402] Testing: JHB9 - Spec Example 2.7. Two Documents in a Stream
+  Result: PASS
+[243/402] Testing: JKF3 - Multiline unidented double quoted block key
+  Result: PASS
+[244/402] Testing: JQ4R - Spec Example 8.14. Block Sequence
+  Result: PASS
+[245/402] Testing: JR7V - Question marks in scalars
+  Result: PASS
+[246/402] Testing: JS2J - Spec Example 6.29. Node Anchors
+  Result: PASS
+[247/402] Testing: JTV5 - Block Mapping with Multiline Scalars
+  Result: FAIL (expected: success, got: error)
+[248/402] Testing: JY7Z - Trailing content that looks like a mapping
+  Result: FAIL (expected: error, got: success)
+[249/402] Testing: K3WX - Colon and adjacent value after comment on next line
+  Result: PASS
+[250/402] Testing: K4SU - Multiple Entry Block Sequence
+  Result: PASS
+[251/402] Testing: K527 - Spec Example 6.6. Line Folding
+  Result: PASS
+[252/402] Testing: K54U - Tab after document header
+  Result: PASS
+[253/402] Testing: K858 - Spec Example 8.6. Empty Scalar Chomping
+  Result: PASS
+[254/402] Testing: 00 - Inline tabs in double quoted
+  Result: PASS
+[255/402] Testing: 01 - Inline tabs in double quoted
+  Result: FAIL (expected: success, got: error)
+[256/402] Testing: 02 - Inline tabs in double quoted
+  Result: PASS
+[257/402] Testing: KK5P - Various combinations of explicit block mappings
+  Result: FAIL (expected: success, got: error)
+[258/402] Testing: KMK3 - Block Submapping
+  Result: PASS
+[259/402] Testing: KS4U - Invalid item after end of flow sequence
+  Result: FAIL (expected: error, got: success)
+[260/402] Testing: KSS4 - Scalars on --- line
+  Result: PASS
+[261/402] Testing: 00 - Trailing line of spaces
+  Result: PASS
+[262/402] Testing: 01 - Trailing line of spaces
+  Result: PASS
+[263/402] Testing: L383 - Two scalar docs with trailing comments
+  Result: PASS
+[264/402] Testing: L94M - Tags in Explicit Mapping
+  Result: PASS
+[265/402] Testing: L9U5 - Spec Example 7.11. Plain Implicit Keys
+  Result: PASS
+[266/402] Testing: LE5A - Spec Example 7.24. Flow Nodes
+  Result: PASS
+[267/402] Testing: LHL4 - Invalid tag
+  Result: FAIL (expected: error, got: success)
+[268/402] Testing: LP6E - Whitespace After Scalars in Flow
+  Result: PASS
+[269/402] Testing: LQZ7 - Spec Example 7.4. Double Quoted Implicit Keys
+  Result: PASS
+[270/402] Testing: LX3P - Implicit Flow Mapping Key on one line
+  Result: PASS
+[271/402] Testing: M29M - Literal Block Scalar
+  Result: PASS
+[272/402] Testing: 00 - Question mark edge cases
+  Result: FAIL (expected: success, got: error)
+[273/402] Testing: 01 - Question mark edge cases
+  Result: PASS
+[274/402] Testing: M5C3 - Spec Example 8.21. Block Scalar Nodes
+  Result: PASS
+[275/402] Testing: M5DY - Spec Example 2.11. Mapping between Sequences
+  Result: PASS
+[276/402] Testing: M6YH - Block sequence indentation
+  Result: FAIL (expected: success, got: error)
+[277/402] Testing: M7A3 - Spec Example 9.3. Bare Documents
+  Result: PASS
+[278/402] Testing: M7NX - Nested flow collections
+  Result: PASS
+[279/402] Testing: M9B4 - Spec Example 8.7. Literal Scalar
+  Result: PASS
+[280/402] Testing: MJS9 - Spec Example 6.7. Block Folding
+  Result: PASS
+[281/402] Testing: 00 - Directive variants
+  Result: PASS
+[282/402] Testing: 01 - Directive variants
+  Result: PASS
+[283/402] Testing: 02 - Directive variants
+  Result: FAIL (expected: success, got: error)
+[284/402] Testing: 03 - Directive variants
+  Result: FAIL (expected: success, got: error)
+[285/402] Testing: 04 - Directive variants
+  Result: FAIL (expected: success, got: error)
+[286/402] Testing: 05 - Directive variants
+  Result: PASS
+[287/402] Testing: 06 - Directive variants
+  Result: PASS
+[288/402] Testing: MXS3 - Flow Mapping in Block Sequence
+  Result: PASS
+[289/402] Testing: MYW6 - Block Scalar Strip
+  Result: PASS
+[290/402] Testing: MZX3 - Non-Specific Tags on Scalars
+  Result: PASS
+[291/402] Testing: N4JP - Bad indentation in mapping
+  Result: FAIL (expected: error, got: success)
+[292/402] Testing: N782 - Invalid document markers in flow style
+  Result: FAIL (expected: error, got: success)
+[293/402] Testing: NAT4 - Various empty or newline only quoted strings
+  Result: PASS
+[294/402] Testing: NB6Z - Multiline plain value with tabs on empty lines
+  Result: FAIL (expected: success, got: error)
+[295/402] Testing: NHX8 - Empty Lines at End of Document
+  Result: PASS
+[296/402] Testing: NJ66 - Multiline plain flow mapping key
+  Result: PASS
+[297/402] Testing: NKF9 - Empty keys in block and flow mapping
+  Result: FAIL (expected: success, got: error)
+[298/402] Testing: NP9H - Spec Example 7.5. Double Quoted Line Breaks
+  Result: PASS
+[299/402] Testing: P2AD - Spec Example 8.1. Block Scalar Header
+  Result: PASS
+[300/402] Testing: P2EQ - Invalid sequene item on same line as previous item
+  Result: FAIL (expected: error, got: success)
+[301/402] Testing: P76L - Spec Example 6.19. Secondary Tag Handle
+  Result: PASS
+[302/402] Testing: P94K - Spec Example 6.11. Multi-Line Comments
+  Result: PASS
+[303/402] Testing: PBJ2 - Spec Example 2.3. Mapping Scalars to Sequences
+  Result: PASS
+[304/402] Testing: PRH3 - Spec Example 7.9. Single Quoted Lines
+  Result: PASS
+[305/402] Testing: PUW8 - Document start on last line
+  Result: PASS
+[306/402] Testing: PW8X - Anchors on Empty Scalars
+  Result: FAIL (expected: success, got: error)
+[307/402] Testing: Q4CL - Trailing content after quoted value
+  Result: FAIL (expected: error, got: success)
+[308/402] Testing: Q5MG - Tab at beginning of line followed by a flow mapping
+  Result: PASS
+[309/402] Testing: Q88A - Spec Example 7.23. Flow Content
+  Result: PASS
+[310/402] Testing: Q8AD - Spec Example 7.5. Double Quoted Line Breaks [1.3]
+  Result: PASS
+[311/402] Testing: Q9WF - Spec Example 6.12. Separation Spaces
+  Result: PASS
+[312/402] Testing: QB6E - Wrong indented multiline quoted scalar
+  Result: FAIL (expected: error, got: success)
+[313/402] Testing: QF4Y - Spec Example 7.19. Single Pair Flow Mappings
+  Result: PASS
+[314/402] Testing: QLJ7 - Tag shorthand used in documents but only defined in the first
+  Result: FAIL (expected: error, got: success)
+[315/402] Testing: QT73 - Comment and document-end marker
+  Result: PASS
+[316/402] Testing: R4YG - Spec Example 8.2. Block Indentation Indicator
+  Result: PASS
+[317/402] Testing: R52L - Nested flow mapping sequence and mappings
+  Result: PASS
+[318/402] Testing: RHX7 - YAML directive without document end marker
+  Result: PASS
+[319/402] Testing: RLU9 - Sequence Indent
+  Result: PASS
+[320/402] Testing: RR7F - Mixed Block Mapping (implicit to explicit)
+  Result: PASS
+[321/402] Testing: RTP8 - Spec Example 9.2. Document Markers
+  Result: PASS
+[322/402] Testing: RXY3 - Invalid document-end marker in single quoted string
+  Result: FAIL (expected: error, got: success)
+[323/402] Testing: RZP5 - Various Trailing Comments [1.3]
+  Result: FAIL (expected: success, got: error)
+[324/402] Testing: RZT7 - Spec Example 2.28. Log File
+  Result: FAIL (expected: success, got: error)
+[325/402] Testing: S3PD - Spec Example 8.18. Implicit Block Mapping Entries
+  Result: PASS
+[326/402] Testing: S4GJ - Invalid text after block scalar indicator
+  Result: PASS
+[327/402] Testing: S4JQ - Spec Example 6.28. Non-Specific Tags
+  Result: PASS
+[328/402] Testing: S4T7 - Document with footer
+  Result: PASS
+[329/402] Testing: S7BG - Colon followed by comma
+  Result: PASS
+[330/402] Testing: S98Z - Block scalar with more spaces than first content line
+  Result: FAIL (expected: error, got: success)
+[331/402] Testing: S9E8 - Spec Example 5.3. Block Structure Indicators
+  Result: PASS
+[332/402] Testing: SBG9 - Flow Sequence in Flow Mapping
+  Result: PASS
+[333/402] Testing: SF5V - Duplicate YAML directive
+  Result: PASS
+[334/402] Testing: SKE5 - Anchor before zero indented sequence
+  Result: PASS
+[335/402] Testing: 00 - Single character streams
+  Result: PASS
+[336/402] Testing: 01 - Single character streams
+  Result: PASS
+[337/402] Testing: SR86 - Anchor plus Alias
+  Result: FAIL (expected: error, got: success)
+[338/402] Testing: SSW6 - Spec Example 7.7. Single Quoted Characters [1.3]
+  Result: PASS
+[339/402] Testing: SU5Z - Comment without whitespace after doublequoted scalar
+  Result: PASS
+[340/402] Testing: SU74 - Anchor and alias as mapping key
+  Result: FAIL (expected: error, got: success)
+[341/402] Testing: SY6V - Anchor before sequence entry on same line
+  Result: FAIL (expected: error, got: success)
+[342/402] Testing: SYW4 - Spec Example 2.2. Mapping Scalars to Scalars
+  Result: PASS
+[343/402] Testing: T26H - Spec Example 8.8. Literal Content [1.3]
+  Result: PASS
+[344/402] Testing: T4YY - Spec Example 7.9. Single Quoted Lines [1.3]
+  Result: PASS
+[345/402] Testing: T5N4 - Spec Example 8.7. Literal Scalar [1.3]
+  Result: PASS
+[346/402] Testing: T833 - Flow mapping missing a separating comma
+  Result: FAIL (expected: error, got: success)
+[347/402] Testing: TD5N - Invalid scalar after sequence
+  Result: FAIL (expected: error, got: success)
+[348/402] Testing: TE2A - Spec Example 8.16. Block Mappings
+  Result: PASS
+[349/402] Testing: TL85 - Spec Example 6.8. Flow Folding
+  Result: PASS
+[350/402] Testing: TS54 - Folded Block Scalar
+  Result: PASS
+[351/402] Testing: U3C3 - Spec Example 6.16. ÔÇ£TAGÔÇØ directive
+  Result: PASS
+[352/402] Testing: U3XV - Node and Mapping Key Anchors
+  Result: FAIL (expected: success, got: error)
+[353/402] Testing: U44R - Bad indentation in mapping (2)
+  Result: FAIL (expected: error, got: success)
+[354/402] Testing: U99R - Invalid comma in tag
+  Result: FAIL (expected: error, got: success)
+[355/402] Testing: U9NS - Spec Example 2.8. Play by Play Feed from a Game
+  Result: PASS
+[356/402] Testing: UDM2 - Plain URL in flow mapping
+  Result: PASS
+[357/402] Testing: UDR7 - Spec Example 5.4. Flow Collection Indicators
+  Result: PASS
+[358/402] Testing: UGM3 - Spec Example 2.27. Invoice
+  Result: FAIL (expected: success, got: error)
+[359/402] Testing: 00 - Syntax character edge cases
+  Result: PASS
+[360/402] Testing: 01 - Syntax character edge cases
+  Result: PASS
+[361/402] Testing: 02 - Syntax character edge cases
+  Result: PASS
+[362/402] Testing: UT92 - Spec Example 9.4. Explicit Documents
+  Result: PASS
+[363/402] Testing: UV7Q - Legal tab after indentation
+  Result: PASS
+[364/402] Testing: V55R - Aliases in Block Sequence
+  Result: PASS
+[365/402] Testing: V9D5 - Spec Example 8.19. Compact Block Mappings
+  Result: PASS
+[366/402] Testing: 00 - Flow collections over many lines
+  Result: FAIL (expected: error, got: success)
+[367/402] Testing: 01 - Flow collections over many lines
+  Result: PASS
+[368/402] Testing: W42U - Spec Example 8.15. Block Sequence Entry Types
+  Result: PASS
+[369/402] Testing: W4TN - Spec Example 9.5. Directives Documents
+  Result: PASS
+[370/402] Testing: W5VH - Allowed characters in alias
+  Result: PASS
+[371/402] Testing: W9L4 - Literal block scalar with more spaces in first line
+  Result: PASS
+[372/402] Testing: WZ62 - Spec Example 7.2. Empty Content
+  Result: PASS
+[373/402] Testing: X38W - Aliases in Flow Objects
+  Result: FAIL (expected: success, got: error)
+[374/402] Testing: X4QW - Comment without whitespace after block scalar indicator
+  Result: PASS
+[375/402] Testing: X8DW - Explicit key and value seperated by comment
+  Result: PASS
+[376/402] Testing: XLQ9 - Multiline scalar that looks like a YAML directive
+  Result: FAIL (expected: success, got: error)
+[377/402] Testing: XV9V - Spec Example 6.5. Empty Lines [1.3]
+  Result: FAIL (expected: success, got: error)
+[378/402] Testing: XW4D - Various Trailing Comments
+  Result: FAIL (expected: success, got: error)
+[379/402] Testing: Y2GN - Anchor with colon in the middle
+  Result: PASS
+[380/402] Testing: 000 - Tabs in various contexts
+  Result: FAIL (expected: error, got: success)
+[381/402] Testing: 001 - Tabs in various contexts
+  Result: PASS
+[382/402] Testing: 002 - Tabs in various contexts
+  Result: PASS
+[383/402] Testing: 003 - Tabs in various contexts
+  Result: FAIL (expected: error, got: success)
+[384/402] Testing: 004 - Tabs in various contexts
+  Result: FAIL (expected: error, got: success)
+[385/402] Testing: 005 - Tabs in various contexts
+  Result: FAIL (expected: error, got: success)
+[386/402] Testing: 006 - Tabs in various contexts
+  Result: PASS
+[387/402] Testing: 007 - Tabs in various contexts
+  Result: FAIL (expected: error, got: success)
+[388/402] Testing: 008 - Tabs in various contexts
+  Result: PASS
+[389/402] Testing: 009 - Tabs in various contexts
+  Result: FAIL (expected: error, got: success)
+[390/402] Testing: 010 - Tabs in various contexts
+  Result: PASS
+[391/402] Testing: YD5X - Spec Example 2.5. Sequence of Sequences
+  Result: PASS
+[392/402] Testing: YJV2 - Dash in flow sequence
+  Result: FAIL (expected: error, got: success)
+[393/402] Testing: Z67P - Spec Example 8.21. Block Scalar Nodes [1.3]
+  Result: PASS
+[394/402] Testing: Z9M4 - Spec Example 6.22. Global Tag Prefix
+  Result: PASS
+[395/402] Testing: ZCZ6 - Invalid mapping in plain single line value
+  Result: FAIL (expected: error, got: success)
+[396/402] Testing: ZF4X - Spec Example 2.6. Mapping of Mappings
+  Result: PASS
+[397/402] Testing: ZH7C - Anchors in Mapping
+  Result: PASS
+[398/402] Testing: ZK9H - Nested top level flow mapping
+  Result: PASS
+[399/402] Testing: ZL4Z - Invalid nested mapping
+  Result: FAIL (expected: error, got: success)
+[400/402] Testing: ZVH3 - Wrong indented sequence item
+  Result: FAIL (expected: error, got: success)
+[401/402] Testing: ZWK4 - Key with anchor after missing explicit mapping value
+  Result: FAIL (expected: success, got: error)
+[402/402] Testing: ZXT5 - Implicit key followed by newline and adjacent value
+  Result: PASS
+
+=== YAML Test Suite Results (All Tests) ===
+Passed:  302
+Failed:  100
+Skipped: 0
+Total:   402
+
+=== Failures ===
+1. 229Q: Spec Example 2.4. Sequence of Mappings (expected: success, got: error)
+2. 26DV: Whitespace around colon in mappings (expected: success, got: error)
+3. 2CMS: Invalid mapping in plain multiline (expected: error, got: success)
+4. 36F6: Multiline plain scalar with empty line (expected: success, got: error)
+5. 01: Leading tabs in double quoted (expected: success, got: error)
+6. 04: Leading tabs in double quoted (expected: success, got: error)
+7. 4CQQ: Spec Example 2.18. Multi-line Flow Scalars (expected: success, got: error)
+8. 4FJ6: Nested implicit complex keys (expected: success, got: error)
+9. 4HVU: Wrong indendation in Sequence (expected: error, got: success)
+10. 565N: Construct Binary (expected: success, got: error)
+11. 5GBF: Spec Example 6.5. Empty Lines (expected: success, got: error)
+12. 5LLU: Block scalar with wrong indented line after spaces only (expected: error, got: success)
+13. 5TRB: Invalid document-start marker in doublequoted tring (expected: error, got: success)
+14. 6BFJ: Mapping, key and flow sequence item anchors (expected: success, got: error)
+15. 6HB6: Spec Example 6.1. Indentation Spaces (expected: success, got: error)
+16. 6S55: Invalid scalar at the end of sequence (expected: error, got: success)
+17. 735Y: Spec Example 8.20. Block Node Types (expected: success, got: error)
+18. 7BMT: Node and Mapping Key Anchors [1.3] (expected: success, got: error)
+19. 8KB6: Multiline plain flow mapping key without value (expected: success, got: error)
+20. 93JH: Block Mappings in Block Sequence (expected: success, got: error)
+21. 9BXH: Multiline doublequoted flow mapping key without value (expected: success, got: error)
+22. 9C9N: Wrong indented flow sequence (expected: error, got: success)
+23. 9CWY: Invalid scalar at the end of mapping (expected: error, got: success)
+24. 9MMW: Single Pair Implicit Entries (expected: success, got: error)
+25. 01: Scalar doc with '...' in content (expected: error, got: success)
+26. A984: Multiline Scalar in Mapping (expected: success, got: error)
+27. BD7L: Invalid mapping after sequence (expected: error, got: success)
+28. BEC7: Spec Example 6.14. ÔÇ£YAMLÔÇØ directive (expected: success, got: error)
+29. BS4K: Comment between plain scalar lines (expected: error, got: success)
+30. C2SP: Flow Mapping Key on two lines (expected: error, got: success)
+31. CXX2: Mapping with anchor on document start line (expected: error, got: success)
+32. DBG4: Spec Example 7.10. Plain Characters (expected: success, got: error)
+33. 02: Trailing tabs in double quoted (expected: success, got: error)
+34. 03: Trailing tabs in double quoted (expected: success, got: error)
+35. DFF7: Spec Example 7.16. Flow Mapping Entries (expected: success, got: error)
+36. DK4H: Implicit key followed by newline (expected: error, got: success)
+37. 00: Tabs that look like indentation (expected: success, got: error)
+38. 01: Tabs that look like indentation (expected: error, got: success)
+39. 07: Tabs that look like indentation (expected: success, got: error)
+40. DMG6: Wrong indendation in Map (expected: error, got: success)
+41. EHF6: Tags for Flow Objects (expected: success, got: error)
+42. EW3V: Wrong indendation in mapping (expected: error, got: success)
+43. F6MC: More indented lines at the beginning of folded block scalars (expected: success, got: error)
+44. FH7J: Tags on Empty Scalars (expected: success, got: error)
+45. FRK4: Spec Example 7.3. Completely Empty Flow Nodes (expected: success, got: error)
+46. G5U8: Plain dashes in flow sequence (expected: error, got: success)
+47. G9HC: Invalid anchor in zero indented sequence (expected: error, got: success)
+48. GDY7: Comment that looks like a mapping key (expected: error, got: success)
+49. GT5M: Node anchor in sequence (expected: error, got: success)
+50. H2RW: Blank lines (expected: success, got: error)
+51. H7J7: Node anchor not indented (expected: error, got: success)
+52. JTV5: Block Mapping with Multiline Scalars (expected: success, got: error)
+53. JY7Z: Trailing content that looks like a mapping (expected: error, got: success)
+54. 01: Inline tabs in double quoted (expected: success, got: error)
+55. KK5P: Various combinations of explicit block mappings (expected: success, got: error)
+56. KS4U: Invalid item after end of flow sequence (expected: error, got: success)
+57. LHL4: Invalid tag (expected: error, got: success)
+58. 00: Question mark edge cases (expected: success, got: error)
+59. M6YH: Block sequence indentation (expected: success, got: error)
+60. 02: Directive variants (expected: success, got: error)
+61. 03: Directive variants (expected: success, got: error)
+62. 04: Directive variants (expected: success, got: error)
+63. N4JP: Bad indentation in mapping (expected: error, got: success)
+64. N782: Invalid document markers in flow style (expected: error, got: success)
+65. NB6Z: Multiline plain value with tabs on empty lines (expected: success, got: error)
+66. NKF9: Empty keys in block and flow mapping (expected: success, got: error)
+67. P2EQ: Invalid sequene item on same line as previous item (expected: error, got: success)
+68. PW8X: Anchors on Empty Scalars (expected: success, got: error)
+69. Q4CL: Trailing content after quoted value (expected: error, got: success)
+70. QB6E: Wrong indented multiline quoted scalar (expected: error, got: success)
+71. QLJ7: Tag shorthand used in documents but only defined in the first (expected: error, got: success)
+72. RXY3: Invalid document-end marker in single quoted string (expected: error, got: success)
+73. RZP5: Various Trailing Comments [1.3] (expected: success, got: error)
+74. RZT7: Spec Example 2.28. Log File (expected: success, got: error)
+75. S98Z: Block scalar with more spaces than first content line (expected: error, got: success)
+76. SR86: Anchor plus Alias (expected: error, got: success)
+77. SU74: Anchor and alias as mapping key (expected: error, got: success)
+78. SY6V: Anchor before sequence entry on same line (expected: error, got: success)
+79. T833: Flow mapping missing a separating comma (expected: error, got: success)
+80. TD5N: Invalid scalar after sequence (expected: error, got: success)
+81. U3XV: Node and Mapping Key Anchors (expected: success, got: error)
+82. U44R: Bad indentation in mapping (2) (expected: error, got: success)
+83. U99R: Invalid comma in tag (expected: error, got: success)
+84. UGM3: Spec Example 2.27. Invoice (expected: success, got: error)
+85. 00: Flow collections over many lines (expected: error, got: success)
+86. X38W: Aliases in Flow Objects (expected: success, got: error)
+87. XLQ9: Multiline scalar that looks like a YAML directive (expected: success, got: error)
+88. XV9V: Spec Example 6.5. Empty Lines [1.3] (expected: success, got: error)
+89. XW4D: Various Trailing Comments (expected: success, got: error)
+90. 000: Tabs in various contexts (expected: error, got: success)
+91. 003: Tabs in various contexts (expected: error, got: success)
+92. 004: Tabs in various contexts (expected: error, got: success)
+93. 005: Tabs in various contexts (expected: error, got: success)
+94. 007: Tabs in various contexts (expected: error, got: success)
+95. 009: Tabs in various contexts (expected: error, got: success)
+96. YJV2: Dash in flow sequence (expected: error, got: success)
+97. ZCZ6: Invalid mapping in plain single line value (expected: error, got: success)
+98. ZL4Z: Invalid nested mapping (expected: error, got: success)
+99. ZVH3: Wrong indented sequence item (expected: error, got: success)
+100. ZWK4: Key with anchor after missing explicit mapping value (expected: success, got: error)
+
+Pass Rate: 75.1%
+test run_yaml_test_suite ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.79s
+
