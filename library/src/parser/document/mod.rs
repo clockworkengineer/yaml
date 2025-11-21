@@ -10,6 +10,7 @@ mod mapping;
 mod scalar;
 mod sequence;
 mod value;
+mod value_tokens; // Token-based value parser (proof of concept)
 
 // Anchor resolution functions - currently not used during parsing
 // pub(crate) use anchors::{collect_anchors, expand_merge_keys, replace_aliases};
