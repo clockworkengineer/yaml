@@ -1,6 +1,6 @@
 # Streaming and Iterator Support - Implementation Summary
 
-This document describes the streaming and iterator capabilities added to the YAML library in Item 4 of the improvement roadmap.
+This document describes the streaming and iterator capabilities added to the YAML library.
 
 ## Overview
 

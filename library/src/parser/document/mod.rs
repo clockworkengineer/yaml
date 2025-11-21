@@ -148,9 +148,30 @@ pub fn parse_document_contents(
             source, directives,
         )?),
         // Support anchors at document level (e.g. "&anchor key: value")
-        Some(c) if c == '&' => Ok(crate::parser::document::value::parse_value(
-            source, directives,
-        )?),
+        Some(c) if c == '&' => {
+            // Save state to check if this is an anchored mapping key
+            let state = source.save_state();
+            source.next(); // skip &
+            
+            // Collect anchor name
+            let _anchor_name = crate::utils::collect_until(source, |c| {
+                c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '#'
+                || c == ',' || c == '[' || c == ']' || c == '{' || c == '}'
+            });
+            crate::parser::document::helpers::skip_whitespace(source);
+            
+            // Check if what follows looks like a mapping key
+            let is_mapping = peek_ahead_for_mapping_key(source);
+            
+            // Restore state and parse appropriately
+            source.restore_state(state);
+            
+            if is_mapping {
+                Ok(parse_mapping(source, indent_level, directives)?)
+            } else {
+                Ok(crate::parser::document::value::parse_value(source, directives)?)
+            }
+        }
         // Support aliases at document level (e.g. "*anchor")
         Some(c) if c == '*' => Ok(crate::parser::document::value::parse_value(
             source, directives,

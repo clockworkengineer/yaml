@@ -1,6 +1,6 @@
 # Error Handling Improvements - Implementation Summary
 
-This document describes the enhanced error handling capabilities added to the YAML library in Item 5 of the improvement roadmap.
+This document describes the enhanced error handling capabilities added to the YAML library.
 
 ## Overview
 

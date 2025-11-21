@@ -1,7 +1,7 @@
 # Fluent API Implementation Summary
 
 ## Overview
-Implemented a fluent builder API for Node construction (Item 1 from improvement suggestions), providing a clean, chainable interface for building YAML structures.
+Implemented a fluent builder API for Node construction, providing a clean, chainable interface for building YAML structures.
 
 ## Changes Made
 

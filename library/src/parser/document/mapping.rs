@@ -6,6 +6,7 @@ use crate::nodes::node::Node;
 use crate::nodes::node::{BlockStyle, QuoteType};
 use crate::parser::document::helpers::{parse_comment, parse_error, parse_mapping_key};
 use crate::parser::document::value::parse_value;
+use crate::utils::collect_until;
 
 /// Parses a YAML mapping (dictionary) with the specified indentation level.
 ///
@@ -92,7 +93,7 @@ pub(crate) fn parse_mapping(
             CHAR_HASH => {
                 parse_comment(source);
             }
-            c if c.is_alphanumeric() || c == CHAR_SINGLE_QUOTE || c == CHAR_DOUBLE_QUOTE => {
+            c if c.is_alphanumeric() || c == CHAR_SINGLE_QUOTE || c == CHAR_DOUBLE_QUOTE || c == CHAR_AMPERSAND => {
                 let current_indent = source.get_current_indent_level();
                 if current_indent < indent_level {
                     break;
@@ -104,7 +105,30 @@ pub(crate) fn parse_mapping(
                     first_key_indent = Some(current_indent);
                 }
                 
+                // Check for anchor on the mapping key
+                let anchor_name = if source.current() == Some(CHAR_AMPERSAND) {
+                    source.next();
+                    let name = collect_until(source, |c| {
+                        c == CHAR_SPACE || c == CHAR_TAB || c == CHAR_NEWLINE 
+                        || c == CHAR_CARRIAGE_RETURN || c == CHAR_HASH
+                        || c == CHAR_COMMA || c == CHAR_LBRACKET || c == CHAR_RBRACKET
+                        || c == CHAR_LBRACE || c == CHAR_RBRACE
+                    });
+                    if name.trim().is_empty() {
+                        return Err(parse_error(source, "Anchor name cannot be empty"));
+                    }
+                    crate::parser::document::helpers::skip_whitespace(source);
+                    Some(name)
+                } else {
+                    None
+                };
+                
                 let (mut key_node, newline) = parse_mapping_key(source, directives)?;
+                
+                // Wrap the key in an Anchored node if we found an anchor
+                if let Some(name) = anchor_name {
+                    key_node = Node::Anchored(Box::new(key_node), name);
+                }
                 if let Node::Str(ref mut s, ref mut qt, ref mut _style) = key_node {
                     if matches!(*qt, QuoteType::Single | QuoteType::Double) && is_plain_safe_key(s)
                     {
