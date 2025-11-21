@@ -2,18 +2,20 @@
 
 [![Rust](https://img.shields.io/badge/rust-1.88.0+-orange.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-362%20passing-green.svg)]()
+[![Tests](https://img.shields.io/badge/internal_tests-726%20passing-green.svg)]()
+[![YAML 1.2](https://img.shields.io/badge/YAML_1.2-79.6%25-yellow.svg)]()
 
-A comprehensive, high-performance YAML library for Rust that provides full YAML 1.2 specification compliance with excellent ergonomics and extensive format conversion capabilities.
+A comprehensive, high-performance YAML library for Rust with strong YAML 1.2 specification compliance (79.6%), excellent ergonomics, and extensive format conversion capabilities.
 
 ## ✨ Features
 
 ### 🎯 **Core YAML Support**
-- **Full YAML 1.2 specification compliance**
+- **79.6% YAML 1.2 specification compliance** (320/402 tests passing)
 - **Unicode-aware parsing** with BOM detection
 - **Multi-document streams** support
-- **Anchors and aliases** with circular reference detection
-- **Block and flow syntax** parsing
+- **Anchors and aliases** including on mapping keys, with circular reference detection
+- **Block and flow syntax** parsing with empty key support
+- **Cross-platform line endings** (Unix LF, Windows CRLF)
 - **Comments preservation** throughout parsing
 - **All scalar types**: strings, integers, floats, booleans, null
 - **All collection types**: sequences, mappings, sets
@@ -40,7 +42,7 @@ A comprehensive, high-performance YAML library for Rust that provides full YAML 
 - **Memory-efficient** node representation
 - **Thread-safe** operations
 - **Error recovery** and detailed diagnostics
-- **Comprehensive test suite** (362+ tests)
+- **Comprehensive test suite** (726 internal tests, 320/402 YAML 1.2 official tests)
 
 ## 📦 Installation
 

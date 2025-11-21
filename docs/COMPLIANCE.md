@@ -4,6 +4,8 @@ This document tracks compliance with the YAML 1.2 specification.
 
 ## Test Coverage Summary
 
+### Internal Test Suite
+
 | Category | Tests | Passing | Coverage |
 |----------|-------|---------|----------|
 | Basic Parsing | 62 | 62 | 100% |
@@ -16,7 +18,17 @@ This document tracks compliance with the YAML 1.2 specification.
 | File I/O | 15 | 15 | 100% |
 | Inline Flow | 32 | 32 | 100% |
 | Format Conversion | 12 | 12 | 100% |
-| **Total** | **315** | **315** | **100%** |
+| **Total** | **726** | **726** | **100%** |
+
+### YAML 1.2 Official Test Suite
+
+| Status | Count | Percentage |
+|--------|-------|------------|
+| ✅ Passing | 320 | 79.6% |
+| ⏳ Remaining | 82 | 20.4% |
+| **Total** | **402** | **100%** |
+
+**Recent Progress**: +49 tests from 67.4% baseline
 
 ## YAML 1.2 Specification Coverage
 
@@ -253,7 +265,15 @@ This document tracks compliance with the YAML 1.2 specification.
 cargo test --lib
 ```
 
-**Current Results**: 600 tests passing
+**Current Results**: 726 internal tests passing
+
+### Running YAML 1.2 Official Test Suite
+
+```bash
+cargo test --test yaml_test_suite
+```
+
+**Current Results**: 320/402 tests passing (79.6%)
 
 ### Running Specific Test Suites
 
@@ -317,15 +337,26 @@ cargo test --lib testing::property::tests
 
 ## Conformance to YAML Test Suite
 
-We pass all applicable tests from the official YAML test suite:
+Progress on the official YAML 1.2 test suite:
 
-- [x] YAML 1.2 test suite: 245/245 tests (100%)
-- [x] Edge cases: 127/127 tests (100%)
-- [x] Error cases: 89/89 tests (100%)
+- [x] Basic features: 240+ tests passing
+- [x] Anchors and aliases: Most patterns supported
+- [x] Flow collections: Complete support
+- [x] Block collections: Complete support
+- [x] Line ending handling: Unix (LF) and Windows (CRLF)
+- [x] Empty keys: Supported in flow mappings
+- [ ] Explicit key syntax (`?`): In progress
+- [ ] Advanced validation: Remaining Phase 1 tests
+
+**Current Status**: 320/402 tests passing (79.6%)
 
 ### Known Limitations
 
-None. Full YAML 1.2 specification compliance achieved.
+1. **Explicit Key Syntax** (~5 tests): The `?` indicator for explicit keys needs implementation
+2. **Tags on Empty Values** (~2 tests): Handling tags without following values
+3. **Advanced Anchor Patterns** (~3 tests): Edge cases with anchors in unusual positions
+4. **Validation Strictness** (~52 tests): Parser accepts some invalid YAML that should be rejected
+5. **Complex Flow Edge Cases** (~20 tests): Unusual combinations of flow and block syntax
 
 ### Extensions
 
@@ -353,10 +384,18 @@ None. Full YAML 1.2 specification compliance achieved.
 
 ## Compliance Verification
 
-Last verified: November 17, 2025
+Last verified: November 21, 2025
 Specification: YAML 1.2.2 (October 1, 2021)
 Test suite version: 1.2.2
 
-**Status**: ✅ **FULLY COMPLIANT**
+**Status**: 🔄 **79.6% COMPLIANT** (320/402 tests)
 
-All 600+ tests passing across all specification chapters.
+- ✅ 726 internal integration tests passing (100%)
+- ✅ 320 YAML 1.2 official test suite tests passing (79.6%)
+- 🔄 82 tests remaining for full compliance
+
+**Recent Improvements**:
+- Windows (CRLF) line ending support (+10 tests)
+- Anchor support on mapping keys (+1 test)
+- Empty key support in flow mappings (+10 tests)
+- Total session gain: +21 tests (+5.2%)
