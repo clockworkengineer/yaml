@@ -3,7 +3,7 @@
 use crate::constants::*;
 use crate::error::messages::*;
 use crate::io::traits::ISource;
-use crate::nodes::node::Node;
+use crate::nodes::node::{BlockStyle, Node, QuoteType};
 use crate::parser::document::helpers::{
     parse_error, parse_quoted_scalar, skip_whitespace, validate_comment_spacing,
 };
@@ -280,8 +280,9 @@ fn parse_inline_mapping_with_colons(
                 key
             }
             Some(CHAR_RBRACE) => {
-                // Empty key before closing brace - invalid
-                return Err(parse_error(source, "Empty key in flow mapping"));
+                // Closing brace without key - this means we're done parsing pairs
+                // (handled by the break above after checking CHAR_RBRACE)
+                break;
             }
             Some(CHAR_COMMA) => {
                 // Comma without key - invalid
@@ -300,10 +301,12 @@ fn parse_inline_mapping_with_colons(
                 }
                 source.next();
                 let trimmed = collected.trim();
+                // Empty keys are valid in YAML (e.g., { : value } or {: value})
                 if trimmed.is_empty() {
-                    return Err(parse_error(source, "Empty key in flow mapping"));
+                    Node::Str(String::new(), QuoteType::Unquoted, BlockStyle::None)
+                } else {
+                    parse_scalar(trimmed, directives)
                 }
-                parse_scalar(trimmed, directives)
             }
         };
 
