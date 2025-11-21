@@ -356,10 +356,12 @@ pub(crate) fn parse_mapping_key(
     source: &mut dyn ISource,
     directives: &crate::parser::directives::DirectiveContext,
 ) -> Result<(Node, bool), String> {
-    let raw = collect_until(source, |c| c == CHAR_COLON || c == CHAR_NEWLINE);
+    let raw = collect_until(source, |c| {
+        c == CHAR_COLON || c == CHAR_NEWLINE || c == CHAR_CARRIAGE_RETURN
+    });
 
-    // Check if we stopped at a colon or newline
-    if source.current() == Some(CHAR_NEWLINE) {
+    // Check if we stopped at a colon or newline/carriage return
+    if source.current() == Some(CHAR_NEWLINE) || source.current() == Some(CHAR_CARRIAGE_RETURN) {
         // We reached end of line without finding a colon - invalid mapping key
         return Err(parse_error(
             source,
@@ -386,9 +388,16 @@ pub(crate) fn parse_mapping_key(
             consume_inline_comment_and_newline(source);
             newline = true;
         } else {
-            newline = c == CHAR_NEWLINE;
-            if newline {
+            // Handle Windows line endings (\r\n) and Unix (\n)
+            if c == CHAR_CARRIAGE_RETURN {
                 source.next();
+                newline = true;
+            }
+            if source.current() == Some(CHAR_NEWLINE) {
+                source.next();
+                newline = true;
+            }
+            if newline {
                 skip_whitespace(source);
             }
         }
