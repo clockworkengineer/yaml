@@ -8,6 +8,7 @@ mod bridge;
 mod helpers;
 mod inline;
 mod mapping;
+mod mapping_tokens;
 mod scalar;
 mod sequence;
 mod sequence_tokens;

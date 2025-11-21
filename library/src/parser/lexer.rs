@@ -307,7 +307,7 @@ impl<'a> Lexer<'a> {
         while let Some(ch) = self.source.current() {
             if ch.is_whitespace() || ch == CHAR_NEWLINE || ch == CHAR_HASH
                 || ch == CHAR_COMMA || ch == CHAR_LBRACKET || ch == CHAR_RBRACKET
-                || ch == CHAR_LBRACE || ch == CHAR_RBRACE
+                || ch == CHAR_LBRACE || ch == CHAR_RBRACE || ch == CHAR_COLON
             {
                 break;
             }
@@ -336,7 +336,7 @@ impl<'a> Lexer<'a> {
         while let Some(ch) = self.source.current() {
             if ch.is_whitespace() || ch == CHAR_NEWLINE || ch == CHAR_HASH
                 || ch == CHAR_COMMA || ch == CHAR_LBRACKET || ch == CHAR_RBRACKET
-                || ch == CHAR_LBRACE || ch == CHAR_RBRACE
+                || ch == CHAR_LBRACE || ch == CHAR_RBRACE || ch == CHAR_COLON
             {
                 break;
             }

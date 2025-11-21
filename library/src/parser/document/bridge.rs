@@ -19,10 +19,7 @@ pub fn parse_value_bridged(
 ) -> Result<Node, String> {
     let mut stream = TokenStream::new(source, directives);
     
-    // Initialize the token stream
-    stream.next()?;
-    
-    // Parse using token-based parser
+    // Parse using token-based parser (stream is auto-initialized)
     parse_value_with_tokens(&mut stream, directives)
 }
 

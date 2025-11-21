@@ -144,9 +144,9 @@ fn parse_value_content(
             Ok(parse_scalar(&content, directives))
         }
         Some(Token::Dash) => {
-            // Could be sequence start
-            // TODO: call token-based sequence parser
-            Err("Sequence not yet implemented in token parser".to_string())
+            // Nested sequence
+            use crate::parser::document::sequence_tokens::parse_sequence_with_tokens;
+            parse_sequence_with_tokens(stream, 0, directives)
         }
         Some(Token::Newline) | Some(Token::Indent(_)) => {
             // Decorator followed by newline = empty value (THIS WORKS NOW!)
@@ -163,6 +163,12 @@ fn parse_value_content(
                 QuoteType::Unquoted,
                 BlockStyle::None,
             ))
+        }
+        Some(Token::Alias(name)) => {
+            // Alias reference - consume and return
+            let alias_name = name.clone();
+            stream.next()?;
+            Ok(Node::Alias(alias_name))
         }
         Some(token) => Err(format!("Unexpected token in value: {:?}", token)),
     }
@@ -195,8 +201,8 @@ mod tests {
         let directives = DirectiveContext::default();
         let mut stream = TokenStream::new(&mut source, &directives);
         
-        stream.next().unwrap(); // Initialize
         let result = parse_value_with_tokens(&mut stream, &directives).unwrap();
+        println!("Result: {:?}", result);
         
         // Should parse as anchored empty string
         match result {
@@ -214,7 +220,6 @@ mod tests {
         let directives = DirectiveContext::default();
         let mut stream = TokenStream::new(&mut source, &directives);
         
-        stream.next().unwrap(); // Initialize
         let result = parse_value_with_tokens(&mut stream, &directives).unwrap();
         
         // Should parse as anchored empty string
@@ -246,7 +251,6 @@ mod tests {
         let directives = DirectiveContext::default();
         let mut stream = TokenStream::new(&mut source, &directives);
         
-        stream.next().unwrap(); // Initialize
         let result = parse_value_with_tokens(&mut stream, &directives).unwrap();
         
         // Should parse as anchored string
@@ -265,7 +269,6 @@ mod tests {
         let directives = DirectiveContext::default();
         let mut stream = TokenStream::new(&mut source, &directives);
         
-        stream.next().unwrap(); // Initialize
         let result = parse_value_with_tokens(&mut stream, &directives).unwrap();
         
         // Should parse as alias

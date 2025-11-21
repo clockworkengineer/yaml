@@ -263,7 +263,6 @@ mod tests {
         let directives = DirectiveContext::default();
         let mut stream = TokenStream::new(&mut source, &directives);
         
-        stream.next().unwrap(); // Initialize
         let decorators = stream.consume_decorators().unwrap();
         
         assert!(decorators.tag.is_some());
@@ -277,7 +276,6 @@ mod tests {
         let directives = DirectiveContext::default();
         let mut stream = TokenStream::new(&mut source, &directives);
         
-        stream.next().unwrap(); // Initialize
         let decorators = stream.consume_decorators().unwrap();
         
         assert!(decorators.anchor.is_some());
@@ -291,7 +289,6 @@ mod tests {
         let directives = DirectiveContext::default();
         let mut stream = TokenStream::new(&mut source, &directives);
         
-        stream.next().unwrap(); // Initialize
         let decorators = stream.consume_decorators().unwrap();
         
         assert!(decorators.tag.is_some());
@@ -306,7 +303,6 @@ mod tests {
         let directives = DirectiveContext::default();
         let mut stream = TokenStream::new(&mut source, &directives);
         
-        stream.next().unwrap(); // Initialize
         let decorators = stream.consume_decorators().unwrap();
         
         assert!(decorators.tag.is_some());
