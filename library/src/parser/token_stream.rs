@@ -22,10 +22,13 @@ pub struct TokenStream<'a> {
 }
 
 impl<'a> TokenStream<'a> {
-    /// Create a new token stream
+    /// Create a new token stream and load the first token
     pub fn new(source: &'a mut dyn ISource, directives: &'a DirectiveContext) -> Self {
+        let mut lexer = Lexer::new(source);
+        // Load the first token
+        let _ = lexer.next();
         TokenStream {
-            lexer: Lexer::new(source),
+            lexer,
             directives,
         }
     }

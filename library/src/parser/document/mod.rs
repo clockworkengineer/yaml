@@ -10,6 +10,7 @@ mod inline;
 mod mapping;
 mod scalar;
 mod sequence;
+mod sequence_tokens;
 #[cfg(test)]
 mod test_empty_decorators;
 mod value;
