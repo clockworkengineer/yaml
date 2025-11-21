@@ -4,7 +4,7 @@ use crate::constants::*;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::parser::document::helpers::{
-    parse_comment, peek_ahead_for_document_start_end, skip_whitespace,
+    parse_comment, peek_ahead_for_document_start_end, skip_whitespace, validate_no_tab_indentation,
 };
 use crate::parser::document::value::parse_value;
 
@@ -32,7 +32,7 @@ pub(crate) fn parse_sequence(
     let mut loop_iterations = 0;
     const MAX_LOOP_ITERATIONS: usize = 100_000;
     const MAX_ITEMS: usize = 50_000; // More reasonable limit on actual items
-    
+
     // Track the indentation of the first dash for validation
     let mut first_dash_indent: Option<usize> = None;
 
@@ -41,17 +41,19 @@ pub(crate) fn parse_sequence(
         loop_iterations += 1;
         if loop_iterations >= MAX_LOOP_ITERATIONS {
             return Err(
-                "Sequence parsing exceeded maximum loop iterations - possible infinite loop".to_string(),
+                "Sequence parsing exceeded maximum loop iterations - possible infinite loop"
+                    .to_string(),
             );
         }
-        
+
         // Also check reasonable item count limit
         if items.len() >= MAX_ITEMS {
-            return Err(
-                format!("Sequence has too many items ({}+) - possible infinite loop", MAX_ITEMS)
-            );
+            return Err(format!(
+                "Sequence has too many items ({}+) - possible infinite loop",
+                MAX_ITEMS
+            ));
         }
-        
+
         let current_indent = source.get_current_indent_level();
         if current_indent < indent_level {
             break;
@@ -95,7 +97,7 @@ pub(crate) fn parse_sequence(
                 } else {
                     first_dash_indent = Some(current_indent);
                 }
-                
+
                 source.next();
                 skip_whitespace(source);
                 if source.current() == Some(CHAR_NEWLINE) {
@@ -136,6 +138,7 @@ pub(crate) fn parse_sequence(
             }
             CHAR_NEWLINE | CHAR_CARRIAGE_RETURN => {
                 source.next();
+                validate_no_tab_indentation(source)?;
                 skip_whitespace(source);
             }
             c if c.is_whitespace() => {

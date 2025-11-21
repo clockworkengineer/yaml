@@ -85,30 +85,50 @@ pub(crate) fn skip_whitespace(source: &mut dyn ISource) {
 /// Skips whitespace but returns an error if tabs are found as line indentation
 /// Only checks for tabs when followed by actual content (not on blank lines)
 pub(crate) fn skip_whitespace_no_tabs(source: &mut dyn ISource) -> Result<(), String> {
-    let mut found_tab = false;
     while let Some(c) = source.current() {
         if c == '\t' {
-            found_tab = true;
-            source.next();
+            // YAML spec: tabs are not allowed as indentation
+            return Err(crate::parser::document::parse_error(
+                source,
+                "Tabs are not allowed as indentation in YAML",
+            ));
         } else if source.is_whitespace(c) {
             source.next();
         } else {
             break;
         }
     }
+    Ok(())
+}
 
-    // Only error if tabs were found AND there's actual content after (not a blank line)
-    if found_tab {
-        if let Some(c) = source.current() {
-            // Check if there's content (not newline/comment/document marker)
-            if c != '\n' && c != '\r' && c != '#' && c != '-' && c != '.' {
-                return Err(crate::parser::document::parse_error(
-                    source,
-                    "Tabs are not allowed as indentation in YAML",
-                ));
-            }
+/// Validate that there are no tabs in the leading whitespace at line start
+/// This should be called after processing a newline, before any content
+pub(crate) fn validate_no_tab_indentation(source: &mut dyn ISource) -> Result<(), String> {
+    // Only check if we're at the start of a line (column 0 or only whitespace so far)
+    let state = source.save_state();
+    
+    // Check characters from current position forward
+    while let Some(c) = source.current() {
+        if c == '\t' {
+            // Found a tab - this is invalid indentation
+            source.restore_state(state);
+            return Err(crate::parser::document::parse_error(
+                source,
+                "Tabs are not allowed as indentation in YAML",
+            ));
+        } else if c == ' ' {
+            source.next();
+        } else if c == '\n' || c == '\r' {
+            // Blank line - tabs would be OK here (no content)
+            source.restore_state(state);
+            return Ok(());
+        } else {
+            // Found content
+            break;
         }
     }
+    
+    source.restore_state(state);
     Ok(())
 }
 
@@ -213,7 +233,10 @@ pub(crate) fn parse_quoted_scalar(source: &mut dyn ISource) -> Result<String, St
     // Validate comment spacing after quoted scalar
     // After closing quote, if next char is #, it's invalid (needs whitespace)
     if source.current() == Some(CHAR_HASH) {
-        return Err(parse_error(source, "Comment indicator (#) must be preceded by whitespace"));
+        return Err(parse_error(
+            source,
+            "Comment indicator (#) must be preceded by whitespace",
+        ));
     }
 
     Ok(out)

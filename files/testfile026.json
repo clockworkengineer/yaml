@@ -1,0 +1,1 @@
+[{"kind":"Deployment","apiVersion":"v1","metadata":{"name":"api-deployment"},"spec":{"replicas":3,"template":{"spec":{"containers":[{"name":"api","image":"my-app/api-server:latest"}]}}}}]

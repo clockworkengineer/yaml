@@ -4,10 +4,10 @@
 //! This eliminates infinite loops with decorators and simplifies the logic.
 
 use crate::nodes::node::Node;
-use crate::parser::token_stream::TokenStream;
-use crate::parser::lexer::Token;
 use crate::parser::directives::DirectiveContext;
 use crate::parser::document::value_tokens::parse_value_with_tokens;
+use crate::parser::lexer::Token;
+use crate::parser::token_stream::TokenStream;
 
 /// Parse a block sequence using tokens
 ///
@@ -49,7 +49,7 @@ pub fn parse_sequence_with_tokens(
             Some(Token::Dash) => {
                 // Consume the dash
                 stream.next()?;
-                
+
                 // Skip whitespace after dash
                 stream.skip_whitespace()?;
 
@@ -67,11 +67,11 @@ pub fn parse_sequence_with_tokens(
                         items.push(Node::None);
                         // Don't consume - let next iteration handle it
                     }
-                                    _ => {
+                    _ => {
                         // Parse the value
                         let value = parse_value_with_tokens(stream, directives)?;
                         items.push(value);
-                        
+
                         // Skip trailing whitespace/newlines until we see next dash or end
                         loop {
                             match stream.current() {
@@ -120,7 +120,7 @@ mod tests {
 
         // Debug: print first few tokens
         println!("First token: {:?}", stream.current());
-        
+
         let result = parse_sequence_with_tokens(&mut stream, 0, &directives).unwrap();
 
         if let Node::Array(items) = result {

@@ -300,7 +300,7 @@ pub(crate) fn parse_value(
     // It handles decorator patterns (FH7J, PW8X) correctly but needs more work for
     // full compatibility with all tag coercion and nested structure scenarios
     // TODO: Enable selective routing once token parser feature-complete
-    
+
     if source.current() == Some('!') {
         source.next();
 
