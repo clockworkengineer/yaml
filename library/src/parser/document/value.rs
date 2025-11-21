@@ -354,14 +354,23 @@ pub(crate) fn parse_value(
                 }
             }
             Some(_) => parse_value(source, directives)?,
-            None => return Err(parse_error(source, ERR_UNEXPECTED_EOF_AFTER_ANCHOR)),
+            None => {
+                // Tag at EOF with no content = empty tagged value
+                Node::Str(
+                    String::new(),
+                    crate::nodes::node::QuoteType::Unquoted,
+                    crate::nodes::node::BlockStyle::None,
+                )
+            }
         };
 
-        // Use resolved tag for coercion and storage
-        if let Some(coerced) = try_coerce_tag(&resolved_tag, inner.clone()) {
+        // Try coercion with the original tag (short form like !!str)
+        // This allows try_coerce_tag to work with its existing pattern matching
+        if let Some(coerced) = try_coerce_tag(&tag, inner.clone()) {
             return Ok(coerced);
         }
 
+        // If coercion doesn't apply, store the resolved (long) tag form
         return Ok(Node::Tagged(Box::new(inner), resolved_tag));
     }
 
@@ -437,7 +446,14 @@ pub(crate) fn parse_value(
                 parse_scalar(raw.trim(), directives)
             }
             Some(_) => parse_value(source, directives)?,
-            None => return Err(parse_error(source, ERR_UNEXPECTED_EOF_AFTER_ANCHOR)),
+            None => {
+                // Anchor at EOF with no content = empty anchored value
+                Node::Str(
+                    String::new(),
+                    crate::nodes::node::QuoteType::Unquoted,
+                    crate::nodes::node::BlockStyle::None,
+                )
+            }
         };
         // Check for nested anchors (not allowed)
         if matches!(node, Node::Anchored(_, _)) {

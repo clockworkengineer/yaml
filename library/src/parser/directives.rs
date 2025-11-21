@@ -29,11 +29,21 @@ pub struct DirectiveContext {
 }
 
 impl DirectiveContext {
-    /// Create a new empty directive context
+    /// Create a new directive context with default tag prefixes
+    /// 
+    /// Per YAML 1.2 spec, two tag handles are defined by default:
+    /// - `!!` resolves to `tag:yaml.org,2002:` (standard YAML types)
+    /// - `!` resolves to `!` (local tags)
     pub fn new() -> Self {
+        let mut tag_prefixes = HashMap::new();
+        
+        // Add default tag prefixes per YAML 1.2 specification
+        tag_prefixes.insert("!!".to_string(), "tag:yaml.org,2002:".to_string());
+        tag_prefixes.insert("!".to_string(), "!".to_string());
+        
         Self {
             yaml_version: None,
-            tag_prefixes: HashMap::new(),
+            tag_prefixes,
         }
     }
 
@@ -60,13 +70,29 @@ impl DirectiveContext {
     ///
     /// Expands tag handles like `!e!mytype` to full URIs like `tag:example.com,2000:app/mytype`
     /// based on registered %TAG directives. If no handle matches, returns the tag as-is.
+    /// 
+    /// Longer handles are matched first (e.g., `!e!` before `!`) to ensure correct resolution.
     pub fn resolve_tag(&self, tag: &str) -> String {
-        // Check if tag uses a registered handle
+        // Find the longest matching handle
+        let mut best_match: Option<(&str, &str)> = None;
+        
         for (handle, prefix) in &self.tag_prefixes {
-            if tag.starts_with(handle) {
-                let suffix = &tag[handle.len()..];
-                return alloc::format!("{}{}", prefix, suffix);
+            if tag.starts_with(handle.as_str()) {
+                // Prefer longer handles (more specific matches)
+                if let Some((existing_handle, _)) = best_match {
+                    if handle.len() > existing_handle.len() {
+                        best_match = Some((handle, prefix));
+                    }
+                } else {
+                    best_match = Some((handle, prefix));
+                }
             }
+        }
+
+        // Apply the best match if found
+        if let Some((handle, prefix)) = best_match {
+            let suffix = &tag[handle.len()..];
+            return alloc::format!("{}{}", prefix, suffix);
         }
 
         // If no handle matches, return as-is
@@ -380,9 +406,11 @@ mod tests {
         let mut source = Buffer::new(b"%FOO bar baz\n---\ntest");
         let context = parse_directives(&mut source).unwrap();
 
-        // Should have no version or tags
+        // Should have no version but should have default tag prefixes
         assert_eq!(context.yaml_version, None);
-        assert!(context.tag_prefixes.is_empty());
+        assert_eq!(context.tag_prefixes.len(), 2); // !! and ! defaults
+        assert_eq!(context.tag_prefixes.get("!!"), Some(&"tag:yaml.org,2002:".to_string()));
+        assert_eq!(context.tag_prefixes.get("!"), Some(&"!".to_string()));
     }
 
     #[test]
@@ -400,6 +428,30 @@ mod tests {
 
         let resolved = context.resolve_tag("!mytag");
         assert_eq!(resolved, "!mytag");
+    }
+
+    #[test]
+    fn test_resolve_default_tag_prefix() {
+        let context = DirectiveContext::new();
+
+        // Test default !! prefix resolution
+        let resolved = context.resolve_tag("!!str");
+        assert_eq!(resolved, "tag:yaml.org,2002:str");
+
+        let resolved = context.resolve_tag("!!int");
+        assert_eq!(resolved, "tag:yaml.org,2002:int");
+
+        let resolved = context.resolve_tag("!!null");
+        assert_eq!(resolved, "tag:yaml.org,2002:null");
+    }
+
+    #[test]
+    fn test_resolve_local_tag() {
+        let context = DirectiveContext::new();
+
+        // Local tags (single !) should stay as-is
+        let resolved = context.resolve_tag("!custom");
+        assert_eq!(resolved, "!custom");
     }
 
     #[test]

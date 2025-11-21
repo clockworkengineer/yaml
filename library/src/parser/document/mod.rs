@@ -4,13 +4,16 @@
 //! implementation.
 
 mod anchors;
+mod bridge;
 mod helpers;
 mod inline;
 mod mapping;
 mod scalar;
 mod sequence;
+#[cfg(test)]
+mod test_empty_decorators;
 mod value;
-mod value_tokens; // Token-based value parser (proof of concept)
+mod value_tokens;
 
 // Anchor resolution functions - currently not used during parsing
 // pub(crate) use anchors::{collect_anchors, expand_merge_keys, replace_aliases};
@@ -784,10 +787,12 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
                     _ => false,
                 };
                 
-                // If directives were present but document is blank/empty, that's an error
-                // Check if any directives were specified (version or tag prefixes)
-                let has_directives = directives.yaml_version.is_some() || !directives.tag_prefixes.is_empty();
-                if is_blank_doc && has_directives {
+                // If directives were EXPLICITLY present but document is blank/empty, that's an error
+                // Check if any directives were explicitly specified (version or non-default tag prefixes)
+                // Note: DirectiveContext always has 2 default tag prefixes (!! and !)
+                let has_explicit_directives = directives.yaml_version.is_some() 
+                    || directives.tag_prefixes.len() > 2;
+                if is_blank_doc && has_explicit_directives {
                     return Err(helpers::parse_error(
                         source,
                         "Directives require document content"
