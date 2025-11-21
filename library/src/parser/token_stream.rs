@@ -116,9 +116,8 @@ impl<'a> TokenStream<'a> {
         let mut decorators = Decorators::default();
 
         // Allow up to 2 passes to handle both tag and anchor
+        // DON'T skip whitespace here - let caller decide if they need to skip before calling
         for _ in 0..2 {
-            self.skip_whitespace()?;
-
             match self.current() {
                 Some(Token::Tag(tag_str)) => {
                     if decorators.tag.is_some() {

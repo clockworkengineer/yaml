@@ -89,7 +89,31 @@ pub fn parse_value_with_tokens(
 
     // If we have decorators, parse the content
     if decorators.tag.is_some() || decorators.anchor.is_some() {
-        stream.skip_whitespace()?;
+        // Check what follows decorators - if newline/eof, it's an empty value
+        match stream.current() {
+            Some(Token::Newline) | Some(Token::Eof) | None => {
+                // Decorator on empty value - don't skip newline, return empty
+                let mut result = Node::Str(String::new(), QuoteType::Unquoted, BlockStyle::None);
+                
+                if let Some(tag) = decorators.tag {
+                    if let Some(coerced) = try_coerce_tag(&tag, result.clone()) {
+                        result = coerced;
+                    } else {
+                        result = Node::Tagged(Box::new(result), tag);
+                    }
+                }
+                
+                if let Some(anchor_name) = decorators.anchor {
+                    result = Node::Anchored(Box::new(result), anchor_name);
+                }
+                
+                return Ok(result);
+            }
+            _ => {
+                // There's content after decorators, skip whitespace and parse it
+                stream.skip_whitespace()?;
+            }
+        }
 
         // Parse the actual value content
         let inner = parse_value_content(stream, directives)?;

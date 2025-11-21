@@ -25,15 +25,25 @@ use crate::parser::document::value_tokens::parse_value_with_tokens;
 /// - Natural handling of empty items after decorators
 pub fn parse_sequence_with_tokens(
     stream: &mut TokenStream,
-    _base_indent: usize,
+    base_indent: usize,
     directives: &DirectiveContext,
 ) -> Result<Node, String> {
     let mut items = Vec::new();
 
-    // Skip initial whitespace/newlines
+    // Skip initial whitespace/newlines but track where we start
     stream.skip_whitespace()?;
 
     loop {
+        // Check for indentation change that would end the sequence
+        if let Some(Token::Indent(level)) = stream.current() {
+            if *level < base_indent {
+                // Dedent - sequence is done
+                break;
+            }
+            stream.next()?;
+            continue;
+        }
+
         // Check if we're at a dash (sequence indicator)
         match stream.current() {
             Some(Token::Dash) => {
@@ -57,13 +67,23 @@ pub fn parse_sequence_with_tokens(
                         items.push(Node::None);
                         // Don't consume - let next iteration handle it
                     }
-                    _ => {
+                                    _ => {
                         // Parse the value
                         let value = parse_value_with_tokens(stream, directives)?;
                         items.push(value);
                         
-                        // Skip trailing whitespace
-                        stream.skip_whitespace()?;
+                        // Skip trailing whitespace/newlines until we see next dash or end
+                        loop {
+                            match stream.current() {
+                                Some(Token::Newline) => {
+                                    stream.next()?;
+                                }
+                                Some(Token::Indent(_)) | Some(Token::Dash) | None => {
+                                    break;
+                                }
+                                _ => break,
+                            }
+                        }
                     }
                 }
             }
@@ -71,12 +91,7 @@ pub fn parse_sequence_with_tokens(
                 // Skip empty lines
                 stream.next()?;
             }
-            Some(Token::Indent(level)) => {
-                // Check indentation - if it's less than base, we're done
-                // For now, just consume and continue
-                stream.next()?;
-            }
-            None | Some(Token::DocumentEnd) | Some(Token::DocumentStart) => {
+            None | Some(Token::DocumentEnd) | Some(Token::DocumentStart) | Some(Token::Eof) => {
                 // End of sequence
                 break;
             }
