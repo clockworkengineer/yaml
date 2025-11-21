@@ -12,64 +12,64 @@ use crate::io::traits::ISource;
 pub enum Token {
     /// Tag decorator: !tag or !!tag
     Tag(String),
-    
+
     /// Anchor definition: &name
     Anchor(String),
-    
+
     /// Alias reference: *name
     Alias(String),
-    
+
     /// Start of flow mapping: {
     FlowMappingStart,
-    
+
     /// End of flow mapping: }
     FlowMappingEnd,
-    
+
     /// Start of flow sequence: [
     FlowSequenceStart,
-    
+
     /// End of flow sequence: ]
     FlowSequenceEnd,
-    
+
     /// Comma separator in flow collections
     Comma,
-    
+
     /// Colon key-value separator
     Colon,
-    
+
     /// Dash sequence indicator: -
     Dash,
-    
+
     /// Question mark explicit key indicator: ?
     QuestionMark,
-    
+
     /// Single-quoted scalar content
     SingleQuoted(String),
-    
+
     /// Double-quoted scalar content
     DoubleQuoted(String),
-    
+
     /// Plain scalar content (unquoted)
     Plain(String),
-    
+
     /// Newline
     Newline,
-    
+
     /// Indentation (spaces at line start)
     Indent(usize),
-    
+
     /// Comment content (everything after #)
     Comment(String),
-    
+
     /// Document start marker: ---
     DocumentStart,
-    
+
     /// Document end marker: ...
     DocumentEnd,
-    
+
     /// Directive: %YAML or %TAG
     Directive(String),
-    
+
     /// End of stream
     Eof,
 }
@@ -190,7 +190,7 @@ impl<'a> Lexer<'a> {
                 // Could be: dash (sequence), document start (---), or plain scalar
                 let state = self.source.save_state();
                 self.source.next();
-                
+
                 match (self.source.current(), self.peek_ahead(2)) {
                     (Some('-'), Some('-')) => {
                         // Document start: ---
@@ -213,7 +213,7 @@ impl<'a> Lexer<'a> {
                 // Could be: document end (...) or plain scalar
                 let state = self.source.save_state();
                 self.source.next();
-                
+
                 match (self.source.current(), self.peek_ahead(2)) {
                     (Some('.'), Some('.')) => {
                         // Document end: ...
@@ -295,7 +295,7 @@ impl<'a> Lexer<'a> {
     /// Scan a tag: !tag or !!tag
     fn scan_tag(&mut self) -> Result<Token, String> {
         self.source.next(); // consume '!'
-        
+
         let is_double = if self.source.current() == Some('!') {
             self.source.next();
             true
@@ -305,9 +305,15 @@ impl<'a> Lexer<'a> {
 
         let mut tag_name = String::new();
         while let Some(ch) = self.source.current() {
-            if ch.is_whitespace() || ch == CHAR_NEWLINE || ch == CHAR_HASH
-                || ch == CHAR_COMMA || ch == CHAR_LBRACKET || ch == CHAR_RBRACKET
-                || ch == CHAR_LBRACE || ch == CHAR_RBRACE || ch == CHAR_COLON
+            if ch.is_whitespace()
+                || ch == CHAR_NEWLINE
+                || ch == CHAR_HASH
+                || ch == CHAR_COMMA
+                || ch == CHAR_LBRACKET
+                || ch == CHAR_RBRACKET
+                || ch == CHAR_LBRACE
+                || ch == CHAR_RBRACE
+                || ch == CHAR_COLON
             {
                 break;
             }
@@ -331,12 +337,18 @@ impl<'a> Lexer<'a> {
     /// Scan an anchor: &name
     fn scan_anchor(&mut self) -> Result<Token, String> {
         self.source.next(); // consume '&'
-        
+
         let mut name = String::new();
         while let Some(ch) = self.source.current() {
-            if ch.is_whitespace() || ch == CHAR_NEWLINE || ch == CHAR_HASH
-                || ch == CHAR_COMMA || ch == CHAR_LBRACKET || ch == CHAR_RBRACKET
-                || ch == CHAR_LBRACE || ch == CHAR_RBRACE || ch == CHAR_COLON
+            if ch.is_whitespace()
+                || ch == CHAR_NEWLINE
+                || ch == CHAR_HASH
+                || ch == CHAR_COMMA
+                || ch == CHAR_LBRACKET
+                || ch == CHAR_RBRACKET
+                || ch == CHAR_LBRACE
+                || ch == CHAR_RBRACE
+                || ch == CHAR_COLON
             {
                 break;
             }
@@ -354,12 +366,17 @@ impl<'a> Lexer<'a> {
     /// Scan an alias: *name
     fn scan_alias(&mut self) -> Result<Token, String> {
         self.source.next(); // consume '*'
-        
+
         let mut name = String::new();
         while let Some(ch) = self.source.current() {
-            if ch.is_whitespace() || ch == CHAR_NEWLINE || ch == CHAR_HASH
-                || ch == CHAR_COMMA || ch == CHAR_LBRACKET || ch == CHAR_RBRACKET
-                || ch == CHAR_LBRACE || ch == CHAR_RBRACE
+            if ch.is_whitespace()
+                || ch == CHAR_NEWLINE
+                || ch == CHAR_HASH
+                || ch == CHAR_COMMA
+                || ch == CHAR_LBRACKET
+                || ch == CHAR_RBRACKET
+                || ch == CHAR_LBRACE
+                || ch == CHAR_RBRACE
             {
                 break;
             }
@@ -377,7 +394,7 @@ impl<'a> Lexer<'a> {
     /// Scan a directive: %YAML or %TAG
     fn scan_directive(&mut self) -> Result<Token, String> {
         self.source.next(); // consume '%'
-        
+
         let content = self.scan_until_newline();
         Ok(Token::Directive(content.trim().to_string()))
     }
@@ -385,7 +402,7 @@ impl<'a> Lexer<'a> {
     /// Scan a single-quoted scalar
     fn scan_single_quoted(&mut self) -> Result<Token, String> {
         self.source.next(); // consume opening quote
-        
+
         let mut content = String::new();
 
         loop {
@@ -415,7 +432,7 @@ impl<'a> Lexer<'a> {
     /// Scan a double-quoted scalar
     fn scan_double_quoted(&mut self) -> Result<Token, String> {
         self.source.next(); // consume opening quote
-        
+
         let mut content = String::new();
 
         loop {
@@ -458,7 +475,7 @@ impl<'a> Lexer<'a> {
                     // Colon could be part of scalar or a separator
                     let state = self.source.save_state();
                     self.source.next();
-                    
+
                     match self.source.current() {
                         Some(c) if c.is_whitespace() || c == CHAR_NEWLINE => {
                             // Colon followed by whitespace - it's a separator
@@ -492,8 +509,13 @@ impl<'a> Lexer<'a> {
                     // Newline, tab, etc. - end of scalar
                     break;
                 }
-                Some(ch) if ch == CHAR_COMMA || ch == CHAR_LBRACKET || ch == CHAR_RBRACKET
-                    || ch == CHAR_LBRACE || ch == CHAR_RBRACE => {
+                Some(ch)
+                    if ch == CHAR_COMMA
+                        || ch == CHAR_LBRACKET
+                        || ch == CHAR_RBRACKET
+                        || ch == CHAR_LBRACE
+                        || ch == CHAR_RBRACE =>
+                {
                     // Flow indicators - end of scalar
                     break;
                 }
@@ -523,10 +545,10 @@ mod tests {
     fn test_scan_tag() {
         let mut source = Buffer::new(b"!!str hello");
         let mut lexer = Lexer::new(&mut source);
-        
+
         let token = lexer.next().unwrap().unwrap();
         assert_eq!(token, Token::Tag("!!str".to_string()));
-        
+
         let token = lexer.next().unwrap().unwrap();
         assert_eq!(token, Token::Plain("hello".to_string()));
     }
@@ -535,10 +557,10 @@ mod tests {
     fn test_scan_anchor() {
         let mut source = Buffer::new(b"&anchor value");
         let mut lexer = Lexer::new(&mut source);
-        
+
         let token = lexer.next().unwrap().unwrap();
         assert_eq!(token, Token::Anchor("anchor".to_string()));
-        
+
         let token = lexer.next().unwrap().unwrap();
         assert_eq!(token, Token::Plain("value".to_string()));
     }
@@ -547,7 +569,7 @@ mod tests {
     fn test_scan_alias() {
         let mut source = Buffer::new(b"*anchor");
         let mut lexer = Lexer::new(&mut source);
-        
+
         let token = lexer.next().unwrap().unwrap();
         assert_eq!(token, Token::Alias("anchor".to_string()));
     }
@@ -556,11 +578,17 @@ mod tests {
     fn test_flow_indicators() {
         let mut source = Buffer::new(b"{a: b}");
         let mut lexer = Lexer::new(&mut source);
-        
+
         assert_eq!(lexer.next().unwrap().unwrap(), Token::FlowMappingStart);
-        assert_eq!(lexer.next().unwrap().unwrap(), Token::Plain("a".to_string()));
+        assert_eq!(
+            lexer.next().unwrap().unwrap(),
+            Token::Plain("a".to_string())
+        );
         assert_eq!(lexer.next().unwrap().unwrap(), Token::Colon);
-        assert_eq!(lexer.next().unwrap().unwrap(), Token::Plain("b".to_string()));
+        assert_eq!(
+            lexer.next().unwrap().unwrap(),
+            Token::Plain("b".to_string())
+        );
         assert_eq!(lexer.next().unwrap().unwrap(), Token::FlowMappingEnd);
     }
 
@@ -568,8 +596,14 @@ mod tests {
     fn test_quoted_strings() {
         let mut source = Buffer::new(b"'single' \"double\"");
         let mut lexer = Lexer::new(&mut source);
-        
-        assert_eq!(lexer.next().unwrap().unwrap(), Token::SingleQuoted("single".to_string()));
-        assert_eq!(lexer.next().unwrap().unwrap(), Token::DoubleQuoted("double".to_string()));
+
+        assert_eq!(
+            lexer.next().unwrap().unwrap(),
+            Token::SingleQuoted("single".to_string())
+        );
+        assert_eq!(
+            lexer.next().unwrap().unwrap(),
+            Token::DoubleQuoted("double".to_string())
+        );
     }
 }

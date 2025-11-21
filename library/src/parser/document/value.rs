@@ -491,8 +491,11 @@ pub(crate) fn parse_value(
             // Collect plain scalar, stopping at newline, comment, or flow indicators
             // Flow indicators (,  ] }) signal end of value in flow context
             let value = collect_until(source, |c| {
-                c == CHAR_NEWLINE || c == CHAR_HASH || 
-                c == CHAR_COMMA || c == CHAR_RBRACKET || c == CHAR_RBRACE
+                c == CHAR_NEWLINE
+                    || c == CHAR_HASH
+                    || c == CHAR_COMMA
+                    || c == CHAR_RBRACKET
+                    || c == CHAR_RBRACE
             });
             let trimmed = value.trim();
 
@@ -501,12 +504,19 @@ pub(crate) fn parse_value(
                 // Check if there's whitespace before the #
                 if !value.ends_with(' ') && !value.ends_with('\t') && !value.is_empty() {
                     // Block scalar indicators need whitespace before comment
-                    if trimmed.ends_with('|') || trimmed.ends_with('>') || 
-                       trimmed.ends_with('+') || trimmed.ends_with('-') ||
-                       (trimmed.len() >= 2 && (trimmed.ends_with("|+") || trimmed.ends_with(">+") ||
-                                                trimmed.ends_with("|-") || trimmed.ends_with(">-") ||
-                                                (trimmed.chars().nth_back(1) == Some('|') || trimmed.chars().nth_back(1) == Some('>')) &&
-                                                 trimmed.chars().last().unwrap().is_ascii_digit())) {
+                    if trimmed.ends_with('|')
+                        || trimmed.ends_with('>')
+                        || trimmed.ends_with('+')
+                        || trimmed.ends_with('-')
+                        || (trimmed.len() >= 2
+                            && (trimmed.ends_with("|+")
+                                || trimmed.ends_with(">+")
+                                || trimmed.ends_with("|-")
+                                || trimmed.ends_with(">-")
+                                || (trimmed.chars().nth_back(1) == Some('|')
+                                    || trimmed.chars().nth_back(1) == Some('>'))
+                                    && trimmed.chars().last().unwrap().is_ascii_digit()))
+                    {
                         return Err(parse_error(
                             source,
                             "Comment indicator (#) must be preceded by whitespace",
@@ -553,7 +563,8 @@ pub(crate) fn parse_value(
                 // Validate block scalar header: after | or >, can have [1-9]?[+-]?,
                 // then optional whitespace and comment, but NOT a comment without whitespace
                 // Check rest_untrimmed to catch `>#` without space
-                let mut has_whitespace = rest_untrimmed.starts_with(' ') || rest_untrimmed.starts_with('\t');
+                let mut has_whitespace =
+                    rest_untrimmed.starts_with(' ') || rest_untrimmed.starts_with('\t');
                 for c in rest.chars() {
                     if c.is_ascii_digit() || c == '+' || c == '-' {
                         // Valid modifier
@@ -769,7 +780,7 @@ pub(crate) fn parse_value(
                             break;
                         }
                     }
-                    
+
                     // Check if this line looks like a mapping key (has a colon)
                     // This prevents us from consuming what should be a new mapping entry
                     if crate::parser::document::helpers::peek_ahead_for_mapping_key(source) {

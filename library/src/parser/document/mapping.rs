@@ -63,24 +63,28 @@ pub(crate) fn parse_mapping(
     let mut loop_iterations = 0;
     const MAX_LOOP_ITERATIONS: usize = 100_000;
     const MAX_PAIRS: usize = 50_000; // More reasonable limit on actual key-value pairs
-    
+
     // Track the indentation of the first key for validation
     let mut first_key_indent: Option<usize> = None;
-    
+
     while let Some(c) = source.current() {
         // Prevent infinite loop - count loop iterations for safety
         loop_iterations += 1;
         if loop_iterations >= MAX_LOOP_ITERATIONS {
-            return Err("Mapping parsing exceeded maximum loop iterations - possible infinite loop".to_string());
-        }
-        
-        // Also check reasonable pair count limit
-        if pairs.len() >= MAX_PAIRS {
             return Err(
-                format!("Mapping has too many pairs ({}+) - possible infinite loop", MAX_PAIRS)
+                "Mapping parsing exceeded maximum loop iterations - possible infinite loop"
+                    .to_string(),
             );
         }
-        
+
+        // Also check reasonable pair count limit
+        if pairs.len() >= MAX_PAIRS {
+            return Err(format!(
+                "Mapping has too many pairs ({}+) - possible infinite loop",
+                MAX_PAIRS
+            ));
+        }
+
         last_was_nested = false;
         match c {
             CHAR_DASH | CHAR_DOT
@@ -93,26 +97,36 @@ pub(crate) fn parse_mapping(
             CHAR_HASH => {
                 parse_comment(source);
             }
-            c if c.is_alphanumeric() || c == CHAR_SINGLE_QUOTE || c == CHAR_DOUBLE_QUOTE || c == CHAR_AMPERSAND => {
+            c if c.is_alphanumeric()
+                || c == CHAR_SINGLE_QUOTE
+                || c == CHAR_DOUBLE_QUOTE
+                || c == CHAR_AMPERSAND =>
+            {
                 let current_indent = source.get_current_indent_level();
                 if current_indent < indent_level {
                     break;
                 }
-                
+
                 // For now, don't validate mapping indentation to avoid breaking existing functionality
                 // TODO: Re-enable after understanding nested mapping edge cases
                 if first_key_indent.is_none() {
                     first_key_indent = Some(current_indent);
                 }
-                
+
                 // Check for anchor on the mapping key
                 let anchor_name = if source.current() == Some(CHAR_AMPERSAND) {
                     source.next();
                     let name = collect_until(source, |c| {
-                        c == CHAR_SPACE || c == CHAR_TAB || c == CHAR_NEWLINE 
-                        || c == CHAR_CARRIAGE_RETURN || c == CHAR_HASH
-                        || c == CHAR_COMMA || c == CHAR_LBRACKET || c == CHAR_RBRACKET
-                        || c == CHAR_LBRACE || c == CHAR_RBRACE
+                        c == CHAR_SPACE
+                            || c == CHAR_TAB
+                            || c == CHAR_NEWLINE
+                            || c == CHAR_CARRIAGE_RETURN
+                            || c == CHAR_HASH
+                            || c == CHAR_COMMA
+                            || c == CHAR_LBRACKET
+                            || c == CHAR_RBRACKET
+                            || c == CHAR_LBRACE
+                            || c == CHAR_RBRACE
                     });
                     if name.trim().is_empty() {
                         return Err(parse_error(source, "Anchor name cannot be empty"));
@@ -122,9 +136,9 @@ pub(crate) fn parse_mapping(
                 } else {
                     None
                 };
-                
+
                 let (mut key_node, newline) = parse_mapping_key(source, directives)?;
-                
+
                 // Wrap the key in an Anchored node if we found an anchor
                 if let Some(name) = anchor_name {
                     key_node = Node::Anchored(Box::new(key_node), name);
