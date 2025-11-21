@@ -26,13 +26,48 @@ pub fn parse_value_bridged(
 /// Check if we should use token-based parsing for a given construct
 ///
 /// During migration, we can selectively enable token-based parsing for
-/// specific patterns that benefit most (e.g., decorators).
+/// specific patterns that benefit most (e.g., decorators on empty values).
 pub fn should_use_token_parsing(source: &mut dyn ISource) -> bool {
     let state = source.save_state();
     
-    // Check if this looks like a decorator pattern (tag or anchor)
+    // Only use token parsing for very specific problematic patterns:
+    // 1. Tag followed by newline/colon (empty value scenarios)
+    // 2. Anchor followed by newline/colon (empty value scenarios)
     let uses_tokens = match source.current() {
-        Some('!') | Some('&') | Some('*') => true,
+        Some('!') => {
+            // Skip the tag to see what follows
+            source.next();
+            while let Some(c) = source.current() {
+                if c == ' ' {
+                    source.next();
+                    continue;
+                }
+                if c == '!' {
+                    source.next();
+                    continue;
+                }
+                if c.is_alphanumeric() || c == '-' || c == '_' {
+                    source.next();
+                    continue;
+                }
+                break;
+            }
+            // After tag, check if we have newline or colon (empty value indicators)
+            matches!(source.current(), Some('\n') | Some(':') | None)
+        }
+        Some('&') => {
+            // Skip the anchor to see what follows
+            source.next();
+            while let Some(c) = source.current() {
+                if c.is_alphanumeric() || c == '-' || c == '_' {
+                    source.next();
+                    continue;
+                }
+                break;
+            }
+            // After anchor, check for newline or colon (empty value indicators)
+            matches!(source.current(), Some('\n') | Some(':') | None)
+        }
         _ => false,
     };
     

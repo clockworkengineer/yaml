@@ -296,6 +296,11 @@ pub(crate) fn parse_value(
     source: &mut dyn ISource,
     directives: &crate::parser::directives::DirectiveContext,
 ) -> Result<Node, String> {
+    // Token-based parsing is available via bridge module but not yet fully integrated
+    // It handles decorator patterns (FH7J, PW8X) correctly but needs more work for
+    // full compatibility with all tag coercion and nested structure scenarios
+    // TODO: Enable selective routing once token parser feature-complete
+    
     if source.current() == Some('!') {
         source.next();
 
