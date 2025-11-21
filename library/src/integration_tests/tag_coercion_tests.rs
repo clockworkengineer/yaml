@@ -345,7 +345,8 @@ mod tests {
                                 std::str::from_utf8(*yaml).unwrap()
                             ),
                             Node::Tagged(inner, tag) => {
-                                if tag == "!!bool" {
+                                // Accept both short form and resolved form
+                                if tag == "!!bool" || tag == "tag:yaml.org,2002:bool" {
                                     // Tagged node with correct tag is acceptable
                                     if let Node::Str(s, _, _) = inner.as_ref() {
                                         let bool_val = match s.as_str() {
@@ -580,7 +581,9 @@ mod tests {
                     let (_k, v) = &pairs[0];
                     match v {
                         Node::Tagged(_, tag) => {
-                            assert_eq!(tag, "!!binary"); // Still tagged but invalid data
+                            // Accept both short and resolved tag formats
+                            assert!(tag == "!!binary" || tag == "tag:yaml.org,2002:binary", 
+                                    "Expected binary tag, got: {}", tag);
                         }
                         _ => {} // May not be tagged if coercion failed
                     }
@@ -619,32 +622,21 @@ mod tests {
                                     std::str::from_utf8(*yaml).unwrap()
                                 );
                             }
-                            Node::Str(s, _, _) => {
-                                // Parser might treat these as strings if it doesn't support the base
-                                let yaml_str = std::str::from_utf8(*yaml).unwrap();
-                                if yaml_str.contains("0b1010") {
-                                    assert!(s.contains("0b1010") || s == "1010");
-                                } else if yaml_str.contains("0o12") {
-                                    assert!(s.contains("0o12") || s == "12");
-                                } else if yaml_str.contains("0x0A") {
-                                    assert!(s.contains("0x0A") || s == "0A");
-                                }
-                            }
                             Node::Tagged(inner, tag) => {
-                                if tag == "!!int" {
-                                    if let Node::Str(s, _, _) = inner.as_ref() {
-                                        // Tagged but not converted - acceptable for this parser
-                                        let yaml_str = std::str::from_utf8(*yaml).unwrap();
-                                        if yaml_str.contains("0b1010") {
-                                            assert_eq!(s, "0b1010");
-                                        } else if yaml_str.contains("0o12") {
-                                            assert_eq!(s, "0o12");
-                                        } else if yaml_str.contains("0x0A") {
-                                            assert_eq!(s, "0x0A");
-                                        }
+                                // May be tagged if not coerced (accept both short and resolved forms)
+                                assert!(tag == "!!int" || tag == "tag:yaml.org,2002:int",
+                                        "Expected int tag, got: {}", tag);
+                                // Check inner value is preserved as string
+                                if let Node::Str(s, _, _) = inner.as_ref() {
+                                    // Tagged but not converted - acceptable for this parser
+                                    let yaml_str = std::str::from_utf8(*yaml).unwrap();
+                                    if yaml_str.contains("0b1010") {
+                                        assert_eq!(s, "0b1010");
+                                    } else if yaml_str.contains("0o12") {
+                                        assert_eq!(s, "0o12");
+                                    } else if yaml_str.contains("0x0A") {
+                                        assert_eq!(s, "0x0A");
                                     }
-                                } else {
-                                    panic!("Unexpected tag: {}", tag);
                                 }
                             }
                             _ => panic!("Unexpected node type for numeric base test: {:?}", v),

@@ -182,11 +182,11 @@ mod tests {
             "Unknown tags should be preserved, not cause errors"
         );
 
-        // Verify the tag is preserved
+        // Verify the tag is preserved (resolved to full URI)
         if let Ok(Node::Documents(docs)) = res {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Tagged(_, tag) = &nodes[0] {
-                    assert_eq!(tag, "!!invalid-tag-name");
+                    assert_eq!(tag, "tag:yaml.org,2002:invalid-tag-name");
                 }
             }
         }
