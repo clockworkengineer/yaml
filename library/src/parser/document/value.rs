@@ -52,7 +52,7 @@ fn is_base64(s: &str) -> bool {
 /// Some(Node) with the coerced type, or None if coercion failed
 fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
     match tag {
-        "!!str" | "!str" => {
+        "!!str" | "!str" | "tag:yaml.org,2002:str" => {
             let s = match node {
                 Node::Str(s, _, _) => s,
                 Node::Number(Numeric::Integer(i)) => i.to_string(),
@@ -64,7 +64,7 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
 
             return Some(Node::Str(s, QuoteType::Unquoted, BlockStyle::None));
         }
-        "!!int" | "!int" => match node {
+        "!!int" | "!int" | "tag:yaml.org,2002:int" => match node {
             Node::Number(Numeric::Integer(i)) => {
                 return Some(Node::Number(Numeric::Integer(i)));
             }
@@ -82,7 +82,7 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
             }
             _ => return None,
         },
-        "!!float" | "!float" => match node {
+        "!!float" | "!float" | "tag:yaml.org,2002:float" => match node {
             Node::Number(Numeric::Float(f)) => return Some(Node::Number(Numeric::Float(f))),
             Node::Number(Numeric::Integer(i)) => {
                 return Some(Node::Number(Numeric::Float(i as f64)));
@@ -95,7 +95,7 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
             }
             _ => return None,
         },
-        "!!bool" | "!bool" => match node {
+        "!!bool" | "!bool" | "tag:yaml.org,2002:bool" => match node {
             Node::Boolean(b) => return Some(Node::Boolean(b)),
             Node::Str(s, _, _) => {
                 let sl = s.to_ascii_lowercase();
@@ -132,7 +132,7 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
             }
             _ => return None,
         },
-        "!!set" | "!set" => match node {
+        "!!set" | "!set" | "tag:yaml.org,2002:set" => match node {
             // Convert mapping with null values to a set
             Node::Mapping(pairs) => {
                 let mut set_items = Vec::new();
@@ -165,7 +165,7 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
                 return Some(Node::Set(vec![node]));
             }
         },
-        "!!binary" | "!binary" => match node {
+        "!!binary" | "!binary" | "tag:yaml.org,2002:binary" => match node {
             Node::Str(s, _, _) => {
                 // Validate base64 format and decode if valid
                 let clean_input = s.chars().filter(|c| !c.is_whitespace()).collect::<String>();
@@ -184,7 +184,7 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
             }
             _ => return None,
         },
-        "!!omap" | "!omap" => match node {
+        "!!omap" | "!omap" | "tag:yaml.org,2002:omap" => match node {
             // Ordered mapping - convert to array of single-key mappings
             Node::Array(items) => {
                 let mut omap_items = Vec::new();
@@ -214,7 +214,7 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
             }
             _ => return None,
         },
-        "!!pairs" | "!pairs" => match node {
+        "!!pairs" | "!pairs" | "tag:yaml.org,2002:pairs" => match node {
             // Pairs - array of key-value pairs
             Node::Array(items) => {
                 let mut pairs_items = Vec::new();
@@ -375,11 +375,14 @@ pub(crate) fn parse_value(
         };
 
         // Try coercion with the original tag (short form like !!str)
-        // This allows try_coerce_tag to work with its existing pattern matching
         if let Some(coerced) = try_coerce_tag(&tag, inner.clone()) {
             return Ok(coerced);
         }
-
+        
+        // Also try coercion with the resolved (long) tag form
+        if let Some(coerced) = try_coerce_tag(&resolved_tag, inner.clone()) {
+            return Ok(coerced);
+        }
         // If coercion doesn't apply, store the resolved (long) tag form
         return Ok(Node::Tagged(Box::new(inner), resolved_tag));
     }

@@ -60,6 +60,60 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
             }
             _ => None,
         },
+        "!!set" | "!set" | "tag:yaml.org,2002:set" => match node {
+            // Convert mapping with null values to a set
+            Node::Mapping(pairs) => {
+                let mut set_items = Vec::new();
+                for (key, value) in pairs {
+                    match value {
+                        Node::None => {
+                            set_items.push(key);
+                        }
+                        _ => return None, // Not a valid set mapping
+                    }
+                }
+                Some(Node::Set(set_items))
+            }
+            // Convert array to a set (remove duplicates)
+            Node::Array(items) => {
+                let mut unique_items = Vec::new();
+                for item in items {
+                    if !unique_items.contains(&item) {
+                        unique_items.push(item);
+                    }
+                }
+                Some(Node::Set(unique_items))
+            }
+            // Single value becomes a set with one element
+            _ => Some(Node::Set(vec![node])),
+        },
+        "!!omap" | "!omap" | "tag:yaml.org,2002:omap" => match node {
+            // Ordered mapping - preserve as tagged array of single-key mappings
+            Node::Array(items) => {
+                // Validate that each item is a mapping with one key-value pair
+                for item in &items {
+                    match item {
+                        Node::Mapping(pairs) if pairs.len() == 1 => {},
+                        _ => return None, // Invalid omap format
+                    }
+                }
+                Some(Node::Tagged(
+                    Box::new(Node::Array(items)),
+                    "tag:yaml.org,2002:omap".to_string(),
+                ))
+            }
+            _ => None,
+        },
+        "!!pairs" | "!pairs" | "tag:yaml.org,2002:pairs" => match node {
+            // Pairs - preserve as tagged array
+            Node::Array(items) => {
+                Some(Node::Tagged(
+                    Box::new(Node::Array(items)),
+                    "tag:yaml.org,2002:pairs".to_string(),
+                ))
+            }
+            _ => None,
+        },
         _ => None,
     }
 }
