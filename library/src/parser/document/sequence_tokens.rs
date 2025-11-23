@@ -116,7 +116,7 @@ mod tests {
         let yaml = b"- a\n- b\n- c";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives);
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
 
         // Debug: print first few tokens
         println!("First token: {:?}", stream.current());
@@ -135,7 +135,7 @@ mod tests {
         let yaml = b"- a\n-\n- c";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives);
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
 
         let result = parse_sequence_with_tokens(&mut stream, 0, &directives).unwrap();
 
@@ -152,7 +152,7 @@ mod tests {
         let yaml = b"- !!str\n- &a\n- c";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives);
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
 
         let result = parse_sequence_with_tokens(&mut stream, 0, &directives).unwrap();
 
@@ -171,7 +171,7 @@ mod tests {
         let yaml = b"- !!str\n";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives);
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
 
         let result = parse_sequence_with_tokens(&mut stream, 0, &directives).unwrap();
 

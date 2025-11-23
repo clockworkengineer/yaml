@@ -7,6 +7,7 @@ mod anchors;
 mod bridge;
 mod helpers;
 mod inline;
+mod inline_tokens;
 mod mapping;
 mod mapping_tokens;
 mod scalar;

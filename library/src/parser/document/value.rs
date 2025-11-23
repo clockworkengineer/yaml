@@ -296,10 +296,15 @@ pub(crate) fn parse_value(
     source: &mut dyn ISource,
     directives: &crate::parser::directives::DirectiveContext,
 ) -> Result<Node, String> {
-    // Token-based parsing is available via bridge module but not yet fully integrated
-    // It handles decorator patterns (FH7J, PW8X) correctly but needs more work for
-    // full compatibility with all tag coercion and nested structure scenarios
-    // TODO: Enable selective routing once token parser feature-complete
+    // Selectively route to token-based parser for patterns that benefit:
+    // - Decorators on empty values (FH7J, PW8X)
+    // - Flow collections (better token boundaries)
+    // - Aliases (simpler token handling)
+    use crate::parser::document::bridge::{parse_value_bridged, should_use_token_parsing};
+    
+    if should_use_token_parsing(source) {
+        return parse_value_bridged(source, directives);
+    }
 
     if source.current() == Some('!') {
         source.next();

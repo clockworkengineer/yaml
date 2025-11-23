@@ -17,7 +17,7 @@ pub fn parse_value_bridged(
     source: &mut dyn ISource,
     directives: &DirectiveContext,
 ) -> Result<Node, String> {
-    let mut stream = TokenStream::new(source, directives);
+    let mut stream = TokenStream::new(source, directives)?;
     
     // Parse using token-based parser (stream is auto-initialized)
     parse_value_with_tokens(&mut stream, directives)
@@ -30,10 +30,17 @@ pub fn parse_value_bridged(
 pub fn should_use_token_parsing(source: &mut dyn ISource) -> bool {
     let state = source.save_state();
     
-    // Only use token parsing for very specific problematic patterns:
-    // 1. Tag followed by newline/colon (empty value scenarios)
-    // 2. Anchor followed by newline/colon (empty value scenarios)
+    // Use token parsing ONLY for:
+    // 1. Tag followed by newline/colon/flow start (decorator scenarios)
+    // 2. Anchor followed by newline/colon/flow start (decorator scenarios)  
+    // 3. Aliases (*name) - simpler token handling
+    //
+    // DON'T use for standalone flow collections - character parser handles those fine
     let uses_tokens = match source.current() {
+        Some('*') => {
+            // Aliases work well with tokens
+            true
+        }
         Some('!') => {
             // Skip the tag to see what follows
             source.next();
@@ -52,8 +59,8 @@ pub fn should_use_token_parsing(source: &mut dyn ISource) -> bool {
                 }
                 break;
             }
-            // After tag, check if we have newline or colon (empty value indicators)
-            matches!(source.current(), Some('\n') | Some(':') | None)
+            // After tag, check if we have newline, colon, or flow collection start
+            matches!(source.current(), Some('\n') | Some(':') | Some('[') | Some('{') | None)
         }
         Some('&') => {
             // Skip the anchor to see what follows
@@ -65,8 +72,8 @@ pub fn should_use_token_parsing(source: &mut dyn ISource) -> bool {
                 }
                 break;
             }
-            // After anchor, check for newline or colon (empty value indicators)
-            matches!(source.current(), Some('\n') | Some(':') | None)
+            // After anchor, check for newline, colon, or flow collection start
+            matches!(source.current(), Some('\n') | Some(':') | Some('[') | Some('{') | None)
         }
         _ => false,
     };

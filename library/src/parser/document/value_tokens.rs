@@ -150,12 +150,12 @@ fn parse_value_content(
 ) -> Result<Node, String> {
     match stream.current() {
         Some(Token::FlowMappingStart) => {
-            // TODO: call token-based flow mapping parser
-            Err("Flow mapping not yet implemented in token parser".to_string())
+            use crate::parser::document::inline_tokens::parse_inline_mapping_with_tokens;
+            parse_inline_mapping_with_tokens(stream, directives)
         }
         Some(Token::FlowSequenceStart) => {
-            // TODO: call token-based flow sequence parser
-            Err("Flow sequence not yet implemented in token parser".to_string())
+            use crate::parser::document::inline_tokens::parse_inline_sequence_with_tokens;
+            parse_inline_sequence_with_tokens(stream, directives)
         }
         Some(Token::SingleQuoted(s)) | Some(Token::DoubleQuoted(s)) => {
             let content = s.clone();
@@ -209,7 +209,7 @@ mod tests {
         // This is the FH7J pattern that caused infinite loops!
         let mut source = Buffer::new(b"!!str");
         let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives);
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
         
         stream.next().unwrap(); // Initialize
         let result = parse_value_with_tokens(&mut stream, &directives).unwrap();
@@ -223,7 +223,7 @@ mod tests {
         // This is the PW8X pattern that caused infinite loops!
         let mut source = Buffer::new(b"&anchor");
         let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives);
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
         
         let result = parse_value_with_tokens(&mut stream, &directives).unwrap();
         println!("Result: {:?}", result);
@@ -242,7 +242,7 @@ mod tests {
     fn test_both_decorators_on_empty() {
         let mut source = Buffer::new(b"!!str &anchor");
         let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives);
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
         
         let result = parse_value_with_tokens(&mut stream, &directives).unwrap();
         
@@ -260,7 +260,7 @@ mod tests {
     fn test_tag_with_plain_value() {
         let mut source = Buffer::new(b"!!str hello");
         let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives);
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
         
         stream.next().unwrap(); // Initialize
         let result = parse_value_with_tokens(&mut stream, &directives).unwrap();
@@ -273,7 +273,7 @@ mod tests {
     fn test_anchor_with_quoted_value() {
         let mut source = Buffer::new(b"&anchor 'hello'");
         let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives);
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
         
         let result = parse_value_with_tokens(&mut stream, &directives).unwrap();
         
@@ -291,7 +291,7 @@ mod tests {
     fn test_alias() {
         let mut source = Buffer::new(b"*myalias");
         let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives);
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
         
         let result = parse_value_with_tokens(&mut stream, &directives).unwrap();
         

@@ -167,7 +167,7 @@ mod tests {
         let yaml = b"key1: value1\nkey2: value2";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives);
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
 
         let result = parse_mapping_with_tokens(&mut stream, 0, &directives).unwrap();
 
@@ -183,7 +183,7 @@ mod tests {
         let yaml = b"key1:\nkey2: value2";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives);
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
 
         let result = parse_mapping_with_tokens(&mut stream, 0, &directives).unwrap();
 
@@ -200,7 +200,7 @@ mod tests {
         let yaml = b"!!str: value\n&anchor: value2";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives);
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
 
         let result = parse_mapping_with_tokens(&mut stream, 0, &directives).unwrap();
 
@@ -219,7 +219,7 @@ mod tests {
         let yaml = b"!!null: a\nb: !!str";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives);
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
 
         let result = parse_mapping_with_tokens(&mut stream, 0, &directives).unwrap();
 

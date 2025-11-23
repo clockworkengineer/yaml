@@ -23,14 +23,16 @@ pub struct TokenStream<'a> {
 
 impl<'a> TokenStream<'a> {
     /// Create a new token stream and load the first token
-    pub fn new(source: &'a mut dyn ISource, directives: &'a DirectiveContext) -> Self {
+    /// 
+    /// Returns Result to propagate lexer errors (e.g., empty alias/anchor names)
+    pub fn new(source: &'a mut dyn ISource, directives: &'a DirectiveContext) -> Result<Self, String> {
         let mut lexer = Lexer::new(source);
-        // Load the first token
-        let _ = lexer.next();
-        TokenStream {
+        // Load the first token - propagate errors
+        lexer.next()?;
+        Ok(TokenStream {
             lexer,
             directives,
-        }
+        })
     }
 
     /// Get the current token without consuming it
@@ -260,7 +262,7 @@ mod tests {
     fn test_consume_decorators_tag_only() {
         let mut source = Buffer::new(b"!!str value");
         let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives);
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
         
         let decorators = stream.consume_decorators().unwrap();
         
@@ -273,7 +275,7 @@ mod tests {
     fn test_consume_decorators_anchor_only() {
         let mut source = Buffer::new(b"&myanchor value");
         let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives);
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
         
         let decorators = stream.consume_decorators().unwrap();
         
@@ -286,7 +288,7 @@ mod tests {
     fn test_consume_decorators_both() {
         let mut source = Buffer::new(b"!!str &myanchor value");
         let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives);
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
         
         let decorators = stream.consume_decorators().unwrap();
         
@@ -300,7 +302,7 @@ mod tests {
     fn test_consume_decorators_reversed() {
         let mut source = Buffer::new(b"&myanchor !!str value");
         let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives);
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
         
         let decorators = stream.consume_decorators().unwrap();
         
@@ -314,7 +316,7 @@ mod tests {
     fn test_skip_whitespace() {
         let mut source = Buffer::new(b"\n  \n  value");
         let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives);
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
         
         stream.next().unwrap(); // Initialize
         stream.skip_whitespace().unwrap();

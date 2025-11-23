@@ -153,6 +153,9 @@ The YAML parser is **production-ready** with:
 2. "Fix CRLF tests by normalizing line endings - all tests passing (656/656)"
 3. "Update session progress - achieved 100% internal test pass rate (654/654)"
 4. "Remove official YAML test suite integration"
+5. "Add official YAML 1.2 test suite integration - 320/402 passing (79.6%)"
+6. "Fix decorator/tag attachment bug - now properly attaches to next value"
+7. "WIP: Add tab validation helpers (incomplete - needs further investigation)"
 
 ## Next Steps (Recommended Priority)
 
