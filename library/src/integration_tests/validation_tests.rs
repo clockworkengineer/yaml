@@ -49,14 +49,15 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO: Tab validation in flow collections not yet implemented
     fn test_tabs_forbidden_in_flow_indentation() {
         // Tabs as indentation in flow collections should be rejected per YAML 1.2 spec
-        // This is a known limitation - tabs in flow collections are currently allowed
         let yaml = b"[\n\titem\n]";
         let mut source = Buffer::new(yaml);
         let result = parse(&mut source);
         assert!(result.is_err(), "Should reject tabs as indentation in flow collections");
+        if let Err(e) = result {
+            assert!(e.to_lowercase().contains("tab"), "Error should mention tabs: {}", e);
+        }
     }
 
     #[test]

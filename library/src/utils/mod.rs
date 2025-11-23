@@ -15,7 +15,7 @@ pub mod optimization;
 #[cfg(feature = "alloc")]
 pub mod streaming;
 
-use crate::constants::{CHAR_HASH, CHAR_NEWLINE};
+use crate::constants::{CHAR_HASH, CHAR_NEWLINE, CHAR_TAB};
 use crate::io::traits::ISource;
 use crate::{Node, Numeric};
 
@@ -102,6 +102,70 @@ pub fn skip_whitespace_and_comments(source: &mut dyn ISource) {
         }
         break;
     }
+}
+
+/// Skips whitespace and comments, validating that tabs are not used as indentation
+/// after newlines. Per YAML 1.2 spec, tabs cannot be used for indentation.
+///
+/// # Arguments
+///
+/// * `source` - A mutable reference to a source implementing ISource trait
+///
+/// # Returns
+///
+/// `Ok(())` if successful, `Err(String)` if tabs found as indentation
+pub fn skip_whitespace_and_comments_validate_tabs(source: &mut dyn ISource) -> Result<(), String> {
+    let mut iterations = 0;
+    const MAX_ITERATIONS: usize = 100_000;
+    let mut after_newline = false;
+
+    loop {
+        while let Some(c) = source.current() {
+            if c == CHAR_NEWLINE || c == '\r' {
+                source.next();
+                after_newline = true;
+                iterations += 1;
+                if iterations >= MAX_ITERATIONS {
+                    return Ok(()); // Prevent infinite loop
+                }
+            } else if c == CHAR_TAB && after_newline {
+                // Tab after newline is indentation - forbidden in YAML 1.2
+                return Err(format!(
+                    "Tabs cannot be used for indentation in YAML (current: '{}', indent: {})",
+                    c,
+                    source.get_current_indent_level()
+                ));
+            } else if source.is_whitespace(c) {
+                source.next();
+                iterations += 1;
+                if iterations >= MAX_ITERATIONS {
+                    return Ok(()); // Prevent infinite loop
+                }
+            } else {
+                // Non-whitespace found
+                after_newline = false;
+                break;
+            }
+        }
+        if source.current() == Some(CHAR_HASH) {
+            while let Some(c) = source.current() {
+                if c == CHAR_NEWLINE {
+                    source.next(); // consume the newline after comment
+                    after_newline = true;
+                    break;
+                }
+                source.next();
+                iterations += 1;
+                if iterations >= MAX_ITERATIONS {
+                    return Ok(()); // Prevent infinite loop
+                }
+            }
+
+            continue;
+        }
+        break;
+    }
+    Ok(())
 }
 
 /// Skips characters in the source until a newline character is encountered.

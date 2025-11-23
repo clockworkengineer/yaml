@@ -5,7 +5,7 @@ use crate::error::messages::*;
 use crate::io::traits::ISource;
 use crate::nodes::node::{BlockStyle, Node, QuoteType};
 use crate::parser::document::helpers::{
-    parse_error, parse_quoted_scalar, skip_whitespace, validate_comment_spacing,
+    parse_error, parse_quoted_scalar, skip_whitespace, skip_whitespace_no_tabs, validate_comment_spacing,
 };
 use crate::parser::document::scalar::parse_scalar;
 use crate::parser::document::value::parse_value;
@@ -33,7 +33,7 @@ pub(crate) fn parse_inline_set(
     const MAX_ITEMS: usize = 10_000;
 
     source.next(); // Skip the opening '{'
-    skip_whitespace(source);
+    skip_whitespace_no_tabs(source)?;
 
     if source.current() == Some(CHAR_RBRACE) {
         source.next();
@@ -51,7 +51,7 @@ pub(crate) fn parse_inline_set(
         }
 
         // Skip whitespace before checking for items
-        skip_whitespace(source);
+        skip_whitespace_no_tabs(source)?;
 
         // Check for closing brace (handles trailing comma case)
         if source.current() == Some(CHAR_RBRACE) {
@@ -82,12 +82,12 @@ pub(crate) fn parse_inline_set(
         // Add item as a key with null value (set format)
         pairs.push((item_node, Node::None));
 
-        skip_whitespace_and_comments(source);
+        skip_whitespace_and_comments_validate_tabs(source)?;
 
         match source.current() {
             Some(CHAR_COMMA) => {
                 source.next();
-                skip_whitespace(source);
+                skip_whitespace_no_tabs(source)?;
                 // Check for trailing comma (comma followed by closing brace)
                 if source.current() == Some(CHAR_RBRACE) {
                     source.next();
@@ -219,7 +219,7 @@ fn parse_inline_mapping_with_colons(
     const MAX_PAIRS: usize = 10_000;
 
     source.next();
-    skip_whitespace(source);
+    skip_whitespace_no_tabs(source)?;
 
     if source.current() == Some(CHAR_RBRACE) {
         source.next();
@@ -236,7 +236,7 @@ fn parse_inline_mapping_with_colons(
             ));
         }
         // Skip whitespace, newlines, and comments before parsing key
-        skip_whitespace_and_comments(source);
+        skip_whitespace_and_comments_validate_tabs(source)?;
 
         // Check for closing brace after whitespace (handles trailing comma case)
         if source.current() == Some(CHAR_RBRACE) {
@@ -252,7 +252,7 @@ fn parse_inline_mapping_with_colons(
         let key_node = match source.current() {
             Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
                 let raw = parse_quoted_scalar(source)?;
-                skip_whitespace_and_comments(source);
+                skip_whitespace_and_comments_validate_tabs(source)?;
                 if source.current() != Some(CHAR_COLON) {
                     return Err(parse_error(source, ERR_EXPECT_COLON_INLINE_MAPPING));
                 }
@@ -262,7 +262,7 @@ fn parse_inline_mapping_with_colons(
             Some(CHAR_LBRACKET) => {
                 // Flow sequence as key
                 let key = parse_inline_sequence(source, directives)?;
-                skip_whitespace_and_comments(source);
+                skip_whitespace_and_comments_validate_tabs(source)?;
                 if source.current() != Some(CHAR_COLON) {
                     return Err(parse_error(source, ERR_EXPECT_COLON_INLINE_MAPPING));
                 }
@@ -272,7 +272,7 @@ fn parse_inline_mapping_with_colons(
             Some(CHAR_LBRACE) => {
                 // Flow mapping as key (nested)
                 let key = parse_inline_mapping(source, directives)?;
-                skip_whitespace_and_comments(source);
+                skip_whitespace_and_comments_validate_tabs(source)?;
                 if source.current() != Some(CHAR_COLON) {
                     return Err(parse_error(source, ERR_EXPECT_COLON_INLINE_MAPPING));
                 }
@@ -292,7 +292,7 @@ fn parse_inline_mapping_with_colons(
                 let collected = collect_until(source, |c| {
                     c == CHAR_COLON || c == CHAR_RBRACE || c == CHAR_COMMA
                 });
-                skip_whitespace_and_comments(source);
+                skip_whitespace_and_comments_validate_tabs(source)?;
                 if source.current() != Some(CHAR_COLON) {
                     if collected.trim().is_empty() {
                         return Err(parse_error(source, "Expected key in flow mapping"));
@@ -310,7 +310,7 @@ fn parse_inline_mapping_with_colons(
             }
         };
 
-        skip_whitespace(source);
+        skip_whitespace_no_tabs(source)?;
 
         let value_node = match source.current() {
             // Handle omitted value (key followed immediately by comma or closing brace)
@@ -332,12 +332,12 @@ fn parse_inline_mapping_with_colons(
 
         pairs.push((key_node, value_node));
 
-        skip_whitespace_and_comments(source);
+        skip_whitespace_and_comments_validate_tabs(source)?;
 
         match source.current() {
             Some(CHAR_COMMA) => {
                 source.next();
-                skip_whitespace_and_comments(source);
+                skip_whitespace_and_comments_validate_tabs(source)?;
                 // Check if there's a closing brace after the comma (trailing comma)
                 if source.current() == Some(CHAR_RBRACE) {
                     source.next();
@@ -412,7 +412,7 @@ pub(crate) fn parse_inline_sequence(
     const MAX_ITEMS: usize = 10_000;
 
     source.next();
-    skip_whitespace(source);
+    skip_whitespace_no_tabs(source)?;
 
     if source.current() == Some(CHAR_RBRACKET) {
         source.next();
@@ -430,7 +430,7 @@ pub(crate) fn parse_inline_sequence(
         }
 
         // Skip whitespace before checking for items
-        skip_whitespace(source);
+        skip_whitespace_no_tabs(source)?;
 
         // Check for closing bracket (handles trailing comma case)
         if source.current() == Some(CHAR_RBRACKET) {
@@ -492,7 +492,7 @@ pub(crate) fn parse_inline_sequence(
             None => return Err(parse_error(source, ERR_EOF_INLINE_SEQUENCE)),
         }
 
-        skip_whitespace_and_comments(source);
+        skip_whitespace_and_comments_validate_tabs(source)?;
 
         match source.current() {
             Some(CHAR_COMMA) => {
@@ -500,7 +500,7 @@ pub(crate) fn parse_inline_sequence(
                 source.next();
                 // Validate comment spacing after comma
                 validate_comment_spacing(source, Some(prev))?;
-                skip_whitespace(source);
+                skip_whitespace_no_tabs(source)?;
                 // Check for trailing comma (comma followed by closing bracket)
                 if source.current() == Some(CHAR_RBRACKET) {
                     source.next();
@@ -533,3 +533,5 @@ pub(crate) fn parse_inline_sequence(
 
     Ok(Node::Array(items))
 }
+
+

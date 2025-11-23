@@ -84,25 +84,33 @@ pub(crate) fn skip_whitespace(source: &mut dyn ISource) {
     }
 }
 
-/// Skips whitespace but returns an error if tabs are found as line indentation
-/// This should be called after consuming a newline, where tabs would be indentation
+/// Skips whitespace but returns an error if tabs are found as line indentation.
+/// Handles newlines and tracks whether tabs appear after them (which would be indentation).
+/// Per YAML 1.2 spec, tabs cannot be used for indentation.
+/// Note: This function assumes it may be called after a newline has already been consumed,
+/// so it starts by assuming we're at the beginning of a line and validates from there.
 pub(crate) fn skip_whitespace_no_tabs(source: &mut dyn ISource) -> Result<(), String> {
-    let mut found_tab_before_content = false;
+    let mut found_tab_after_newline = false;
+    let mut after_newline = true;  // Assume we start after a newline (caller consumed it)
     
     while let Some(c) = source.current() {
-        if c == '\t' {
-            // Mark that we found a tab - we'll error if followed by content
-            found_tab_before_content = true;
+        if c == '\n' || c == '\r' {
+            // Consume newline and mark that we're at line start
+            source.next();
+            after_newline = true;
+            found_tab_after_newline = false;  // Reset for new line
+        } else if c == '\t' {
+            if after_newline {
+                // Tab after newline = indentation = forbidden
+                found_tab_after_newline = true;
+            }
             source.next();
         } else if c == ' ' {
             source.next();
-        } else if c == '\n' || c == '\r' {
-            // Blank line - tabs don't matter here
-            return Ok(());
         } else {
-            // Found actual content after whitespace
-            if found_tab_before_content {
-                // Tabs before content = indentation = forbidden
+            // Found actual non-whitespace content
+            if found_tab_after_newline {
+                // Tabs were used as indentation - error
                 return Err(crate::parser::document::parse_error(
                     source,
                     "Tabs are not allowed as indentation in YAML",
