@@ -83,18 +83,29 @@ pub(crate) fn skip_whitespace(source: &mut dyn ISource) {
 }
 
 /// Skips whitespace but returns an error if tabs are found as line indentation
-/// Only checks for tabs when followed by actual content (not on blank lines)
+/// This should be called after consuming a newline, where tabs would be indentation
 pub(crate) fn skip_whitespace_no_tabs(source: &mut dyn ISource) -> Result<(), String> {
+    let mut found_tab_before_content = false;
+    
     while let Some(c) = source.current() {
         if c == '\t' {
-            // YAML spec: tabs are not allowed as indentation
-            return Err(crate::parser::document::parse_error(
-                source,
-                "Tabs are not allowed as indentation in YAML",
-            ));
-        } else if source.is_whitespace(c) {
+            // Mark that we found a tab - we'll error if followed by content
+            found_tab_before_content = true;
             source.next();
+        } else if c == ' ' {
+            source.next();
+        } else if c == '\n' || c == '\r' {
+            // Blank line - tabs don't matter here
+            return Ok(());
         } else {
+            // Found actual content after whitespace
+            if found_tab_before_content {
+                // Tabs before content = indentation = forbidden
+                return Err(crate::parser::document::parse_error(
+                    source,
+                    "Tabs are not allowed as indentation in YAML",
+                ));
+            }
             break;
         }
     }
@@ -106,7 +117,7 @@ pub(crate) fn skip_whitespace_no_tabs(source: &mut dyn ISource) -> Result<(), St
 pub(crate) fn validate_no_tab_indentation(source: &mut dyn ISource) -> Result<(), String> {
     // Only check if we're at the start of a line (column 0 or only whitespace so far)
     let state = source.save_state();
-    
+
     // Check characters from current position forward
     while let Some(c) = source.current() {
         if c == '\t' {
@@ -127,7 +138,7 @@ pub(crate) fn validate_no_tab_indentation(source: &mut dyn ISource) -> Result<()
             break;
         }
     }
-    
+
     source.restore_state(state);
     Ok(())
 }

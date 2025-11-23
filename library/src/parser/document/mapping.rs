@@ -85,6 +85,12 @@ pub(crate) fn parse_mapping(
             ));
         }
 
+        // Check for tabs at line start before processing content
+        if c == '\t' && source.get_current_indent_level() > 0 {
+            // Tab found at indentation level - this is invalid
+            return Err(parse_error(source, "Tabs are not allowed as indentation in YAML"));
+        }
+
         last_was_nested = false;
         match c {
             CHAR_DASH | CHAR_DOT
@@ -197,6 +203,10 @@ pub(crate) fn parse_mapping(
                         || matches!(value_node, Node::Str(_, _, BlockStyle::Literal));
                     pairs.push((key_node, value_node));
                 }
+            }
+            '\t' => {
+                // Tab at line start = indentation = forbidden
+                return Err(parse_error(source, "Tabs are not allowed as indentation in YAML"));
             }
             c if c.is_whitespace() => {
                 source.next();
