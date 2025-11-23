@@ -3,10 +3,8 @@
 //! This demonstrates how the tokenization approach solves the decorator parsing
 //! problem and eliminates infinite loops.
 
-use crate::constants::*;
-use crate::error::messages::*;
 use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
-use crate::parser::token_stream::{TokenStream, Decorators};
+use crate::parser::token_stream::TokenStream;
 use crate::parser::lexer::Token;
 use crate::parser::document::scalar::parse_scalar;
 use crate::parser::directives::DirectiveContext;
@@ -280,7 +278,6 @@ mod tests {
         let mut stream = TokenStream::new(&mut source, &directives).unwrap();
         
         let result = parse_value_with_tokens(&mut stream, &directives).unwrap();
-        println!("Result: {:?}", result);
         
         // Should parse as anchored empty string
         match result {

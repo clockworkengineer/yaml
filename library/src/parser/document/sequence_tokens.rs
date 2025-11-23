@@ -118,9 +118,6 @@ mod tests {
         let directives = DirectiveContext::new();
         let mut stream = TokenStream::new(&mut source, &directives).unwrap();
 
-        // Debug: print first few tokens
-        println!("First token: {:?}", stream.current());
-
         let result = parse_sequence_with_tokens(&mut stream, 0, &directives).unwrap();
 
         if let Node::Array(items) = result {
@@ -179,7 +176,6 @@ mod tests {
             assert_eq!(items.len(), 1);
             // Should be tagged empty string (!!str on empty value)
             // Coercion produces Str, but non-coercible tags are stored as Tagged
-            println!("Got item: {:?}", items[0]);
             match &items[0] {
                 Node::Str(s, _, _) => assert!(s.is_empty(), "Expected empty string"),
                 Node::Tagged(inner, tag) => {
