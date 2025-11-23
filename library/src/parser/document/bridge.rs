@@ -31,11 +31,11 @@ pub fn should_use_token_parsing(source: &mut dyn ISource) -> bool {
     let state = source.save_state();
     
     // Use token parsing ONLY for:
-    // 1. Tag followed by newline/colon/flow start (decorator scenarios)
-    // 2. Anchor followed by newline/colon/flow start (decorator scenarios)  
+    // 1. Tag followed by specific patterns (decorator scenarios)
+    // 2. Anchor followed by specific patterns (decorator scenarios)  
     // 3. Aliases (*name) - simpler token handling
     //
-    // DON'T use for standalone flow collections - character parser handles those fine
+    // DON'T use for: block structures, tags with colons, !!set, quoted scalars
     let uses_tokens = match source.current() {
         Some('*') => {
             // Aliases work well with tokens
