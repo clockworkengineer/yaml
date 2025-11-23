@@ -34,7 +34,8 @@ pub(crate) fn parse_error(source: &mut dyn ISource, msg: &str) -> String {
     )
 }
 
-/// Checks if the current line has tabs in indentation (YAML error)
+/// Validates that tabs are not used for indentation at current position.
+/// According to YAML 1.2 spec, tabs cannot be used for indentation.
 ///
 /// # Arguments
 ///
@@ -42,32 +43,33 @@ pub(crate) fn parse_error(source: &mut dyn ISource, msg: &str) -> String {
 ///
 /// # Returns
 ///
-/// true if tabs are found in indentation, false otherwise
-#[allow(dead_code)]
-pub(crate) fn has_tabs_in_indentation(source: &mut dyn ISource) -> bool {
+/// `Ok(())` if no tabs in indentation, `Err(String)` if tabs found
+pub(crate) fn validate_no_tabs_in_indentation(source: &mut dyn ISource) -> Result<(), String> {
     let state = source.save_state();
 
-    // Check from start of line for any tabs before non-whitespace
+    // Check from current position for tabs before non-whitespace
     while let Some(c) = source.current() {
-        if c == '\t' {
+        if c == CHAR_TAB {
             source.restore_state(state);
-            return true;
+            return Err(parse_error(source, "Tabs cannot be used for indentation in YAML"));
         }
-        if c == ' ' {
+        if c == CHAR_SPACE {
             source.next();
             continue;
         }
+        // Non-whitespace found, no tabs in indentation
         break;
     }
 
     source.restore_state(state);
-    false
+    Ok(())
 }
 
 /// Skips whitespace characters in the source.
 ///
 /// Advances the source position past all consecutive whitespace characters
 /// as defined by the source's is_whitespace method.
+/// Note: This does NOT validate tabs - tabs are allowed in some contexts.
 ///
 /// # Arguments
 ///
@@ -416,7 +418,7 @@ pub(crate) fn parse_mapping_key(
 
     let mut newline = false;
     source.next(); // consume the colon
-    skip_whitespace(source);
+    skip_whitespace(source);  // Tabs OK here - not indentation (same line as colon)
     if let Some(c) = source.current() {
         if c == CHAR_HASH {
             consume_inline_comment_and_newline(source);
@@ -432,7 +434,8 @@ pub(crate) fn parse_mapping_key(
                 newline = true;
             }
             if newline {
-                skip_whitespace(source);
+                // After newline, validate no tabs in indentation
+                skip_whitespace_no_tabs(source)?;
             }
         }
     }

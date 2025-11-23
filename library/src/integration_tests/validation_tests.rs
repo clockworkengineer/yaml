@@ -18,9 +18,46 @@ mod tests {
         }
     }
 
-    // TODO: 4EJS - tabs as indentation
-    // This is complex because tabs are only forbidden as INDENTATION, not in other contexts
-    // Need more sophisticated checking that doesn't break valid YAML
+    #[test]
+    fn test_4ejs_tabs_forbidden_as_indentation() {
+        // Tabs as indentation in a mapping should be rejected
+        let yaml = b"key1: value1\nkey2:\n\tvalue2";  // Tab before 'value2'
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source);
+        assert!(result.is_err(), "Should reject tabs as indentation: {:?}", result);
+        if let Err(e) = result {
+            assert!(e.to_lowercase().contains("tab"), "Error should mention tabs: {}", e);
+        }
+    }
+
+    #[test]
+    fn test_tabs_allowed_in_quoted_strings() {
+        // Tabs inside quoted strings should be allowed
+        let yaml = b"key: \"value\twith\ttab\"";
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source);
+        assert!(result.is_ok(), "Tabs inside quoted strings should be allowed: {:?}", result.err());
+    }
+
+    #[test]
+    fn test_tabs_allowed_in_comments() {
+        // Tabs in comments should be allowed
+        let yaml = b"key: value  #\tcomment\twith\ttabs";
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source);
+        assert!(result.is_ok(), "Tabs in comments should be allowed: {:?}", result.err());
+    }
+
+    #[test]
+    #[ignore] // TODO: Tab validation in flow collections not yet implemented
+    fn test_tabs_forbidden_in_flow_indentation() {
+        // Tabs as indentation in flow collections should be rejected per YAML 1.2 spec
+        // This is a known limitation - tabs in flow collections are currently allowed
+        let yaml = b"[\n\titem\n]";
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source);
+        assert!(result.is_err(), "Should reject tabs as indentation in flow collections");
+    }
 
     #[test]
     fn test_4jvg_multiple_anchors_on_scalar() {

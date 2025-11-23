@@ -347,7 +347,7 @@ pub(crate) fn parse_value(
             Some('\n') => {
                 // Tag followed by newline - content is on following lines
                 source.next(); // consume the newline
-                skip_whitespace(source);
+                crate::parser::document::helpers::skip_whitespace_no_tabs(source)?;
 
                 // Check if there's indented content
                 let current_indent = source.get_current_indent_level();
