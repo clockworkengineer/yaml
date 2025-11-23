@@ -42,25 +42,43 @@ pub fn should_use_token_parsing(source: &mut dyn ISource) -> bool {
             true
         }
         Some('!') => {
-            // Skip the tag to see what follows
+            // Skip the tag to collect it
             source.next();
+            let mut tag = String::from("!");
             while let Some(c) = source.current() {
                 if c == ' ' {
                     source.next();
-                    continue;
+                    break;
                 }
                 if c == '!' {
+                    tag.push(c);
                     source.next();
                     continue;
                 }
                 if c.is_alphanumeric() || c == '-' || c == '_' {
+                    tag.push(c);
                     source.next();
                     continue;
                 }
                 break;
             }
-            // After tag, check if we have newline, colon, or flow collection start
-            matches!(source.current(), Some('\n') | Some(':') | Some('[') | Some('{') | None)
+            
+            // Skip whitespace after tag
+            while let Some(c) = source.current() {
+                if c == ' ' || c == '\t' {
+                    source.next();
+                } else {
+                    break;
+                }
+            }
+            
+            // Special case: !!set with { needs character parser for set syntax
+            if (tag == "!!set" || tag == "!set") && source.current() == Some('{') {
+                false
+            } else {
+                // After tag, check if we have newline, colon, or flow collection start
+                matches!(source.current(), Some('\n') | Some(':') | Some('[') | Some('{') | None)
+            }
         }
         Some('&') => {
             // Skip the anchor to see what follows
