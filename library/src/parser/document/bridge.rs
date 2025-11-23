@@ -45,12 +45,20 @@ pub fn should_use_token_parsing(source: &mut dyn ISource) -> bool {
             // Skip the tag to collect it
             source.next();
             let mut tag = String::from("!");
+            let mut has_colon = false;
+            
             while let Some(c) = source.current() {
                 if c == ' ' {
                     source.next();
                     break;
                 }
                 if c == '!' {
+                    tag.push(c);
+                    source.next();
+                    continue;
+                }
+                if c == ':' {
+                    has_colon = true;
                     tag.push(c);
                     source.next();
                     continue;
@@ -72,8 +80,12 @@ pub fn should_use_token_parsing(source: &mut dyn ISource) -> bool {
                 }
             }
             
-            // Special case: !!set with { needs character parser for set syntax
-            if (tag == "!!set" || tag == "!set") && source.current() == Some('{') {
+            // Don't use token parsing for:
+            // 1. Tags with colons (!!int:hex, !!yaml:omap, etc.) - complex formats
+            // 2. !!set with { - needs character parser for set syntax
+            if has_colon {
+                false
+            } else if (tag == "!!set" || tag == "!set") && source.current() == Some('{') {
                 false
             } else {
                 // After tag, check if we have newline, colon, or flow collection start
