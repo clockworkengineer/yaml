@@ -53,16 +53,16 @@ fn is_base64(s: &str) -> bool {
 fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
     match tag {
         "!!str" | "!str" | "tag:yaml.org,2002:str" => {
-            let s = match node {
-                Node::Str(s, _, _) => s,
-                Node::Number(Numeric::Integer(i)) => i.to_string(),
-                Node::Number(Numeric::Float(f)) => f.to_string(),
-                Node::Boolean(b) => b.to_string(),
-                Node::None => String::new(),
+            let (s, style) = match node {
+                Node::Str(s, _, style) => (s, style),
+                Node::Number(Numeric::Integer(i)) => (i.to_string(), BlockStyle::None),
+                Node::Number(Numeric::Float(f)) => (f.to_string(), BlockStyle::None),
+                Node::Boolean(b) => (b.to_string(), BlockStyle::None),
+                Node::None => (String::new(), BlockStyle::None),
                 _ => return None,
             };
 
-            return Some(Node::Str(s, QuoteType::Unquoted, BlockStyle::None));
+            return Some(Node::Str(s, QuoteType::Unquoted, style));
         }
         "!!int" | "!int" | "tag:yaml.org,2002:int" => match node {
             Node::Number(Numeric::Integer(i)) => {
@@ -113,8 +113,8 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
             return Some(Node::None);
         }
         "!!timestamp" | "!timestamp" => match node {
-            Node::Str(s, _, _) => {
-                return Some(Node::Str(s, QuoteType::Unquoted, BlockStyle::None));
+            Node::Str(s, _, style) => {
+                return Some(Node::Str(s, QuoteType::Unquoted, style));
             }
             Node::Number(Numeric::Integer(i)) => {
                 return Some(Node::Str(
@@ -301,7 +301,7 @@ pub(crate) fn parse_value(
     // - Flow collections (better token boundaries)
     // - Aliases (simpler token handling)
     use crate::parser::document::bridge::{parse_value_bridged, should_use_token_parsing};
-    
+
     if should_use_token_parsing(source) {
         return parse_value_bridged(source, directives);
     }
@@ -378,7 +378,7 @@ pub(crate) fn parse_value(
         if let Some(coerced) = try_coerce_tag(&tag, inner.clone()) {
             return Ok(coerced);
         }
-        
+
         // Also try coercion with the resolved (long) tag form
         if let Some(coerced) = try_coerce_tag(&resolved_tag, inner.clone()) {
             return Ok(coerced);

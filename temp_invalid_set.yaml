@@ -1,0 +1,3 @@
+﻿not_a_set: !!set
+  item1: value1
+  item2: null

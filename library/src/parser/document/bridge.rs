@@ -28,7 +28,7 @@ pub fn parse_value_bridged(
 /// During migration, we can selectively enable token-based parsing for
 /// specific patterns that benefit most (e.g., decorators on empty values).
 pub fn should_use_token_parsing(source: &mut dyn ISource) -> bool {
-    let state = source.save_state();
+    let original_state = source.save_state();
     
     // Use token parsing ONLY for:
     // 1. Tag followed by specific patterns (decorator scenarios)
@@ -88,8 +88,31 @@ pub fn should_use_token_parsing(source: &mut dyn ISource) -> bool {
             } else if (tag == "!!set" || tag == "!set") && source.current() == Some('{') {
                 false
             } else {
-                // After tag, check if we have newline, colon, or flow collection start
-                matches!(source.current(), Some('\n') | Some(':') | Some('[') | Some('{') | None)
+                // After tag, check if we have newline with indented content following
+                // If so, DON'T use token parsing - the character parser handles block content better
+                if source.current() == Some('\n') {
+                    // Peek ahead to see if there's indented content
+                    let peek_state = source.save_state();
+                    source.next(); // skip newline
+                    // Skip spaces (but not newlines) to check indent
+                    let mut indent = 0;
+                    while matches!(source.current(), Some(' ')) {
+                        indent += 1;
+                        source.next();
+                    }
+                    let has_content = !matches!(source.current(), None | Some('\n'));
+                    source.restore_state(peek_state);
+                    
+                    // If there's indented content (indent > 0) and not another newline/eof,
+                    // use character parser for better block structure handling
+                    if indent > 0 && has_content {
+                        source.restore_state(original_state);
+                        return false;
+                    }
+                }
+                
+                // After tag, check if we have colon or flow collection start (use tokens for these)
+                matches!(source.current(), Some(':') | Some('[') | Some('{') | None)
             }
         }
         Some('&') => {
@@ -108,7 +131,7 @@ pub fn should_use_token_parsing(source: &mut dyn ISource) -> bool {
         _ => false,
     };
     
-    source.restore_state(state);
+    source.restore_state(original_state);
     uses_tokens
 }
 

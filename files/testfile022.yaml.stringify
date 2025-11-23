@@ -1,0 +1,25 @@
+---
+codename: YAML
+name: YAML ain't markup language
+release: 2001
+...
+---
+uses: 
+  - configuration language
+- data persistence
+- internet messaging
+- cross-language data sharing
+...
+---
+company: spacelift
+domain: 
+  - devops
+- devsecops
+tutorial: 
+  - name: yaml
+  - type: awesome
+  - rank: 1
+  - born: 2001
+author: omkarbirade
+published: true
+...
