@@ -248,6 +248,15 @@ fn parse_value_content(
             stream.next()?;
             Ok(Node::Alias(alias_name))
         }
+        Some(Token::Colon) => {
+            // Decorator followed by colon = empty value used as mapping key
+            // Don't consume the colon - let the mapping parser handle it
+            Ok(Node::Str(
+                String::new(),
+                QuoteType::Unquoted,
+                BlockStyle::None,
+            ))
+        }
         Some(token) => Err(format!("Unexpected token in value: {:?}", token)),
     }
 }

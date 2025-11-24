@@ -415,14 +415,13 @@ pub(crate) fn parse_value(
     if source.current() == Some(CHAR_ASTERISK) {
         source.next();
         let name = collect_until(source, |c| {
-            // Alias names can contain any character except:
+            // Anchor names can contain any character except:
             // - Whitespace (space, tab, newline, carriage return)
             // - Flow indicators: [ ] { } ,
-            // - Mapping indicator: :
             // - Comment indicator: #
+            // Per YAML spec, colons ARE allowed in anchor/alias names
             c == CHAR_NEWLINE
                 || c == CHAR_HASH
-                || c == CHAR_COLON
                 || c.is_whitespace()
                 || c == CHAR_COMMA
                 || c == CHAR_LBRACKET

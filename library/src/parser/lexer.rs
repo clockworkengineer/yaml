@@ -343,11 +343,10 @@ impl<'a> Lexer<'a> {
         while let Some(ch) = self.source.current() {
             // Per YAML spec, anchor names are ns-anchor-char
             // Stop at: whitespace, newlines, comments, flow indicators []{},
-            // and colons (mapping indicators)
+            // Colons ARE allowed in anchor names per spec
             if ch.is_whitespace()
                 || ch == CHAR_NEWLINE
                 || ch == CHAR_HASH
-                || ch == CHAR_COLON
                 || ch == CHAR_COMMA
                 || ch == CHAR_LBRACKET
                 || ch == CHAR_RBRACKET
@@ -376,7 +375,6 @@ impl<'a> Lexer<'a> {
             if ch.is_whitespace()
                 || ch == CHAR_NEWLINE
                 || ch == CHAR_HASH
-                || ch == CHAR_COLON
                 || ch == CHAR_COMMA
                 || ch == CHAR_LBRACKET
                 || ch == CHAR_RBRACKET
