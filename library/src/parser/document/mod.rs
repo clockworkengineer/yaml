@@ -532,10 +532,8 @@ pub fn parse_document_contents(
                     }
                     Some(_) => parse_value(source, directives)?,
                     None => {
-                        return Err(helpers::parse_error(
-                            source,
-                            "Unexpected end of input while parsing explicit pair value",
-                        ));
+                        // EOF after explicit key means implicit null value
+                        Node::None
                     }
                 };
 
@@ -591,8 +589,65 @@ pub fn parse_document_contents(
                     crate::nodes::node::BlockStyle::None,
                 ))
             } else {
-                // At root level (indent_level == 0) without a colon, parse as plain scalar
-                let scalar_value = crate::utils::read_line_trimmed_into_string(source);
+                // At root level (indent_level == 0) without a colon, parse as multiline plain scalar
+                let mut lines = Vec::new();
+                let start_indent = source.get_current_indent_level();
+                
+                loop {
+                    // Read the current line
+                    let line = crate::utils::read_line_trimmed_into_string(source);
+                    if !line.is_empty() {
+                        lines.push(line);
+                    }
+                    
+                    // Skip newline if present
+                    if source.current() == Some('\n') {
+                        source.next();
+                    }
+                    
+                    // Check what comes next
+                    if !source.more() {
+                        break;
+                    }
+                    
+                    // Skip whitespace to check indent of next line
+                    skip_whitespace(source);
+                    
+                    if !source.more() {
+                        break;
+                    }
+                    
+                    let line_indent = source.get_current_indent_level();
+                    let ch = source.current();
+                    
+                    // Stop if we hit a document marker
+                    if ch == Some('-') && helpers::peek_ahead_for_document_start_end(source, '-') {
+                        break;
+                    }
+                    if ch == Some('.') && helpers::peek_ahead_for_document_start_end(source, '.') {
+                        break;
+                    }
+                    
+                    // Stop on dedent (but not at indent 0, where all lines are the same)
+                    if start_indent > 0 && line_indent < start_indent {
+                        break;
+                    }
+                    
+                    // Stop on comment
+                    if ch == Some('#') {
+                        break;
+                    }
+                    
+                    // Continue if at same or greater indent
+                    if line_indent >= start_indent {
+                        continue;
+                    }
+                    
+                    // Otherwise stop
+                    break;
+                }
+                
+                let scalar_value = lines.join(" ");
                 Ok(Node::Str(
                     scalar_value,
                     crate::nodes::node::QuoteType::Unquoted,
@@ -668,8 +723,18 @@ pub fn parse_document(
                 continue;
             }
             '%' => {
-                // Directive at this point means we've reached the next document
-                break;
+                // Only treat % as directive separator if we're at document boundary (no content yet)
+                // Otherwise % can be valid content in plain scalars
+                if document_nodes.is_empty() {
+                    break;
+                } else {
+                    // Already have content, so % should have been consumed as part of it
+                    // If we're here, there's a parsing issue
+                    return Err(helpers::parse_error(
+                        source,
+                        "Unexpected % after document content (directives must appear before content)"
+                    ));
+                }
             }
             _ => {
                 let node = parse_document_contents(source, indent_level, directives)?;
