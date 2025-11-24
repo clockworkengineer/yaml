@@ -801,8 +801,13 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
         // Parse directives before this document
         let directives = parse_directives(source)?;
 
+        // Track if we have explicit directives
+        let has_explicit_directives = directives.yaml_version.is_some() 
+            || directives.tag_prefixes.len() > 2;
+
         // Check for document start marker (---)
-        if helpers::peek_ahead_for_document_start_end(source, '-') {
+        let has_document_marker = helpers::peek_ahead_for_document_start_end(source, '-');
+        if has_document_marker {
             source.next();
             source.next();
             source.next();
@@ -848,6 +853,14 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
             }
         }
 
+        // If we have explicit directives but no document marker, that's an error
+        if has_explicit_directives && !has_document_marker {
+            return Err(helpers::parse_error(
+                source,
+                "Directives require a document (use --- to start document)"
+            ));
+        }
+
         // Parse the document with directive context
         let document = parse_document(source, 0, &directives);
         match document {
@@ -857,18 +870,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
                     _ => false,
                 };
                 
-                // If directives were EXPLICITLY present but document is blank/empty, that's an error
-                // Check if any directives were explicitly specified (version or non-default tag prefixes)
-                // Note: DirectiveContext always has 2 default tag prefixes (!! and !)
-                let has_explicit_directives = directives.yaml_version.is_some() 
-                    || directives.tag_prefixes.len() > 2;
-                if is_blank_doc && has_explicit_directives {
-                    return Err(helpers::parse_error(
-                        source,
-                        "Directives require document content"
-                    ));
-                }
-                
+                // Empty documents are valid after --- marker
                 if !is_blank_doc {
                     docs.push(doc)
                 }
