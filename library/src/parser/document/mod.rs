@@ -411,7 +411,8 @@ pub fn parse_document_contents(
                         crate::nodes::node::QuoteType::Double,
                         crate::nodes::node::BlockStyle::None,
                     );
-                } else if matches!(source.current(), Some('"') | Some('\'')) {
+                } else if matches!(source.current(), Some('"') | Some('\'') | Some('&') | Some('*') | Some('!')) {
+                    // Quoted strings, anchors, aliases, and tags need special parsing
                     key_node = crate::parser::document::value::parse_value(source, directives)?;
                 } else if source.current() == Some('#') || source.current() == Some('\n') {
                     let st = source.save_state();
