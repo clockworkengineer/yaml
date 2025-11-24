@@ -109,7 +109,8 @@ pub(crate) fn parse_mapping(
             c if c.is_alphanumeric()
                 || c == CHAR_SINGLE_QUOTE
                 || c == CHAR_DOUBLE_QUOTE
-                || c == CHAR_AMPERSAND =>
+                || c == CHAR_AMPERSAND
+                || c == CHAR_ASTERISK =>
             {
                 let current_indent = source.get_current_indent_level();
                 if current_indent < indent_level {
@@ -122,36 +123,81 @@ pub(crate) fn parse_mapping(
                     first_key_indent = Some(current_indent);
                 }
 
-                // Check for anchor on the mapping key
-                let anchor_name = if source.current() == Some(CHAR_AMPERSAND) {
+                // Check for alias as key (*alias)
+                let (mut key_node, newline) = if source.current() == Some(CHAR_ASTERISK) {
                     source.next();
-                    let name = collect_until(source, |c| {
+                    let alias_name = collect_until(source, |c| {
                         c == CHAR_SPACE
                             || c == CHAR_TAB
                             || c == CHAR_NEWLINE
                             || c == CHAR_CARRIAGE_RETURN
                             || c == CHAR_HASH
-                            || c == CHAR_COMMA
-                            || c == CHAR_LBRACKET
-                            || c == CHAR_RBRACKET
-                            || c == CHAR_LBRACE
-                            || c == CHAR_RBRACE
+                            || c == CHAR_COLON
                     });
-                    if name.trim().is_empty() {
-                        return Err(parse_error(source, "Anchor name cannot be empty"));
+                    if alias_name.trim().is_empty() {
+                        return Err(parse_error(source, "Alias name cannot be empty"));
                     }
+                    
                     crate::parser::document::helpers::skip_whitespace(source);
-                    Some(name)
+                    
+                    // Must have colon after alias
+                    if source.current() != Some(CHAR_COLON) {
+                        return Err(parse_error(source, "Alias used as key must be followed by colon"));
+                    }
+                    source.next(); // consume colon
+                    
+                    let mut newline = false;
+                    crate::parser::document::helpers::skip_whitespace(source);
+                    if source.current() == Some(CHAR_HASH) {
+                        crate::utils::consume_inline_comment_and_newline(source);
+                        newline = true;
+                    } else if source.current() == Some(CHAR_CARRIAGE_RETURN) {
+                        source.next();
+                        newline = true;
+                    }
+                    if source.current() == Some(CHAR_NEWLINE) {
+                        source.next();
+                        newline = true;
+                    }
+                    if newline {
+                        crate::parser::document::helpers::skip_whitespace_no_tabs(source)?;
+                    }
+                    
+                    (Node::Alias(alias_name), newline)
                 } else {
-                    None
+                    // Check for anchor on the mapping key
+                    let anchor_name = if source.current() == Some(CHAR_AMPERSAND) {
+                        source.next();
+                        let name = collect_until(source, |c| {
+                            c == CHAR_SPACE
+                                || c == CHAR_TAB
+                                || c == CHAR_NEWLINE
+                                || c == CHAR_CARRIAGE_RETURN
+                                || c == CHAR_HASH
+                                || c == CHAR_COMMA
+                                || c == CHAR_LBRACKET
+                                || c == CHAR_RBRACKET
+                                || c == CHAR_LBRACE
+                                || c == CHAR_RBRACE
+                        });
+                        if name.trim().is_empty() {
+                            return Err(parse_error(source, "Anchor name cannot be empty"));
+                        }
+                        crate::parser::document::helpers::skip_whitespace(source);
+                        Some(name)
+                    } else {
+                        None
+                    };
+
+                    let (mut key_node, newline) = parse_mapping_key(source, directives)?;
+                    
+                    // Wrap the key in an Anchored node if we found an anchor
+                    if let Some(name) = anchor_name {
+                        key_node = Node::Anchored(Box::new(key_node), name);
+                    }
+                    
+                    (key_node, newline)
                 };
-
-                let (mut key_node, newline) = parse_mapping_key(source, directives)?;
-
-                // Wrap the key in an Anchored node if we found an anchor
-                if let Some(name) = anchor_name {
-                    key_node = Node::Anchored(Box::new(key_node), name);
-                }
                 if let Node::Str(ref mut s, ref mut qt, ref mut _style) = key_node {
                     if matches!(*qt, QuoteType::Single | QuoteType::Double) && is_plain_safe_key(s)
                     {

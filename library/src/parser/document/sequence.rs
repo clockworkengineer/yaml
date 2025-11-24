@@ -55,6 +55,33 @@ pub(crate) fn parse_sequence(
         }
 
         let current_indent = source.get_current_indent_level();
+        
+        // Special handling for dashes: validate indentation consistency
+        // before breaking due to dedentation
+        if c == CHAR_DASH && !peek_ahead_for_document_start_end(source, c) {
+            if let Some(first_indent) = first_dash_indent {
+                // We've seen at least one dash - validate this one matches
+                if current_indent != first_indent {
+                    if current_indent > first_indent {
+                        // Nested sequence - will be handled by recursion
+                        break;
+                    } else if current_indent < indent_level {
+                        // Dedented dash below the sequence's base indent - break to return to parent
+                        break;
+                    } else {
+                        // Dash at inconsistent indentation within this sequence's range
+                        return Err(crate::parser::document::helpers::parse_error(
+                            source,
+                            &format!(
+                                "Inconsistent indentation in sequence: expected {}, got {}",
+                                first_indent, current_indent
+                            ),
+                        ));
+                    }
+                }
+            }
+        }
+        
         if current_indent < indent_level {
             break;
         }
@@ -72,34 +99,17 @@ pub(crate) fn parse_sequence(
                 break;
             }
             CHAR_DASH => {
-                // Validate consistent indentation for all sequence items at THIS level
-                if let Some(first_indent) = first_dash_indent {
-                    // We've seen at least one dash - all subsequent dashes must match OR be nested
-                    if current_indent != first_indent {
-                        // If indentation changed, it's either:
-                        // 1. Less than first_indent: parent level (will be caught by break above)
-                        // 2. Greater than first_indent: nested sequence (break out)
-                        // 3. Between first_indent and indent_level: ERROR - misaligned
-                        if current_indent > first_indent {
-                            // Nested sequence - let parent recursion handle it
-                            break;
-                        } else {
-                            // Misaligned sequence item at same level
-                            return Err(crate::parser::document::helpers::parse_error(
-                                source,
-                                &format!(
-                                    "Inconsistent indentation in sequence: expected {}, got {}",
-                                    first_indent, current_indent
-                                ),
-                            ));
-                        }
-                    }
-                } else {
+                // Record first dash indentation if not set
+                if first_dash_indent.is_none() {
                     first_dash_indent = Some(current_indent);
                 }
 
                 source.next();
                 skip_whitespace(source);
+                // Handle both Unix (\n) and Windows (\r\n) line endings
+                if source.current() == Some(CHAR_CARRIAGE_RETURN) {
+                    source.next();
+                }
                 if source.current() == Some(CHAR_NEWLINE) {
                     source.next();
                     skip_whitespace(source);

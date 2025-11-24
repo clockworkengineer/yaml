@@ -53,10 +53,10 @@ impl DirectiveContext {
         if major != 1 {
             return Err(alloc::format!("Invalid YAML major version: {}", major));
         }
-        if minor > 2 {
-            return Err(alloc::format!("Invalid YAML minor version: 1.{}", minor));
-        }
-
+        // Per YAML spec, parsers should accept future minor versions
+        // We support 1.1 and 1.2, but don't error on higher minor versions
+        // (just use 1.2 behavior)
+        
         self.yaml_version = Some((major, minor));
         Ok(())
     }

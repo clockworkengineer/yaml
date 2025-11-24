@@ -206,9 +206,22 @@ pub(crate) fn parse_quoted_scalar(source: &mut dyn ISource) -> Result<String, St
     source.next();
 
     let mut prev_was_backslash = false;
+    let mut at_line_start = true;
     loop {
         match source.current() {
             Some(c) => {
+                // Check for document markers at line start
+                if at_line_start && (c == '-' || c == '.') {
+                    if peek_ahead_for_document_start_end(source, c) {
+                        return Err(parse_error(
+                            source,
+                            "Document marker found inside quoted string - quotes must be closed before document markers",
+                        ));
+                    }
+                }
+                
+                at_line_start = c == '\n';
+                
                 out.push(c);
                 source.next();
 

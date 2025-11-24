@@ -11,6 +11,61 @@ use crate::parser::document::scalar::parse_scalar;
 use crate::parser::document::value::parse_value;
 use crate::utils::*;
 
+/// Collects a plain scalar in flow context, handling line folding.
+/// Newlines followed by spaces fold into a single space per YAML spec.
+fn collect_flow_scalar<F>(source: &mut dyn ISource, mut stop_pred: F) -> String
+where
+    F: FnMut(char) -> bool,
+{
+    let mut out = String::new();
+    let mut iterations = 0;
+    const MAX_ITERATIONS: usize = 100_000;
+
+    while let Some(c) = source.current() {
+        // Check stop condition first (before consuming)
+        if stop_pred(c) {
+            break;
+        }
+
+        if c == '\n' || c == '\r' {
+            // Handle newline with line folding
+            source.next();
+            
+            // Skip the following indentation spaces
+            while let Some(next_c) = source.current() {
+                if next_c == ' ' || next_c == '\t' {
+                    source.next();
+                } else {
+                    break;
+                }
+            }
+            
+            // Check if we hit a stop character after the newline+spaces
+            if let Some(next_c) = source.current() {
+                if stop_pred(next_c) {
+                    break;
+                }
+            }
+            
+            // Add a single space for the folded line (if we have content)
+            if !out.is_empty() && !out.ends_with(' ') {
+                out.push(' ');
+            }
+            continue;
+        }
+
+        out.push(c);
+        source.next();
+
+        iterations += 1;
+        if iterations >= MAX_ITERATIONS {
+            break;
+        }
+    }
+    
+    out
+}
+
 /// Parses an inline YAML set enclosed in curly braces {} without colons.
 ///
 /// Handles comma-separated values within braces for set syntax like {item1, item2, item3}.
@@ -67,7 +122,7 @@ pub(crate) fn parse_inline_set(
             Some(CHAR_LBRACE) => parse_inline_mapping(source, directives)?,
             Some(CHAR_LBRACKET) => parse_inline_sequence(source, directives)?,
             Some(_) => {
-                let val = collect_until(source, |c| {
+                let val = collect_flow_scalar(source, |c| {
                     c == CHAR_COMMA || c == CHAR_RBRACE || c == CHAR_HASH
                 });
                 let trimmed = val.trim();
@@ -250,33 +305,93 @@ fn parse_inline_mapping_with_colons(
         }
 
         let key_node = match source.current() {
+            Some('?') => {
+                // Explicit key indicator
+                source.next();
+                skip_whitespace_and_comments_validate_tabs(source)?;
+                
+                // Check what follows the ?
+                let key = match source.current() {
+                    Some(CHAR_COLON) | Some(CHAR_COMMA) | Some(CHAR_RBRACE) | None => {
+                        // ? followed by : or , or } or EOF means null key
+                        Node::None
+                    }
+                    Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
+                        let raw = parse_quoted_scalar(source)?;
+                        parse_scalar(raw.trim(), directives)
+                    }
+                    Some(CHAR_LBRACKET) => {
+                        parse_inline_sequence(source, directives)?
+                    }
+                    Some(CHAR_LBRACE) => {
+                        parse_inline_mapping(source, directives)?
+                    }
+                    _ => {
+                        // Parse regular scalar key with line folding
+                        let collected = collect_flow_scalar(source, |c| {
+                            c == CHAR_COLON || c == CHAR_RBRACE || c == CHAR_COMMA
+                        });
+                        parse_scalar(collected.trim(), directives)
+                    }
+                };
+                
+                skip_whitespace_and_comments_validate_tabs(source)?;
+                
+                // After explicit key, colon is optional
+                // If there's a colon, consume it and move to value parsing
+                // If no colon, the value is implicitly null
+                if source.current() == Some(CHAR_COLON) {
+                    source.next();
+                }
+                
+                key
+            }
             Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
                 let raw = parse_quoted_scalar(source)?;
                 skip_whitespace_and_comments_validate_tabs(source)?;
-                if source.current() != Some(CHAR_COLON) {
+                let key_node = parse_scalar(raw.trim(), directives);
+                
+                // Check if there's a colon for the value
+                if source.current() == Some(CHAR_COLON) {
+                    source.next();
+                } else if source.current() == Some(CHAR_COMMA) || source.current() == Some(CHAR_RBRACE) {
+                    // No colon means implicit null value
+                } else {
                     return Err(parse_error(source, ERR_EXPECT_COLON_INLINE_MAPPING));
                 }
-                source.next();
-                parse_scalar(raw.trim(), directives)
+                
+                key_node
             }
             Some(CHAR_LBRACKET) => {
                 // Flow sequence as key
                 let key = parse_inline_sequence(source, directives)?;
                 skip_whitespace_and_comments_validate_tabs(source)?;
-                if source.current() != Some(CHAR_COLON) {
+                
+                // Check if there's a colon for the value
+                if source.current() == Some(CHAR_COLON) {
+                    source.next();
+                } else if source.current() == Some(CHAR_COMMA) || source.current() == Some(CHAR_RBRACE) {
+                    // No colon means implicit null value
+                } else {
                     return Err(parse_error(source, ERR_EXPECT_COLON_INLINE_MAPPING));
                 }
-                source.next();
+                
                 key
             }
             Some(CHAR_LBRACE) => {
                 // Flow mapping as key (nested)
                 let key = parse_inline_mapping(source, directives)?;
                 skip_whitespace_and_comments_validate_tabs(source)?;
-                if source.current() != Some(CHAR_COLON) {
+                
+                // Check if there's a colon for the value
+                if source.current() == Some(CHAR_COLON) {
+                    source.next();
+                } else if source.current() == Some(CHAR_COMMA) || source.current() == Some(CHAR_RBRACE) {
+                    // No colon means implicit null value
+                } else {
                     return Err(parse_error(source, ERR_EXPECT_COLON_INLINE_MAPPING));
                 }
-                source.next();
+                
                 key
             }
             Some(CHAR_RBRACE) => {
@@ -289,24 +404,32 @@ fn parse_inline_mapping_with_colons(
                 return Err(parse_error(source, "Unexpected comma in flow mapping"));
             }
             _ => {
-                let collected = collect_until(source, |c| {
+                // Use collect_flow_scalar to handle multiline plain scalars in flow context
+                let collected = collect_flow_scalar(source, |c| {
                     c == CHAR_COLON || c == CHAR_RBRACE || c == CHAR_COMMA
                 });
                 skip_whitespace_and_comments_validate_tabs(source)?;
-                if source.current() != Some(CHAR_COLON) {
-                    if collected.trim().is_empty() {
-                        return Err(parse_error(source, "Expected key in flow mapping"));
+                
+                let key_node = {
+                    let trimmed = collected.trim();
+                    if trimmed.is_empty() {
+                        Node::Str(String::new(), QuoteType::Unquoted, BlockStyle::None)
+                    } else {
+                        parse_scalar(trimmed, directives)
                     }
+                };
+                
+                // Check if there's a colon for the value
+                if source.current() == Some(CHAR_COLON) {
+                    source.next();
+                } else if source.current() == Some(CHAR_COMMA) || source.current() == Some(CHAR_RBRACE) {
+                    // No colon means implicit null value - just use the key we parsed
+                    // and continue (value will be set to Node::None below)
+                } else {
                     return Err(parse_error(source, ERR_EXPECT_COLON_INLINE_MAPPING));
                 }
-                source.next();
-                let trimmed = collected.trim();
-                // Empty keys are valid in YAML (e.g., { : value } or {: value})
-                if trimmed.is_empty() {
-                    Node::Str(String::new(), QuoteType::Unquoted, BlockStyle::None)
-                } else {
-                    parse_scalar(trimmed, directives)
-                }
+                
+                key_node
             }
         };
 
@@ -322,7 +445,8 @@ fn parse_inline_mapping_with_colons(
                 parse_scalar(raw.trim(), directives)
             }
             Some(_) => {
-                let val = collect_until(source, |c| {
+                // Use collect_flow_scalar for multiline plain scalar values
+                let val = collect_flow_scalar(source, |c| {
                     c == CHAR_COMMA || c == CHAR_RBRACE || c == CHAR_HASH
                 });
                 parse_scalar(val.trim(), directives)
@@ -412,7 +536,8 @@ pub(crate) fn parse_inline_sequence(
     const MAX_ITEMS: usize = 10_000;
 
     source.next();
-    skip_whitespace_no_tabs(source)?;
+    // In flow context, tabs are allowed per YAML 1.2 spec
+    crate::utils::skip_whitespace_and_comments(source);
 
     if source.current() == Some(CHAR_RBRACKET) {
         source.next();
@@ -429,8 +554,9 @@ pub(crate) fn parse_inline_sequence(
             ));
         }
 
-        // Skip whitespace before checking for items
-        skip_whitespace_no_tabs(source)?;
+        // Skip whitespace and comments before checking for items
+        // In flow context, tabs are allowed per YAML 1.2 spec
+        crate::utils::skip_whitespace_and_comments(source);
 
         // Check for closing bracket (handles trailing comma case)
         if source.current() == Some(CHAR_RBRACKET) {
@@ -449,14 +575,201 @@ pub(crate) fn parse_inline_sequence(
         match source.current() {
             Some(CHAR_LBRACKET) => {
                 let nested = parse_inline_sequence(source, directives)?;
-                items.push(nested);
+                
+                // Check if this flow sequence is being used as an implicit key
+                skip_whitespace_and_comments_validate_tabs(source)?;
+                if source.current() == Some(CHAR_COLON) {
+                    // Flow sequence is a key! Parse the value
+                    source.next(); // consume colon
+                    skip_whitespace_and_comments_validate_tabs(source)?;
+                    
+                    let value_node = match source.current() {
+                        Some(CHAR_LBRACE) => parse_inline_mapping(source, directives)?,
+                        Some(CHAR_LBRACKET) => parse_inline_sequence(source, directives)?,
+                        Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
+                            let raw = parse_quoted_scalar(source)?;
+                            parse_scalar(raw.trim(), directives)
+                        }
+                        Some(CHAR_COMMA) | Some(CHAR_RBRACKET) => Node::None,
+                        _ => {
+                            let val_str = collect_flow_scalar(source, |c| {
+                                c == CHAR_COMMA || c == CHAR_RBRACKET
+                            });
+                            parse_scalar(val_str.trim(), directives)
+                        }
+                    };
+                    
+                    items.push(Node::Mapping(vec![(nested, value_node)]));
+                } else {
+                    items.push(nested);
+                }
             }
             Some(CHAR_LBRACE) => {
                 let nested_map = parse_inline_mapping(source, directives)?;
-                items.push(nested_map);
+                
+                // Check if this flow mapping is being used as an implicit key
+                skip_whitespace_and_comments_validate_tabs(source)?;
+                if source.current() == Some(CHAR_COLON) {
+                    // Flow mapping is a key! Parse the value
+                    source.next(); // consume colon
+                    skip_whitespace_and_comments_validate_tabs(source)?;
+                    
+                    let value_node = match source.current() {
+                        Some(CHAR_LBRACE) => parse_inline_mapping(source, directives)?,
+                        Some(CHAR_LBRACKET) => parse_inline_sequence(source, directives)?,
+                        Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
+                            let raw = parse_quoted_scalar(source)?;
+                            parse_scalar(raw.trim(), directives)
+                        }
+                        Some(CHAR_COMMA) | Some(CHAR_RBRACKET) => Node::None,
+                        _ => {
+                            let val_str = collect_flow_scalar(source, |c| {
+                                c == CHAR_COMMA || c == CHAR_RBRACKET
+                            });
+                            parse_scalar(val_str.trim(), directives)
+                        }
+                    };
+                    
+                    items.push(Node::Mapping(vec![(nested_map, value_node)]));
+                } else {
+                    items.push(nested_map);
+                }
             }
             // Support anchors and aliases in flow sequences
-            Some(CHAR_AMPERSAND) | Some(CHAR_ASTERISK) => {
+            Some(CHAR_AMPERSAND) => {
+                // Parse anchor, then check if it's followed by an implicit key
+                source.next();
+                let anchor_name = collect_until(source, |c| {
+                    c == CHAR_SPACE
+                        || c == CHAR_TAB
+                        || c == CHAR_NEWLINE
+                        || c == CHAR_CARRIAGE_RETURN
+                        || c == CHAR_HASH
+                        || c == CHAR_COMMA
+                        || c == CHAR_RBRACKET
+                });
+                if anchor_name.trim().is_empty() {
+                    return Err(parse_error(source, "Anchor name cannot be empty"));
+                }
+                crate::utils::skip_whitespace_and_comments(source);
+                
+                // Check for implicit key-value after anchor
+                let saved_state = source.save_state();
+                let mut found_colon = false;
+                let mut brace_depth = 0;
+                let mut bracket_depth = 0;
+                let mut in_quotes = false;
+                let mut quote_char = '\0';
+                
+                while let Some(c) = source.current() {
+                    match c {
+                        CHAR_SINGLE_QUOTE | CHAR_DOUBLE_QUOTE if !in_quotes => {
+                            in_quotes = true;
+                            quote_char = c;
+                        }
+                        c if in_quotes && c == quote_char => {
+                            in_quotes = false;
+                            quote_char = '\0';
+                        }
+                        CHAR_LBRACE if !in_quotes => brace_depth += 1,
+                        CHAR_RBRACE if !in_quotes => {
+                            if brace_depth > 0 {
+                                brace_depth -= 1;
+                            }
+                        }
+                        CHAR_LBRACKET if !in_quotes => bracket_depth += 1,
+                        CHAR_RBRACKET if !in_quotes => {
+                            if bracket_depth == 0 {
+                                break;
+                            }
+                            bracket_depth -= 1;
+                        }
+                        CHAR_COLON if !in_quotes && brace_depth == 0 && bracket_depth == 0 => {
+                            found_colon = true;
+                            break;
+                        }
+                        CHAR_COMMA if !in_quotes && brace_depth == 0 && bracket_depth == 0 => break,
+                        CHAR_HASH if !in_quotes => break,
+                        _ => {}
+                    }
+                    source.next();
+                }
+                
+                source.restore_state(saved_state);
+                
+                if found_colon {
+                    // Parse as anchored implicit mapping
+                    let key_node = match source.current() {
+                        Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
+                            let raw = parse_quoted_scalar(source)?;
+                            parse_scalar(raw.trim(), directives)
+                        }
+                        Some(CHAR_LBRACE) => parse_inline_mapping(source, directives)?,
+                        Some(CHAR_LBRACKET) => parse_inline_sequence(source, directives)?,
+                        _ => {
+                            let key_str = collect_flow_scalar(source, |c| {
+                                c == CHAR_COLON || c == CHAR_COMMA || c == CHAR_RBRACKET
+                            });
+                            parse_scalar(key_str.trim(), directives)
+                        }
+                    };
+                    
+                    crate::utils::skip_whitespace_and_comments(source);
+                    
+                    if source.current() != Some(CHAR_COLON) {
+                        return Err(parse_error(source, "Expected ':' after implicit key"));
+                    }
+                    source.next();
+                    crate::utils::skip_whitespace_and_comments(source);
+                    
+                    let value_node = match source.current() {
+                        Some(CHAR_LBRACE) => parse_inline_mapping(source, directives)?,
+                        Some(CHAR_LBRACKET) => parse_inline_sequence(source, directives)?,
+                        Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
+                            let raw = parse_quoted_scalar(source)?;
+                            parse_scalar(raw.trim(), directives)
+                        }
+                        Some(CHAR_COMMA) | Some(CHAR_RBRACKET) => Node::None,
+                        _ => {
+                            let val_str = collect_flow_scalar(source, |c| {
+                                c == CHAR_COMMA || c == CHAR_RBRACKET || c == CHAR_HASH
+                            });
+                            let trimmed = val_str.trim();
+                            if trimmed.is_empty() {
+                                Node::None
+                            } else {
+                                parse_scalar(trimmed, directives)
+                            }
+                        }
+                    };
+                    
+                    let mapping = Node::Mapping(vec![(key_node, value_node)]);
+                    items.push(Node::Anchored(Box::new(mapping), anchor_name));
+                } else {
+                    // Parse as anchored regular value
+                    let value_node = match source.current() {
+                        Some(CHAR_LBRACE) => parse_inline_mapping(source, directives)?,
+                        Some(CHAR_LBRACKET) => parse_inline_sequence(source, directives)?,
+                        Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
+                            let raw = parse_quoted_scalar(source)?;
+                            parse_scalar(raw.trim(), directives)
+                        }
+                        _ => {
+                            let val = collect_flow_scalar(source, |c| {
+                                c == CHAR_COMMA || c == CHAR_RBRACKET || c == CHAR_HASH
+                            });
+                            let trimmed = val.trim();
+                            if trimmed.is_empty() {
+                                Node::None
+                            } else {
+                                parse_scalar(trimmed, directives)
+                            }
+                        }
+                    };
+                    items.push(Node::Anchored(Box::new(value_node), anchor_name));
+                }
+            }
+            Some(CHAR_ASTERISK) => {
                 let node = parse_value(source, directives)?;
                 items.push(node);
             }
@@ -468,23 +781,124 @@ pub(crate) fn parse_inline_sequence(
                 ));
             }
             Some(_) => {
-                let node = match source.current() {
-                    Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
-                        let raw = parse_quoted_scalar(source)?;
-                        parse_scalar(raw.trim(), directives)
+                // Check if this might be an implicit key-value pair (key : value)
+                // Save state to potentially backtrack
+                let saved_state = source.save_state();
+                let mut found_colon = false;
+                let mut brace_depth = 0;
+                let mut bracket_depth = 0;
+                let mut in_quotes = false;
+                let mut quote_char = '\0';
+                
+                // Scan ahead to see if there's a colon for implicit key
+                while let Some(c) = source.current() {
+                    match c {
+                        CHAR_SINGLE_QUOTE | CHAR_DOUBLE_QUOTE if !in_quotes => {
+                            in_quotes = true;
+                            quote_char = c;
+                        }
+                        c if in_quotes && c == quote_char => {
+                            // For double quotes, check for escape with backslash (handled by parse_quoted_scalar)
+                            // For single quotes, doubled quotes are escapes
+                            // For lookahead purposes, just exit quotes (parse_quoted_scalar handles escapes properly)
+                            in_quotes = false;
+                            quote_char = '\0';
+                        }
+                        CHAR_LBRACE if !in_quotes => brace_depth += 1,
+                        CHAR_RBRACE if !in_quotes => {
+                            if brace_depth > 0 {
+                                brace_depth -= 1;
+                            }
+                        }
+                        CHAR_LBRACKET if !in_quotes => bracket_depth += 1,
+                        CHAR_RBRACKET if !in_quotes => {
+                            if bracket_depth == 0 {
+                                break; // Reached our closing bracket
+                            }
+                            bracket_depth -= 1;
+                        }
+                        CHAR_COLON if !in_quotes && brace_depth == 0 && bracket_depth == 0 => {
+                            found_colon = true;
+                            break;
+                        }
+                        CHAR_COMMA if !in_quotes && brace_depth == 0 && bracket_depth == 0 => break,
+                        CHAR_HASH if !in_quotes => break, // Comment starts, stop lookahead
+                        _ => {}
                     }
-                    _ => {
-                        let val = collect_until(source, |c| {
-                            c == CHAR_COMMA || c == CHAR_RBRACKET || c == CHAR_HASH
-                        });
-                        let trimmed = val.trim();
-                        if trimmed.is_empty() {
-                            Node::None
-                        } else {
-                            parse_scalar(trimmed, directives)
+                    source.next();
+                }
+                
+                source.restore_state(saved_state);
+                
+                let node = if found_colon {
+                    // Parse as implicit key-value pair (single-entry mapping)
+                    let key_node = match source.current() {
+                        Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
+                            let raw = parse_quoted_scalar(source)?;
+                            parse_scalar(raw.trim(), directives)
+                        }
+                        Some(CHAR_LBRACE) => parse_inline_mapping(source, directives)?,
+                        Some(CHAR_LBRACKET) => parse_inline_sequence(source, directives)?,
+                        _ => {
+                            let key_str = collect_flow_scalar(source, |c| {
+                                c == CHAR_COLON || c == CHAR_COMMA || c == CHAR_RBRACKET
+                            });
+                            parse_scalar(key_str.trim(), directives)
+                        }
+                    };
+                    
+                    skip_whitespace_and_comments_validate_tabs(source)?;
+                    
+                    if source.current() != Some(CHAR_COLON) {
+                        return Err(parse_error(source, "Expected ':' after implicit key in flow sequence"));
+                    }
+                    source.next(); // consume colon
+                    skip_whitespace_and_comments_validate_tabs(source)?;
+                    
+                    let value_node = match source.current() {
+                        Some(CHAR_LBRACE) => parse_inline_mapping(source, directives)?,
+                        Some(CHAR_LBRACKET) => parse_inline_sequence(source, directives)?,
+                        Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
+                            let raw = parse_quoted_scalar(source)?;
+                            parse_scalar(raw.trim(), directives)
+                        }
+                        Some(CHAR_COMMA) | Some(CHAR_RBRACKET) => Node::None,
+                        _ => {
+                            let val_str = collect_flow_scalar(source, |c| {
+                                c == CHAR_COMMA || c == CHAR_RBRACKET
+                            });
+                            let trimmed = val_str.trim();
+                            if trimmed.is_empty() {
+                                Node::None
+                            } else {
+                                parse_scalar(trimmed, directives)
+                            }
+                        }
+                    };
+                    
+                    // Wrap as single-pair mapping
+                    Node::Mapping(vec![(key_node, value_node)])
+                } else {
+                    // Regular value
+                    match source.current() {
+                        Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
+                            let raw = parse_quoted_scalar(source)?;
+                            parse_scalar(raw.trim(), directives)
+                        }
+                        _ => {
+                            let val = collect_flow_scalar(source, |c| {
+                                c == CHAR_COMMA || c == CHAR_RBRACKET || c == CHAR_HASH
+                            });
+                            let trimmed = val.trim();
+                            if trimmed.is_empty() {
+                                Node::None
+                            } else {
+                                parse_scalar(trimmed, directives)
+                            }
                         }
                     }
                 };
+                
                 if !matches!(node, Node::None) {
                     items.push(node);
                 }
@@ -493,6 +907,10 @@ pub(crate) fn parse_inline_sequence(
         }
 
         skip_whitespace_and_comments_validate_tabs(source)?;
+        
+        // For now, skip indentation validation in flow context as it's too restrictive
+        // TODO: Implement proper multiline flow indentation rules per YAML spec
+        // The spec requires flow content to be "more indented" but the exact rules are complex
 
         match source.current() {
             Some(CHAR_COMMA) => {

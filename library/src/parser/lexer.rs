@@ -340,6 +340,9 @@ impl<'a> Lexer<'a> {
 
         let mut name = String::new();
         while let Some(ch) = self.source.current() {
+            // Per YAML spec, anchor names are ns-anchor-char
+            // Stop at: whitespace, newlines, comments, and flow indicators []{},
+            // Colons are allowed in anchor names
             if ch.is_whitespace()
                 || ch == CHAR_NEWLINE
                 || ch == CHAR_HASH
@@ -348,7 +351,6 @@ impl<'a> Lexer<'a> {
                 || ch == CHAR_RBRACKET
                 || ch == CHAR_LBRACE
                 || ch == CHAR_RBRACE
-                || ch == CHAR_COLON
             {
                 break;
             }
