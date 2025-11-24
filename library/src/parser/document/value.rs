@@ -619,14 +619,13 @@ pub(crate) fn parse_value(
                 // Validate block scalar header: after | or >, can have [1-9]?[+-]?,
                 // then optional whitespace and comment, but NOT a comment without whitespace
                 // Check rest_untrimmed to catch `>#` without space
-                let mut has_whitespace =
+                let has_whitespace =
                     rest_untrimmed.starts_with(' ') || rest_untrimmed.starts_with('\t');
                 for c in rest.chars() {
                     if c.is_ascii_digit() || c == '+' || c == '-' {
                         // Valid modifier
                         continue;
                     } else if c == ' ' || c == '\t' {
-                        has_whitespace = true;
                         // Rest of line can be whitespace/comment
                         break;
                     } else if c == '#' {

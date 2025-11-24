@@ -111,6 +111,7 @@ impl<'a> Lexer<'a> {
     }
 
     /// Peek at the next token without consuming it
+    #[allow(dead_code)]
     pub fn peek(&mut self) -> Result<Option<&Token>, String> {
         if self.peeked_token.is_none() {
             self.peeked_token = self.scan_token()?;
@@ -535,6 +536,7 @@ impl<'a> Lexer<'a> {
     }
 
     /// Get the current indentation level (for error reporting)
+    #[allow(dead_code)]
     pub fn indent_level(&self) -> usize {
         self.source.get_current_indent_level()
     }

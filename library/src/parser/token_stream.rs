@@ -21,6 +21,7 @@ pub struct TokenStream<'a> {
     directives: &'a DirectiveContext,
 }
 
+#[allow(dead_code)]
 impl<'a> TokenStream<'a> {
     /// Create a new token stream and load the first token
     /// 
@@ -227,7 +228,7 @@ impl<'a> TokenStream<'a> {
     /// Check if the next token (after whitespace) is a colon
     pub fn has_colon_ahead(&mut self) -> Result<bool, String> {
         // Save position
-        let current_state = self.current().cloned();
+        let _current_state = self.current().cloned();
         
         // Skip whitespace
         while matches!(self.peek()?, Some(Token::Newline) | Some(Token::Indent(_))) {
@@ -247,6 +248,7 @@ impl<'a> TokenStream<'a> {
 
 /// Type of scalar value
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum ScalarType {
     Plain,
     SingleQuoted,

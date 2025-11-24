@@ -76,6 +76,7 @@ pub(crate) fn collect_anchors(
 /// # Returns
 ///
 /// Result indicating success or an error string for undefined aliases
+#[allow(dead_code)]
 pub(crate) fn replace_aliases(
     node: &mut Node,
     anchors: &HashMap<String, Node>,
@@ -141,6 +142,7 @@ pub(crate) fn replace_aliases(
 /// # Returns
 ///
 /// Result indicating success or an error string for invalid merge operations
+#[allow(dead_code)]
 pub(crate) fn expand_merge_keys(
     node: &mut Node,
     anchors: &HashMap<String, Node>,

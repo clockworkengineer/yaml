@@ -24,6 +24,7 @@ use crate::parser::document::value_tokens::parse_value_with_tokens;
 /// - No complex lookahead for keys with decorators
 /// - Clear token boundaries prevent infinite loops
 /// - Natural handling of explicit keys (?)
+#[allow(dead_code)]
 pub fn parse_mapping_with_tokens(
     stream: &mut TokenStream,
     _base_indent: usize,
@@ -74,6 +75,7 @@ pub fn parse_mapping_with_tokens(
 }
 
 /// Parse a single key-value pair
+#[allow(dead_code)]
 fn parse_mapping_pair(
     stream: &mut TokenStream,
     directives: &DirectiveContext,

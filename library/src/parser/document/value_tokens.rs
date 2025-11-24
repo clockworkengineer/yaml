@@ -256,7 +256,6 @@ fn parse_value_content(
 mod tests {
     use super::*;
     use crate::io::sources::buffer::Buffer;
-    use crate::io::traits::ISource;
 
     #[test]
     fn test_tag_on_empty_value() {

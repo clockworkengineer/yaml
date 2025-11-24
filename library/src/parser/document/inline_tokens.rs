@@ -144,7 +144,6 @@ mod tests {
     use super::*;
     use crate::io::sources::buffer::Buffer;
     use crate::parser::directives::DirectiveContext;
-    use crate::nodes::node::QuoteType;
 
     #[test]
     fn test_empty_flow_sequence() {

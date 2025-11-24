@@ -44,6 +44,7 @@ pub(crate) fn parse_error(source: &mut dyn ISource, msg: &str) -> String {
 /// # Returns
 ///
 /// `Ok(())` if no tabs in indentation, `Err(String)` if tabs found
+#[allow(dead_code)]
 pub(crate) fn validate_no_tabs_in_indentation(source: &mut dyn ISource) -> Result<(), String> {
     let state = source.save_state();
 

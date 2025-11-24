@@ -5,7 +5,7 @@ use crate::error::messages::*;
 use crate::io::traits::ISource;
 use crate::nodes::node::{BlockStyle, Node, QuoteType};
 use crate::parser::document::helpers::{
-    parse_error, parse_quoted_scalar, skip_whitespace, skip_whitespace_no_tabs, validate_comment_spacing,
+    parse_error, parse_quoted_scalar, skip_whitespace_no_tabs, validate_comment_spacing,
 };
 use crate::parser::document::scalar::parse_scalar;
 use crate::parser::document::value::parse_value;
