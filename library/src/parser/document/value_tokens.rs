@@ -141,10 +141,13 @@ pub fn parse_value_with_tokens(
 
     // If we have decorators, parse the content
     if decorators.tag.is_some() || decorators.anchor.is_some() {
-        // Check what follows decorators - if newline/eof, it's an empty value
+        // Skip whitespace/newlines after decorators to find the actual content
+        stream.skip_whitespace()?;
+        
+        // NOW check if we're at EOF or end of structure (empty decorated value)
         match stream.current() {
-            Some(Token::Newline) | Some(Token::Eof) | None => {
-                // Decorator on empty value - don't skip newline, return empty
+            Some(Token::Eof) | None => {
+                // Decorator at EOF with no content - empty value
                 let mut result = Node::Str(String::new(), QuoteType::Unquoted, BlockStyle::None);
                 
                 if let Some(tag) = decorators.tag {
@@ -162,8 +165,7 @@ pub fn parse_value_with_tokens(
                 return Ok(result);
             }
             _ => {
-                // There's content after decorators, skip whitespace and parse it
-                stream.skip_whitespace()?;
+                // There's content after decorators, continue to parse it
             }
         }
 

@@ -320,6 +320,14 @@ pub(crate) fn parse_value(
 
         skip_whitespace(source);
 
+        // Handle comments after the tag
+        if source.current() == Some(CHAR_HASH) {
+            crate::parser::document::helpers::parse_comment(source);
+            if source.current() == Some(CHAR_NEWLINE) || source.current() == Some(CHAR_CARRIAGE_RETURN) {
+                // Comment consumed, now at newline
+            }
+        }
+
         let inner = match source.current() {
             Some(CHAR_LBRACE) => parse_inline_mapping(source, directives)?,
             Some(CHAR_LBRACKET) => parse_inline_sequence(source, directives)?,
@@ -349,18 +357,35 @@ pub(crate) fn parse_value(
                 source.next(); // consume the newline
                 crate::parser::document::helpers::skip_whitespace_no_tabs(source)?;
 
-                // Check if there's indented content
-                let current_indent = source.get_current_indent_level();
-                if current_indent > 0 {
-                    // Parse as block structure
-                    crate::parser::document::parse_document_contents(
-                        source,
-                        current_indent,
-                        directives,
-                    )?
-                } else {
-                    // No indented content, treat as null
-                    Node::None
+                // Check what comes next
+                match source.current() {
+                    Some(CHAR_LBRACE) => {
+                        // Flow mapping after newline
+                        parse_inline_mapping(source, directives)?
+                    }
+                    Some(CHAR_LBRACKET) => {
+                        // Flow sequence after newline
+                        parse_inline_sequence(source, directives)?
+                    }
+                    Some(_) => {
+                        // Check if there's indented content
+                        let current_indent = source.get_current_indent_level();
+                        if current_indent > 0 {
+                            // Parse as block structure
+                            crate::parser::document::parse_document_contents(
+                                source,
+                                current_indent,
+                                directives,
+                            )?
+                        } else {
+                            // No indented content, treat as null
+                            Node::None
+                        }
+                    }
+                    None => {
+                        // Tag at EOF after newline = empty/null
+                        Node::None
+                    }
                 }
             }
             Some(_) => parse_value(source, directives)?,
@@ -501,14 +526,10 @@ pub(crate) fn parse_value(
             Ok(parse_scalar(trimmed, directives))
         }
         Some(_) => {
-            // Collect plain scalar, stopping at newline, comment, or flow indicators
-            // Flow indicators (,  ] }) signal end of value in flow context
+            // Collect plain scalar, stopping at newline or comment
+            // Note: Commas are valid in plain scalars in block context
             let value = collect_until(source, |c| {
-                c == CHAR_NEWLINE
-                    || c == CHAR_HASH
-                    || c == CHAR_COMMA
-                    || c == CHAR_RBRACKET
-                    || c == CHAR_RBRACE
+                c == CHAR_NEWLINE || c == CHAR_HASH
             });
             let trimmed = value.trim();
 

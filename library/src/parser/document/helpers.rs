@@ -311,6 +311,45 @@ pub(crate) fn peek_ahead_for_mapping_key(source: &mut dyn ISource) -> bool {
     let mut found = false;
     let state = source.save_state();
 
+    // Skip tags (!!tag or !tag) if present
+    while source.current() == Some('!') {
+        source.next(); // Skip first !
+        // Check for second ! (!!tag)
+        if source.current() == Some('!') {
+            source.next(); // Skip second !
+        }
+        // Skip tag name (alphanumeric, -, _, . but NOT colon - that would consume the mapping separator)
+        while let Some(c) = source.current() {
+            if c.is_alphanumeric() || c == CHAR_DASH || c == '_' || c == CHAR_DOT {
+                source.next();
+            } else {
+                break;
+            }
+        }
+        // Skip whitespace after tag
+        while matches!(source.current(), Some(CHAR_SPACE) | Some(CHAR_TAB)) {
+            source.next();
+        }
+    }
+
+    // Skip anchors (&name) if present
+    if source.current() == Some(CHAR_AMPERSAND) {
+        source.next(); // Skip &
+        // Skip anchor name (but NOT colon - anchor names with colons are allowed per spec,
+        // but in this context we're looking for mapping keys, so stop at colon)
+        while let Some(c) = source.current() {
+            if c.is_alphanumeric() || c == CHAR_DASH || c == '_' {
+                source.next();
+            } else {
+                break;
+            }
+        }
+        // Skip whitespace after anchor
+        while matches!(source.current(), Some(CHAR_SPACE) | Some(CHAR_TAB)) {
+            source.next();
+        }
+    }
+
     // Handle quoted strings specially - they can span multiple lines
     if matches!(
         source.current(),
@@ -367,7 +406,7 @@ pub(crate) fn peek_ahead_for_mapping_key(source: &mut dyn ISource) -> bool {
                     found = true;
                     break;
                 }
-                CHAR_NEWLINE => {
+                CHAR_NEWLINE | CHAR_CARRIAGE_RETURN => {
                     break;
                 }
                 _ => {
