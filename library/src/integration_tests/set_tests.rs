@@ -41,7 +41,7 @@ mod tests {
                         Node::Tagged(inner, tag) => {
                             // The parser might not have converted it yet, check if it's a mapping
                             if tag == "!!set" {
-                                if let Node::Mapping(mapping_pairs) = inner.as_ref() {
+                                if let Node::Mapping(_mapping_pairs) = inner.as_ref() {
                                     // This is acceptable - the parser kept it as a tagged mapping
                                     return;
                                 }

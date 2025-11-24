@@ -449,7 +449,22 @@ fn parse_inline_mapping_with_colons(
                 let val = collect_flow_scalar(source, |c| {
                     c == CHAR_COMMA || c == CHAR_RBRACE || c == CHAR_HASH
                 });
-                parse_scalar(val.trim(), directives)
+                let trimmed = val.trim();
+                // Check if value looks like it contains a mapping (missing comma before next key)
+                // Pattern: "value key:" suggests missing comma before "key:"
+                if trimmed.contains(':') {
+                    // Check if there's a potential mapping key after whitespace
+                    let parts: Vec<&str> = trimmed.split_whitespace().collect();
+                    if parts.len() >= 2 {
+                        // Look for pattern like "1 bar:" where we have value then key
+                        for i in 1..parts.len() {
+                            if parts[i].ends_with(':') || (i + 1 < parts.len() && parts[i + 1] == ":") {
+                                return Err(parse_error(source, "Flow mapping missing separating comma between pairs"));
+                            }
+                        }
+                    }
+                }
+                parse_scalar(trimmed, directives)
             }
             None => return Err(parse_error(source, ERR_EOF_INLINE_MAPPING)),
         };
@@ -893,6 +908,14 @@ pub(crate) fn parse_inline_sequence(
                             if trimmed.is_empty() {
                                 Node::None
                             } else {
+                                // Reject plain scalars that are just a dash (ambiguous with sequence indicator)
+                                if trimmed == "-" {
+                                    return Err(parse_error(source, "Plain dash in flow sequence is ambiguous"));
+                                }
+                                // Reject document markers in flow context
+                                if trimmed == "---" || trimmed == "..." {
+                                    return Err(parse_error(source, "Document markers are not allowed in flow collections"));
+                                }
                                 parse_scalar(trimmed, directives)
                             }
                         }

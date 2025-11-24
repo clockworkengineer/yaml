@@ -17,6 +17,7 @@ use std::collections::HashMap;
 /// # Returns
 ///
 /// Result indicating success or an error string for invalid anchors
+#[allow(dead_code)]
 pub(crate) fn collect_anchors(
     node: &Node,
     anchors: &mut HashMap<String, Node>,
