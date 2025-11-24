@@ -193,6 +193,10 @@ pub(crate) fn parse_mapping(
                     
                     // Wrap the key in an Anchored node if we found an anchor
                     if let Some(name) = anchor_name {
+                        // Check if we're trying to anchor an alias (not allowed)
+                        if matches!(key_node, Node::Alias(_)) {
+                            return Err(parse_error(source, "Cannot apply anchor to an alias - aliases reference existing anchors"));
+                        }
                         key_node = Node::Anchored(Box::new(key_node), name);
                     }
                     

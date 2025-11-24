@@ -418,9 +418,11 @@ pub(crate) fn parse_value(
             // Alias names can contain any character except:
             // - Whitespace (space, tab, newline, carriage return)
             // - Flow indicators: [ ] { } ,
+            // - Mapping indicator: :
             // - Comment indicator: #
             c == CHAR_NEWLINE
                 || c == CHAR_HASH
+                || c == CHAR_COLON
                 || c.is_whitespace()
                 || c == CHAR_COMMA
                 || c == CHAR_LBRACKET
@@ -440,12 +442,14 @@ pub(crate) fn parse_value(
             // Anchor names can contain any character except:
             // - Whitespace (space, tab, newline, carriage return)
             // - Flow indicators: [ ] { } ,
+            // - Mapping indicator: :
             // - Comment indicator: #
             c == CHAR_SPACE
                 || c == CHAR_TAB
                 || c == CHAR_NEWLINE
                 || c == CHAR_CARRIAGE_RETURN
                 || c == CHAR_HASH
+                || c == CHAR_COLON
                 || c == CHAR_COMMA
                 || c == CHAR_LBRACKET
                 || c == CHAR_RBRACKET
@@ -456,6 +460,20 @@ pub(crate) fn parse_value(
             return Err(parse_error(source, ERR_EMPTY_ANCHOR_NAME));
         }
         skip_whitespace(source);
+        
+        // Check for invalid patterns like &anchor - (anchor before dash on same line)
+        if source.current() == Some('-') {
+            // Check if this is a sequence indicator (dash followed by whitespace)
+            let saved = source.save_state();
+            source.next();
+            let next_char = source.current();
+            source.restore_state(saved);
+            
+            if matches!(next_char, Some(' ') | Some('\t') | Some('\n') | None) {
+                return Err(parse_error(source, "Anchor must be placed after the dash (-) in sequences, not before"));
+            }
+        }
+        
         // Handle both Unix (\n) and Windows (\r\n) line endings
         if source.current() == Some(CHAR_CARRIAGE_RETURN) {
             source.next();
@@ -496,6 +514,10 @@ pub(crate) fn parse_value(
         // Check for nested anchors (not allowed)
         if matches!(node, Node::Anchored(_, _)) {
             return Err(parse_error(source, "A node cannot have multiple anchors"));
+        }
+        // Check for anchor applied to alias (not allowed - aliases reference existing anchors)
+        if matches!(node, Node::Alias(_)) {
+            return Err(parse_error(source, "Cannot apply anchor to an alias - aliases reference existing anchors"));
         }
         return Ok(Node::Anchored(Box::new(node), name));
     }

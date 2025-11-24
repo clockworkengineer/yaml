@@ -452,30 +452,45 @@ pub(crate) fn parse_mapping_key(
     source: &mut dyn ISource,
     directives: &crate::parser::directives::DirectiveContext,
 ) -> Result<(Node, bool), String> {
-    let raw = collect_until(source, |c| {
-        c == CHAR_COLON || c == CHAR_NEWLINE || c == CHAR_CARRIAGE_RETURN
-    });
+    // Check for anchors or aliases at the start of the key
+    let key_node = if matches!(source.current(), Some(CHAR_AMPERSAND) | Some(CHAR_ASTERISK)) {
+        // Use parse_value to handle anchors/aliases properly
+        crate::parser::document::value::parse_value(source, directives)?
+    } else {
+        // Original collection-based parsing for plain scalars
+        let raw = collect_until(source, |c| {
+            c == CHAR_COLON || c == CHAR_NEWLINE || c == CHAR_CARRIAGE_RETURN
+        });
 
-    // Check if we stopped at a colon or newline/carriage return
-    if source.current() == Some(CHAR_NEWLINE) || source.current() == Some(CHAR_CARRIAGE_RETURN) {
-        // We reached end of line without finding a colon - invalid mapping key
-        return Err(parse_error(
-            source,
-            "Mapping key must be followed by a colon",
-        ));
-    }
+        // Check if we stopped at a colon or newline/carriage return
+        if source.current() == Some(CHAR_NEWLINE) || source.current() == Some(CHAR_CARRIAGE_RETURN) {
+            // We reached end of line without finding a colon - invalid mapping key
+            return Err(parse_error(
+                source,
+                "Mapping key must be followed by a colon",
+            ));
+        }
 
-    // Check if we hit EOF without a colon
-    if source.current().is_none() {
-        // EOF without colon - could be valid scalar, not a mapping
-        // But we're in parse_mapping_key, so this shouldn't happen
-        // Let the caller handle it
-        return Err(parse_error(
-            source,
-            "Unexpected end of input in mapping key",
-        ));
-    }
+        // Check if we hit EOF without a colon
+        if source.current().is_none() {
+            // EOF without colon - could be valid scalar, not a mapping
+            // But we're in parse_mapping_key, so this shouldn't happen
+            // Let the caller handle it
+            return Err(parse_error(
+                source,
+                "Unexpected end of input in mapping key",
+            ));
+        }
 
+        match raw.trim() {
+            v if v.starts_with(CHAR_HASH) => {
+                Node::Str(v.to_string(), QuoteType::Unquoted, BlockStyle::None)
+            }
+            v => crate::parser::document::scalar::parse_scalar(v, directives),
+        }
+    };
+
+    // Now consume the colon and check for newline
     let mut newline = false;
     source.next(); // consume the colon
     skip_whitespace(source);  // Tabs OK here - not indentation (same line as colon)
@@ -500,16 +515,7 @@ pub(crate) fn parse_mapping_key(
         }
     }
 
-    match raw.trim() {
-        v if v.starts_with(CHAR_HASH) => Ok((
-            Node::Str(v.to_string(), QuoteType::Unquoted, BlockStyle::None),
-            newline,
-        )),
-        v => Ok((
-            crate::parser::document::scalar::parse_scalar(v, directives),
-            newline,
-        )),
-    }
+    Ok((key_node, newline))
 }
 
 /// Parses a comment line from the source.
