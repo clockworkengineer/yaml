@@ -808,11 +808,12 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
             source.next();
             
             // After ---, only whitespace/comments allowed until end of line
-            // Exception: block scalar indicators (>, |) and tags/anchors are allowed
+            // Exception: block scalar indicators (>, |) are allowed (they apply to following lines)
             skip_whitespace(source);
             if let Some(c) = source.current() {
-                // Allow: newline, carriage return, comment, block scalar indicators, tags, anchors
-                if c != '\n' && c != '\r' && c != '#' && c != '>' && c != '|' && c != '!' && c != '&' {
+                // Allow: newline, carriage return, comment, block scalar indicators
+                // Note: tags and anchors must be on following lines, not same line as ---
+                if c != '\n' && c != '\r' && c != '#' && c != '>' && c != '|' {
                     // Check if it's the start of a mapping key pattern (key:)
                     // Save state to check ahead
                     let state = source.save_state();
