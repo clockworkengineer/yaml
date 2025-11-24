@@ -49,6 +49,11 @@ impl DirectiveContext {
 
     /// Set the YAML version
     pub fn set_version(&mut self, major: u8, minor: u8) -> Result<(), String> {
+        // Check for duplicate YAML directive
+        if self.yaml_version.is_some() {
+            return Err("Duplicate YAML directive".to_string());
+        }
+        
         // Validate version (only 1.1 and 1.2 are standard)
         if major != 1 {
             return Err(alloc::format!("Invalid YAML major version: {}", major));
@@ -202,7 +207,22 @@ fn parse_yaml_directive(
     // Set version in context
     context.set_version(major, minor)?;
 
-    // Skip to end of line
+    // After version, must have whitespace before comment or end of line
+    let has_whitespace = matches!(source.current(), Some(' ') | Some('\t'));
+    skip_directive_whitespace(source);
+    
+    if let Some(c) = source.current() {
+        if c == '#' && !has_whitespace {
+            return Err("Comment requires whitespace after YAML version".to_string());
+        }
+        if c != '\n' && c != '\r' && c != '#' {
+            return Err(alloc::format!(
+                "Invalid content after YAML version directive: '{}'", c
+            ));
+        }
+    }
+
+    // Skip to end of line (handles comment if present)
     skip_to_end_of_line(source);
 
     Ok(())

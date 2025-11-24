@@ -629,6 +629,11 @@ pub fn parse_document_contents(
                         break;
                     }
                     
+                    // Stop if we hit a directive
+                    if ch == Some('%') && line_indent == 0 {
+                        break;
+                    }
+                    
                     // Stop on dedent (but not at indent 0, where all lines are the same)
                     if start_indent > 0 && line_indent < start_indent {
                         break;
@@ -880,7 +885,8 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
 
         // Check for document end marker (...)
         skip_whitespace(source);
-        if helpers::peek_ahead_for_document_start_end(source, '.') {
+        let has_document_end = helpers::peek_ahead_for_document_start_end(source, '.');
+        if has_document_end {
             source.next();
             source.next();
             source.next();
@@ -906,6 +912,17 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
         // If no more content, stop
         if !source.more() {
             break;
+        }
+        
+        // Check if next content starts with directive without document-end marker
+        // Peek ahead to see if we're about to parse directives for next document
+        skip_whitespace(source);
+        if !has_document_end && source.current() == Some('%') {
+            // We have a directive after document content but no ... marker
+            return Err(parse_error(
+                source,
+                "Directive requires document-end marker (...) before starting new document"
+            ));
         }
     }
 
