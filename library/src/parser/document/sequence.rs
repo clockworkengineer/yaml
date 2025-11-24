@@ -105,6 +105,38 @@ pub(crate) fn parse_sequence(
                 }
 
                 source.next();
+                // Tabs are not allowed after '-' if followed by structure or newline
+                // But allowed if followed by content (e.g., "-\t-1" is valid, "-\t-" is not)
+                if source.current() == Some('\t') {
+                    // Save state and check what follows the tab
+                    let state = source.save_state();
+                    source.next(); // Skip tab
+                    let next_char = source.current();
+                    source.restore_state(state);
+                    
+                    // Disallow tab if followed by newline, or by '-' that's not part of content
+                    if next_char == Some('\n') || next_char == Some('\r') {
+                        return Err(crate::parser::document::helpers::parse_error(
+                            source,
+                            "Tabs cannot be used as separation after sequence indicator"
+                        ));
+                    }
+                    // If followed by another dash, check if it's a structure indicator
+                    if next_char == Some('-') {
+                        let state2 = source.save_state();
+                        source.next(); // Skip tab
+                        source.next(); // Skip dash
+                        let after_dash = source.current();
+                        source.restore_state(state2);
+                        // If dash followed by space/newline, it's structure
+                        if after_dash == Some(' ') || after_dash == Some('\n') || after_dash == Some('\r') || after_dash == Some('\t') {
+                            return Err(crate::parser::document::helpers::parse_error(
+                                source,
+                                "Tabs cannot be used as separation after sequence indicator"
+                            ));
+                        }
+                    }
+                }
                 skip_whitespace(source);
                 // Handle both Unix (\n) and Windows (\r\n) line endings
                 if source.current() == Some(CHAR_CARRIAGE_RETURN) {

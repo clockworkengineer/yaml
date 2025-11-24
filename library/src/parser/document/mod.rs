@@ -198,6 +198,13 @@ pub fn parse_document_contents(
                 }
 
                 source.next(); // Skip ':'
+                // Tabs are not allowed immediately after ':' indicator
+                if source.current() == Some('\t') {
+                    return Err(helpers::parse_error(
+                        source,
+                        "Tabs cannot be used as separation after explicit value indicator"
+                    ));
+                }
                 skip_whitespace(source);
 
                 // Parse the value
@@ -251,6 +258,13 @@ pub fn parse_document_contents(
             } else {
                 // Original single explicit key logic
                 source.next();
+                // Tabs are not allowed immediately after '?' indicator
+                if source.current() == Some('\t') {
+                    return Err(helpers::parse_error(
+                        source,
+                        "Tabs cannot be used as separation after explicit key indicator"
+                    ));
+                }
                 skip_whitespace(source);
                 let mut key_node: Node;
 
