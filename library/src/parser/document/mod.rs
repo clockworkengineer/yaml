@@ -14,14 +14,14 @@ mod inline;
 mod inline_tokens;
 mod loop_guards;
 mod mapping;
+mod tokens;
 mod mapping_tokens;
 mod scalar;
 mod sequence;
 mod sequence_tokens;
-#[cfg(test)]
-mod test_empty_decorators;
 mod value;
 mod value_tokens;
+// token modules now grouped under tokens/
 
 // Anchor resolution functions - currently not used during parsing
 // pub(crate) use anchors::{collect_anchors, expand_merge_keys, replace_aliases};
