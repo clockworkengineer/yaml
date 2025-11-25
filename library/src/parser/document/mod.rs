@@ -4,10 +4,15 @@
 //! implementation.
 
 mod anchors;
+mod block_scalar;
 mod bridge;
+mod context;
+mod error_builder;
+mod explicit_key;
 mod helpers;
 mod inline;
 mod inline_tokens;
+mod loop_guards;
 mod mapping;
 mod mapping_tokens;
 mod scalar;
@@ -20,6 +25,7 @@ mod value_tokens;
 
 // Anchor resolution functions - currently not used during parsing
 // pub(crate) use anchors::{collect_anchors, expand_merge_keys, replace_aliases};
+
 #[cfg(test)]
 pub(crate) use helpers::parse_quoted_scalar;
 pub(crate) use helpers::{parse_comment, parse_error, peek_ahead_for_mapping_key};
@@ -30,7 +36,6 @@ pub(crate) use scalar::parse_scalar;
 pub(crate) use sequence::parse_sequence;
 pub(crate) use value::parse_value;
 
-use crate::constants::*;
 use crate::io::traits::ISource;
 use crate::nodes::node::BlockStyle;
 use crate::nodes::node::Node;
@@ -298,150 +303,11 @@ pub fn parse_document_contents(
                     key_node = parse_sequence(source, nested_indent, directives)?;
                 } else if matches!(source.current(), Some('|') | Some('>')) {
                     let is_folded = source.current() == Some('>');
-                    source.next(); // consume '|' or '>'
-
-                    // Parse optional block scalar modifiers: indentation indicator and chomping indicator
-                    // Format: |[1-9]?[+-]? or >[1-9]?[+-]?
-                    let mut has_indent_indicator = false;
-                    let mut has_chomping_indicator = false;
-
-                    // Check for indentation indicator (must be 1-9)
-                    if let Some(c) = source.current() {
-                        if c.is_ascii_digit() {
-                            if c == '0' {
-                                return Err(helpers::parse_error(
-                                    source,
-                                    "Block scalar indentation indicator must be between 1-9, not 0",
-                                ));
-                            }
-                            has_indent_indicator = true;
-                            source.next();
-                        }
-                    }
-
-                    // Check for chomping indicator (+ or -)
-                    if let Some(c) = source.current() {
-                        if c == '+' || c == '-' {
-                            has_chomping_indicator = true;
-                            source.next();
-                        }
-                    }
-
-                    // If we had indent indicator, optionally check for chomping after it
-                    // Format can be: |1+, |1-, |+, |-, >2+, etc.
-                    if has_indent_indicator && !has_chomping_indicator {
-                        if let Some(c) = source.current() {
-                            if c == '+' || c == '-' {
-                                source.next();
-                            }
-                        }
-                    }
-
-                    // Validate: rest of line should be whitespace or comment
-                    let mut last_was_whitespace = false;
-                    while let Some(c) = source.current() {
-                        if c == '\n' {
-                            break;
-                        } else if c == ' ' || c == '\t' {
-                            last_was_whitespace = true;
-                            source.next();
-                        } else if c == '#' {
-                            // Comment must be preceded by whitespace
-                            if !last_was_whitespace {
-                                return Err(helpers::parse_error(
-                                    source,
-                                    "Comment indicator (#) must be preceded by whitespace",
-                                ));
-                            }
-                            // Comment - consume until newline
-                            let _ = crate::utils::collect_until(source, |c| c == '\n');
-                            break;
-                        } else {
-                            return Err(helpers::parse_error(
-                                source,
-                                &format!(
-                                    "Invalid block scalar modifier: unexpected character '{}'",
-                                    c
-                                ),
-                            ));
-                        }
-                    }
-
-                    if source.current() == Some('\n') {
-                        source.next();
-                    }
-
-                    let mut raw_lines: Vec<String> = Vec::new();
-                    let mut first_indent: Option<usize> = None;
-                    loop {
-                        if source.current().is_none() {
-                            break;
-                        }
-                        let st_line = source.save_state();
-                        let mut cur_indent = 0usize;
-                        while let Some(CHAR_SPACE) = source.current() {
-                            cur_indent += 1;
-                            source.next();
-                        }
-                        let cur_is_newline = source.current() == Some('\n');
-
-                        let is_colon_start = matches!(source.current(), Some(':'));
-                        source.restore_state(st_line);
-
-                        if first_indent.is_none() {
-                            if cur_is_newline {
-                                let _ = crate::utils::collect_until(source, |c| c == '\n');
-                                if source.current() == Some('\n') {
-                                    source.next();
-                                }
-                                raw_lines.push(String::new());
-                                continue;
-                            } else {
-                                first_indent = Some(cur_indent);
-                            }
-                        } else if !cur_is_newline && cur_indent < first_indent.unwrap() {
-                            break;
-                        }
-
-                        if is_colon_start {
-                            break;
-                        }
-
-                        let raw_line = crate::utils::collect_until(source, |c| c == '\n');
-                        if source.current() == Some('\n') {
-                            source.next();
-                        }
-                        raw_lines.push(raw_line);
-                    }
-
-                    while matches!(raw_lines.last(), Some(s) if s.is_empty()) {
-                        raw_lines.pop();
-                    }
-
-                    let fi = first_indent.unwrap_or(0);
-                    let mut norm_lines: Vec<String> = Vec::with_capacity(raw_lines.len());
-                    if is_folded {
-                        for l in raw_lines.iter() {
-                            if l.is_empty() {
-                                norm_lines.push(String::new());
-                            } else {
-                                let lead = l.chars().take_while(|&ch| ch == CHAR_SPACE).count();
-                                let strip = fi.min(lead);
-                                let stripped: String = l.chars().skip(strip).collect();
-                                norm_lines.push(stripped);
-                            }
-                        }
-                    } else {
-                        norm_lines = raw_lines.clone();
-                    }
-
-                    let mut escaped_parts: Vec<String> = Vec::with_capacity(norm_lines.len());
-                    for l in norm_lines.iter() {
-                        let stripped: String = l.chars().skip(fi).collect();
-                        escaped_parts.push(stripped);
-                    }
-
-                    let mut escaped_key = escaped_parts.join("\\n");
+                    
+                    // Use the consolidated block scalar parser
+                    let content = block_scalar::parse_block_scalar(source, is_folded)?;
+                    
+                    let mut escaped_key = content;
                     escaped_key.push_str("\\n");
                     key_node = Node::Str(
                         escaped_key,
@@ -855,12 +721,12 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
             source.next();
             
             // After ---, only whitespace/comments allowed until end of line
-            // Exception: block scalar indicators (>, |) are allowed (they apply to following lines)
+            // Exception: block scalar indicators (>, |) and tags (!) are allowed
             skip_whitespace(source);
             if let Some(c) = source.current() {
-                // Allow: newline, carriage return, comment, block scalar indicators
-                // Note: tags and anchors must be on following lines, not same line as ---
-                if c != '\n' && c != '\r' && c != '#' && c != '>' && c != '|' {
+                // Allow: newline, carriage return, comment, block scalar indicators, tags
+                // Tags can appear after --- to apply to the document (e.g., --- !<tag>)
+                if c != '\n' && c != '\r' && c != '#' && c != '>' && c != '|' && c != '!' {
                     // Check if it's the start of a mapping key pattern (key:)
                     // Save state to check ahead
                     let state = source.save_state();

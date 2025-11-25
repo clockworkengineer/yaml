@@ -6,6 +6,8 @@ use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::nodes::node::Node::Document;
 use crate::nodes::node::{BlockStyle, QuoteType};
+use crate::parser::document::context::ParsingContext;
+use crate::parser::document::error_builder::forbidden_error;
 use crate::utils::*;
 
 /// Creates a formatted error message with current parser context information.
@@ -34,32 +36,78 @@ pub(crate) fn parse_error(source: &mut dyn ISource, msg: &str) -> String {
     )
 }
 
-/// Validates that tabs are not used for indentation at current position.
-/// According to YAML 1.2 spec, tabs cannot be used for indentation.
+/// Unified indentation validation using parsing context.
+///
+/// This function provides context-aware validation of indentation, particularly
+/// for tab characters which are forbidden in certain contexts per YAML 1.2 spec.
+///
+/// Tabs are forbidden when:
+/// - In block context (not flow collections like [], {})
+/// - Used as indentation (after newlines, before content)
+///
+/// Tabs are allowed when:
+/// - In flow context (inside [], {}, quoted strings)
+/// - Part of string content (not indentation)
 ///
 /// # Arguments
 ///
 /// * `source` - A mutable reference to a source implementing ISource trait
+/// * `ctx` - The current parsing context (determines validation rules)
 ///
 /// # Returns
 ///
-/// `Ok(())` if no tabs in indentation, `Err(String)` if tabs found
-#[allow(dead_code)]
-pub(crate) fn validate_no_tabs_in_indentation(source: &mut dyn ISource) -> Result<(), String> {
-    let state = source.save_state();
+/// `Ok(())` if indentation is valid, `Err(String)` if tabs found in forbidden context
+///
+/// # Example
+///
+/// ```ignore
+/// let ctx = ParsingContext::new(0);
+/// validate_indentation(source, &ctx)?;
+/// ```
+pub(crate) fn validate_indentation(
+    source: &mut dyn ISource,
+    ctx: &ParsingContext,
+) -> Result<(), String> {
+    // In flow context, tabs are allowed (different whitespace rules)
+    if ctx.in_flow {
+        return Ok(());
+    }
 
-    // Check from current position for tabs before non-whitespace
+    // Only validate tabs when we're at indentation position (after newline)
+    if !ctx.should_validate_tab_indentation() {
+        return Ok(());
+    }
+
+    let state = source.save_state();
+    let line_start_column = state.column;
+
+    // Check from current position for tabs before reaching required indentation level
+    // Once we've consumed enough spaces to reach the indent level, tabs are allowed (content)
     while let Some(c) = source.current() {
+        let current_state = source.save_state();
+        let current_column = current_state.column;
+        let spaces_consumed = current_column - line_start_column;
+        
         if c == CHAR_TAB {
-            source.restore_state(state);
-            return Err(parse_error(source, "Tabs cannot be used for indentation in YAML"));
-        }
-        if c == CHAR_SPACE {
+            // Tab is only forbidden if we haven't exceeded the parent's indentation level
+            // Tabs at or before the parent level are indentation (forbidden)
+            // Tabs after the parent level are content whitespace (allowed)
+            if spaces_consumed <= ctx.indent_level {
+                source.restore_state(state);
+                return Err(forbidden_error(source, "Tabs", "as indentation in YAML"));
+            }
+            // Tab after required indentation is content whitespace - allowed
+            break;
+        } else if c == CHAR_SPACE {
             source.next();
-            continue;
+        } else if c == CHAR_NEWLINE || c == CHAR_CARRIAGE_RETURN {
+            // Blank line - tabs would be OK here (no content)
+            source.restore_state(state);
+            return Ok(());
+        } else {
+            // Found content - no tabs in indentation
+            break;
         }
-        // Non-whitespace found, no tabs in indentation
-        break;
     }
 
     source.restore_state(state);
@@ -85,21 +133,48 @@ pub(crate) fn skip_whitespace(source: &mut dyn ISource) {
     }
 }
 
+/// Skips whitespace with context-aware tab validation.
+///
+/// This validates indentation first (before consuming), then skips whitespace.
+/// This order ensures tabs in indentation are caught before being consumed.
+///
+/// # Arguments
+///
+/// * `source` - A mutable reference to a source implementing ISource trait
+/// * `ctx` - The current parsing context
+///
+/// # Returns
+///
+/// `Ok(())` if successful, `Err(String)` if tabs found in forbidden context
+pub(crate) fn skip_whitespace_with_context(
+    source: &mut dyn ISource,
+    ctx: &ParsingContext,
+) -> Result<(), String> {
+    // Validate BEFORE consuming whitespace
+    validate_indentation(source, ctx)?;
+    skip_whitespace(source);
+    Ok(())
+}
+
 /// Skips whitespace but returns an error if tabs are found as line indentation.
+///
+/// **DEPRECATED**: Use `skip_whitespace_with_context()` with proper ParsingContext instead.
+/// This function is kept for backward compatibility during refactoring.
+///
 /// Handles newlines and tracks whether tabs appear after them (which would be indentation).
 /// Per YAML 1.2 spec, tabs cannot be used for indentation.
 /// Note: This function assumes it may be called after a newline has already been consumed,
 /// so it starts by assuming we're at the beginning of a line and validates from there.
 pub(crate) fn skip_whitespace_no_tabs(source: &mut dyn ISource) -> Result<(), String> {
     let mut found_tab_after_newline = false;
-    let mut after_newline = true;  // Assume we start after a newline (caller consumed it)
-    
+    let mut after_newline = true; // Assume we start after a newline (caller consumed it)
+
     while let Some(c) = source.current() {
         if c == '\n' || c == '\r' {
             // Consume newline and mark that we're at line start
             source.next();
             after_newline = true;
-            found_tab_after_newline = false;  // Reset for new line
+            found_tab_after_newline = false; // Reset for new line
         } else if c == '\t' {
             if after_newline {
                 // Tab after newline = indentation = forbidden
@@ -123,35 +198,17 @@ pub(crate) fn skip_whitespace_no_tabs(source: &mut dyn ISource) -> Result<(), St
     Ok(())
 }
 
-/// Validate that there are no tabs in the leading whitespace at line start
+/// Validate that there are no tabs in the leading whitespace at line start.
+///
+/// **DEPRECATED**: Use `validate_indentation()` with proper ParsingContext instead.
+/// This function is kept for backward compatibility during refactoring.
+///
 /// This should be called after processing a newline, before any content
 pub(crate) fn validate_no_tab_indentation(source: &mut dyn ISource) -> Result<(), String> {
-    // Only check if we're at the start of a line (column 0 or only whitespace so far)
-    let state = source.save_state();
-
-    // Check characters from current position forward
-    while let Some(c) = source.current() {
-        if c == '\t' {
-            // Found a tab - this is invalid indentation
-            source.restore_state(state);
-            return Err(crate::parser::document::parse_error(
-                source,
-                "Tabs are not allowed as indentation in YAML",
-            ));
-        } else if c == ' ' {
-            source.next();
-        } else if c == '\n' || c == '\r' {
-            // Blank line - tabs would be OK here (no content)
-            source.restore_state(state);
-            return Ok(());
-        } else {
-            // Found content
-            break;
-        }
-    }
-
-    source.restore_state(state);
-    Ok(())
+    // Create a temporary context for validation (assumes block context after newline)
+    let mut ctx = ParsingContext::new(source.get_current_indent_level());
+    ctx.mark_newline_consumed();
+    validate_indentation(source, &ctx)
 }
 
 /// Determines if a node represents blank or empty content.
@@ -220,9 +277,9 @@ pub(crate) fn parse_quoted_scalar(source: &mut dyn ISource) -> Result<String, St
                         ));
                     }
                 }
-                
+
                 at_line_start = c == '\n';
-                
+
                 out.push(c);
                 source.next();
 
@@ -454,7 +511,10 @@ pub(crate) fn parse_mapping_key(
     directives: &crate::parser::directives::DirectiveContext,
 ) -> Result<(Node, bool), String> {
     // Check for anchors, aliases, or tags at the start of the key
-    let key_node = if matches!(source.current(), Some(CHAR_AMPERSAND) | Some(CHAR_ASTERISK) | Some('!')) {
+    let key_node = if matches!(
+        source.current(),
+        Some(CHAR_AMPERSAND) | Some(CHAR_ASTERISK) | Some('!')
+    ) {
         // Use parse_value to handle anchors/aliases/tags properly
         crate::parser::document::value::parse_value(source, directives)?
     } else {
@@ -464,7 +524,8 @@ pub(crate) fn parse_mapping_key(
         });
 
         // Check if we stopped at a colon or newline/carriage return
-        if source.current() == Some(CHAR_NEWLINE) || source.current() == Some(CHAR_CARRIAGE_RETURN) {
+        if source.current() == Some(CHAR_NEWLINE) || source.current() == Some(CHAR_CARRIAGE_RETURN)
+        {
             // We reached end of line without finding a colon - invalid mapping key
             return Err(parse_error(
                 source,
@@ -494,7 +555,7 @@ pub(crate) fn parse_mapping_key(
     // Now consume the colon and check for newline
     let mut newline = false;
     source.next(); // consume the colon
-    skip_whitespace(source);  // Tabs OK here - not indentation (same line as colon)
+    skip_whitespace(source); // Tabs OK here - not indentation (same line as colon)
     if let Some(c) = source.current() {
         if c == CHAR_HASH {
             consume_inline_comment_and_newline(source);
@@ -511,7 +572,12 @@ pub(crate) fn parse_mapping_key(
             }
             if newline {
                 // After newline, validate no tabs in indentation
-                skip_whitespace_no_tabs(source)?;
+                // Create temporary context for validation (assume block mapping at current indent)
+                let mut temp_ctx = crate::parser::document::context::ParsingContext::new(
+                    source.get_current_indent_level()
+                );
+                temp_ctx.mark_newline_consumed();
+                skip_whitespace_with_context(source, &temp_ctx)?;
             }
         }
     }
@@ -581,4 +647,141 @@ pub(crate) fn validate_comment_spacing(
 /// A String containing the inline representation
 pub(crate) fn node_to_inline_string(node: &Node) -> String {
     crate::utils::node_to_inline_string(node)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::io::sources::buffer::Buffer;
+    use crate::parser::document::context::{CollectionType, ParsingContext};
+
+    #[test]
+    fn test_validate_indentation_block_context_with_tab() {
+        // Tab in block context after newline should error
+        let mut source = Buffer::new(b"\t  content");
+        let mut ctx = ParsingContext::new(0);
+        ctx.mark_newline_consumed();
+
+        let result = validate_indentation(&mut source, &ctx);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("Tabs") && err.contains("not allowed"),
+            "Error: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_validate_indentation_block_context_no_tab() {
+        // Spaces in block context are OK
+        let mut source = Buffer::new(b"  content");
+        let mut ctx = ParsingContext::new(0);
+        ctx.mark_newline_consumed();
+
+        let result = validate_indentation(&mut source, &ctx);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_indentation_flow_context_with_tab() {
+        // Tab in flow context is allowed
+        let mut source = Buffer::new(b"\t  content");
+        let ctx = ParsingContext::new(0).child_flow_context(CollectionType::FlowSequence);
+
+        let result = validate_indentation(&mut source, &ctx);
+        assert!(result.is_ok(), "Tabs should be allowed in flow context");
+    }
+
+    #[test]
+    fn test_validate_indentation_not_after_newline() {
+        // Tab not immediately after newline (content found) - should not validate
+        let mut source = Buffer::new(b"\tcontent");
+        let ctx = ParsingContext::new(0);
+        // Don't mark newline consumed - simulates tab in middle of content
+
+        let result = validate_indentation(&mut source, &ctx);
+        assert!(result.is_ok(), "Tabs OK when not at indentation position");
+    }
+
+    #[test]
+    fn test_validate_indentation_blank_line() {
+        // Tab at line start is indentation even if followed by newline
+        let mut source = Buffer::new(b"\t\n");
+        let mut ctx = ParsingContext::new(0);
+        ctx.mark_newline_consumed();
+
+        let result = validate_indentation(&mut source, &ctx);
+        // Should error - tab is still indentation even on "blank" lines
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_indentation_actual_blank_line() {
+        // Truly blank line (just newline, no tabs) should be OK
+        let mut source = Buffer::new(b"\n");
+        let mut ctx = ParsingContext::new(0);
+        ctx.mark_newline_consumed();
+
+        let result = validate_indentation(&mut source, &ctx);
+        assert!(result.is_ok(), "Blank lines without tabs should be OK");
+    }
+
+    #[test]
+    fn test_validate_indentation_spaces_then_tab() {
+        // Spaces followed by tab in indentation
+        let mut source = Buffer::new(b"  \tcontent");
+        let mut ctx = ParsingContext::new(0);
+        ctx.mark_newline_consumed();
+
+        let result = validate_indentation(&mut source, &ctx);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("Tabs") && err.contains("not allowed"),
+            "Error: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_validate_no_tab_indentation_backward_compat() {
+        // Test backward compatibility wrapper
+        let mut source = Buffer::new(b"\tcontent");
+
+        let result = validate_no_tab_indentation(&mut source);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_skip_whitespace_with_context_block() {
+        // Test the new wrapper function
+        let mut source = Buffer::new(b"  content");
+        let mut ctx = ParsingContext::new(0);
+        ctx.mark_newline_consumed();
+
+        let result = skip_whitespace_with_context(&mut source, &ctx);
+        assert!(result.is_ok());
+        assert_eq!(source.current(), Some('c'));
+    }
+
+    #[test]
+    fn test_skip_whitespace_with_context_tab_error() {
+        let mut source = Buffer::new(b"\tcontent");
+        let mut ctx = ParsingContext::new(0);
+        ctx.mark_newline_consumed();
+
+        let result = skip_whitespace_with_context(&mut source, &ctx);
+        assert!(result.is_err(), "Should error on tab in block indentation");
+    }
+
+    #[test]
+    fn test_skip_whitespace_with_context_flow() {
+        // Tabs OK in flow context
+        let mut source = Buffer::new(b"\tcontent");
+        let ctx = ParsingContext::new(0).child_flow_context(CollectionType::FlowMapping);
+
+        let result = skip_whitespace_with_context(&mut source, &ctx);
+        assert!(result.is_ok());
+    }
 }

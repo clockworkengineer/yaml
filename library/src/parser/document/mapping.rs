@@ -4,9 +4,12 @@ use crate::constants::*;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::nodes::node::{BlockStyle, QuoteType};
+use crate::parser::document::context::{CollectionType, ParsingContext};
 use crate::parser::document::helpers::{parse_comment, parse_error, parse_mapping_key};
+use crate::parser::document::loop_guards::{MAX_LOOP_ITERATIONS, MAX_MAPPING_PAIRS};
 use crate::parser::document::value::parse_value;
 use crate::utils::collect_until;
+use crate::{combined_loop_guard, loop_guard_init};
 
 /// Parses a YAML mapping (dictionary) with the specified indentation level.
 ///
@@ -60,39 +63,24 @@ pub(crate) fn parse_mapping(
 
     let mut pairs: Vec<(Node, Node)> = Vec::new();
     let mut last_was_nested: bool;
-    let mut loop_iterations = 0;
-    const MAX_LOOP_ITERATIONS: usize = 100_000;
-    const MAX_PAIRS: usize = 50_000; // More reasonable limit on actual key-value pairs
+    loop_guard_init!(loop_counter);
 
     // Track the indentation of the first key for validation
     let mut first_key_indent: Option<usize> = None;
 
+    // Create parsing context for validation
+    let mut ctx = ParsingContext::new(indent_level);
+    ctx.collection_type = CollectionType::BlockMapping;
+
     while let Some(c) = source.current() {
-        // Prevent infinite loop - count loop iterations for safety
-        loop_iterations += 1;
-        if loop_iterations >= MAX_LOOP_ITERATIONS {
-            return Err(
-                "Mapping parsing exceeded maximum loop iterations - possible infinite loop"
-                    .to_string(),
-            );
-        }
-
-        // Also check reasonable pair count limit
-        if pairs.len() >= MAX_PAIRS {
-            return Err(format!(
-                "Mapping has too many pairs ({}+) - possible infinite loop",
-                MAX_PAIRS
-            ));
-        }
-
-        // Check for tabs at line start before processing content
-        if c == '\t' && source.get_current_indent_level() > 0 {
-            // Tab found at indentation level - this is invalid
-            return Err(parse_error(
-                source,
-                "Tabs are not allowed as indentation in YAML",
-            ));
-        }
+        // Prevent infinite loop and excessive memory usage
+        combined_loop_guard!(
+            loop_counter,
+            pairs,
+            MAX_LOOP_ITERATIONS,
+            MAX_MAPPING_PAIRS,
+            "Mapping"
+        );
 
         last_was_nested = false;
         match c {
@@ -114,6 +102,7 @@ pub(crate) fn parse_mapping(
             {
                 let current_indent = source.get_current_indent_level();
                 if current_indent < indent_level {
+                    // eprintln!("DEBUG: Breaking from mapping - indent {} < {}", current_indent, indent_level);
                     break;
                 }
 
@@ -273,6 +262,38 @@ pub(crate) fn parse_mapping(
             c if c.is_whitespace() => {
                 source.next();
                 continue;
+            }
+            '!' => {
+                // Tag at start of mapping key
+                let current_indent = source.get_current_indent_level();
+                if current_indent < indent_level {
+                    break;
+                }
+
+                if first_key_indent.is_none() {
+                    first_key_indent = Some(current_indent);
+                }
+
+                // Parse as a mapping key-value pair (tag will be handled by parse_mapping_key)
+                let (key_node, newline) = parse_mapping_key(source, directives)?;
+
+                let next_indent = source.get_current_indent_level();
+                if next_indent > indent_level && newline {
+                    pairs.push((
+                        key_node,
+                        crate::parser::document::parse_document_contents(
+                            source,
+                            next_indent,
+                            directives,
+                        )?,
+                    ));
+                    continue;
+                } else {
+                    let value_node = parse_value(source, directives)?;
+                    last_was_nested = matches!(value_node, Node::Anchored(_, _))
+                        || matches!(value_node, Node::Str(_, _, BlockStyle::Literal));
+                    pairs.push((key_node, value_node));
+                }
             }
             _ => break,
         }

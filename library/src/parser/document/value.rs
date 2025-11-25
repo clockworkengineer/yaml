@@ -449,24 +449,48 @@ pub(crate) fn parse_value(
 
     if source.current() == Some(CHAR_AMPERSAND) {
         source.next();
-        let name = collect_until(source, |c| {
-            // Anchor names can contain any character except:
-            // - Whitespace (space, tab, newline, carriage return)
-            // - Flow indicators: [ ] { } ,
-            // - Mapping indicator: :
-            // - Comment indicator: #
-            c == CHAR_SPACE
+
+        // Collect anchor name - per YAML spec, colons ARE allowed in anchor names
+        // We need to handle the special case where colon+space indicates a mapping key
+        let mut name = String::new();
+        while let Some(c) = source.current() {
+            // Stop at: whitespace, flow indicators, comments
+            if c == CHAR_SPACE
                 || c == CHAR_TAB
                 || c == CHAR_NEWLINE
                 || c == CHAR_CARRIAGE_RETURN
                 || c == CHAR_HASH
-                || c == CHAR_COLON
                 || c == CHAR_COMMA
                 || c == CHAR_LBRACKET
                 || c == CHAR_RBRACKET
                 || c == CHAR_LBRACE
                 || c == CHAR_RBRACE
-        });
+            {
+                break;
+            }
+
+            // Special handling for colon - only stop if followed by whitespace/newline/end
+            // This allows &foo:bar but stops at &foo: value
+            if c == CHAR_COLON {
+                let saved = source.save_state();
+                source.next();
+                let next = source.current();
+                source.restore_state(saved);
+
+                if matches!(
+                    next,
+                    Some(' ') | Some('\t') | Some('\n') | Some('\r') | None
+                ) {
+                    // Colon is a mapping separator, stop here
+                    break;
+                }
+                // Otherwise, colon is part of the anchor name, continue
+            }
+
+            name.push(c);
+            source.next();
+        }
+
         if name.trim().is_empty() {
             return Err(parse_error(source, ERR_EMPTY_ANCHOR_NAME));
         }
@@ -497,8 +521,11 @@ pub(crate) fn parse_value(
             source.next();
             let next_char = source.current();
             source.restore_state(saved);
-            
-            if matches!(next_char, Some(' ') | Some('\t') | Some('\n') | Some('\r') | None) {
+
+            if matches!(
+                next_char,
+                Some(' ') | Some('\t') | Some('\n') | Some('\r') | None
+            ) {
                 // This is a sequence indicator for the next item - anchor has empty value
                 return Ok(Node::Anchored(
                     Box::new(Node::Str(
@@ -712,12 +739,20 @@ pub(crate) fn parse_value(
                         cur_indent += 1;
                         source.next();
                     }
-                    let cur_is_newline = source.current() == Some(CHAR_NEWLINE);
+                    // Check for newline (both LF and CR for Windows compatibility)
+                    let cur_is_newline = source.current() == Some(CHAR_NEWLINE)
+                        || source.current() == Some(CHAR_CARRIAGE_RETURN);
                     source.restore_state(st_line);
 
                     if first_indent.is_none() {
                         if cur_is_newline {
-                            let _ = collect_until(source, |c| c == CHAR_NEWLINE);
+                            let _ = collect_until(source, |c| {
+                                c == CHAR_NEWLINE || c == CHAR_CARRIAGE_RETURN
+                            });
+                            // Handle both Unix (LF) and Windows (CRLF) line endings
+                            if source.current() == Some(CHAR_CARRIAGE_RETURN) {
+                                source.next();
+                            }
                             if source.current() == Some(CHAR_NEWLINE) {
                                 source.next();
                             }
@@ -730,7 +765,12 @@ pub(crate) fn parse_value(
                         break;
                     }
 
-                    let raw_line = collect_until(source, |c| c == CHAR_NEWLINE);
+                    let raw_line =
+                        collect_until(source, |c| c == CHAR_NEWLINE || c == CHAR_CARRIAGE_RETURN);
+                    // Handle both Unix (LF) and Windows (CRLF) line endings
+                    if source.current() == Some(CHAR_CARRIAGE_RETURN) {
+                        source.next();
+                    }
                     if source.current() == Some(CHAR_NEWLINE) {
                         source.next();
                     }
@@ -818,6 +858,9 @@ pub(crate) fn parse_value(
                 let mut parts = vec![value.clone()];
                 let mut has_empty_line = false;
 
+                // Track if we're in a mapping context where continuation needs to respect parent indent
+                // For now, be conservative with indent 0 check
+
                 // Collect continuation lines
                 loop {
                     // Check if we're at a newline
@@ -840,11 +883,20 @@ pub(crate) fn parse_value(
                         }
                     }
 
-                    // Empty line - this might end the scalar or be part of it
-                    if source.current() == Some(CHAR_NEWLINE) {
+                    // Empty line - in multiline plain scalars, empty lines are allowed
+                    // as long as subsequent lines are indented. Continue to check next line.
+                    if source.current() == Some(CHAR_NEWLINE)
+                        || source.current() == Some(CHAR_CARRIAGE_RETURN)
+                    {
                         has_empty_line = true;
-                        source.restore_state(state);
-                        break;
+                        // Skip the empty line character and continue
+                        // This allows: "a\n b\n\n c" to parse as multiline scalar
+                        source.next(); // Consume the newline/CR
+                        // If this is CR, also consume LF if present (Windows CRLF)
+                        if source.current() == Some(CHAR_NEWLINE) {
+                            source.next();
+                        }
+                        continue;
                     }
 
                     // EOF ends the scalar
@@ -854,7 +906,8 @@ pub(crate) fn parse_value(
                     }
 
                     // Line with indent 0 ends the scalar
-                    // (Continuation lines must be indented)
+                    // (Continuation lines must be indented relative to parent)
+                    // TODO: This should check indent > parent_indent_level, not just != 0
                     if next_indent == 0 {
                         source.restore_state(state);
                         break;
@@ -893,9 +946,9 @@ pub(crate) fn parse_value(
 
                     // This is a continuation line - collect it (DON'T restore state)
                     let cont_line = collect_until(source, |c| c == CHAR_NEWLINE || c == CHAR_HASH);
-                    if !cont_line.trim().is_empty() {
-                        parts.push(cont_line);
-                    }
+                    // Keep track of both empty and non-empty lines
+                    // Empty lines in plain scalars become spaces when folded
+                    parts.push(cont_line);
                     // Now we're at the newline after the continuation line, loop will check again
                 }
 
@@ -904,7 +957,14 @@ pub(crate) fn parse_value(
                     Ok(parse_scalar(trimmed, directives))
                 } else {
                     // Multiline plain scalar - fold lines together
-                    let combined = parts.join(" ");
+                    // Filter out completely empty parts and join with space
+                    let non_empty: Vec<String> = parts
+                        .iter()
+                        .map(|s| s.trim())
+                        .filter(|s| !s.is_empty())
+                        .map(|s| s.to_string())
+                        .collect();
+                    let combined = non_empty.join(" ");
                     Ok(parse_scalar(combined.trim(), directives))
                 }
             } else {

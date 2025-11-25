@@ -3,10 +3,14 @@
 use crate::constants::*;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
+use crate::parser::document::context::{CollectionType, ParsingContext};
 use crate::parser::document::helpers::{
-    parse_comment, peek_ahead_for_document_start_end, skip_whitespace, validate_no_tab_indentation,
+    parse_comment, peek_ahead_for_document_start_end, skip_whitespace, validate_indentation,
+    validate_no_tab_indentation,
 };
+use crate::parser::document::loop_guards::{MAX_LOOP_ITERATIONS, MAX_SEQUENCE_ITEMS};
 use crate::parser::document::value::parse_value;
+use crate::{combined_loop_guard, loop_guard_init};
 
 /// Parses a YAML sequence (array) with the specified indentation level.
 ///
@@ -29,33 +33,34 @@ pub(crate) fn parse_sequence(
     directives: &crate::parser::directives::DirectiveContext,
 ) -> Result<Node, String> {
     let mut items = Vec::new();
-    let mut loop_iterations = 0;
-    const MAX_LOOP_ITERATIONS: usize = 100_000;
-    const MAX_ITEMS: usize = 50_000; // More reasonable limit on actual items
+    loop_guard_init!(loop_counter);
 
     // Track the indentation of the first dash for validation
     let mut first_dash_indent: Option<usize> = None;
 
-    while let Some(c) = source.current() {
-        // Prevent infinite loop - count loop iterations for safety
-        loop_iterations += 1;
-        if loop_iterations >= MAX_LOOP_ITERATIONS {
-            return Err(
-                "Sequence parsing exceeded maximum loop iterations - possible infinite loop"
-                    .to_string(),
-            );
-        }
+    // Create parsing context for validation
+    let mut ctx = ParsingContext::new(indent_level);
+    ctx.collection_type = CollectionType::BlockSequence;
 
-        // Also check reasonable item count limit
-        if items.len() >= MAX_ITEMS {
-            return Err(format!(
-                "Sequence has too many items ({}+) - possible infinite loop",
-                MAX_ITEMS
-            ));
+    while let Some(c) = source.current() {
+        // Prevent infinite loop and excessive memory usage
+        combined_loop_guard!(
+            loop_counter,
+            items,
+            MAX_LOOP_ITERATIONS,
+            MAX_SEQUENCE_ITEMS,
+            "Sequence"
+        );
+
+        // Context-aware tab validation at line start
+        if source.get_current_indent_level() == 0 || c == '\n' || c == '\r' {
+            ctx.mark_newline_consumed();
+            validate_indentation(source, &ctx)?;
+            ctx.mark_content_found();
         }
 
         let current_indent = source.get_current_indent_level();
-        
+
         // Special handling for dashes: validate indentation consistency
         // before breaking due to dedentation
         if c == CHAR_DASH && !peek_ahead_for_document_start_end(source, c) {
@@ -81,7 +86,7 @@ pub(crate) fn parse_sequence(
                 }
             }
         }
-        
+
         if current_indent < indent_level {
             break;
         }
@@ -113,12 +118,12 @@ pub(crate) fn parse_sequence(
                     source.next(); // Skip tab
                     let next_char = source.current();
                     source.restore_state(state);
-                    
+
                     // Disallow tab if followed by newline, or by '-' that's not part of content
                     if next_char == Some('\n') || next_char == Some('\r') {
                         return Err(crate::parser::document::helpers::parse_error(
                             source,
-                            "Tabs cannot be used as separation after sequence indicator"
+                            "Tabs cannot be used as separation after sequence indicator",
                         ));
                     }
                     // If followed by another dash, check if it's a structure indicator
@@ -129,10 +134,14 @@ pub(crate) fn parse_sequence(
                         let after_dash = source.current();
                         source.restore_state(state2);
                         // If dash followed by space/newline, it's structure
-                        if after_dash == Some(' ') || after_dash == Some('\n') || after_dash == Some('\r') || after_dash == Some('\t') {
+                        if after_dash == Some(' ')
+                            || after_dash == Some('\n')
+                            || after_dash == Some('\r')
+                            || after_dash == Some('\t')
+                        {
                             return Err(crate::parser::document::helpers::parse_error(
                                 source,
-                                "Tabs cannot be used as separation after sequence indicator"
+                                "Tabs cannot be used as separation after sequence indicator",
                             ));
                         }
                     }
@@ -187,15 +196,26 @@ pub(crate) fn parse_sequence(
                 skip_whitespace(source);
             }
             _ => {
-                // Unexpected character - check if we should break or error
-                if source.get_current_indent_level() <= indent_level {
+                // Check indent before throwing error
+                let current_indent = source.get_current_indent_level();
+                if current_indent <= indent_level {
+                    // At or before sequence level - end of sequence
                     break;
                 }
-                return Err(format!(
-                    "Expected sequence item starting with CHAR_DASH, got '{}' at indent {}",
-                    source.current().unwrap_or('\0'),
-                    source.get_current_indent_level()
-                ));
+
+                // More indented - likely continuation of previous item or new nested content
+                // Don't try to parse here - this creates loops. Just break and let parent handle it.
+                match source.current() {
+                    Some(_) => {
+                        // Other characters at higher indent - unclear what to do
+                        return Err(format!(
+                            "Expected sequence item starting with CHAR_DASH, got '{}' at indent {}",
+                            source.current().unwrap_or('\0'),
+                            current_indent
+                        ));
+                    }
+                    None => break,
+                }
             }
         }
     }
