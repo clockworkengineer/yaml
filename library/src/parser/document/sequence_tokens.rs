@@ -5,7 +5,7 @@
 
 use crate::nodes::node::Node;
 use crate::parser::directives::DirectiveContext;
-use crate::parser::document::value_tokens::parse_value_with_tokens;
+use crate::parser::document::tokens::value::parse_value_with_tokens;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
 

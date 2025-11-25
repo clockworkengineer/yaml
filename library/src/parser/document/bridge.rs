@@ -7,7 +7,7 @@ use crate::io::traits::ISource;
 use crate::parser::token_stream::TokenStream;
 use crate::parser::directives::DirectiveContext;
 use crate::nodes::node::Node;
-use crate::parser::document::value_tokens::parse_value_with_tokens;
+use crate::parser::document::tokens::value::parse_value_with_tokens;
 
 /// Parse a value using tokens, wrapping the source in a token stream
 ///
