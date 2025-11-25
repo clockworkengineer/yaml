@@ -26,123 +26,43 @@ pub fn parse_value_bridged(
 /// Check if we should use token-based parsing for a given construct
 ///
 /// During migration, we can selectively enable token-based parsing for
-/// specific patterns that benefit most (e.g., decorators on empty values).
+/// specific patterns that benefit most.
+/// 
+/// CRITICAL: Avoid using token parsing in contexts where control will return
+/// to character-based parsing, as lexer read-ahead causes position sync issues.
 pub fn should_use_token_parsing(source: &mut dyn ISource) -> bool {
-    let original_state = source.save_state();
+    // SIMPLIFIED ROUTING: Avoid token/character mixing to prevent position sync issues
+    // Only use token parsing for pure flow contexts where we won't return to character parsing
     
-    // Use token parsing ONLY for:
-    // 1. Tag followed by specific patterns (decorator scenarios)
-    // 2. Anchor followed by specific patterns (decorator scenarios)  
-    // 3. Aliases (*name) - simpler token handling
-    //
-    // DON'T use for: block structures, tags with colons, !!set, quoted scalars
     let uses_tokens = match source.current() {
         Some('*') => {
-            // Aliases work well with tokens
-            true
+            // Aliases: Check if in flow context
+            let state = source.save_state();
+            source.next();
+            while let Some(c) = source.current() {
+                if c.is_alphanumeric() || c == '-' || c == '_' {
+                    source.next();
+                    continue;
+                }
+                break;
+            }
+            // Only use tokens if in flow collection or at EOF
+            let in_flow = matches!(source.current(), Some('[') | Some('{') | None);
+            source.restore_state(state);
+            in_flow
         }
         Some('!') => {
-            // Skip the tag to collect it
-            source.next();
-            let mut tag = String::from("!");
-            let mut has_colon = false;
-            
-            while let Some(c) = source.current() {
-                if c == ' ' {
-                    source.next();
-                    break;
-                }
-                if c == '!' {
-                    tag.push(c);
-                    source.next();
-                    continue;
-                }
-                if c == ':' {
-                    has_colon = true;
-                    tag.push(c);
-                    source.next();
-                    continue;
-                }
-                if c.is_alphanumeric() || c == '-' || c == '_' {
-                    tag.push(c);
-                    source.next();
-                    continue;
-                }
-                break;
-            }
-            
-            // Skip whitespace after tag
-            while let Some(c) = source.current() {
-                if c == ' ' || c == '\t' {
-                    source.next();
-                } else {
-                    break;
-                }
-            }
-            
-            // Don't use token parsing for:
-            // 1. Tags with colons in the tag itself (!!int:hex, !!yaml:omap, etc.) - complex formats
-            // 2. !!set with { - needs character parser for set syntax
-            // 3. Tags followed by colon in block context - character parser handles better (no sync issues)
-            if has_colon {
-                false
-            } else if (tag == "!!set" || tag == "!set") && source.current() == Some('{') {
-                false
-            } else if source.current() == Some(':') {
-                // Tag followed by colon (mapping key) - DON'T use token parsing
-                // Mixing token/character parsing causes position sync issues
-                false
-            } else {
-                // After tag, check if we have newline with indented content following
-                // If so, DON'T use token parsing - the character parser handles block content better
-                if source.current() == Some('\n') {
-                    // Peek ahead to see if there's indented content
-                    let peek_state = source.save_state();
-                    source.next(); // skip newline
-                    // Skip spaces (but not newlines) to check indent
-                    let mut indent = 0;
-                    while matches!(source.current(), Some(' ')) {
-                        indent += 1;
-                        source.next();
-                    }
-                    let has_content = !matches!(source.current(), None | Some('\n'));
-                    source.restore_state(peek_state);
-                    
-                    // If there's indented content (indent > 0) and not another newline/eof,
-                    // use character parser for better block structure handling
-                    if indent > 0 && has_content {
-                        source.restore_state(original_state);
-                        return false;
-                    }
-                }
-                
-                // After tag, check if we have flow collection start (use tokens for these)
-                // Colon is explicitly excluded above to avoid sync issues
-                matches!(source.current(), Some('[') | Some('{') | None)
-            }
+            // DON'T use token parsing for tags - character parser handles all cases
+            // This avoids position sync issues when returning to character-based parsing
+            false
         }
         Some('&') => {
-            // Skip the anchor to see what follows
-            source.next();
-            while let Some(c) = source.current() {
-                if c.is_alphanumeric() || c == '-' || c == '_' {
-                    source.next();
-                    continue;
-                }
-                break;
-            }
-            // After anchor, ONLY use token parsing for:
-            // - Flow collections ("[", "{")
-            // - EOF (None)
-            // DON'T use for:
-            // - Newlines - character parser handles block context better
-            // - Colons - causes position sync issues when mixing parsers
-            matches!(source.current(), Some('[') | Some('{') | None)
+            // DON'T use token parsing for anchors - character parser handles all cases
+            false
         }
         _ => false,
     };
     
-    source.restore_state(original_state);
     uses_tokens
 }
 
