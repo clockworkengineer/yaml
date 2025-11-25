@@ -145,9 +145,22 @@ pub fn parse_value_with_tokens(
         stream.skip_whitespace()?;
         
         // NOW check if we're at EOF or end of structure (empty decorated value)
+        // This includes:
+        // - EOF/None: end of document
+        // - Dash: next sequence item (e.g., "- !!str\n-" = empty tagged value)
+        // - Colon: mapping key (e.g., "!!str :")
+        // - FlowMappingEnd/FlowSequenceEnd: end of flow collection
+        // - DocumentStart/DocumentEnd: document boundary
         match stream.current() {
-            Some(Token::Eof) | None => {
-                // Decorator at EOF with no content - empty value
+            Some(Token::Eof) 
+            | Some(Token::Dash)
+            | Some(Token::Colon)
+            | Some(Token::FlowMappingEnd)
+            | Some(Token::FlowSequenceEnd)
+            | Some(Token::DocumentStart)
+            | Some(Token::DocumentEnd)
+            | None => {
+                // Decorator with no content - empty value
                 let mut result = Node::Str(String::new(), QuoteType::Unquoted, BlockStyle::None);
                 
                 if let Some(tag) = decorators.tag {

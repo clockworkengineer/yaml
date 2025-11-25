@@ -323,12 +323,24 @@ pub(crate) fn parse_value(
         // Handle comments after the tag
         if source.current() == Some(CHAR_HASH) {
             crate::parser::document::helpers::parse_comment(source);
-            if source.current() == Some(CHAR_NEWLINE) || source.current() == Some(CHAR_CARRIAGE_RETURN) {
+            if source.current() == Some(CHAR_NEWLINE)
+                || source.current() == Some(CHAR_CARRIAGE_RETURN)
+            {
                 // Comment consumed, now at newline
             }
         }
 
         let inner = match source.current() {
+            Some(CHAR_COLON) => {
+                // Tag followed by colon = empty tagged value used as mapping key
+                // e.g., "!!null : value" or "!!str :"
+                // Don't consume the colon - let the mapping parser handle it
+                Node::Str(
+                    String::new(),
+                    crate::nodes::node::QuoteType::Unquoted,
+                    crate::nodes::node::BlockStyle::None,
+                )
+            }
             Some(CHAR_LBRACE) => parse_inline_mapping(source, directives)?,
             Some(CHAR_LBRACKET) => parse_inline_sequence(source, directives)?,
             Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
@@ -459,7 +471,7 @@ pub(crate) fn parse_value(
             return Err(parse_error(source, ERR_EMPTY_ANCHOR_NAME));
         }
         skip_whitespace(source);
-        
+
         // Check for invalid patterns like &anchor - (anchor before dash on same line)
         if source.current() == Some('-') {
             // Check if this is a sequence indicator (dash followed by whitespace)
@@ -467,12 +479,38 @@ pub(crate) fn parse_value(
             source.next();
             let next_char = source.current();
             source.restore_state(saved);
-            
+
             if matches!(next_char, Some(' ') | Some('\t') | Some('\n') | None) {
-                return Err(parse_error(source, "Anchor must be placed after the dash (-) in sequences, not before"));
+                return Err(parse_error(
+                    source,
+                    "Anchor must be placed after the dash (-) in sequences, not before",
+                ));
             }
         }
-        
+
+        // Check if we're at a position indicating end of anchor's value (empty anchored value)
+        // This handles cases like: "- &a\n- b" where &a wraps an empty value
+        // After skip_whitespace, if we see a dash (next sequence item), we have an empty value
+        if source.current() == Some(CHAR_DASH) {
+            // Check if this is a sequence indicator
+            let saved = source.save_state();
+            source.next();
+            let next_char = source.current();
+            source.restore_state(saved);
+            
+            if matches!(next_char, Some(' ') | Some('\t') | Some('\n') | Some('\r') | None) {
+                // This is a sequence indicator for the next item - anchor has empty value
+                return Ok(Node::Anchored(
+                    Box::new(Node::Str(
+                        String::new(),
+                        crate::nodes::node::QuoteType::Unquoted,
+                        crate::nodes::node::BlockStyle::None,
+                    )),
+                    name,
+                ));
+            }
+        }
+
         // Handle both Unix (\n) and Windows (\r\n) line endings
         if source.current() == Some(CHAR_CARRIAGE_RETURN) {
             source.next();
@@ -494,6 +532,16 @@ pub(crate) fn parse_value(
             return Ok(Node::Anchored(Box::new(node), name));
         }
         let node = match source.current() {
+            Some(CHAR_COLON) => {
+                // Anchor followed by colon = empty anchored value used as mapping key
+                // e.g., "&a : value" or "&b :"
+                // Don't consume the colon - let the mapping parser handle it
+                Node::Str(
+                    String::new(),
+                    crate::nodes::node::QuoteType::Unquoted,
+                    crate::nodes::node::BlockStyle::None,
+                )
+            }
             Some(CHAR_LBRACE) => parse_inline_mapping(source, directives)?,
             Some(CHAR_LBRACKET) => parse_inline_sequence(source, directives)?,
             Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
@@ -516,7 +564,10 @@ pub(crate) fn parse_value(
         }
         // Check for anchor applied to alias (not allowed - aliases reference existing anchors)
         if matches!(node, Node::Alias(_)) {
-            return Err(parse_error(source, "Cannot apply anchor to an alias - aliases reference existing anchors"));
+            return Err(parse_error(
+                source,
+                "Cannot apply anchor to an alias - aliases reference existing anchors",
+            ));
         }
         return Ok(Node::Anchored(Box::new(node), name));
     }
@@ -549,9 +600,7 @@ pub(crate) fn parse_value(
         Some(_) => {
             // Collect plain scalar, stopping at newline or comment
             // Note: Commas are valid in plain scalars in block context
-            let value = collect_until(source, |c| {
-                c == CHAR_NEWLINE || c == CHAR_HASH
-            });
+            let value = collect_until(source, |c| c == CHAR_NEWLINE || c == CHAR_HASH);
             let trimmed = value.trim();
 
             // Check if comment follows without whitespace (for block scalars like `>#`)

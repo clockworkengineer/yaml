@@ -151,9 +151,32 @@ pub fn parse_document_contents(
         Some(c) if c == '{' => Ok(parse_inline_mapping(source, directives)?),
         Some(c) if c == '[' => Ok(parse_inline_sequence(source, directives)?),
         // Support tagged values at the start of a nested block (e.g. indented "!!set" lines)
-        Some(c) if c == '!' => Ok(crate::parser::document::value::parse_value(
-            source, directives,
-        )?),
+        Some(c) if c == '!' => {
+            // Save state to check if this is a tagged mapping key
+            let state = source.save_state();
+            source.next(); // skip first !
+            
+            // Skip the tag
+            while let Some(ch) = source.current() {
+                if ch == ' ' || ch == '\t' || ch == '\n' {
+                    break;
+                }
+                source.next();
+            }
+            crate::parser::document::helpers::skip_whitespace(source);
+            
+            // Check if what follows is a colon (indicating mapping key)
+            let is_mapping_key = source.current() == Some(':');
+            
+            // Restore state and parse appropriately
+            source.restore_state(state);
+            
+            if is_mapping_key {
+                Ok(parse_mapping(source, indent_level, directives)?)
+            } else {
+                Ok(crate::parser::document::value::parse_value(source, directives)?)
+            }
+        }
         // Support anchors at document level (e.g. "&anchor key: value")
         Some(c) if c == '&' => {
             // Save state to check if this is an anchored mapping key

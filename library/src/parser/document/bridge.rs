@@ -81,11 +81,16 @@ pub fn should_use_token_parsing(source: &mut dyn ISource) -> bool {
             }
             
             // Don't use token parsing for:
-            // 1. Tags with colons (!!int:hex, !!yaml:omap, etc.) - complex formats
+            // 1. Tags with colons in the tag itself (!!int:hex, !!yaml:omap, etc.) - complex formats
             // 2. !!set with { - needs character parser for set syntax
+            // 3. Tags followed by colon in block context - character parser handles better (no sync issues)
             if has_colon {
                 false
             } else if (tag == "!!set" || tag == "!set") && source.current() == Some('{') {
+                false
+            } else if source.current() == Some(':') {
+                // Tag followed by colon (mapping key) - DON'T use token parsing
+                // Mixing token/character parsing causes position sync issues
                 false
             } else {
                 // After tag, check if we have newline with indented content following
@@ -111,8 +116,9 @@ pub fn should_use_token_parsing(source: &mut dyn ISource) -> bool {
                     }
                 }
                 
-                // After tag, check if we have colon or flow collection start (use tokens for these)
-                matches!(source.current(), Some(':') | Some('[') | Some('{') | None)
+                // After tag, check if we have flow collection start (use tokens for these)
+                // Colon is explicitly excluded above to avoid sync issues
+                matches!(source.current(), Some('[') | Some('{') | None)
             }
         }
         Some('&') => {
@@ -125,8 +131,13 @@ pub fn should_use_token_parsing(source: &mut dyn ISource) -> bool {
                 }
                 break;
             }
-            // After anchor, check for newline, colon, or flow collection start
-            matches!(source.current(), Some('\n') | Some(':') | Some('[') | Some('{') | None)
+            // After anchor, ONLY use token parsing for:
+            // - Flow collections ("[", "{")
+            // - EOF (None)
+            // DON'T use for:
+            // - Newlines - character parser handles block context better
+            // - Colons - causes position sync issues when mixing parsers
+            matches!(source.current(), Some('[') | Some('{') | None)
         }
         _ => false,
     };

@@ -453,9 +453,9 @@ pub(crate) fn parse_mapping_key(
     source: &mut dyn ISource,
     directives: &crate::parser::directives::DirectiveContext,
 ) -> Result<(Node, bool), String> {
-    // Check for anchors or aliases at the start of the key
-    let key_node = if matches!(source.current(), Some(CHAR_AMPERSAND) | Some(CHAR_ASTERISK)) {
-        // Use parse_value to handle anchors/aliases properly
+    // Check for anchors, aliases, or tags at the start of the key
+    let key_node = if matches!(source.current(), Some(CHAR_AMPERSAND) | Some(CHAR_ASTERISK) | Some('!')) {
+        // Use parse_value to handle anchors/aliases/tags properly
         crate::parser::document::value::parse_value(source, directives)?
     } else {
         // Original collection-based parsing for plain scalars

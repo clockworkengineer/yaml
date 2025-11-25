@@ -137,15 +137,18 @@ pub(crate) fn parse_mapping(
                     if alias_name.trim().is_empty() {
                         return Err(parse_error(source, "Alias name cannot be empty"));
                     }
-                    
+
                     crate::parser::document::helpers::skip_whitespace(source);
-                    
+
                     // Must have colon after alias
                     if source.current() != Some(CHAR_COLON) {
-                        return Err(parse_error(source, "Alias used as key must be followed by colon"));
+                        return Err(parse_error(
+                            source,
+                            "Alias used as key must be followed by colon",
+                        ));
                     }
                     source.next(); // consume colon
-                    
+
                     let mut newline = false;
                     crate::parser::document::helpers::skip_whitespace(source);
                     if source.current() == Some(CHAR_HASH) {
@@ -162,7 +165,7 @@ pub(crate) fn parse_mapping(
                     if newline {
                         crate::parser::document::helpers::skip_whitespace_no_tabs(source)?;
                     }
-                    
+
                     (Node::Alias(alias_name), newline)
                 } else {
                     // Check for anchor on the mapping key
@@ -190,16 +193,19 @@ pub(crate) fn parse_mapping(
                     };
 
                     let (mut key_node, newline) = parse_mapping_key(source, directives)?;
-                    
+
                     // Wrap the key in an Anchored node if we found an anchor
                     if let Some(name) = anchor_name {
                         // Check if we're trying to anchor an alias (not allowed)
                         if matches!(key_node, Node::Alias(_)) {
-                            return Err(parse_error(source, "Cannot apply anchor to an alias - aliases reference existing anchors"));
+                            return Err(parse_error(
+                                source,
+                                "Cannot apply anchor to an alias - aliases reference existing anchors",
+                            ));
                         }
                         key_node = Node::Anchored(Box::new(key_node), name);
                     }
-                    
+
                     (key_node, newline)
                 };
                 if let Node::Str(ref mut s, ref mut qt, ref mut _style) = key_node {
