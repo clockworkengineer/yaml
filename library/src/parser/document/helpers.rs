@@ -78,39 +78,22 @@ pub(crate) fn validate_indentation(
         return Ok(());
     }
 
-    let state = source.save_state();
-    let line_start_column = state.column;
-
-    // Check from current position for tabs before reaching required indentation level
-    // Once we've consumed enough spaces to reach the indent level, tabs are allowed (content)
+    // From indentation position, any tab encountered before actual content is forbidden
     while let Some(c) = source.current() {
-        let current_state = source.save_state();
-        let current_column = current_state.column;
-        let spaces_consumed = current_column - line_start_column;
-        
         if c == CHAR_TAB {
-            // Tab is only forbidden if we haven't exceeded the parent's indentation level
-            // Tabs at or before the parent level are indentation (forbidden)
-            // Tabs after the parent level are content whitespace (allowed)
-            if spaces_consumed <= ctx.indent_level {
-                source.restore_state(state);
-                return Err(forbidden_error(source, "Tabs", "as indentation in YAML"));
-            }
-            // Tab after required indentation is content whitespace - allowed
-            break;
+            return Err(forbidden_error(source, "Tabs", "as indentation in YAML"));
         } else if c == CHAR_SPACE {
             source.next();
+            continue;
         } else if c == CHAR_NEWLINE || c == CHAR_CARRIAGE_RETURN {
-            // Blank line - tabs would be OK here (no content)
-            source.restore_state(state);
+            // Truly blank line
             return Ok(());
         } else {
-            // Found content - no tabs in indentation
+            // Non-space content reached; stop validation
             break;
         }
     }
 
-    source.restore_state(state);
     Ok(())
 }
 

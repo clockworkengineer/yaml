@@ -419,12 +419,11 @@ fn parse_inline_mapping_with_colons(
                     }
                 };
                 
-                // Check if there's a colon for the value
+                // Require a colon for mappings that contain any key-value pairs
+                // Cases like {a, b} are sets and handled elsewhere; once we are in the
+                // mapping-with-colons path, every entry must have ':' after the key.
                 if source.current() == Some(CHAR_COLON) {
                     source.next();
-                } else if source.current() == Some(CHAR_COMMA) || source.current() == Some(CHAR_RBRACE) {
-                    // No colon means implicit null value - just use the key we parsed
-                    // and continue (value will be set to Node::None below)
                 } else {
                     return Err(parse_error(source, ERR_EXPECT_COLON_INLINE_MAPPING));
                 }
@@ -551,8 +550,8 @@ pub(crate) fn parse_inline_sequence(
     const MAX_ITEMS: usize = 10_000;
 
     source.next();
-    // In flow context, tabs are allowed per YAML 1.2 spec
-    crate::utils::skip_whitespace_and_comments(source);
+    // Validate tabs are not used as indentation after newline in flow context
+    skip_whitespace_and_comments_validate_tabs(source)?;
 
     if source.current() == Some(CHAR_RBRACKET) {
         source.next();
@@ -570,8 +569,8 @@ pub(crate) fn parse_inline_sequence(
         }
 
         // Skip whitespace and comments before checking for items
-        // In flow context, tabs are allowed per YAML 1.2 spec
-        crate::utils::skip_whitespace_and_comments(source);
+        // Reject tabs used as indentation after newlines in flow context
+        skip_whitespace_and_comments_validate_tabs(source)?;
 
         // Check for closing bracket (handles trailing comma case)
         if source.current() == Some(CHAR_RBRACKET) {

@@ -216,18 +216,19 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
         },
         "!!pairs" | "!pairs" | "tag:yaml.org,2002:pairs" => match node {
             // Pairs - array of key-value pairs
+            // Keep representation as an array of 2-element arrays, as required by tests
             Node::Array(items) => {
                 let mut pairs_items = Vec::new();
                 for item in items {
                     match &item {
+                        // Single-pair mapping -> convert to [key, value]
                         Node::Mapping(pairs) if pairs.len() == 1 => {
-                            pairs_items.push(item);
+                            let (k, v) = pairs[0].clone();
+                            pairs_items.push(Node::Array(vec![k, v]));
                         }
+                        // Already a [key, value] array -> keep as is
                         Node::Array(arr) if arr.len() == 2 => {
-                            // Convert [key, value] to {key: value}
-                            let key = arr[0].clone();
-                            let value = arr[1].clone();
-                            pairs_items.push(Node::Mapping(vec![(key, value)]));
+                            pairs_items.push(Node::Array(arr.clone()));
                         }
                         _ => return None, // Invalid pairs format
                     }

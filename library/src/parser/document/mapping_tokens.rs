@@ -81,7 +81,8 @@ fn parse_mapping_pair(
     directives: &DirectiveContext,
 ) -> Result<(Node, Node), String> {
     // Check for explicit key indicator (?)
-    let explicit_key = if matches!(stream.current(), Some(Token::Plain(s)) if s == "?") {
+    // Lexer emits a dedicated token for '?', not a plain scalar
+    let explicit_key = if matches!(stream.current(), Some(Token::QuestionMark)) {
         stream.next()?;
         stream.skip_whitespace()?;
         true
@@ -134,6 +135,19 @@ fn parse_mapping_pair(
                 }
             } else {
                 return Err("Expected colon after explicit key".to_string());
+            }
+        }
+        // Defensive fallback: if we somehow see EOF here, try advancing once
+        // (some lexers may emit Eof sentinel that advances to a real token on next())
+        Some(Token::Eof) | None => {
+            if let Some(tok) = stream.next()? {
+                if matches!(tok, Token::Colon) {
+                    // already advanced and consumed colon
+                } else {
+                    return Err(format!("Expected colon after key, got after advance: {:?}", tok));
+                }
+            } else {
+                return Err("Expected colon after key, got EOF".to_string());
             }
         }
         _ => {
