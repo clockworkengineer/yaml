@@ -55,7 +55,10 @@ fn run_yaml_test_suite() {
     // Try multiple possible paths for the test suite
     let suite_dir = Path::new("c:/Projects/yaml/yaml-test-suite/src");
     if !suite_dir.exists() {
-        println!("YAML test suite repo directory not found at {:?}", suite_dir);
+        println!(
+            "YAML test suite repo directory not found at {:?}",
+            suite_dir
+        );
         println!("Please clone https://github.com/yaml/yaml-test-suite.git to this location.");
         return;
     }
@@ -196,7 +199,11 @@ fn run_yaml_test_suite() {
     if total_tests > 0 {
         let pass_rate = (passed as f64 / total_tests as f64) * 100.0;
         println!("\nPass Rate: {:.1}%", pass_rate);
-        assert!(pass_rate >= 90.0, "YAML test suite pass rate is below 90%: {:.1}%", pass_rate);
+        assert!(
+            pass_rate >= 90.0,
+            "YAML test suite pass rate is below 90%: {:.1}%",
+            pass_rate
+        );
     }
 }
 
