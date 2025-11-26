@@ -9,7 +9,7 @@ use crate::parser::directives::DirectiveContext;
 use crate::io::traits::ISource;
 
 /// Decorators (tags and anchors) extracted from token stream
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Decorators {
     pub tag: Option<String>,
     pub anchor: Option<String>,
@@ -37,21 +37,25 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Get the current token without consuming it
+    #[inline]
     pub fn current(&self) -> Option<&Token> {
         self.lexer.current()
     }
 
     /// Advance to the next token
+    #[inline]
     pub fn next(&mut self) -> Result<Option<Token>, String> {
         self.lexer.next()
     }
 
     /// Peek at the next token without consuming it
+    #[inline]
     pub fn peek(&mut self) -> Result<Option<&Token>, String> {
         self.lexer.peek()
     }
 
     /// Check if current token matches a predicate
+    #[inline]
     pub fn is_current<F>(&self, predicate: F) -> bool
     where
         F: FnOnce(&Token) -> bool,
@@ -60,6 +64,7 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Expect a specific token and consume it
+    #[inline]
     pub fn expect(&mut self, expected: Token) -> Result<(), String> {
         match self.current() {
             Some(token) if token == &expected => {
@@ -75,19 +80,19 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Skip whitespace tokens (newlines, indents)
+    #[inline]
     pub fn skip_whitespace(&mut self) -> Result<(), String> {
-        loop {
-            match self.current() {
-                Some(Token::Newline) | Some(Token::Indent(_)) => {
-                    self.next()?;
-                }
-                _ => break,
-            }
+        while self
+            .current()
+            .map_or(false, |t| matches!(t, Token::Newline | Token::Indent(_)))
+        {
+            self.next()?;
         }
         Ok(())
     }
 
     /// Skip comments
+    #[inline]
     pub fn skip_comments(&mut self) -> Result<(), String> {
         while matches!(self.current(), Some(Token::Comment(_))) {
             self.next()?;
@@ -96,16 +101,17 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Skip whitespace and comments
+    #[inline]
     pub fn skip_whitespace_and_comments(&mut self) -> Result<(), String> {
-        loop {
-            match self.current() {
-                Some(Token::Newline) | Some(Token::Indent(_)) | Some(Token::Comment(_)) => {
-                    self.next()?;
-                }
-                _ => break,
-            }
+        while self.current().map_or(false, |t| Self::is_trivia(t)) {
+            self.next()?;
         }
         Ok(())
+    }
+
+    #[inline]
+    fn is_trivia(token: &Token) -> bool {
+        matches!(token, Token::Newline | Token::Indent(_) | Token::Comment(_))
     }
 
     /// Consume decorators (tags and anchors) from the token stream

@@ -8,7 +8,7 @@ use crate::constants::*;
 use crate::io::traits::ISource;
 
 /// A YAML token with its type and associated data
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
     /// Tag decorator: !tag or !!tag
     Tag(String),
@@ -94,11 +94,13 @@ impl<'a> Lexer<'a> {
     }
 
     /// Get the current token without consuming it
+    #[inline]
     pub fn current(&self) -> Option<&Token> {
         self.current_token.as_ref()
     }
 
     /// Advance to the next token
+    #[inline]
     pub fn next(&mut self) -> Result<Option<Token>, String> {
         if let Some(peeked) = self.peeked_token.take() {
             self.current_token = Some(peeked.clone());
@@ -112,6 +114,7 @@ impl<'a> Lexer<'a> {
 
     /// Peek at the next token without consuming it
     #[allow(dead_code)]
+    #[inline]
     pub fn peek(&mut self) -> Result<Option<&Token>, String> {
         if self.peeked_token.is_none() {
             self.peeked_token = self.scan_token()?;

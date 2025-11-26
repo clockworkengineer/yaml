@@ -3,7 +3,7 @@
 //! This library provides a flexible YAML implementation with:
 //! - Core Node type for representing YAML structures
 //! - Parser to build Node trees from streams
-//! - Multiple format serializers (YAML, YAML, XML, Bencode)
+//! - Multiple format serializers (YAML, JSON, XML, TOML, Bencode)
 //! - File and buffer I/O abstractions
 //! - Pretty-printing utilities
 //! - Unicode-aware file handling
@@ -88,13 +88,13 @@ pub use file::file::read_file_to_string;
 /// This function writes a string to a file in the specified Unicode format
 #[cfg(feature = "file-io")]
 pub use file::file::write_file_from_string;
-/// Destination implementation for writing JSON data to a memory buffer
+/// Destination implementation for writing YAML data to a memory buffer
 pub use io::destinations::buffer::Buffer as BufferDestination;
-/// Destination implementation for writing JSON data to a file
+/// Destination implementation for writing YAML data to a file
 pub use io::destinations::file::File as FileDestination;
-/// Source implementation for reading JSON data from a memory buffer
+/// Source implementation for reading YAML data from a memory buffer
 pub use io::sources::buffer::Buffer as BufferSource;
-/// Source implementation for reading JSON data from a file
+/// Source implementation for reading YAML data from a file
 pub use io::sources::file::File as FileSource;
 /// Returns the base node of document number n (0-based), reporting any errors.
 pub use misc::get_document_base as get_document;
@@ -111,7 +111,7 @@ pub use nodes::node::BlockStyle;
 /// Fluent builder for constructing Mapping nodes
 #[cfg(feature = "alloc")]
 pub use nodes::node::MappingBuilder;
-/// Core data structure representing a json node and numerical node in the parsed tree
+/// Core data structure representing a YAML node in the parsed tree
 pub use nodes::node::Node;
 /// Core data structure representing a numeric value node in the parsed tree
 pub use nodes::node::Numeric;
@@ -128,7 +128,7 @@ pub use nodes::node::make_set;
 pub use parser::config::ParserConfig;
 /// Parser configuration builder
 pub use parser::config::ParserConfigBuilder;
-/// Parses json data into a Node tree structure
+/// Parses YAML data into a Node tree structure
 pub use parser::document::parse;
 /// Converts a Node tree to bencode format
 #[cfg(feature = "format-converters")]

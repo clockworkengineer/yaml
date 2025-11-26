@@ -93,7 +93,7 @@ impl fmt::Display for ErrorKind {
 /// assert_eq!(error.line(), Some(5));
 /// assert_eq!(error.column(), Some(12));
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct YamlError {
     kind: ErrorKind,
     message: alloc::string::String,

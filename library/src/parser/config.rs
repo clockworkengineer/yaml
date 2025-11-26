@@ -82,11 +82,13 @@ impl Default for ParserConfig {
 
 impl ParserConfig {
     /// Create a new parser configuration with default settings
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
     
     /// Create a builder for fluent configuration
+    #[must_use]
     pub fn builder() -> ParserConfigBuilder {
         ParserConfigBuilder::new()
     }
@@ -182,6 +184,7 @@ impl ParserConfig {
 ///     .depth_error_message("Nesting too deep!")
 ///     .build();
 /// ```
+#[must_use]
 #[derive(Default)]
 pub struct ParserConfigBuilder {
     config: ParserConfig,
@@ -189,6 +192,7 @@ pub struct ParserConfigBuilder {
 
 impl ParserConfigBuilder {
     /// Create a new builder with default settings
+    #[must_use]
     pub fn new() -> Self {
         Self {
             config: ParserConfig::default(),
@@ -196,78 +200,91 @@ impl ParserConfigBuilder {
     }
     
     /// Set maximum nesting depth
+    #[must_use]
     pub fn max_depth(mut self, depth: usize) -> Self {
         self.config.max_depth = depth;
         self
     }
     
     /// Set maximum document size in bytes
+    #[must_use]
     pub fn max_size(mut self, size: usize) -> Self {
         self.config.max_size = Some(size);
         self
     }
     
     /// Enable or disable strict YAML 1.2 compliance
+    #[must_use]
     pub fn strict_mode(mut self, enabled: bool) -> Self {
         self.config.strict_mode = enabled;
         self
     }
     
     /// Allow or disallow duplicate keys in mappings
+    #[must_use]
     pub fn allow_duplicate_keys(mut self, allow: bool) -> Self {
         self.config.allow_duplicate_keys = allow;
         self
     }
     
     /// Allow or disallow tabs for indentation
+    #[must_use]
     pub fn allow_tabs(mut self, allow: bool) -> Self {
         self.config.allow_tabs = allow;
         self
     }
     
     /// Allow or disallow merge keys (<<)
+    #[must_use]
     pub fn allow_merge_keys(mut self, allow: bool) -> Self {
         self.config.allow_merge_keys = allow;
         self
     }
     
     /// Allow or disallow anchors and aliases
+    #[must_use]
     pub fn allow_anchors(mut self, allow: bool) -> Self {
         self.config.allow_anchors = allow;
         self
     }
     
     /// Set maximum number of anchors per document
+    #[must_use]
     pub fn max_anchors(mut self, max: usize) -> Self {
         self.config.max_anchors = Some(max);
         self
     }
     
     /// Allow or disallow explicit document markers (--- and ...)
+    #[must_use]
     pub fn allow_document_markers(mut self, allow: bool) -> Self {
         self.config.allow_document_markers = allow;
         self
     }
     
     /// Allow or disallow tags (!!, !tag)
+    #[must_use]
     pub fn allow_tags(mut self, allow: bool) -> Self {
         self.config.allow_tags = allow;
         self
     }
     
     /// Preserve or discard comments during parsing
+    #[must_use]
     pub fn preserve_comments(mut self, preserve: bool) -> Self {
         self.config.preserve_comments = preserve;
         self
     }
     
     /// Set custom error message for depth exceeded
+    #[must_use]
     pub fn depth_error_message<S: Into<String>>(mut self, message: S) -> Self {
         self.config.depth_error_message = Some(message.into());
         self
     }
     
     /// Build the final ParserConfig
+    #[must_use]
     pub fn build(self) -> ParserConfig {
         self.config
     }
