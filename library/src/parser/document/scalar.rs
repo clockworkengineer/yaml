@@ -35,6 +35,98 @@ pub(crate) fn parse_scalar(value: &str, directives: &DirectiveContext) -> Node {
         "on" | "On" | "ON" if directives.is_yaml_11() => Node::Boolean(true),
         "off" | "Off" | "OFF" if directives.is_yaml_11() => Node::Boolean(false),
         v => {
+            // Only treat | or > as block scalar indicators in block context, not in flow collections
+            // For flow context, these should be part of the string
+            // (Assume flow context if there are no newlines in the value)
+            if (v.starts_with('|') || v.starts_with('>')) && v.contains('\n') {
+                // Block scalar indicator: | or >, possibly followed by chomping (+/-) and indentation
+                let mut chars = v.chars();
+                let indicator = chars.next().unwrap();
+                let mut chomping = None;
+                let mut indent = None;
+                let mut rest = String::new();
+                // Parse optional chomping and indentation
+                while let Some(c) = chars.next() {
+                    match c {
+                        '+' | '-' if chomping.is_none() => chomping = Some(c),
+                        d if d.is_ascii_digit() && indent.is_none() => {
+                            let mut num = d.to_string();
+                            while let Some(next) = chars.clone().next() {
+                                if next.is_ascii_digit() {
+                                    num.push(next);
+                                    chars.next();
+                                } else {
+                                    break;
+                                }
+                            }
+                            indent = num.parse::<usize>().ok();
+                        }
+                        ' ' => continue,
+                        _ => {
+                            rest.push(c);
+                            rest.push_str(chars.as_str());
+                            break;
+                        }
+                    }
+                }
+                let content = if rest.is_empty() { v[1..].trim_start() } else { rest.trim_start() };
+
+                // Split lines and apply indentation
+                let lines: Vec<&str> = content.lines().collect();
+                let min_indent = indent.unwrap_or_else(|| {
+                    lines.iter()
+                        .filter(|l| !l.trim().is_empty())
+                        .map(|l| l.chars().take_while(|c| *c == ' ').count())
+                        .min()
+                        .unwrap_or(0)
+                });
+                let stripped: Vec<&str> = lines
+                    .iter()
+                    .map(|l| if l.len() >= min_indent { &l[min_indent..] } else { l.trim_end() })
+                    .collect();
+
+                let style = if indicator == '|' { BlockStyle::Literal } else { BlockStyle::Folded };
+                let mut result = String::new();
+                if style == BlockStyle::Literal {
+                    result = stripped.join("\n");
+                } else {
+                    // Folded: replace newlines with space except for empty lines
+                    let mut prev_blank = false;
+                    for line in &stripped {
+                        if line.trim().is_empty() {
+                            result.push('\n');
+                            prev_blank = true;
+                        } else {
+                            if !result.is_empty() && !prev_blank {
+                                result.push(' ');
+                            }
+                            result.push_str(line);
+                            prev_blank = false;
+                        }
+                    }
+                }
+
+                // Chomping: '+' (keep all), '-' (strip all), default (keep one)
+                let trailing_newlines = content.chars().rev().take_while(|c| *c == '\n').count();
+                match chomping {
+                    Some('+') => {
+                        for _ in 0..trailing_newlines {
+                            result.push('\n');
+                        }
+                    }
+                    Some('-') => {
+                        // Strip all trailing newlines
+                        result = result.trim_end_matches('\n').to_string();
+                    }
+                    _ => {
+                        // Default: keep one trailing newline
+                        if trailing_newlines > 0 {
+                            result.push('\n');
+                        }
+                    }
+                }
+                return Node::Str(result, QuoteType::Unquoted, style);
+            }
             // Try parsing as octal first (version-specific)
             if v.starts_with('0') && v.len() > 1 {
                 // YAML 1.2: 0o prefix for octal

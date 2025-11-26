@@ -27,10 +27,26 @@ where
             break;
         }
 
+        // Allow quoted scalars to be parsed as a single item
+        if c == '\'' || c == '"' {
+            let quote_char = c;
+            let mut quoted = String::new();
+            source.next();
+            while let Some(qc) = source.current() {
+                if qc == quote_char {
+                    source.next();
+                    break;
+                }
+                quoted.push(qc);
+                source.next();
+            }
+            out.push_str(&quoted);
+            continue;
+        }
+
         if c == '\n' || c == '\r' {
             // Handle newline with line folding
             source.next();
-            
             // Skip the following indentation spaces
             while let Some(next_c) = source.current() {
                 if next_c == ' ' || next_c == '\t' {
@@ -39,14 +55,12 @@ where
                     break;
                 }
             }
-            
             // Check if we hit a stop character after the newline+spaces
             if let Some(next_c) = source.current() {
                 if stop_pred(next_c) {
                     break;
                 }
             }
-            
             // Add a single space for the folded line (if we have content)
             if !out.is_empty() && !out.ends_with(' ') {
                 out.push(' ');
@@ -62,7 +76,6 @@ where
             break;
         }
     }
-    
     out
 }
 
@@ -900,6 +913,7 @@ pub(crate) fn parse_inline_sequence(
                             parse_scalar(raw.trim(), directives)
                         }
                         _ => {
+                            // Accept leading special characters (e.g., '>folded') as part of the scalar
                             let val = collect_flow_scalar(source, |c| {
                                 c == CHAR_COMMA || c == CHAR_RBRACKET || c == CHAR_HASH
                             });
@@ -907,11 +921,10 @@ pub(crate) fn parse_inline_sequence(
                             if trimmed.is_empty() {
                                 Node::None
                             } else {
-                                // Reject plain scalars that are just a dash (ambiguous with sequence indicator)
+                                // Do not strip leading '>' or other special chars; let parse_scalar handle it
                                 if trimmed == "-" {
                                     return Err(parse_error(source, "Plain dash in flow sequence is ambiguous"));
                                 }
-                                // Reject document markers in flow context
                                 if trimmed == "---" || trimmed == "..." {
                                     return Err(parse_error(source, "Document markers are not allowed in flow collections"));
                                 }
