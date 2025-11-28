@@ -1,6 +1,8 @@
+
 # YAML Utility Library Example
 
-This utility library provides helper functions for working with YAML files in the examples. It's designed to simplify common file operations across multiple examples.
+This utility library provides helper functions for working with YAML files in the examples. It's designed to simplify common file operations across multiple examples and supports error handling and validation for robust workflows.
+
 
 ## What This Library Provides
 
@@ -8,6 +10,7 @@ This utility library provides helper functions for working with YAML files in th
 - **Batch processing** - Processing multiple files efficiently
 - **Directory handling** - Creating directories as needed
 - **Reusable patterns** - Common operations used across examples
+- **Error codes and suggestions** - Enhanced error handling for file operations
 
 ## Main Function
 

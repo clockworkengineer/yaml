@@ -1,6 +1,8 @@
+
 # YAML Validation Example
 
-This example demonstrates JSON Schema-style validation for YAML documents using the `yaml_lib` validation module.
+This example demonstrates JSON Schema-style validation for YAML documents using the `yaml_lib` validation module. It showcases type checking, constraint validation, error reporting, and custom validation logic.
+
 
 ## Features Demonstrated
 
@@ -12,12 +14,15 @@ This example demonstrates JSON Schema-style validation for YAML documents using 
 6. **Pattern and Enum Validation** - Match patterns and restrict to allowed values
 7. **Custom Validators** - Create custom validation logic
 8. **Real-World Configuration** - Validate complex application configuration
+9. **Error Codes and Suggestions** - Enhanced error handling with codes and fix suggestions
+
 
 ## Running the Example
 
 ```bash
 cargo run --release
 ```
+
 
 ## Key Concepts
 

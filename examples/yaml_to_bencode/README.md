@@ -1,6 +1,8 @@
+
 # YAML to Bencode Converter Example
 
-This example demonstrates how to convert YAML files to Bencode format using the YAML library's Bencode serialization capabilities.
+This example demonstrates how to convert YAML files to Bencode format using the YAML library's Bencode serialization capabilities. Error handling and validation are supported for robust conversion.
+
 
 ## What This Example Shows
 
@@ -9,6 +11,7 @@ This example demonstrates how to convert YAML files to Bencode format using the 
 - Converting Node trees to Bencode format with `to_bencode()`
 - Writing Bencode output to files using `FileDestination`
 - Batch processing multiple files
+- Error codes and recovery for malformed files
 
 ## What is Bencode?
 
@@ -29,11 +32,13 @@ The example:
    - Converts the parsed Node tree to Bencode format
    - Writes the Bencode output to a new file with `.bencode` extension
 
+
 This is useful for:
 - **BitTorrent applications** - Creating or manipulating .torrent files
 - **P2P systems** - Data exchange in peer-to-peer networks
 - **Compact serialization** - Efficient binary data representation
 - **Cross-format conversion** - Moving data between YAML and Bencode
+- **Error diagnostics** - Get detailed error codes and suggestions for invalid files
 
 ## Usage
 

@@ -1,6 +1,8 @@
+
 # YAML Parse and Stringify Example
 
-This example demonstrates the basic parsing and stringification functionality of the YAML library. It reads YAML files from a directory, parses them into a Node tree structure, and then stringifies them back to YAML format.
+This example demonstrates the basic parsing and stringification functionality of the YAML library. It reads YAML files from a directory, parses them into a Node tree structure, and then stringifies them back to YAML format. Error handling and validation are available for advanced use cases.
+
 
 ## What This Example Shows
 
@@ -9,6 +11,7 @@ This example demonstrates the basic parsing and stringification functionality of
 - Writing YAML content using `FileDestination`
 - Converting Node trees back to YAML with `stringify()`
 - Batch processing multiple YAML files
+- Error codes and recovery for malformed files
 
 ## How It Works
 
@@ -21,11 +24,13 @@ The example:
    - Stringifies the Node tree back to YAML format
    - Writes the result to the output file
 
+
 This is useful for:
 - **Validating YAML syntax** - Files that parse successfully are valid YAML
 - **Reformatting YAML** - The stringify process normalizes formatting
 - **Testing round-trip conversion** - Verifying that parse→stringify preserves data
 - **YAML normalization** - Converting various YAML styles to a canonical format
+- **Error diagnostics** - Get detailed error codes and suggestions for invalid files
 
 ## Usage
 

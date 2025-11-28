@@ -2,21 +2,26 @@
 
 [![Rust](https://img.shields.io/badge/rust-1.88.0+-orange.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-362%20passing-green.svg)]()
 
-A comprehensive, high-performance YAML library for Rust that provides full YAML 1.2 specification compliance with excellent ergonomics and extensive format conversion capabilities.
+![Tests](https://img.shields.io/badge/internal_tests-362%20passing-green.svg)
+![YAML 1.2](https://img.shields.io/badge/YAML_1.2-~80%25-yellow.svg)
+
+A comprehensive, high-performance YAML library for Rust with strong YAML 1.2 specification compliance (~80%), excellent ergonomics, advanced error handling, validation, and extensive format conversion capabilities.
 
 ## ✨ Features
 
-### 🎯 **Core YAML Support**
-- **Full YAML 1.2 specification compliance**
+
+### 🏅 **Core YAML Support**
+- **~80% YAML 1.2 specification compliance** (320/402 tests passing)
 - **Unicode-aware parsing** with BOM detection
 - **Multi-document streams** support
-- **Anchors and aliases** with circular reference detection
-- **Block and flow syntax** parsing
+- **Anchors and aliases** including on mapping keys, with circular reference detection
+- **Block and flow syntax** parsing with empty key support
+- **Cross-platform line endings** (Unix LF, Windows CRLF)
 - **Comments preservation** throughout parsing
 - **All scalar types**: strings, integers, floats, booleans, null
 - **All collection types**: sequences, mappings, sets
+
 
 ### 🏷️ **Advanced Tag Support**
 - **Standard YAML tags**: `!!str`, `!!int`, `!!float`, `!!bool`, `!!null`
@@ -28,6 +33,7 @@ A comprehensive, high-performance YAML library for Rust that provides full YAML 
 - **Numeric bases**: hexadecimal (`!!int:hex`) and octal (`!!int:oct`)
 - **Custom tags**: preservation and round-trip support
 
+
 ### 🔄 **Multi-Format Conversion**
 - **YAML** ↔ Native format with pretty-printing
 - **JSON** ↔ With pretty-printing support
@@ -35,12 +41,29 @@ A comprehensive, high-performance YAML library for Rust that provides full YAML 
 - **TOML** ↔ With table structure preservation
 - **Bencode** ↔ For BitTorrent applications
 
-### 🚀 **Performance & Safety**
+
+### 🚀 **Performance, Safety & Validation**
 - **Zero-copy parsing** where possible
 - **Memory-efficient** node representation
 - **Thread-safe** operations
 - **Error recovery** and detailed diagnostics
-- **Comprehensive test suite** (362+ tests)
+- **Comprehensive test suite** (362+ internal tests, 320/402 YAML 1.2 official tests)
+- **JSON Schema-style validation** for YAML documents
+- **Error codes and suggestions** for programmatic error handling
+## 🛡️ Error Handling & Validation
+
+### Error Handling
+- **Error codes (E001-E015)** for programmatic handling
+- **Intelligent suggestions** for fixing common mistakes
+- **Error recovery strategies** to continue parsing after errors
+- **Enhanced error context** with source spans and snippets
+- **Multi-error collection** for batch reporting
+
+### Validation
+- **JSON Schema-style validation** for YAML documents
+- **Type checking, constraint validation, and schema enforcement**
+- **Built-in validators**: type, range, length, pattern, enum, required, custom
+- **Comprehensive validation examples** in `examples/yaml_validation/`
 
 ## 📦 Installation
 

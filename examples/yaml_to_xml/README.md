@@ -1,6 +1,8 @@
+
 # YAML to XML Converter Example
 
-This example demonstrates how to convert YAML files to XML format using the YAML library's XML serialization capabilities.
+This example demonstrates how to convert YAML files to XML format using the YAML library's XML serialization capabilities. Error handling and validation are supported for robust conversion.
+
 
 ## What This Example Shows
 
@@ -9,6 +11,7 @@ This example demonstrates how to convert YAML files to XML format using the YAML
 - Converting Node trees to XML format with `to_xml()`
 - Writing XML output to files using `FileDestination`
 - Batch processing multiple files
+- Error codes and recovery for malformed files
 
 ## How It Works
 
@@ -19,11 +22,13 @@ The example:
    - Converts the parsed Node tree to XML format
    - Writes the XML output to a new file with `.xml` extension
 
+
 This is useful for:
 - **Legacy system integration** - Working with XML-based systems
 - **Data transformation** - Converting modern YAML configs to XML
 - **API compatibility** - Supporting XML-based APIs
 - **Documentation generation** - XML formats for processing
+- **Error diagnostics** - Get detailed error codes and suggestions for invalid files
 
 ## Usage
 

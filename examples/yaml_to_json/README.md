@@ -1,6 +1,8 @@
+
 # YAML to JSON Converter Example
 
-This example demonstrates how to convert YAML files to JSON format using the YAML library's built-in JSON serialization capabilities.
+This example demonstrates how to convert YAML files to JSON format using the YAML library's built-in JSON serialization capabilities. Error handling and validation are supported for robust conversion.
+
 
 ## What This Example Shows
 
@@ -9,6 +11,7 @@ This example demonstrates how to convert YAML files to JSON format using the YAM
 - Converting Node trees to JSON format with `to_json()`
 - Writing JSON output to files using `FileDestination`
 - Batch processing multiple files
+- Error codes and recovery for malformed files
 
 ## How It Works
 
@@ -19,11 +22,13 @@ The example:
    - Converts the parsed Node tree to JSON format
    - Writes the JSON output to a new file with `.json` extension
 
+
 This is useful for:
 - **Data interchange** - Converting YAML configs to JSON for web APIs
 - **Integration** - Working with systems that only accept JSON
 - **Comparison** - Viewing YAML data in a different format
 - **Web compatibility** - JSON is more widely supported in browsers
+- **Error diagnostics** - Get detailed error codes and suggestions for invalid files
 
 ## Usage
 
