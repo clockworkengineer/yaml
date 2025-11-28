@@ -2,9 +2,9 @@
 //!
 //! Provides tools for comparing YAML nodes and identifying differences.
 
+use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use alloc::format;
 
 use crate::nodes::node::Node;
 
@@ -65,15 +65,15 @@ impl Diff {
     /// Format as a readable string
     pub fn format(&self) -> String {
         let mut result = format!("[{:?}] {}: {}", self.diff_type, self.path, self.description);
-        
+
         if let Some(old) = &self.old_value {
             result.push_str(&format!("\n  Old: {}", old));
         }
-        
+
         if let Some(new) = &self.new_value {
             result.push_str(&format!("\n  New: {}", new));
         }
-        
+
         result
     }
 }
@@ -139,11 +139,11 @@ pub fn diff_nodes(old: &Node, new: &Node) -> DiffResult {
 }
 
 fn diff_nodes_impl(old: &Node, new: &Node, path: String, result: &mut DiffResult) {
-    use crate::devtools::inspect::{node_type, node_summary};
-    
+    use crate::devtools::inspect::{node_summary, node_type};
+
     let old_type = node_type(old);
     let new_type = node_type(new);
-    
+
     // Check type difference
     if old_type != new_type {
         result.add_diff(Diff::with_values(
@@ -155,14 +155,14 @@ fn diff_nodes_impl(old: &Node, new: &Node, path: String, result: &mut DiffResult
         ));
         return;
     }
-    
+
     // Check value differences based on type
     match (old, new) {
         (Node::None, Node::None) => {}
         (Node::Boolean(o), Node::Boolean(n)) if o == n => {}
         (Node::Number(o), Node::Number(n)) if o == n => {}
         (Node::Str(o, _, _), Node::Str(n, _, _)) if o == n => {}
-        
+
         (Node::Boolean(o), Node::Boolean(n)) => {
             result.add_diff(Diff::with_values(
                 DiffType::Modified,
@@ -172,7 +172,7 @@ fn diff_nodes_impl(old: &Node, new: &Node, path: String, result: &mut DiffResult
                 "Boolean value changed".to_string(),
             ));
         }
-        
+
         (Node::Number(o), Node::Number(n)) => {
             result.add_diff(Diff::with_values(
                 DiffType::Modified,
@@ -182,7 +182,7 @@ fn diff_nodes_impl(old: &Node, new: &Node, path: String, result: &mut DiffResult
                 "Number value changed".to_string(),
             ));
         }
-        
+
         (Node::Str(o, _, _), Node::Str(n, _, _)) => {
             result.add_diff(Diff::with_values(
                 DiffType::Modified,
@@ -192,7 +192,7 @@ fn diff_nodes_impl(old: &Node, new: &Node, path: String, result: &mut DiffResult
                 "String value changed".to_string(),
             ));
         }
-        
+
         (Node::Array(old_items), Node::Array(new_items)) => {
             if old_items.len() != new_items.len() {
                 result.add_diff(Diff::with_values(
@@ -203,13 +203,13 @@ fn diff_nodes_impl(old: &Node, new: &Node, path: String, result: &mut DiffResult
                     "Array size changed".to_string(),
                 ));
             }
-            
+
             let min_len = old_items.len().min(new_items.len());
             for i in 0..min_len {
                 let item_path = format!("{}[{}]", path, i);
                 diff_nodes_impl(&old_items[i], &new_items[i], item_path, result);
             }
-            
+
             // Handle extra items
             for i in min_len..old_items.len() {
                 let item_path = format!("{}[{}]", path, i);
@@ -221,7 +221,7 @@ fn diff_nodes_impl(old: &Node, new: &Node, path: String, result: &mut DiffResult
                     "Array item removed".to_string(),
                 ));
             }
-            
+
             for i in min_len..new_items.len() {
                 let item_path = format!("{}[{}]", path, i);
                 result.add_diff(Diff::with_values(
@@ -233,7 +233,7 @@ fn diff_nodes_impl(old: &Node, new: &Node, path: String, result: &mut DiffResult
                 ));
             }
         }
-        
+
         (Node::Mapping(old_pairs), Node::Mapping(new_pairs)) => {
             if old_pairs.len() != new_pairs.len() {
                 result.add_diff(Diff::with_values(
@@ -244,24 +244,22 @@ fn diff_nodes_impl(old: &Node, new: &Node, path: String, result: &mut DiffResult
                     "Mapping size changed".to_string(),
                 ));
             }
-            
+
             // Compare common keys
             for (old_key, old_val) in old_pairs {
                 let key_str = match old_key {
                     Node::Str(s, _, _) => s.clone(),
                     _ => format!("{:?}", old_key),
                 };
-                
-                let new_val = new_pairs.iter()
-                    .find(|(k, _)| k == old_key)
-                    .map(|(_, v)| v);
-                
+
+                let new_val = new_pairs.iter().find(|(k, _)| k == old_key).map(|(_, v)| v);
+
                 let item_path = if path.is_empty() {
                     key_str.clone()
                 } else {
                     format!("{}.{}", path, key_str)
                 };
-                
+
                 match new_val {
                     Some(nv) => diff_nodes_impl(old_val, nv, item_path, result),
                     None => {
@@ -275,7 +273,7 @@ fn diff_nodes_impl(old: &Node, new: &Node, path: String, result: &mut DiffResult
                     }
                 }
             }
-            
+
             // Check for added keys
             for (new_key, new_val) in new_pairs {
                 let exists = old_pairs.iter().any(|(k, _)| k == new_key);
@@ -284,13 +282,13 @@ fn diff_nodes_impl(old: &Node, new: &Node, path: String, result: &mut DiffResult
                         Node::Str(s, _, _) => s.clone(),
                         _ => format!("{:?}", new_key),
                     };
-                    
+
                     let item_path = if path.is_empty() {
                         key_str.clone()
                     } else {
                         format!("{}.{}", path, key_str)
                     };
-                    
+
                     result.add_diff(Diff::with_values(
                         DiffType::Added,
                         item_path,
@@ -301,7 +299,7 @@ fn diff_nodes_impl(old: &Node, new: &Node, path: String, result: &mut DiffResult
                 }
             }
         }
-        
+
         _ => {
             // Fallback for other types
             if node_summary(old) != node_summary(new) {
@@ -325,7 +323,7 @@ mod tests {
     fn test_identical_nodes() {
         let node1 = Node::from("test");
         let node2 = Node::from("test");
-        
+
         let result = diff_nodes(&node1, &node2);
         assert!(result.is_identical());
         assert_eq!(result.count(), 0);
@@ -335,7 +333,7 @@ mod tests {
     fn test_different_strings() {
         let node1 = Node::from("old");
         let node2 = Node::from("new");
-        
+
         let result = diff_nodes(&node1, &node2);
         assert!(!result.is_identical());
         assert_eq!(result.count(), 1);
@@ -346,7 +344,7 @@ mod tests {
     fn test_type_change() {
         let node1 = Node::from("test");
         let node2 = Node::from(42);
-        
+
         let result = diff_nodes(&node1, &node2);
         assert!(!result.is_identical());
         assert_eq!(result.diffs[0].diff_type, DiffType::TypeChanged);
@@ -356,23 +354,26 @@ mod tests {
     fn test_array_size_change() {
         let node1 = Node::Array(vec![Node::from(1), Node::from(2)]);
         let node2 = Node::Array(vec![Node::from(1), Node::from(2), Node::from(3)]);
-        
+
         let result = diff_nodes(&node1, &node2);
         assert!(!result.is_identical());
-        assert!(result.diffs.iter().any(|d| d.diff_type == DiffType::SizeChanged));
+        assert!(
+            result
+                .diffs
+                .iter()
+                .any(|d| d.diff_type == DiffType::SizeChanged)
+        );
         assert!(result.diffs.iter().any(|d| d.diff_type == DiffType::Added));
     }
 
     #[test]
     fn test_mapping_key_added() {
-        let node1 = Node::Mapping(vec![
-            (Node::from("name"), Node::from("Alice")),
-        ]);
+        let node1 = Node::Mapping(vec![(Node::from("name"), Node::from("Alice"))]);
         let node2 = Node::Mapping(vec![
             (Node::from("name"), Node::from("Alice")),
             (Node::from("age"), Node::from(30)),
         ]);
-        
+
         let result = diff_nodes(&node1, &node2);
         assert!(!result.is_identical());
         assert!(result.diffs.iter().any(|d| d.diff_type == DiffType::Added));
@@ -384,13 +385,16 @@ mod tests {
             (Node::from("name"), Node::from("Alice")),
             (Node::from("age"), Node::from(30)),
         ]);
-        let node2 = Node::Mapping(vec![
-            (Node::from("name"), Node::from("Alice")),
-        ]);
-        
+        let node2 = Node::Mapping(vec![(Node::from("name"), Node::from("Alice"))]);
+
         let result = diff_nodes(&node1, &node2);
         assert!(!result.is_identical());
-        assert!(result.diffs.iter().any(|d| d.diff_type == DiffType::Removed));
+        assert!(
+            result
+                .diffs
+                .iter()
+                .any(|d| d.diff_type == DiffType::Removed)
+        );
     }
 
     #[test]
@@ -402,7 +406,7 @@ mod tests {
             Some("new".to_string()),
             "Value changed".to_string(),
         );
-        
+
         let formatted = diff.format();
         assert!(formatted.contains("Modified"));
         assert!(formatted.contains("test.value"));

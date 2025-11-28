@@ -2,9 +2,9 @@
 //!
 //! Provides tools for defining and checking properties that should always hold.
 
+use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use alloc::format;
 
 use crate::nodes::node::Node;
 
@@ -130,9 +130,9 @@ pub mod properties {
 
             match node {
                 Node::Array(items) => items.iter().all(|n| check_depth(n, current + 1, max)),
-                Node::Mapping(pairs) => pairs
-                    .iter()
-                    .all(|(k, v)| check_depth(k, current + 1, max) && check_depth(v, current + 1, max)),
+                Node::Mapping(pairs) => pairs.iter().all(|(k, v)| {
+                    check_depth(k, current + 1, max) && check_depth(v, current + 1, max)
+                }),
                 Node::Set(items) => items.iter().all(|n| check_depth(n, current + 1, max)),
                 Node::Document(items) => items.iter().all(|n| check_depth(n, current + 1, max)),
                 Node::Documents(docs) => docs.iter().all(|n| check_depth(n, current + 1, max)),
@@ -151,8 +151,8 @@ pub mod properties {
 
     /// Property: No circular references
     pub fn no_circular_references(node: &Node) -> PropertyResult {
-        use core::ptr;
         use alloc::vec::Vec;
+        use core::ptr;
 
         fn check_circular(node: &Node, visited: &mut Vec<*const Node>) -> bool {
             let node_ptr = node as *const Node;
@@ -197,7 +197,9 @@ pub mod properties {
                 }
                 Node::Mapping(pairs) => {
                     pairs.len() <= max_size
-                        && pairs.iter().all(|(k, v)| check_finite(k, max_size) && check_finite(v, max_size))
+                        && pairs
+                            .iter()
+                            .all(|(k, v)| check_finite(k, max_size) && check_finite(v, max_size))
                 }
                 Node::Set(items) => {
                     items.len() <= max_size && items.iter().all(|n| check_finite(n, max_size))
@@ -238,11 +240,26 @@ impl PropertySuite {
     /// Create suite with common properties
     pub fn common() -> Self {
         let mut suite = Self::new();
-        suite.add(Property::new("parse_never_panics", properties::parse_never_panics));
-        suite.add(Property::new("stringify_never_panics", properties::stringify_never_panics));
-        suite.add(Property::new("depth_is_bounded", properties::depth_is_bounded));
-        suite.add(Property::new("no_circular_references", properties::no_circular_references));
-        suite.add(Property::new("collections_are_finite", properties::collections_are_finite));
+        suite.add(Property::new(
+            "parse_never_panics",
+            properties::parse_never_panics,
+        ));
+        suite.add(Property::new(
+            "stringify_never_panics",
+            properties::stringify_never_panics,
+        ));
+        suite.add(Property::new(
+            "depth_is_bounded",
+            properties::depth_is_bounded,
+        ));
+        suite.add(Property::new(
+            "no_circular_references",
+            properties::no_circular_references,
+        ));
+        suite.add(Property::new(
+            "collections_are_finite",
+            properties::collections_are_finite,
+        ));
         suite
     }
 
@@ -297,16 +314,19 @@ mod tests {
         let shallow = Node::from("test");
         assert_eq!(properties::depth_is_bounded(&shallow), PropertyResult::Pass);
 
-        let nested = Node::Array(vec![
-            Node::Array(vec![Node::Array(vec![Node::from("deep")])]),
-        ]);
+        let nested = Node::Array(vec![Node::Array(vec![Node::Array(vec![Node::from(
+            "deep",
+        )])])]);
         assert_eq!(properties::depth_is_bounded(&nested), PropertyResult::Pass);
     }
 
     #[test]
     fn test_collections_are_finite() {
         let small = Node::Array(vec![Node::from(1), Node::from(2), Node::from(3)]);
-        assert_eq!(properties::collections_are_finite(&small), PropertyResult::Pass);
+        assert_eq!(
+            properties::collections_are_finite(&small),
+            PropertyResult::Pass
+        );
     }
 
     #[test]
@@ -321,7 +341,10 @@ mod tests {
         assert!(results.len() > 0);
 
         // Most should pass
-        let passed = results.iter().filter(|(_, r)| matches!(r, PropertyResult::Pass)).count();
+        let passed = results
+            .iter()
+            .filter(|(_, r)| matches!(r, PropertyResult::Pass))
+            .count();
         assert!(passed > 0);
     }
 
@@ -339,6 +362,9 @@ mod tests {
         if !matches!(result, PropertyResult::Pass | PropertyResult::Skip(_)) {
             eprintln!("Roundtrip failed: {:?}", result);
         }
-        assert!(matches!(result, PropertyResult::Pass | PropertyResult::Skip(_)));
+        assert!(matches!(
+            result,
+            PropertyResult::Pass | PropertyResult::Skip(_)
+        ));
     }
 }

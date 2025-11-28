@@ -5,9 +5,9 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use crate::nodes::node::Node;
-use crate::stringify::format::{FormatOptions, FormatContext};
 use crate::io::traits::IDestination;
+use crate::nodes::node::Node;
+use crate::stringify::format::{FormatContext, FormatOptions};
 
 /// Streaming YAML serializer
 pub struct StreamingSerializer<'a> {
@@ -47,12 +47,12 @@ impl<'a> StreamingSerializer<'a> {
     /// Write string to stream
     fn write_str(&mut self, s: &str) -> Result<(), String> {
         self.buffer.extend_from_slice(s.as_bytes());
-        
+
         // Flush if buffer is large enough
         if self.buffer.len() >= self.buffer_size {
             self.flush()?;
         }
-        
+
         Ok(())
     }
 
@@ -74,7 +74,11 @@ impl<'a> StreamingSerializer<'a> {
     }
 
     /// Internal serialization implementation
-    fn serialize_node_impl(&mut self, node: &Node, context: &mut FormatContext) -> Result<(), String> {
+    fn serialize_node_impl(
+        &mut self,
+        node: &Node,
+        context: &mut FormatContext,
+    ) -> Result<(), String> {
         match node {
             Node::Str(s, _, _) => {
                 self.write_str(&self.format_string(s))?;
@@ -132,12 +136,16 @@ impl<'a> StreamingSerializer<'a> {
                 self.write_str(&buffer.to_string())?;
             }
         }
-        
+
         Ok(())
     }
 
     /// Serialize array
-    fn serialize_array(&mut self, items: &[Node], context: &mut FormatContext) -> Result<(), String> {
+    fn serialize_array(
+        &mut self,
+        items: &[Node],
+        context: &mut FormatContext,
+    ) -> Result<(), String> {
         if items.is_empty() && self.options.flow_empty_collections {
             self.write_str("[]")?;
             return Ok(());
@@ -171,7 +179,11 @@ impl<'a> StreamingSerializer<'a> {
     }
 
     /// Serialize mapping
-    fn serialize_mapping(&mut self, pairs: &[(Node, Node)], context: &mut FormatContext) -> Result<(), String> {
+    fn serialize_mapping(
+        &mut self,
+        pairs: &[(Node, Node)],
+        context: &mut FormatContext,
+    ) -> Result<(), String> {
         if pairs.is_empty() && self.options.flow_empty_collections {
             self.write_str("{}")?;
             return Ok(());
@@ -231,13 +243,17 @@ impl<'a> StreamingSerializer<'a> {
         use crate::stringify::format::QuoteStyle;
 
         // Check if string needs quoting
-        let needs_quotes = s.is_empty() 
+        let needs_quotes = s.is_empty()
             || s.contains(':')
             || s.contains('#')
             || s.contains('\n')
-            || s.starts_with([' ', '-', '?', '[', ']', '{', '}', ',', '&', '*', '!', '|', '>', '%', '@', '`'])
+            || s.starts_with([
+                ' ', '-', '?', '[', ']', '{', '}', ',', '&', '*', '!', '|', '>', '%', '@', '`',
+            ])
             || s.ends_with(' ')
-            || s == "true" || s == "false" || s == "null"
+            || s == "true"
+            || s == "false"
+            || s == "null"
             || s.parse::<f64>().is_ok();
 
         match self.options.quote_style {
@@ -286,11 +302,7 @@ mod tests {
         let mut buffer = Buffer::new();
         let mut serializer = StreamingSerializer::new(&mut buffer);
 
-        let node = Node::Array(vec![
-            Node::from(1),
-            Node::from(2),
-            Node::from(3),
-        ]);
+        let node = Node::Array(vec![Node::from(1), Node::from(2), Node::from(3)]);
 
         serializer.serialize_node(&node).unwrap();
 
@@ -318,7 +330,8 @@ mod tests {
     #[test]
     fn test_flow_style() {
         let mut buffer = Buffer::new();
-        let opts = FormatOptions::new().with_collection_style(crate::stringify::format::CollectionStyle::Flow);
+        let opts = FormatOptions::new()
+            .with_collection_style(crate::stringify::format::CollectionStyle::Flow);
         let mut serializer = StreamingSerializer::with_options(&mut buffer, opts);
 
         let node = Node::Array(vec![Node::from(1), Node::from(2)]);

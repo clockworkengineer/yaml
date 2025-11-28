@@ -69,12 +69,17 @@ pub(crate) fn parse_scalar(value: &str, directives: &DirectiveContext) -> Node {
                         }
                     }
                 }
-                let content = if rest.is_empty() { v[1..].trim_start() } else { rest.trim_start() };
+                let content = if rest.is_empty() {
+                    v[1..].trim_start()
+                } else {
+                    rest.trim_start()
+                };
 
                 // Split lines and apply indentation
                 let lines: Vec<&str> = content.lines().collect();
                 let min_indent = indent.unwrap_or_else(|| {
-                    lines.iter()
+                    lines
+                        .iter()
                         .filter(|l| !l.trim().is_empty())
                         .map(|l| l.chars().take_while(|c| *c == ' ').count())
                         .min()
@@ -82,10 +87,20 @@ pub(crate) fn parse_scalar(value: &str, directives: &DirectiveContext) -> Node {
                 });
                 let stripped: Vec<&str> = lines
                     .iter()
-                    .map(|l| if l.len() >= min_indent { &l[min_indent..] } else { l.trim_end() })
+                    .map(|l| {
+                        if l.len() >= min_indent {
+                            &l[min_indent..]
+                        } else {
+                            l.trim_end()
+                        }
+                    })
                     .collect();
 
-                let style = if indicator == '|' { BlockStyle::Literal } else { BlockStyle::Folded };
+                let style = if indicator == '|' {
+                    BlockStyle::Literal
+                } else {
+                    BlockStyle::Folded
+                };
                 let mut result = String::new();
                 if style == BlockStyle::Literal {
                     result = stripped.join("\n");
@@ -162,7 +177,7 @@ pub(crate) fn parse_scalar(value: &str, directives: &DirectiveContext) -> Node {
                         // vs. newlines from escape sequences like \n
                         let has_source_newlines = inner.contains('\n');
                         let unescaped = crate::utils::unescape_double_quoted(inner);
-                        
+
                         // Only apply folding rules if the original source had actual newlines
                         // Escape sequences like \n should produce literal characters without folding
                         let folded = if has_source_newlines {
@@ -213,7 +228,7 @@ pub(crate) fn parse_scalar(value: &str, directives: &DirectiveContext) -> Node {
                             // No source newlines - just use unescaped string as-is
                             unescaped
                         };
-                        
+
                         let simple = folded.chars().all(|ch| {
                             ch.is_alphanumeric()
                                 || ch.is_whitespace()

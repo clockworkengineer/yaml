@@ -23,7 +23,10 @@ mod test_directive_validation {
         if let Err(ref e) = result {
             println!("Error (correct): {}", e);
         }
-        assert!(result.is_err(), "Should reject directive with only end marker");
+        assert!(
+            result.is_err(),
+            "Should reject directive with only end marker"
+        );
     }
 
     #[test]

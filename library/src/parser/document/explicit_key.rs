@@ -11,7 +11,7 @@ pub(crate) fn is_explicit_key_start(source: &mut dyn ISource) -> bool {
 }
 
 /// Parses an explicit mapping key-value pair
-/// 
+///
 /// Format: ? key\n  : value
 /// The ? must be at the start of a line
 /// Returns (key_node, value_node)
@@ -47,7 +47,7 @@ pub(crate) fn parse_explicit_mapping_entry(
 
     // Look for the : indicator
     crate::parser::document::helpers::skip_whitespace(source);
-    
+
     let value_node = if source.current() == Some(':') {
         source.next();
         crate::parser::document::helpers::skip_whitespace(source);

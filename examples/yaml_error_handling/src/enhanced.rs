@@ -8,8 +8,8 @@
 //! - Multiple error collection
 
 use yaml_lib::{
-    EnhancedError, ErrorCode, ErrorCollection, ErrorKind, ErrorSuggestion,
-    RecoveryContext, RecoveryHandler, RecoveryStrategy, Span, SuggestionBuilder, YamlError,
+    EnhancedError, ErrorCode, ErrorCollection, ErrorKind, ErrorSuggestion, RecoveryContext,
+    RecoveryHandler, RecoveryStrategy, Span, SuggestionBuilder, YamlError,
 };
 
 pub fn main() {
@@ -133,8 +133,8 @@ fn demo_enhanced_errors() {
     println!("--- Example 4: Enhanced Errors with Context ---");
 
     // Create a base error
-    let base_error = YamlError::new(ErrorKind::SyntaxError, "Missing colon in mapping")
-        .with_position(5, 10);
+    let base_error =
+        YamlError::new(ErrorKind::SyntaxError, "Missing colon in mapping").with_position(5, 10);
 
     // Enhance with error code and suggestions
     let enhanced = EnhancedError::new(base_error)
@@ -218,8 +218,14 @@ fn demo_recovery_context() {
     println!("\nEntering block mapping...");
     ctx.enter_block_mapping();
     println!("  State: {:?}", ctx.state);
-    println!("  Can recover with SkipLine: {}", ctx.can_recover(RecoveryStrategy::SkipLine));
-    println!("  Can recover with SkipToNextMapping: {}", ctx.can_recover(RecoveryStrategy::SkipToNextMapping));
+    println!(
+        "  Can recover with SkipLine: {}",
+        ctx.can_recover(RecoveryStrategy::SkipLine)
+    );
+    println!(
+        "  Can recover with SkipToNextMapping: {}",
+        ctx.can_recover(RecoveryStrategy::SkipToNextMapping)
+    );
 
     // Simulate entering a flow mapping
     println!("\nEntering flow mapping...");
@@ -227,7 +233,10 @@ fn demo_recovery_context() {
     println!("  State: {:?}", ctx.state);
     println!("  In flow context: {}", ctx.in_flow);
     println!("  Bracket depth: {}", ctx.bracket_depth);
-    println!("  Can recover with SkipCollection: {}", ctx.can_recover(RecoveryStrategy::SkipCollection));
+    println!(
+        "  Can recover with SkipCollection: {}",
+        ctx.can_recover(RecoveryStrategy::SkipCollection)
+    );
 
     // Exit flow
     println!("\nExiting flow...");
@@ -237,7 +246,10 @@ fn demo_recovery_context() {
 
     // Test abort strategy
     println!("\nTesting abort strategy:");
-    println!("  Can recover with Abort: {}", ctx.can_recover(RecoveryStrategy::Abort));
+    println!(
+        "  Can recover with Abort: {}",
+        ctx.can_recover(RecoveryStrategy::Abort)
+    );
 
     println!();
 }
@@ -277,7 +289,12 @@ fn demo_error_collection() {
     // Display all errors
     println!("\nAll collected errors:");
     for (i, error) in collection.errors().iter().enumerate() {
-        println!("  {}. {} - {}", i + 1, error.code().unwrap(), error.base().message());
+        println!(
+            "  {}. {} - {}",
+            i + 1,
+            error.code().unwrap(),
+            error.base().message()
+        );
     }
 
     println!();

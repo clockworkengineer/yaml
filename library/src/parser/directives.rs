@@ -30,17 +30,17 @@ pub struct DirectiveContext {
 
 impl DirectiveContext {
     /// Create a new directive context with default tag prefixes
-    /// 
+    ///
     /// Per YAML 1.2 spec, two tag handles are defined by default:
     /// - `!!` resolves to `tag:yaml.org,2002:` (standard YAML types)
     /// - `!` resolves to `!` (local tags)
     pub fn new() -> Self {
         let mut tag_prefixes = HashMap::new();
-        
+
         // Add default tag prefixes per YAML 1.2 specification
         tag_prefixes.insert("!!".to_string(), "tag:yaml.org,2002:".to_string());
         tag_prefixes.insert("!".to_string(), "!".to_string());
-        
+
         Self {
             yaml_version: None,
             tag_prefixes,
@@ -53,7 +53,7 @@ impl DirectiveContext {
         if self.yaml_version.is_some() {
             return Err("Duplicate YAML directive".to_string());
         }
-        
+
         // Validate version (only 1.1 and 1.2 are standard)
         if major != 1 {
             return Err(alloc::format!("Invalid YAML major version: {}", major));
@@ -61,7 +61,7 @@ impl DirectiveContext {
         // Per YAML spec, parsers should accept future minor versions
         // We support 1.1 and 1.2, but don't error on higher minor versions
         // (just use 1.2 behavior)
-        
+
         self.yaml_version = Some((major, minor));
         Ok(())
     }
@@ -75,12 +75,12 @@ impl DirectiveContext {
     ///
     /// Expands tag handles like `!e!mytype` to full URIs like `tag:example.com,2000:app/mytype`
     /// based on registered %TAG directives. If no handle matches, returns the tag as-is.
-    /// 
+    ///
     /// Longer handles are matched first (e.g., `!e!` before `!`) to ensure correct resolution.
     pub fn resolve_tag(&self, tag: &str) -> String {
         // Find the longest matching handle
         let mut best_match: Option<(&str, &str)> = None;
-        
+
         for (handle, prefix) in &self.tag_prefixes {
             if tag.starts_with(handle.as_str()) {
                 // Prefer longer handles (more specific matches)
@@ -210,14 +210,15 @@ fn parse_yaml_directive(
     // After version, must have whitespace before comment or end of line
     let has_whitespace = matches!(source.current(), Some(' ') | Some('\t'));
     skip_directive_whitespace(source);
-    
+
     if let Some(c) = source.current() {
         if c == '#' && !has_whitespace {
             return Err("Comment requires whitespace after YAML version".to_string());
         }
         if c != '\n' && c != '\r' && c != '#' {
             return Err(alloc::format!(
-                "Invalid content after YAML version directive: '{}'", c
+                "Invalid content after YAML version directive: '{}'",
+                c
             ));
         }
     }
@@ -429,7 +430,10 @@ mod tests {
         // Should have no version but should have default tag prefixes
         assert_eq!(context.yaml_version, None);
         assert_eq!(context.tag_prefixes.len(), 2); // !! and ! defaults
-        assert_eq!(context.tag_prefixes.get("!!"), Some(&"tag:yaml.org,2002:".to_string()));
+        assert_eq!(
+            context.tag_prefixes.get("!!"),
+            Some(&"tag:yaml.org,2002:".to_string())
+        );
         assert_eq!(context.tag_prefixes.get("!"), Some(&"!".to_string()));
     }
 

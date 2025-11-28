@@ -61,9 +61,7 @@ fn get_all_test_dirs(suite_dir: &Path) -> Vec<PathBuf> {
 #[test]
 fn run_yaml_test_suite() {
     // Try multiple possible paths for the test suite
-    let possible_paths = vec![
-        Path::new("c:/Projects/yaml/yaml-test-suite/src"),
-    ];
+    let possible_paths = vec![Path::new("c:/Projects/yaml/yaml-test-suite/src")];
 
     let suite_dir = possible_paths.iter().find(|p| p.exists()).cloned();
     let suite_dir = match suite_dir {

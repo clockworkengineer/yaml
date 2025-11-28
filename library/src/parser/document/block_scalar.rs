@@ -5,7 +5,7 @@ use crate::io::traits::ISource;
 use crate::nodes::node::{BlockStyle, Node, QuoteType};
 
 /// Parses a block scalar (literal | or folded >)
-/// 
+///
 /// Returns a tuple of (content_string, is_folded)
 pub(crate) fn parse_block_scalar(
     source: &mut dyn ISource,

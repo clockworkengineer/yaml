@@ -322,7 +322,7 @@ fn parse_inline_mapping_with_colons(
                 // Explicit key indicator
                 source.next();
                 skip_whitespace_and_comments_validate_tabs(source)?;
-                
+
                 // Check what follows the ?
                 let key = match source.current() {
                     Some(CHAR_COLON) | Some(CHAR_COMMA) | Some(CHAR_RBRACE) | None => {
@@ -333,12 +333,8 @@ fn parse_inline_mapping_with_colons(
                         let raw = parse_quoted_scalar(source)?;
                         parse_scalar(raw.trim(), directives)
                     }
-                    Some(CHAR_LBRACKET) => {
-                        parse_inline_sequence(source, directives)?
-                    }
-                    Some(CHAR_LBRACE) => {
-                        parse_inline_mapping(source, directives)?
-                    }
+                    Some(CHAR_LBRACKET) => parse_inline_sequence(source, directives)?,
+                    Some(CHAR_LBRACE) => parse_inline_mapping(source, directives)?,
                     _ => {
                         // Parse regular scalar key with line folding
                         let collected = collect_flow_scalar(source, |c| {
@@ -347,64 +343,70 @@ fn parse_inline_mapping_with_colons(
                         parse_scalar(collected.trim(), directives)
                     }
                 };
-                
+
                 skip_whitespace_and_comments_validate_tabs(source)?;
-                
+
                 // After explicit key, colon is optional
                 // If there's a colon, consume it and move to value parsing
                 // If no colon, the value is implicitly null
                 if source.current() == Some(CHAR_COLON) {
                     source.next();
                 }
-                
+
                 key
             }
             Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE) => {
                 let raw = parse_quoted_scalar(source)?;
                 skip_whitespace_and_comments_validate_tabs(source)?;
                 let key_node = parse_scalar(raw.trim(), directives);
-                
+
                 // Check if there's a colon for the value
                 if source.current() == Some(CHAR_COLON) {
                     source.next();
-                } else if source.current() == Some(CHAR_COMMA) || source.current() == Some(CHAR_RBRACE) {
+                } else if source.current() == Some(CHAR_COMMA)
+                    || source.current() == Some(CHAR_RBRACE)
+                {
                     // No colon means implicit null value
                 } else {
                     return Err(parse_error(source, ERR_EXPECT_COLON_INLINE_MAPPING));
                 }
-                
+
                 key_node
             }
             Some(CHAR_LBRACKET) => {
                 // Flow sequence as key
                 let key = parse_inline_sequence(source, directives)?;
                 skip_whitespace_and_comments_validate_tabs(source)?;
-                
+
                 // Check if there's a colon for the value
                 if source.current() == Some(CHAR_COLON) {
                     source.next();
-                } else if source.current() == Some(CHAR_COMMA) || source.current() == Some(CHAR_RBRACE) {
+                } else if source.current() == Some(CHAR_COMMA)
+                    || source.current() == Some(CHAR_RBRACE)
+                {
                     // No colon means implicit null value
                 } else {
                     return Err(parse_error(source, ERR_EXPECT_COLON_INLINE_MAPPING));
                 }
-                
+
                 key
             }
             Some(CHAR_LBRACE) => {
                 // Flow mapping as key (nested)
                 let key = parse_inline_mapping(source, directives)?;
                 skip_whitespace_and_comments_validate_tabs(source)?;
-                
+
                 // Check if there's a colon for the value
                 if source.current() == Some(CHAR_COLON) {
                     source.next();
-                } else if source.current() == Some(CHAR_COMMA) || source.current() == Some(CHAR_RBRACE) {
+                } else if source.current() == Some(CHAR_COMMA)
+                    || source.current() == Some(CHAR_RBRACE)
+                {
                     // No colon means implicit null value
                 } else {
                     return Err(parse_error(source, ERR_EXPECT_COLON_INLINE_MAPPING));
                 }
-                
+
                 key
             }
             Some(CHAR_RBRACE) => {
@@ -422,7 +424,7 @@ fn parse_inline_mapping_with_colons(
                     c == CHAR_COLON || c == CHAR_RBRACE || c == CHAR_COMMA
                 });
                 skip_whitespace_and_comments_validate_tabs(source)?;
-                
+
                 let key_node = {
                     let trimmed = collected.trim();
                     if trimmed.is_empty() {
@@ -431,7 +433,7 @@ fn parse_inline_mapping_with_colons(
                         parse_scalar(trimmed, directives)
                     }
                 };
-                
+
                 // Require a colon for mappings that contain any key-value pairs
                 // Cases like {a, b} are sets and handled elsewhere; once we are in the
                 // mapping-with-colons path, every entry must have ':' after the key.
@@ -440,7 +442,7 @@ fn parse_inline_mapping_with_colons(
                 } else {
                     return Err(parse_error(source, ERR_EXPECT_COLON_INLINE_MAPPING));
                 }
-                
+
                 key_node
             }
         };
@@ -470,8 +472,13 @@ fn parse_inline_mapping_with_colons(
                     if parts.len() >= 2 {
                         // Look for pattern like "1 bar:" where we have value then key
                         for i in 1..parts.len() {
-                            if parts[i].ends_with(':') || (i + 1 < parts.len() && parts[i + 1] == ":") {
-                                return Err(parse_error(source, "Flow mapping missing separating comma between pairs"));
+                            if parts[i].ends_with(':')
+                                || (i + 1 < parts.len() && parts[i + 1] == ":")
+                            {
+                                return Err(parse_error(
+                                    source,
+                                    "Flow mapping missing separating comma between pairs",
+                                ));
                             }
                         }
                     }
@@ -602,14 +609,14 @@ pub(crate) fn parse_inline_sequence(
         match source.current() {
             Some(CHAR_LBRACKET) => {
                 let nested = parse_inline_sequence(source, directives)?;
-                
+
                 // Check if this flow sequence is being used as an implicit key
                 skip_whitespace_and_comments_validate_tabs(source)?;
                 if source.current() == Some(CHAR_COLON) {
                     // Flow sequence is a key! Parse the value
                     source.next(); // consume colon
                     skip_whitespace_and_comments_validate_tabs(source)?;
-                    
+
                     let value_node = match source.current() {
                         Some(CHAR_LBRACE) => parse_inline_mapping(source, directives)?,
                         Some(CHAR_LBRACKET) => parse_inline_sequence(source, directives)?,
@@ -625,7 +632,7 @@ pub(crate) fn parse_inline_sequence(
                             parse_scalar(val_str.trim(), directives)
                         }
                     };
-                    
+
                     items.push(Node::Mapping(vec![(nested, value_node)]));
                 } else {
                     items.push(nested);
@@ -633,14 +640,14 @@ pub(crate) fn parse_inline_sequence(
             }
             Some(CHAR_LBRACE) => {
                 let nested_map = parse_inline_mapping(source, directives)?;
-                
+
                 // Check if this flow mapping is being used as an implicit key
                 skip_whitespace_and_comments_validate_tabs(source)?;
                 if source.current() == Some(CHAR_COLON) {
                     // Flow mapping is a key! Parse the value
                     source.next(); // consume colon
                     skip_whitespace_and_comments_validate_tabs(source)?;
-                    
+
                     let value_node = match source.current() {
                         Some(CHAR_LBRACE) => parse_inline_mapping(source, directives)?,
                         Some(CHAR_LBRACKET) => parse_inline_sequence(source, directives)?,
@@ -656,7 +663,7 @@ pub(crate) fn parse_inline_sequence(
                             parse_scalar(val_str.trim(), directives)
                         }
                     };
-                    
+
                     items.push(Node::Mapping(vec![(nested_map, value_node)]));
                 } else {
                     items.push(nested_map);
@@ -679,7 +686,7 @@ pub(crate) fn parse_inline_sequence(
                     return Err(parse_error(source, "Anchor name cannot be empty"));
                 }
                 crate::utils::skip_whitespace_and_comments(source);
-                
+
                 // Check for implicit key-value after anchor
                 let saved_state = source.save_state();
                 let mut found_colon = false;
@@ -687,7 +694,7 @@ pub(crate) fn parse_inline_sequence(
                 let mut bracket_depth = 0;
                 let mut in_quotes = false;
                 let mut quote_char = '\0';
-                
+
                 while let Some(c) = source.current() {
                     match c {
                         CHAR_SINGLE_QUOTE | CHAR_DOUBLE_QUOTE if !in_quotes => {
@@ -721,9 +728,9 @@ pub(crate) fn parse_inline_sequence(
                     }
                     source.next();
                 }
-                
+
                 source.restore_state(saved_state);
-                
+
                 if found_colon {
                     // Parse as anchored implicit mapping
                     let key_node = match source.current() {
@@ -740,15 +747,15 @@ pub(crate) fn parse_inline_sequence(
                             parse_scalar(key_str.trim(), directives)
                         }
                     };
-                    
+
                     crate::utils::skip_whitespace_and_comments(source);
-                    
+
                     if source.current() != Some(CHAR_COLON) {
                         return Err(parse_error(source, "Expected ':' after implicit key"));
                     }
                     source.next();
                     crate::utils::skip_whitespace_and_comments(source);
-                    
+
                     let value_node = match source.current() {
                         Some(CHAR_LBRACE) => parse_inline_mapping(source, directives)?,
                         Some(CHAR_LBRACKET) => parse_inline_sequence(source, directives)?,
@@ -769,7 +776,7 @@ pub(crate) fn parse_inline_sequence(
                             }
                         }
                     };
-                    
+
                     let mapping = Node::Mapping(vec![(key_node, value_node)]);
                     items.push(Node::Anchored(Box::new(mapping), anchor_name));
                 } else {
@@ -816,7 +823,7 @@ pub(crate) fn parse_inline_sequence(
                 let mut bracket_depth = 0;
                 let mut in_quotes = false;
                 let mut quote_char = '\0';
-                
+
                 // Scan ahead to see if there's a colon for implicit key
                 while let Some(c) = source.current() {
                     match c {
@@ -854,9 +861,9 @@ pub(crate) fn parse_inline_sequence(
                     }
                     source.next();
                 }
-                
+
                 source.restore_state(saved_state);
-                
+
                 let node = if found_colon {
                     // Parse as implicit key-value pair (single-entry mapping)
                     let key_node = match source.current() {
@@ -873,15 +880,18 @@ pub(crate) fn parse_inline_sequence(
                             parse_scalar(key_str.trim(), directives)
                         }
                     };
-                    
+
                     skip_whitespace_and_comments_validate_tabs(source)?;
-                    
+
                     if source.current() != Some(CHAR_COLON) {
-                        return Err(parse_error(source, "Expected ':' after implicit key in flow sequence"));
+                        return Err(parse_error(
+                            source,
+                            "Expected ':' after implicit key in flow sequence",
+                        ));
                     }
                     source.next(); // consume colon
                     skip_whitespace_and_comments_validate_tabs(source)?;
-                    
+
                     let value_node = match source.current() {
                         Some(CHAR_LBRACE) => parse_inline_mapping(source, directives)?,
                         Some(CHAR_LBRACKET) => parse_inline_sequence(source, directives)?,
@@ -902,7 +912,7 @@ pub(crate) fn parse_inline_sequence(
                             }
                         }
                     };
-                    
+
                     // Wrap as single-pair mapping
                     Node::Mapping(vec![(key_node, value_node)])
                 } else {
@@ -923,17 +933,23 @@ pub(crate) fn parse_inline_sequence(
                             } else {
                                 // Do not strip leading '>' or other special chars; let parse_scalar handle it
                                 if trimmed == "-" {
-                                    return Err(parse_error(source, "Plain dash in flow sequence is ambiguous"));
+                                    return Err(parse_error(
+                                        source,
+                                        "Plain dash in flow sequence is ambiguous",
+                                    ));
                                 }
                                 if trimmed == "---" || trimmed == "..." {
-                                    return Err(parse_error(source, "Document markers are not allowed in flow collections"));
+                                    return Err(parse_error(
+                                        source,
+                                        "Document markers are not allowed in flow collections",
+                                    ));
                                 }
                                 parse_scalar(trimmed, directives)
                             }
                         }
                     }
                 };
-                
+
                 if !matches!(node, Node::None) {
                     items.push(node);
                 }
@@ -942,7 +958,7 @@ pub(crate) fn parse_inline_sequence(
         }
 
         skip_whitespace_and_comments_validate_tabs(source)?;
-        
+
         // For now, skip indentation validation in flow context as it's too restrictive
         // TODO: Implement proper multiline flow indentation rules per YAML spec
         // The spec requires flow content to be "more indented" but the exact rules are complex
@@ -986,5 +1002,3 @@ pub(crate) fn parse_inline_sequence(
 
     Ok(Node::Array(items))
 }
-
-

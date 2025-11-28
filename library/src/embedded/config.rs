@@ -53,12 +53,21 @@ mod tests {
 
     #[test]
     fn test_nesting_depth_is_reasonable() {
-        assert!(MAX_NESTING_DEPTH >= 8, "Nesting depth should support at least 8 levels");
-        assert!(MAX_NESTING_DEPTH <= 1024, "Nesting depth should not exceed 1024 levels");
+        assert!(
+            MAX_NESTING_DEPTH >= 8,
+            "Nesting depth should support at least 8 levels"
+        );
+        assert!(
+            MAX_NESTING_DEPTH <= 1024,
+            "Nesting depth should not exceed 1024 levels"
+        );
     }
 
     #[test]
     fn test_document_size_is_reasonable() {
-        assert!(MAX_DOCUMENT_SIZE >= 1024, "Document size should be at least 1KB");
+        assert!(
+            MAX_DOCUMENT_SIZE >= 1024,
+            "Document size should be at least 1KB"
+        );
     }
 }

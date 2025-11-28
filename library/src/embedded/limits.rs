@@ -321,7 +321,7 @@ mod tests {
     #[test]
     #[cfg(feature = "alloc")]
     fn test_node_validator_mapping() {
-        use crate::nodes::node::{Node, Numeric, QuoteType, BlockStyle};
+        use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
         let mapping = Node::Mapping(vec![
             (
                 Node::Str("key1".to_string(), QuoteType::Unquoted, BlockStyle::None),
@@ -373,7 +373,7 @@ mod tests {
     #[test]
     #[cfg(feature = "alloc")]
     fn test_node_validator_long_string() {
-        use crate::nodes::node::{Node, QuoteType, BlockStyle};
+        use crate::nodes::node::{BlockStyle, Node, QuoteType};
         let long_str = "x".repeat(MAX_STRING_LENGTH + 1);
         let node = Node::Str(long_str.clone(), QuoteType::Unquoted, BlockStyle::None);
         let mut validator = NodeValidator::new();
@@ -412,7 +412,7 @@ mod tests {
     #[test]
     #[cfg(feature = "alloc")]
     fn test_node_validator_too_many_mapping_pairs() {
-        use crate::nodes::node::{Node, Numeric, QuoteType, BlockStyle};
+        use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
         let mut pairs = alloc::vec::Vec::new();
         for i in 0..=(MAX_MAPPING_PAIRS + 1) {
             pairs.push((
@@ -452,10 +452,7 @@ mod tests {
         use crate::nodes::node::Node;
         let mut node = Node::None;
         for i in 0..=(MAX_ANCHORS + 1) {
-            node = Node::Anchored(
-                alloc::boxed::Box::new(node),
-                format!("anchor{}", i),
-            );
+            node = Node::Anchored(alloc::boxed::Box::new(node), format!("anchor{}", i));
         }
         let mut validator = NodeValidator::new();
         let result = validator.validate(&node);

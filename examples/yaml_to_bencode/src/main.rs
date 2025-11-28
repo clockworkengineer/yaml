@@ -1,7 +1,6 @@
-
 use std::path::Path;
 // Import the necessary types and functions from yaml_lib and yaml_utility_lib
-use yaml_lib::{FileSource, parse, FileDestination, to_bencode};
+use yaml_lib::{FileDestination, FileSource, parse, to_bencode};
 use yaml_utility_lib::get_yaml_file_list;
 
 /// Processes a single yaml file by converting it to XML format.
@@ -23,8 +22,9 @@ fn process_yaml_file(file_path: &str) -> Result<(), String> {
         Path::new(file_path)
             .with_extension("ben")
             .to_string_lossy()
-            .as_ref()
-    ).map_err(|e| e.to_string())?;
+            .as_ref(),
+    )
+    .map_err(|e| e.to_string())?;
 
     // Convert the parsed yaml node to XML format and write to destination
     to_bencode(&node, &mut destination).unwrap();

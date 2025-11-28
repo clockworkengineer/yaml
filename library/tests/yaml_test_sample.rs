@@ -1,8 +1,8 @@
 //! Sample test to verify YAML test suite loading works
 
 use std::fs;
-use std::path::Path;
 use std::panic;
+use std::path::Path;
 use std::time::{Duration, Instant};
 use yaml_lib::{BufferSource, parse};
 
@@ -17,14 +17,14 @@ fn test_sample_yaml_cases() {
 
     // Test just a few specific cases
     let test_ids = vec!["229Q", "236B", "26DV", "27NA", "2JQS"];
-    
+
     let mut passed = 0;
     let mut failed = 0;
     let mut timeouts = 0;
 
     for test_id in test_ids {
         let test_dir = suite_dir.join(test_id);
-        
+
         if !test_dir.exists() {
             println!("Test {} not found", test_id);
             continue;
@@ -45,7 +45,10 @@ fn test_sample_yaml_cases() {
         let has_error = test_dir.join("error").exists();
 
         println!("\nTesting {}: {}", test_id, name);
-        println!("  Expected: {}", if has_error { "error" } else { "success" });
+        println!(
+            "  Expected: {}",
+            if has_error { "error" } else { "success" }
+        );
 
         // Run with timeout
         let start = Instant::now();
@@ -78,8 +81,15 @@ fn test_sample_yaml_cases() {
             _ => false,
         };
 
-        println!("  Got: {}", if parse_result.is_ok() { "success" } else { "error" });
-        
+        println!(
+            "  Got: {}",
+            if parse_result.is_ok() {
+                "success"
+            } else {
+                "error"
+            }
+        );
+
         if test_passed {
             println!("  ✓ PASS");
             passed += 1;

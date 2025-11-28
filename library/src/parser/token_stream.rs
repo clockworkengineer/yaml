@@ -4,9 +4,9 @@
 //! common patterns like consuming decorators, looking for specific tokens,
 //! and managing token sequences.
 
-use crate::parser::lexer::{Lexer, Token};
-use crate::parser::directives::DirectiveContext;
 use crate::io::traits::ISource;
+use crate::parser::directives::DirectiveContext;
+use crate::parser::lexer::{Lexer, Token};
 
 /// Decorators (tags and anchors) extracted from token stream
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -24,16 +24,16 @@ pub struct TokenStream<'a> {
 #[allow(dead_code)]
 impl<'a> TokenStream<'a> {
     /// Create a new token stream and load the first token
-    /// 
+    ///
     /// Returns Result to propagate lexer errors (e.g., empty alias/anchor names)
-    pub fn new(source: &'a mut dyn ISource, directives: &'a DirectiveContext) -> Result<Self, String> {
+    pub fn new(
+        source: &'a mut dyn ISource,
+        directives: &'a DirectiveContext,
+    ) -> Result<Self, String> {
         let mut lexer = Lexer::new(source);
         // Load the first token - propagate errors
         lexer.next()?;
-        Ok(TokenStream {
-            lexer,
-            directives,
-        })
+        Ok(TokenStream { lexer, directives })
     }
 
     /// Get the current token without consuming it
@@ -71,10 +71,7 @@ impl<'a> TokenStream<'a> {
                 self.next()?;
                 Ok(())
             }
-            Some(token) => Err(format!(
-                "Expected token {:?}, got {:?}",
-                expected, token
-            )),
+            Some(token) => Err(format!("Expected token {:?}, got {:?}", expected, token)),
             None => Err(format!("Expected token {:?}, got EOF", expected)),
         }
     }
@@ -235,19 +232,19 @@ impl<'a> TokenStream<'a> {
     pub fn has_colon_ahead(&mut self) -> Result<bool, String> {
         // Save position
         let _current_state = self.current().cloned();
-        
+
         // Skip whitespace
         while matches!(self.peek()?, Some(Token::Newline) | Some(Token::Indent(_))) {
             self.next()?;
         }
-        
+
         // Check for colon
         let has_colon = matches!(self.peek()?, Some(Token::Colon));
-        
+
         // Note: We've consumed tokens during lookahead
         // In a real implementation, we'd need a more sophisticated approach
         // For now, this is a simplified version
-        
+
         Ok(has_colon)
     }
 }
@@ -271,9 +268,9 @@ mod tests {
         let mut source = Buffer::new(b"!!str value");
         let directives = DirectiveContext::default();
         let mut stream = TokenStream::new(&mut source, &directives).unwrap();
-        
+
         let decorators = stream.consume_decorators().unwrap();
-        
+
         assert!(decorators.tag.is_some());
         assert_eq!(decorators.tag.unwrap(), "!!str");
         assert!(decorators.anchor.is_none());
@@ -284,9 +281,9 @@ mod tests {
         let mut source = Buffer::new(b"&myanchor value");
         let directives = DirectiveContext::default();
         let mut stream = TokenStream::new(&mut source, &directives).unwrap();
-        
+
         let decorators = stream.consume_decorators().unwrap();
-        
+
         assert!(decorators.anchor.is_some());
         assert_eq!(decorators.anchor.unwrap(), "myanchor");
         assert!(decorators.tag.is_none());
@@ -297,9 +294,9 @@ mod tests {
         let mut source = Buffer::new(b"!!str &myanchor value");
         let directives = DirectiveContext::default();
         let mut stream = TokenStream::new(&mut source, &directives).unwrap();
-        
+
         let decorators = stream.consume_decorators().unwrap();
-        
+
         assert!(decorators.tag.is_some());
         assert!(decorators.anchor.is_some());
         assert_eq!(decorators.tag.unwrap(), "!!str");
@@ -311,9 +308,9 @@ mod tests {
         let mut source = Buffer::new(b"&myanchor !!str value");
         let directives = DirectiveContext::default();
         let mut stream = TokenStream::new(&mut source, &directives).unwrap();
-        
+
         let decorators = stream.consume_decorators().unwrap();
-        
+
         assert!(decorators.tag.is_some());
         assert!(decorators.anchor.is_some());
         assert_eq!(decorators.tag.unwrap(), "!!str");
@@ -325,10 +322,10 @@ mod tests {
         let mut source = Buffer::new(b"\n  \n  value");
         let directives = DirectiveContext::default();
         let mut stream = TokenStream::new(&mut source, &directives).unwrap();
-        
+
         stream.next().unwrap(); // Initialize
         stream.skip_whitespace().unwrap();
-        
+
         assert!(matches!(stream.current(), Some(Token::Plain(_))));
     }
 }

@@ -417,7 +417,7 @@ pub fn unescape_double_quoted(s: &str) -> String {
                     result.push('\t');
                 }
                 Some('b') => {
-                    result.push('\x08');  // backspace
+                    result.push('\x08'); // backspace
                 }
 
                 Some('"') => result.push('"'),

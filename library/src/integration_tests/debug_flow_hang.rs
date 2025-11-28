@@ -8,7 +8,7 @@ mod debug_flow_hang {
         eprintln!("\n=== Testing: - {{ a: 1, }} ===");
         let yaml = b"- { a: 1, }";
         let mut source = BufferSource::new(yaml);
-        
+
         eprintln!("Starting parse...");
         match parse(&mut source) {
             Ok(node) => {
@@ -27,7 +27,7 @@ mod debug_flow_hang {
         eprintln!("\n=== Testing: - {{ a: 1, }}\\n ===");
         let yaml = b"- { a: 1, }\n";
         let mut source = BufferSource::new(yaml);
-        
+
         eprintln!("Starting parse...");
         match parse(&mut source) {
             Ok(node) => {
@@ -46,7 +46,7 @@ mod debug_flow_hang {
         eprintln!("\n=== Testing: two items ===");
         let yaml = b"- { a: 1, }\n- { b: 2 }";
         let mut source = BufferSource::new(yaml);
-        
+
         eprintln!("Starting parse...");
         match parse(&mut source) {
             Ok(node) => {

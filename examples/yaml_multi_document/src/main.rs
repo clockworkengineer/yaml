@@ -196,7 +196,7 @@ logging:
             let count = get_number_of_documents(&node);
             match count {
                 Ok(count) => println!("Loaded {} environment configurations", count),
-                Err(e) => eprintln!("Error counting documents: {}", e)
+                Err(e) => eprintln!("Error counting documents: {}", e),
             }
 
             let environments = vec!["development", "staging", "production"];
@@ -267,8 +267,8 @@ records:
                         }
                         println!();
                     }
-                },
-                Err(e) => eprintln!("Error counting documents: {}", e)
+                }
+                Err(e) => eprintln!("Error counting documents: {}", e),
             }
         }
         Err(e) => eprintln!("Parse error: {}", e),
@@ -327,24 +327,22 @@ data:
             if let Ok(num) = doc_count {
                 for i in 0..num {
                     match get_document(&node, i) {
-                    Ok(doc) => {
-                        let doc_type = match &doc {
-                            Node::Mapping(_) => "Mapping",
-                            Node::Array(_) => "Sequence",
-                            Node::Str(_,_,_) => "String",
-                            Node::Number(_) => "Number",
-                            Node::Boolean(_) => "Boolean",
-                            Node::None => "Null",
-                            _ => {
-                                "Other"
-                            },
-                        };
-                        println!("Document {} - Type: {}", i, doc_type);
-                        print_node(&doc);
-                        println!();
+                        Ok(doc) => {
+                            let doc_type = match &doc {
+                                Node::Mapping(_) => "Mapping",
+                                Node::Array(_) => "Sequence",
+                                Node::Str(_, _, _) => "String",
+                                Node::Number(_) => "Number",
+                                Node::Boolean(_) => "Boolean",
+                                Node::None => "Null",
+                                _ => "Other",
+                            };
+                            println!("Document {} - Type: {}", i, doc_type);
+                            print_node(&doc);
+                            println!();
+                        }
+                        Err(e) => eprintln!("Error accessing document {}: {}", i, e),
                     }
-                    Err(e) => eprintln!("Error accessing document {}: {}", i, e),
-                }
                 }
             }
         }

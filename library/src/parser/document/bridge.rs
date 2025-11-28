@@ -4,10 +4,10 @@
 //! parsing during the migration phase.
 
 use crate::io::traits::ISource;
-use crate::parser::token_stream::TokenStream;
-use crate::parser::directives::DirectiveContext;
 use crate::nodes::node::Node;
+use crate::parser::directives::DirectiveContext;
 use crate::parser::document::tokens::value::parse_value_with_tokens;
+use crate::parser::token_stream::TokenStream;
 
 /// Parse a value using tokens, wrapping the source in a token stream
 ///
@@ -18,7 +18,7 @@ pub fn parse_value_bridged(
     directives: &DirectiveContext,
 ) -> Result<Node, String> {
     let mut stream = TokenStream::new(source, directives)?;
-    
+
     // Parse using token-based parser (stream is auto-initialized)
     parse_value_with_tokens(&mut stream, directives)
 }
@@ -27,13 +27,13 @@ pub fn parse_value_bridged(
 ///
 /// During migration, we can selectively enable token-based parsing for
 /// specific patterns that benefit most.
-/// 
+///
 /// CRITICAL: Avoid using token parsing in contexts where control will return
 /// to character-based parsing, as lexer read-ahead causes position sync issues.
 pub fn should_use_token_parsing(source: &mut dyn ISource) -> bool {
     // SIMPLIFIED ROUTING: Avoid token/character mixing to prevent position sync issues
     // Only use token parsing for pure flow contexts where we won't return to character parsing
-    
+
     let uses_tokens = match source.current() {
         Some('*') => {
             // Aliases: Check if in flow context
@@ -62,7 +62,7 @@ pub fn should_use_token_parsing(source: &mut dyn ISource) -> bool {
         }
         _ => false,
     };
-    
+
     uses_tokens
 }
 
@@ -75,9 +75,9 @@ mod tests {
     fn test_bridged_tag_on_empty() {
         let mut source = Buffer::new(b"!!str");
         let directives = DirectiveContext::default();
-        
+
         let result = parse_value_bridged(&mut source, &directives).unwrap();
-        
+
         assert!(matches!(result, Node::Str(s, _, _) if s.is_empty()));
     }
 
@@ -85,9 +85,9 @@ mod tests {
     fn test_bridged_anchor_on_empty() {
         let mut source = Buffer::new(b"&anchor");
         let directives = DirectiveContext::default();
-        
+
         let result = parse_value_bridged(&mut source, &directives).unwrap();
-        
+
         match result {
             Node::Anchored(inner, name) => {
                 assert_eq!(name, "anchor");
@@ -101,9 +101,9 @@ mod tests {
     fn test_bridged_plain_value() {
         let mut source = Buffer::new(b"hello");
         let directives = DirectiveContext::default();
-        
+
         let result = parse_value_bridged(&mut source, &directives).unwrap();
-        
+
         assert!(matches!(result, Node::Str(s, _, _) if s == "hello"));
     }
 }

@@ -3,9 +3,9 @@
 //! Provides utilities for detecting memory leaks, undefined behavior,
 //! and other safety issues.
 
+use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use alloc::format;
 
 use crate::nodes::node::Node;
 
@@ -87,7 +87,10 @@ pub fn audit_node(node: &Node) -> SafetyAudit {
     if size > 100000 {
         audit.add_issue(SafetyIssue::ExcessiveMemory(size));
     } else if size > 10000 {
-        audit.add_warning(format!("Large document ({} nodes), high memory usage", size));
+        audit.add_warning(format!(
+            "Large document ({} nodes), high memory usage",
+            size
+        ));
     }
 
     // Check for circular references
@@ -145,16 +148,16 @@ fn count_nodes(node: &Node) -> usize {
 /// Check for circular references
 fn has_circular_references(node: &Node) -> bool {
     use core::ptr;
-    
+
     fn check_impl(node: &Node, visited: &mut Vec<*const Node>) -> bool {
         let node_ptr = node as *const Node;
-        
+
         if visited.iter().any(|&p| ptr::eq(p, node_ptr)) {
             return true;
         }
-        
+
         visited.push(node_ptr);
-        
+
         let has_cycle = match node {
             Node::Array(items) => items.iter().any(|n| check_impl(n, visited)),
             Node::Mapping(pairs) => pairs
@@ -167,11 +170,11 @@ fn has_circular_references(node: &Node) -> bool {
             Node::Anchored(inner, _) => check_impl(inner, visited),
             _ => false,
         };
-        
+
         visited.pop();
         has_cycle
     }
-    
+
     let mut visited = Vec::new();
     check_impl(node, &mut visited)
 }
@@ -199,12 +202,10 @@ fn check_collection_sizes(node: &Node, audit: &mut SafetyAudit) {
             } else if pairs.len() > 1000 {
                 audit.add_warning(format!("Large mapping with {} pairs", pairs.len()));
             }
-            pairs
-                .iter()
-                .for_each(|(k, v)| {
-                    check_collection_sizes(k, audit);
-                    check_collection_sizes(v, audit);
-                });
+            pairs.iter().for_each(|(k, v)| {
+                check_collection_sizes(k, audit);
+                check_collection_sizes(v, audit);
+            });
         }
         Node::Set(items) => {
             if items.len() > 10000 {
@@ -274,10 +275,10 @@ pub fn calculate_memory_stats(node: &Node) -> MemoryStats {
 fn calculate_stats_impl(node: &Node, depth: usize, stats: &mut MemoryStats) {
     stats.total_nodes += 1;
     stats.max_depth = stats.max_depth.max(depth);
-    
+
     // Rough estimate: 64 bytes per node base
     stats.estimated_bytes += 64;
-    
+
     match node {
         Node::Str(s, _, _) => {
             stats.string_count += 1;
@@ -294,12 +295,10 @@ fn calculate_stats_impl(node: &Node, depth: usize, stats: &mut MemoryStats) {
         Node::Mapping(pairs) => {
             stats.mapping_count += 1;
             stats.estimated_bytes += pairs.len() * 16; // Vec of tuples overhead
-            pairs
-                .iter()
-                .for_each(|(k, v)| {
-                    calculate_stats_impl(k, depth + 1, stats);
-                    calculate_stats_impl(v, depth + 1, stats);
-                });
+            pairs.iter().for_each(|(k, v)| {
+                calculate_stats_impl(k, depth + 1, stats);
+                calculate_stats_impl(v, depth + 1, stats);
+            });
         }
         Node::Set(items) => {
             stats.estimated_bytes += items.len() * 8;

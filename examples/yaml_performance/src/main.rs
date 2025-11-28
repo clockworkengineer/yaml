@@ -3,7 +3,9 @@
 //! Shows how to use DocumentStats, Timer, and Profiler for analyzing
 //! and optimizing YAML processing performance.
 
-use yaml_lib::{parse, stringify, BufferSource, BufferDestination, DocumentStats, Node, Profiler, Timer};
+use yaml_lib::{
+    parse, stringify, BufferDestination, BufferSource, DocumentStats, Node, Profiler, Timer,
+};
 
 fn main() {
     println!("=== YAML Performance Measurement Examples ===\n");

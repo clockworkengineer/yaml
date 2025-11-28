@@ -15,14 +15,12 @@ use yaml_lib::{FileDestination, FileSource, Node, Numeric, parse, stringify};
 /// * `Ok(Node)` - A Node::List containing the sequence
 /// * `Err(String)` - Error message if reading or parsing fails
 fn read_sequence(file_path: &Path) -> Result<Node, String> {
-
     if !file_path.exists() {
         return Ok(Node::Array(vec![
             Node::Number(Numeric::Integer(1)),
             Node::Number(Numeric::Integer(1)),
         ]));
     }
-
 
     match FileSource::new(&file_path.to_string_lossy()) {
         Ok(mut file) => match parse(&mut file) {
@@ -49,7 +47,6 @@ fn read_sequence(file_path: &Path) -> Result<Node, String> {
 /// # Arguments
 /// * `sequence` - Mutable reference to the Node containing the sequence
 fn add_next(sequence: &mut Node) {
-
     if let Node::Array(items) = sequence {
         if items.len() < 2 {
             return;
@@ -75,7 +72,6 @@ fn add_next(sequence: &mut Node) {
 /// * `Ok(())` - Write operation succeeded
 /// * `Err(String)` - Error message if writing fails
 fn write_sequence(file_path: &Path, sequence: &Node) -> Result<(), String> {
-
     let file = FileDestination::new(file_path.to_str().unwrap_or(""));
     match file {
         Ok(mut f) => {
@@ -90,7 +86,6 @@ fn write_sequence(file_path: &Path, sequence: &Node) -> Result<(), String> {
 /// Reads the existing Fibonacci sequence, adds the next number,
 /// and saves the updated sequence back to the file.
 fn main() {
-
     let file_path = Path::new("fibonacci.yaml");
     match read_sequence(file_path) {
         Ok(mut sequence) => {

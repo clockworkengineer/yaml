@@ -26,37 +26,37 @@ use alloc::string::String;
 pub struct ParserConfig {
     /// Maximum nesting depth allowed (default: 128)
     pub max_depth: usize,
-    
+
     /// Maximum document size in bytes (default: unlimited)
     pub max_size: Option<usize>,
-    
+
     /// Enable strict YAML 1.2 compliance (default: false)
     pub strict_mode: bool,
-    
+
     /// Allow duplicate keys in mappings (default: true)
     pub allow_duplicate_keys: bool,
-    
+
     /// Allow tabs for indentation (default: true)
     pub allow_tabs: bool,
-    
+
     /// Merge keys (<<) support (default: true)
     pub allow_merge_keys: bool,
-    
+
     /// Allow anchors and aliases (default: true)
     pub allow_anchors: bool,
-    
+
     /// Maximum number of anchors per document (default: unlimited)
     pub max_anchors: Option<usize>,
-    
+
     /// Allow explicit document markers (--- and ...) (default: true)
     pub allow_document_markers: bool,
-    
+
     /// Allow tags (!!, !tag) (default: true)
     pub allow_tags: bool,
-    
+
     /// Preserve comments during parsing (default: false)
     pub preserve_comments: bool,
-    
+
     /// Custom error message for depth exceeded
     pub depth_error_message: Option<String>,
 }
@@ -86,13 +86,13 @@ impl ParserConfig {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     /// Create a builder for fluent configuration
     #[must_use]
     pub fn builder() -> ParserConfigBuilder {
         ParserConfigBuilder::new()
     }
-    
+
     /// Create a strict YAML 1.2 compliant configuration
     pub fn strict() -> Self {
         Self {
@@ -102,7 +102,7 @@ impl ParserConfig {
             ..Default::default()
         }
     }
-    
+
     /// Create a permissive configuration for maximum compatibility
     pub fn permissive() -> Self {
         Self {
@@ -114,7 +114,7 @@ impl ParserConfig {
             ..Default::default()
         }
     }
-    
+
     /// Create an embedded-optimized configuration with resource limits
     pub fn embedded() -> Self {
         Self {
@@ -125,7 +125,7 @@ impl ParserConfig {
             ..Default::default()
         }
     }
-    
+
     /// Validate if current depth exceeds maximum
     pub fn check_depth(&self, current_depth: usize) -> Result<(), String> {
         if current_depth > self.max_depth {
@@ -134,34 +134,37 @@ impl ParserConfig {
             } else {
                 Err(alloc::format!(
                     "Maximum nesting depth of {} exceeded (current: {})",
-                    self.max_depth, current_depth
+                    self.max_depth,
+                    current_depth
                 ))
             }
         } else {
             Ok(())
         }
     }
-    
+
     /// Validate if document size exceeds maximum
     pub fn check_size(&self, current_size: usize) -> Result<(), String> {
         if let Some(max) = self.max_size {
             if current_size > max {
                 return Err(alloc::format!(
                     "Maximum document size of {} bytes exceeded (current: {})",
-                    max, current_size
+                    max,
+                    current_size
                 ));
             }
         }
         Ok(())
     }
-    
+
     /// Validate if anchor count exceeds maximum
     pub fn check_anchor_count(&self, count: usize) -> Result<(), String> {
         if let Some(max) = self.max_anchors {
             if count > max {
                 return Err(alloc::format!(
                     "Maximum anchor count of {} exceeded (current: {})",
-                    max, count
+                    max,
+                    count
                 ));
             }
         }
@@ -198,91 +201,91 @@ impl ParserConfigBuilder {
             config: ParserConfig::default(),
         }
     }
-    
+
     /// Set maximum nesting depth
     #[must_use]
     pub fn max_depth(mut self, depth: usize) -> Self {
         self.config.max_depth = depth;
         self
     }
-    
+
     /// Set maximum document size in bytes
     #[must_use]
     pub fn max_size(mut self, size: usize) -> Self {
         self.config.max_size = Some(size);
         self
     }
-    
+
     /// Enable or disable strict YAML 1.2 compliance
     #[must_use]
     pub fn strict_mode(mut self, enabled: bool) -> Self {
         self.config.strict_mode = enabled;
         self
     }
-    
+
     /// Allow or disallow duplicate keys in mappings
     #[must_use]
     pub fn allow_duplicate_keys(mut self, allow: bool) -> Self {
         self.config.allow_duplicate_keys = allow;
         self
     }
-    
+
     /// Allow or disallow tabs for indentation
     #[must_use]
     pub fn allow_tabs(mut self, allow: bool) -> Self {
         self.config.allow_tabs = allow;
         self
     }
-    
+
     /// Allow or disallow merge keys (<<)
     #[must_use]
     pub fn allow_merge_keys(mut self, allow: bool) -> Self {
         self.config.allow_merge_keys = allow;
         self
     }
-    
+
     /// Allow or disallow anchors and aliases
     #[must_use]
     pub fn allow_anchors(mut self, allow: bool) -> Self {
         self.config.allow_anchors = allow;
         self
     }
-    
+
     /// Set maximum number of anchors per document
     #[must_use]
     pub fn max_anchors(mut self, max: usize) -> Self {
         self.config.max_anchors = Some(max);
         self
     }
-    
+
     /// Allow or disallow explicit document markers (--- and ...)
     #[must_use]
     pub fn allow_document_markers(mut self, allow: bool) -> Self {
         self.config.allow_document_markers = allow;
         self
     }
-    
+
     /// Allow or disallow tags (!!, !tag)
     #[must_use]
     pub fn allow_tags(mut self, allow: bool) -> Self {
         self.config.allow_tags = allow;
         self
     }
-    
+
     /// Preserve or discard comments during parsing
     #[must_use]
     pub fn preserve_comments(mut self, preserve: bool) -> Self {
         self.config.preserve_comments = preserve;
         self
     }
-    
+
     /// Set custom error message for depth exceeded
     #[must_use]
     pub fn depth_error_message<S: Into<String>>(mut self, message: S) -> Self {
         self.config.depth_error_message = Some(message.into());
         self
     }
-    
+
     /// Build the final ParserConfig
     #[must_use]
     pub fn build(self) -> ParserConfig {
@@ -348,7 +351,7 @@ mod tests {
             .max_depth(64)
             .strict_mode(true)
             .build();
-        
+
         assert_eq!(config.max_depth, 64);
         assert!(config.strict_mode);
     }
@@ -369,7 +372,7 @@ mod tests {
             .preserve_comments(true)
             .depth_error_message("Too deep!")
             .build();
-        
+
         assert_eq!(config.max_depth, 64);
         assert_eq!(config.max_size, Some(1024));
         assert!(config.strict_mode);
@@ -404,7 +407,7 @@ mod tests {
             .max_depth(10)
             .depth_error_message("Custom depth error")
             .build();
-        
+
         let result = config.check_depth(11);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "Custom depth error");
@@ -460,7 +463,7 @@ mod tests {
             .strict_mode(true)
             .allow_duplicate_keys(false)
             .build();
-        
+
         assert_eq!(config.max_depth, 32);
         assert_eq!(config.max_size, Some(4096));
         assert!(config.strict_mode);
@@ -473,7 +476,7 @@ mod tests {
             .max_depth(64)
             .strict_mode(true)
             .build();
-        
+
         let config2 = config1.clone();
         assert_eq!(config2.max_depth, 64);
         assert!(config2.strict_mode);

@@ -259,7 +259,10 @@ mod tests {
     #[test]
     fn test_eof_expecting() {
         let error = eof_expecting("closing bracket");
-        assert_eq!(error, "Unexpected end of input while expecting closing bracket");
+        assert_eq!(
+            error,
+            "Unexpected end of input while expecting closing bracket"
+        );
     }
 
     #[test]

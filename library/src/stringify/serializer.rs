@@ -2,11 +2,11 @@
 //!
 //! Allows users to define custom serialization logic for specific node types.
 
-use alloc::string::String;
 use alloc::boxed::Box;
+use alloc::string::String;
 
 use crate::nodes::node::Node;
-use crate::stringify::format::{FormatOptions, FormatContext};
+use crate::stringify::format::{FormatContext, FormatOptions};
 
 /// Result type for serialization operations
 pub type SerializeResult = Result<String, String>;
@@ -15,10 +15,15 @@ pub type SerializeResult = Result<String, String>;
 pub trait Serializer {
     /// Check if this serializer can handle the given node
     fn can_serialize(&self, node: &Node) -> bool;
-    
+
     /// Serialize the node to a string
-    fn serialize(&self, node: &Node, options: &FormatOptions, context: &FormatContext) -> SerializeResult;
-    
+    fn serialize(
+        &self,
+        node: &Node,
+        options: &FormatOptions,
+        context: &FormatContext,
+    ) -> SerializeResult;
+
     /// Get serializer priority (higher = checked first)
     fn priority(&self) -> i32 {
         0
@@ -51,7 +56,12 @@ impl Serializer for TaggedSerializer {
         }
     }
 
-    fn serialize(&self, node: &Node, options: &FormatOptions, context: &FormatContext) -> SerializeResult {
+    fn serialize(
+        &self,
+        node: &Node,
+        options: &FormatOptions,
+        context: &FormatContext,
+    ) -> SerializeResult {
         (self.serialize_fn)(node, options, context)
     }
 
@@ -84,7 +94,12 @@ impl Serializer for TypeSerializer {
         (self.can_serialize_fn)(node)
     }
 
-    fn serialize(&self, node: &Node, options: &FormatOptions, context: &FormatContext) -> SerializeResult {
+    fn serialize(
+        &self,
+        node: &Node,
+        options: &FormatOptions,
+        context: &FormatContext,
+    ) -> SerializeResult {
         (self.serialize_fn)(node, options, context)
     }
 }
@@ -105,7 +120,8 @@ impl SerializerRegistry {
     pub fn register(&mut self, serializer: Box<dyn Serializer>) {
         self.serializers.push(serializer);
         // Sort by priority (descending)
-        self.serializers.sort_by(|a, b| b.priority().cmp(&a.priority()));
+        self.serializers
+            .sort_by(|a, b| b.priority().cmp(&a.priority()));
     }
 
     /// Find a serializer for the given node
@@ -148,26 +164,21 @@ mod tests {
 
     #[test]
     fn test_tagged_serializer() {
-        let serializer = TaggedSerializer::new("!custom", |node, _opts, _ctx| {
-            match node {
-                Node::Tagged(inner, _) => {
-                    if let Node::Str(s, _, _) = &**inner {
-                        Ok(format!("CUSTOM: {}", s))
-                    } else {
-                        Err("Expected string".to_string())
-                    }
+        let serializer = TaggedSerializer::new("!custom", |node, _opts, _ctx| match node {
+            Node::Tagged(inner, _) => {
+                if let Node::Str(s, _, _) = &**inner {
+                    Ok(format!("CUSTOM: {}", s))
+                } else {
+                    Err("Expected string".to_string())
                 }
-                _ => Err("Not a tagged node".to_string()),
             }
+            _ => Err("Not a tagged node".to_string()),
         });
 
-        let node = Node::Tagged(
-            Box::new(Node::from("test")),
-            "!custom".to_string(),
-        );
+        let node = Node::Tagged(Box::new(Node::from("test")), "!custom".to_string());
 
         assert!(serializer.can_serialize(&node));
-        
+
         let opts = FormatOptions::default();
         let ctx = FormatContext::new();
         let result = serializer.serialize(&node, &opts, &ctx).unwrap();
@@ -222,15 +233,15 @@ mod tests {
         let ctx = FormatContext::new();
 
         // Should use custom serializer
-        let result = registry.serialize(&large, &opts, &ctx, |_, _, _| {
-            Ok("DEFAULT".to_string())
-        }).unwrap();
+        let result = registry
+            .serialize(&large, &opts, &ctx, |_, _, _| Ok("DEFAULT".to_string()))
+            .unwrap();
         assert_eq!(result, "5K");
 
         // Should use default
-        let result = registry.serialize(&small, &opts, &ctx, |_, _, _| {
-            Ok("DEFAULT".to_string())
-        }).unwrap();
+        let result = registry
+            .serialize(&small, &opts, &ctx, |_, _, _| Ok("DEFAULT".to_string()))
+            .unwrap();
         assert_eq!(result, "DEFAULT");
     }
 
@@ -255,9 +266,9 @@ mod tests {
         let ctx = FormatContext::new();
 
         // Should use high priority serializer
-        let result = registry.serialize(&node, &opts, &ctx, |_, _, _| {
-            Ok("DEFAULT".to_string())
-        }).unwrap();
+        let result = registry
+            .serialize(&node, &opts, &ctx, |_, _, _| Ok("DEFAULT".to_string()))
+            .unwrap();
         assert_eq!(result, "HIGH");
     }
 }

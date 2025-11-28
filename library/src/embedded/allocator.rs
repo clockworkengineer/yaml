@@ -25,7 +25,7 @@ impl BumpAllocator {
     pub fn alloc(&mut self, size: usize, align: usize) -> Option<&mut [u8]> {
         let align_offset = (self.offset + align - 1) & !(align - 1);
         let end = align_offset.checked_add(size)?;
-        
+
         if end > self.buffer.len() {
             return None;
         }
@@ -138,7 +138,7 @@ mod tests {
     #[test]
     fn test_bump_allocator_alloc() {
         let mut allocator = BumpAllocator::new();
-        
+
         let slice1 = allocator.alloc(100, 1);
         assert!(slice1.is_some());
         assert_eq!(slice1.unwrap().len(), 100);
@@ -153,11 +153,11 @@ mod tests {
     #[test]
     fn test_bump_allocator_alignment() {
         let mut allocator = BumpAllocator::new();
-        
+
         // Allocate with 8-byte alignment
         let slice1 = allocator.alloc(5, 8);
         assert!(slice1.is_some());
-        
+
         // Next allocation should be 8-byte aligned
         let slice2 = allocator.alloc(10, 8);
         assert!(slice2.is_some());
@@ -166,7 +166,7 @@ mod tests {
     #[test]
     fn test_bump_allocator_out_of_memory() {
         let mut allocator = BumpAllocator::new();
-        
+
         // Try to allocate more than capacity
         let slice = allocator.alloc(5000, 1);
         assert!(slice.is_none());
@@ -175,10 +175,10 @@ mod tests {
     #[test]
     fn test_bump_allocator_reset() {
         let mut allocator = BumpAllocator::new();
-        
+
         allocator.alloc(100, 1);
         assert_eq!(allocator.used(), 100);
-        
+
         allocator.reset();
         assert_eq!(allocator.used(), 0);
         assert_eq!(allocator.available(), 4096);
@@ -194,7 +194,7 @@ mod tests {
     #[test]
     fn test_fixed_size_pool_alloc() {
         let mut pool: FixedSizePool<64, 10> = FixedSizePool::new();
-        
+
         let block1 = pool.alloc();
         assert!(block1.is_some());
         assert_eq!(pool.free_count(), 9);
@@ -209,12 +209,12 @@ mod tests {
     #[test]
     fn test_fixed_size_pool_exhaustion() {
         let mut pool: FixedSizePool<64, 3> = FixedSizePool::new();
-        
+
         assert!(pool.alloc().is_some());
         assert!(pool.alloc().is_some());
         assert!(pool.alloc().is_some());
         assert!(pool.alloc().is_none()); // Pool exhausted
-        
+
         assert_eq!(pool.free_count(), 0);
         assert_eq!(pool.allocated_count(), 3);
     }
@@ -222,7 +222,7 @@ mod tests {
     #[test]
     fn test_bump_allocator_multiple_allocs() {
         let mut allocator = BumpAllocator::new();
-        
+
         for i in 1..=10 {
             let slice = allocator.alloc(100, 1);
             assert!(slice.is_some());
@@ -233,15 +233,15 @@ mod tests {
     #[test]
     fn test_bump_allocator_capacity_boundary() {
         let mut allocator = BumpAllocator::new();
-        
+
         // Allocate almost full capacity
         let slice1 = allocator.alloc(4000, 1);
         assert!(slice1.is_some());
-        
+
         // Should fit
         let slice2 = allocator.alloc(96, 1);
         assert!(slice2.is_some());
-        
+
         // Should not fit
         let slice3 = allocator.alloc(1, 1);
         assert!(slice3.is_none());

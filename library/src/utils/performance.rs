@@ -18,43 +18,43 @@ use crate::nodes::node::Node;
 pub struct DocumentStats {
     /// Total number of nodes in the document
     pub total_nodes: usize,
-    
+
     /// Maximum nesting depth
     pub max_depth: usize,
-    
+
     /// Number of string nodes
     pub string_count: usize,
-    
+
     /// Number of numeric nodes
     pub number_count: usize,
-    
+
     /// Number of boolean nodes
     pub boolean_count: usize,
-    
+
     /// Number of array/sequence nodes
     pub array_count: usize,
-    
+
     /// Number of mapping nodes
     pub mapping_count: usize,
-    
+
     /// Number of set nodes
     pub set_count: usize,
-    
+
     /// Number of anchor nodes
     pub anchor_count: usize,
-    
+
     /// Number of alias nodes
     pub alias_count: usize,
-    
+
     /// Number of tagged nodes
     pub tagged_count: usize,
-    
+
     /// Total string length (bytes)
     pub total_string_bytes: usize,
-    
+
     /// Largest array size
     pub largest_array: usize,
-    
+
     /// Largest mapping size
     pub largest_mapping: usize,
 }
@@ -64,7 +64,7 @@ impl DocumentStats {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     /// Gather statistics from a Node tree
     ///
     /// # Example
@@ -86,14 +86,14 @@ impl DocumentStats {
         stats.analyze_node(node, 0);
         stats
     }
-    
+
     fn analyze_node(&mut self, node: &Node, depth: usize) {
         self.total_nodes += 1;
-        
+
         if depth > self.max_depth {
             self.max_depth = depth;
         }
-        
+
         match node {
             Node::Str(s, _, _) => {
                 self.string_count += 1;
@@ -149,17 +149,17 @@ impl DocumentStats {
             Node::Comment(_) | Node::None => {}
         }
     }
-    
+
     /// Calculate estimated memory usage in bytes
     pub fn estimated_memory_bytes(&self) -> usize {
         // Rough estimation based on typical sizes
         let node_overhead = self.total_nodes * 64; // ~64 bytes per Node enum
         let string_data = self.total_string_bytes;
         let collection_overhead = (self.array_count + self.mapping_count + self.set_count) * 24; // Vec overhead
-        
+
         node_overhead + string_data + collection_overhead
     }
-    
+
     /// Get a human-readable summary
     #[cfg(feature = "alloc")]
     pub fn summary(&self) -> String {
@@ -213,17 +213,17 @@ impl Timer {
             label: label.into(),
         }
     }
-    
+
     /// Get elapsed time since timer start
     pub fn elapsed(&self) -> Duration {
         self.start.elapsed()
     }
-    
+
     /// Stop the timer and return elapsed duration
     pub fn stop(self) -> Duration {
         self.elapsed()
     }
-    
+
     /// Stop the timer and print elapsed time
     pub fn stop_and_print(self) {
         let elapsed = self.elapsed();
@@ -246,7 +246,7 @@ impl Profiler {
             measurements: Vec::new(),
         }
     }
-    
+
     /// Time an operation and record it
     pub fn time<F, R>(&mut self, label: &str, f: F) -> R
     where
@@ -258,17 +258,17 @@ impl Profiler {
         self.measurements.push((label.to_string(), elapsed));
         result
     }
-    
+
     /// Get all measurements
     pub fn measurements(&self) -> &[(String, Duration)] {
         &self.measurements
     }
-    
+
     /// Get total time across all measurements
     pub fn total_time(&self) -> Duration {
         self.measurements.iter().map(|(_, d)| *d).sum()
     }
-    
+
     /// Print all measurements
     pub fn print_results(&self) {
         println!("Performance Profile:");
@@ -279,7 +279,7 @@ impl Profiler {
         println!("{:-<60}", "");
         println!("{:<40} {:>15?}", "Total", self.total_time());
     }
-    
+
     /// Clear all measurements
     pub fn clear(&mut self) {
         self.measurements.clear();
@@ -296,15 +296,15 @@ where
     let timer1 = Timer::new(label1);
     f1();
     let time1 = timer1.stop();
-    
+
     let timer2 = Timer::new(label2);
     f2();
     let time2 = timer2.stop();
-    
+
     println!("Performance Comparison:");
     println!("  {}: {:?}", label1, time1);
     println!("  {}: {:?}", label2, time2);
-    
+
     if time1 < time2 {
         let ratio = time2.as_secs_f64() / time1.as_secs_f64();
         println!("  {} is {:.2}x faster", label1, ratio);
@@ -331,7 +331,7 @@ mod tests {
     fn test_document_stats_simple() {
         let node = Node::from(42);
         let stats = DocumentStats::from_node(&node);
-        
+
         assert_eq!(stats.total_nodes, 1);
         assert_eq!(stats.number_count, 1);
         assert_eq!(stats.max_depth, 0);
@@ -339,13 +339,9 @@ mod tests {
 
     #[test]
     fn test_document_stats_array() {
-        let node = Node::Array(vec![
-            Node::from(1),
-            Node::from(2),
-            Node::from(3),
-        ]);
+        let node = Node::Array(vec![Node::from(1), Node::from(2), Node::from(3)]);
         let stats = DocumentStats::from_node(&node);
-        
+
         assert_eq!(stats.total_nodes, 4); // array + 3 numbers
         assert_eq!(stats.array_count, 1);
         assert_eq!(stats.number_count, 3);
@@ -357,13 +353,10 @@ mod tests {
     fn test_document_stats_nested() {
         let node = Node::Array(vec![
             Node::from(1),
-            Node::Array(vec![
-                Node::from(2),
-                Node::from(3),
-            ]),
+            Node::Array(vec![Node::from(2), Node::from(3)]),
         ]);
         let stats = DocumentStats::from_node(&node);
-        
+
         assert_eq!(stats.total_nodes, 5);
         assert_eq!(stats.array_count, 2);
         assert_eq!(stats.number_count, 3);
@@ -377,7 +370,7 @@ mod tests {
             (Node::from("key2"), Node::from("value2")),
         ]);
         let stats = DocumentStats::from_node(&node);
-        
+
         assert_eq!(stats.total_nodes, 5); // mapping + 2 keys + 2 values
         assert_eq!(stats.mapping_count, 1);
         assert_eq!(stats.string_count, 4);
@@ -388,12 +381,15 @@ mod tests {
     #[test]
     fn test_document_stats_mixed() {
         let node = Node::Mapping(vec![
-            (Node::from("numbers"), Node::Array(vec![Node::from(1), Node::from(2)])),
+            (
+                Node::from("numbers"),
+                Node::Array(vec![Node::from(1), Node::from(2)]),
+            ),
             (Node::from("text"), Node::from("hello")),
             (Node::from("flag"), Node::from(true)),
         ]);
         let stats = DocumentStats::from_node(&node);
-        
+
         assert_eq!(stats.mapping_count, 1);
         assert_eq!(stats.array_count, 1);
         assert_eq!(stats.string_count, 4); // 3 keys + 1 value
@@ -404,13 +400,10 @@ mod tests {
     #[test]
     fn test_document_stats_anchors() {
         use alloc::boxed::Box;
-        
-        let node = Node::Anchored(
-            Box::new(Node::from(42)),
-            "anchor".to_string(),
-        );
+
+        let node = Node::Anchored(Box::new(Node::from(42)), "anchor".to_string());
         let stats = DocumentStats::from_node(&node);
-        
+
         assert_eq!(stats.anchor_count, 1);
         assert_eq!(stats.number_count, 1);
     }
@@ -419,7 +412,7 @@ mod tests {
     fn test_document_stats_alias() {
         let node = Node::Alias("ref".to_string());
         let stats = DocumentStats::from_node(&node);
-        
+
         assert_eq!(stats.alias_count, 1);
         assert_eq!(stats.total_nodes, 1);
     }
@@ -427,13 +420,10 @@ mod tests {
     #[test]
     fn test_document_stats_tagged() {
         use alloc::boxed::Box;
-        
-        let node = Node::Tagged(
-            Box::new(Node::from("value")),
-            "!custom".to_string(),
-        );
+
+        let node = Node::Tagged(Box::new(Node::from("value")), "!custom".to_string());
         let stats = DocumentStats::from_node(&node);
-        
+
         assert_eq!(stats.tagged_count, 1);
         assert_eq!(stats.string_count, 1);
     }
@@ -442,7 +432,7 @@ mod tests {
     fn test_estimated_memory() {
         let node = Node::Array(vec![Node::from(1), Node::from(2)]);
         let stats = DocumentStats::from_node(&node);
-        
+
         let mem = stats.estimated_memory_bytes();
         assert!(mem > 0);
         // Should account for nodes and collection overhead
@@ -454,7 +444,7 @@ mod tests {
     fn test_summary_format() {
         let node = Node::Array(vec![Node::from(1), Node::from(2)]);
         let stats = DocumentStats::from_node(&node);
-        
+
         let summary = stats.summary();
         assert!(summary.contains("Total nodes: 3"));
         assert!(summary.contains("Arrays: 1"));
@@ -497,12 +487,12 @@ mod tests {
     #[test]
     fn test_profiler_time() {
         let mut profiler = Profiler::new();
-        
+
         let result = profiler.time("test_op", || {
             std::thread::sleep(std::time::Duration::from_millis(10));
             42
         });
-        
+
         assert_eq!(result, 42);
         assert_eq!(profiler.measurements().len(), 1);
         assert_eq!(profiler.measurements()[0].0, "test_op");
@@ -513,10 +503,14 @@ mod tests {
     #[test]
     fn test_profiler_multiple_measurements() {
         let mut profiler = Profiler::new();
-        
-        profiler.time("op1", || std::thread::sleep(std::time::Duration::from_millis(10)));
-        profiler.time("op2", || std::thread::sleep(std::time::Duration::from_millis(20)));
-        
+
+        profiler.time("op1", || {
+            std::thread::sleep(std::time::Duration::from_millis(10))
+        });
+        profiler.time("op2", || {
+            std::thread::sleep(std::time::Duration::from_millis(20))
+        });
+
         assert_eq!(profiler.measurements().len(), 2);
         let total = profiler.total_time();
         assert!(total.as_millis() >= 30);
@@ -526,10 +520,10 @@ mod tests {
     #[test]
     fn test_profiler_clear() {
         let mut profiler = Profiler::new();
-        
+
         profiler.time("op", || {});
         assert_eq!(profiler.measurements().len(), 1);
-        
+
         profiler.clear();
         assert_eq!(profiler.measurements().len(), 0);
     }

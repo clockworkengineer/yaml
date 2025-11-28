@@ -313,7 +313,10 @@ mod tests {
         let yaml = b"---\nnested sequences:\n- - - []\n- - - {}\nkey1: []\nkey2: {}";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        assert!(result.is_ok(), "Should parse nested sequences with empty flow collections");
+        assert!(
+            result.is_ok(),
+            "Should parse nested sequences with empty flow collections"
+        );
     }
 
     #[test]
@@ -322,13 +325,16 @@ mod tests {
         let yaml = b"- { one : two , three: four , }\n- {five: six,seven : eight}";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        
+
         match &result {
-            Ok(_) => {},
+            Ok(_) => {}
             Err(e) => println!("5C5M Error: {}", e),
         }
-        
-        assert!(result.is_ok(), "Should parse flow mappings with trailing commas");
+
+        assert!(
+            result.is_ok(),
+            "Should parse flow mappings with trailing commas"
+        );
     }
 
     #[test]
@@ -365,8 +371,14 @@ mod tests {
                 if let Node::Mapping(pairs) = &nodes[0] {
                     if let Node::Str(content, _, _) = &pairs[0].1 {
                         // Should now contain actual newline and tab characters, not escaped versions
-                        assert!(content.contains('\n'), "Should contain actual newline character");
-                        assert!(content.contains('\t'), "Should contain actual tab character");
+                        assert!(
+                            content.contains('\n'),
+                            "Should contain actual newline character"
+                        );
+                        assert!(
+                            content.contains('\t'),
+                            "Should contain actual tab character"
+                        );
                         assert_eq!(content, "Line 1\nLine 2\tTabbed");
                     }
                 }

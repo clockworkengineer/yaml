@@ -24,14 +24,14 @@ pub fn parse_inline_sequence_with_tokens(
 ) -> Result<Node, String> {
     // Expect opening bracket
     stream.expect(Token::FlowSequenceStart)?;
-    
+
     let mut items = Vec::new();
     let mut expect_item = true; // After [ or comma, we expect an item
-    
+
     loop {
         // Skip whitespace/comments
         stream.skip_whitespace_and_comments()?;
-        
+
         match stream.current() {
             Some(Token::FlowSequenceEnd) => {
                 // Closing bracket - done
@@ -54,7 +54,7 @@ pub fn parse_inline_sequence_with_tokens(
                     // Found value without comma separator
                     return Err("Expected comma or ] in flow sequence".to_string());
                 }
-                
+
                 // Parse the value
                 let value = parse_value_with_tokens(stream, directives)?;
                 items.push(value);
@@ -62,7 +62,7 @@ pub fn parse_inline_sequence_with_tokens(
             }
         }
     }
-    
+
     Ok(Node::Array(items))
 }
 
@@ -81,14 +81,14 @@ pub fn parse_inline_mapping_with_tokens(
 ) -> Result<Node, String> {
     // Expect opening brace
     stream.expect(Token::FlowMappingStart)?;
-    
+
     let mut pairs = Vec::new();
     let mut expect_entry = true; // After { or comma, we expect a key
-    
+
     loop {
         // Skip whitespace/comments
         stream.skip_whitespace_and_comments()?;
-        
+
         match stream.current() {
             Some(Token::FlowMappingEnd) => {
                 // Closing brace - done
@@ -111,31 +111,31 @@ pub fn parse_inline_mapping_with_tokens(
                     // Found key without comma separator
                     return Err("Expected comma or } in flow mapping".to_string());
                 }
-                
+
                 // Parse the key
                 let key = parse_value_with_tokens(stream, directives)?;
-                
+
                 // Skip whitespace
                 stream.skip_whitespace_and_comments()?;
-                
+
                 // Expect colon
                 if !matches!(stream.current(), Some(Token::Colon)) {
                     return Err("Expected : after mapping key in flow mapping".to_string());
                 }
                 stream.next()?;
-                
+
                 // Skip whitespace
                 stream.skip_whitespace_and_comments()?;
-                
+
                 // Parse the value
                 let value = parse_value_with_tokens(stream, directives)?;
-                
+
                 pairs.push((key, value));
                 expect_entry = false;
             }
         }
     }
-    
+
     Ok(Node::Mapping(pairs))
 }
 

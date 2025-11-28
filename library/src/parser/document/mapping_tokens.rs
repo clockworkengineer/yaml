@@ -4,10 +4,10 @@
 //! This eliminates infinite loops with decorators and handles complex key patterns.
 
 use crate::nodes::node::Node;
-use crate::parser::token_stream::TokenStream;
-use crate::parser::lexer::Token;
 use crate::parser::directives::DirectiveContext;
 use crate::parser::document::tokens::value::parse_value_with_tokens;
+use crate::parser::lexer::Token;
+use crate::parser::token_stream::TokenStream;
 
 /// Parse a block mapping using tokens
 ///
@@ -64,7 +64,7 @@ pub fn parse_mapping_with_tokens(
                 // Parse a key-value pair
                 let (key, value) = parse_mapping_pair(stream, directives)?;
                 pairs.push((key, value));
-                
+
                 // Skip trailing whitespace
                 stream.skip_whitespace()?;
             }
@@ -91,13 +91,16 @@ fn parse_mapping_pair(
     };
 
     // Check if we have decorators on an implicit empty key (decorator followed by colon)
-    let key = if matches!(stream.current(), Some(Token::Tag(_)) | Some(Token::Anchor(_))) {
+    let key = if matches!(
+        stream.current(),
+        Some(Token::Tag(_)) | Some(Token::Anchor(_))
+    ) {
         // Consume decorators
         let decorators = stream.consume_decorators()?;
-        
+
         // Check if followed immediately by colon (implicit empty key)
         if matches!(stream.current(), Some(Token::Colon)) {
-            use crate::nodes::node::{QuoteType, BlockStyle};
+            use crate::nodes::node::{BlockStyle, QuoteType};
             let mut node = Node::Str("".to_string(), QuoteType::Unquoted, BlockStyle::None);
             if let Some(tag) = decorators.tag {
                 node = Node::Tagged(Box::new(node), tag);
@@ -114,7 +117,7 @@ fn parse_mapping_pair(
         // No decorators, parse key normally
         parse_value_with_tokens(stream, directives)?
     };
-    
+
     // Skip whitespace after key
     stream.skip_whitespace()?;
 
@@ -144,14 +147,20 @@ fn parse_mapping_pair(
                 if matches!(tok, Token::Colon) {
                     // already advanced and consumed colon
                 } else {
-                    return Err(format!("Expected colon after key, got after advance: {:?}", tok));
+                    return Err(format!(
+                        "Expected colon after key, got after advance: {:?}",
+                        tok
+                    ));
                 }
             } else {
                 return Err("Expected colon after key, got EOF".to_string());
             }
         }
         _ => {
-            return Err(format!("Expected colon after key, got: {:?}", stream.current()));
+            return Err(format!(
+                "Expected colon after key, got: {:?}",
+                stream.current()
+            ));
         }
     }
 

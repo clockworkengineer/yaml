@@ -502,7 +502,9 @@ mod tests {
                     let (_k, v) = &pairs[0];
                     // omap should be treated as tagged array
                     match v {
-                        Node::Tagged(inner, tag) if tag == "!!omap" || tag == "tag:yaml.org,2002:omap" => {
+                        Node::Tagged(inner, tag)
+                            if tag == "!!omap" || tag == "tag:yaml.org,2002:omap" =>
+                        {
                             if let Node::Array(items) = inner.as_ref() {
                                 assert_eq!(items.len(), 3);
                                 // Each item should be a mapping with one key-value pair
@@ -538,16 +540,24 @@ mod tests {
                     let (_k, v) = &pairs[0];
                     // pairs should be treated as tagged array of 2-element arrays
                     match v {
-                        Node::Tagged(inner, tag) if tag == "!!pairs" || tag == "tag:yaml.org,2002:pairs" => {
+                        Node::Tagged(inner, tag)
+                            if tag == "!!pairs" || tag == "tag:yaml.org,2002:pairs" =>
+                        {
                             if let Node::Array(items) = inner.as_ref() {
                                 assert_eq!(items.len(), 2);
                                 // Each item should be a 2-element array [key, value]
                                 for item in items {
                                     match item {
                                         Node::Array(pair) => {
-                                            assert_eq!(pair.len(), 2, "Each pair should have exactly 2 elements");
+                                            assert_eq!(
+                                                pair.len(),
+                                                2,
+                                                "Each pair should have exactly 2 elements"
+                                            );
                                         }
-                                        _ => panic!("Expected array in pairs item, got: {:?}", item),
+                                        _ => {
+                                            panic!("Expected array in pairs item, got: {:?}", item)
+                                        }
                                     }
                                 }
                                 return;
@@ -573,7 +583,7 @@ mod tests {
         let invalid_yaml = b"data: !!binary Invalid@Base64!";
         let mut source = BufferSource::new(invalid_yaml);
         let result = parse(&mut source).unwrap();
-        
+
         // Should still parse but not be coerced to binary tag
         if let Node::Documents(ref docs) = result {
             if let Document(nodes) = &docs[0] {
@@ -582,8 +592,11 @@ mod tests {
                     match v {
                         Node::Tagged(_, tag) => {
                             // Accept both short and resolved tag formats
-                            assert!(tag == "!!binary" || tag == "tag:yaml.org,2002:binary", 
-                                    "Expected binary tag, got: {}", tag);
+                            assert!(
+                                tag == "!!binary" || tag == "tag:yaml.org,2002:binary",
+                                "Expected binary tag, got: {}",
+                                tag
+                            );
                         }
                         _ => {} // May not be tagged if coercion failed
                     }
@@ -624,8 +637,11 @@ mod tests {
                             }
                             Node::Tagged(inner, tag) => {
                                 // May be tagged if not coerced (accept both short and resolved forms)
-                                assert!(tag == "!!int" || tag == "tag:yaml.org,2002:int",
-                                        "Expected int tag, got: {}", tag);
+                                assert!(
+                                    tag == "!!int" || tag == "tag:yaml.org,2002:int",
+                                    "Expected int tag, got: {}",
+                                    tag
+                                );
                                 // Check inner value is preserved as string
                                 if let Node::Str(s, _, _) = inner.as_ref() {
                                     // Tagged but not converted - acceptable for this parser
@@ -1170,7 +1186,7 @@ mod tests {
                 }
             }
         }
-        
+
         // Test octal
         let oct_yaml = b"oct_value: !!int:oct '0o777'";
         let mut source = BufferSource::new(oct_yaml);

@@ -14,11 +14,11 @@ mod inline;
 mod inline_tokens;
 mod loop_guards;
 mod mapping;
-mod tokens;
 mod mapping_tokens;
 mod scalar;
 mod sequence;
 mod sequence_tokens;
+mod tokens;
 mod value;
 mod value_tokens;
 // token modules now grouped under tokens/
@@ -160,7 +160,7 @@ pub fn parse_document_contents(
             // Save state to check if this is a tagged mapping key
             let state = source.save_state();
             source.next(); // skip first !
-            
+
             // Skip the tag
             while let Some(ch) = source.current() {
                 if ch == ' ' || ch == '\t' || ch == '\n' {
@@ -169,17 +169,19 @@ pub fn parse_document_contents(
                 source.next();
             }
             crate::parser::document::helpers::skip_whitespace(source);
-            
+
             // Check if what follows is a colon (indicating mapping key)
             let is_mapping_key = source.current() == Some(':');
-            
+
             // Restore state and parse appropriately
             source.restore_state(state);
-            
+
             if is_mapping_key {
                 Ok(parse_mapping(source, indent_level, directives)?)
             } else {
-                Ok(crate::parser::document::value::parse_value(source, directives)?)
+                Ok(crate::parser::document::value::parse_value(
+                    source, directives,
+                )?)
             }
         }
         // Support anchors at document level (e.g. "&anchor key: value")
@@ -187,24 +189,34 @@ pub fn parse_document_contents(
             // Save state to check if this is an anchored mapping key
             let state = source.save_state();
             source.next(); // skip &
-            
+
             // Collect anchor name
             let _anchor_name = crate::utils::collect_until(source, |c| {
-                c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '#'
-                || c == ',' || c == '[' || c == ']' || c == '{' || c == '}'
+                c == ' '
+                    || c == '\t'
+                    || c == '\n'
+                    || c == '\r'
+                    || c == '#'
+                    || c == ','
+                    || c == '['
+                    || c == ']'
+                    || c == '{'
+                    || c == '}'
             });
             crate::parser::document::helpers::skip_whitespace(source);
-            
+
             // Check if what follows looks like a mapping key
             let is_mapping = peek_ahead_for_mapping_key(source);
-            
+
             // Restore state and parse appropriately
             source.restore_state(state);
-            
+
             if is_mapping {
                 Ok(parse_mapping(source, indent_level, directives)?)
             } else {
-                Ok(crate::parser::document::value::parse_value(source, directives)?)
+                Ok(crate::parser::document::value::parse_value(
+                    source, directives,
+                )?)
             }
         }
         // Support aliases at document level (e.g. "*anchor")
@@ -230,7 +242,7 @@ pub fn parse_document_contents(
                 if source.current() == Some('\t') {
                     return Err(helpers::parse_error(
                         source,
-                        "Tabs cannot be used as separation after explicit value indicator"
+                        "Tabs cannot be used as separation after explicit value indicator",
                     ));
                 }
                 skip_whitespace(source);
@@ -290,7 +302,7 @@ pub fn parse_document_contents(
                 if source.current() == Some('\t') {
                     return Err(helpers::parse_error(
                         source,
-                        "Tabs cannot be used as separation after explicit key indicator"
+                        "Tabs cannot be used as separation after explicit key indicator",
                     ));
                 }
                 skip_whitespace(source);
@@ -303,10 +315,10 @@ pub fn parse_document_contents(
                     key_node = parse_sequence(source, nested_indent, directives)?;
                 } else if matches!(source.current(), Some('|') | Some('>')) {
                     let is_folded = source.current() == Some('>');
-                    
+
                     // Use the consolidated block scalar parser
                     let content = block_scalar::parse_block_scalar(source, is_folded)?;
-                    
+
                     let mut escaped_key = content;
                     escaped_key.push_str("\\n");
                     key_node = Node::Str(
@@ -314,7 +326,10 @@ pub fn parse_document_contents(
                         crate::nodes::node::QuoteType::Double,
                         crate::nodes::node::BlockStyle::None,
                     );
-                } else if matches!(source.current(), Some('"') | Some('\'') | Some('&') | Some('*') | Some('!')) {
+                } else if matches!(
+                    source.current(),
+                    Some('"') | Some('\'') | Some('&') | Some('*') | Some('!')
+                ) {
                     // Quoted strings, anchors, aliases, and tags need special parsing
                     key_node = crate::parser::document::value::parse_value(source, directives)?;
                 } else if source.current() == Some('#') || source.current() == Some('\n') {
@@ -496,34 +511,34 @@ pub fn parse_document_contents(
                 // At root level (indent_level == 0) without a colon, parse as multiline plain scalar
                 let mut lines = Vec::new();
                 let start_indent = source.get_current_indent_level();
-                
+
                 loop {
                     // Read the current line
                     let line = crate::utils::read_line_trimmed_into_string(source);
                     if !line.is_empty() {
                         lines.push(line);
                     }
-                    
+
                     // Skip newline if present
                     if source.current() == Some('\n') {
                         source.next();
                     }
-                    
+
                     // Check what comes next
                     if !source.more() {
                         break;
                     }
-                    
+
                     // Skip whitespace to check indent of next line
                     skip_whitespace(source);
-                    
+
                     if !source.more() {
                         break;
                     }
-                    
+
                     let line_indent = source.get_current_indent_level();
                     let ch = source.current();
-                    
+
                     // Stop if we hit a document marker
                     if ch == Some('-') && helpers::peek_ahead_for_document_start_end(source, '-') {
                         break;
@@ -531,31 +546,31 @@ pub fn parse_document_contents(
                     if ch == Some('.') && helpers::peek_ahead_for_document_start_end(source, '.') {
                         break;
                     }
-                    
+
                     // Stop if we hit a directive
                     if ch == Some('%') && line_indent == 0 {
                         break;
                     }
-                    
+
                     // Stop on dedent (but not at indent 0, where all lines are the same)
                     if start_indent > 0 && line_indent < start_indent {
                         break;
                     }
-                    
+
                     // Stop on comment
                     if ch == Some('#') {
                         break;
                     }
-                    
+
                     // Continue if at same or greater indent
                     if line_indent >= start_indent {
                         continue;
                     }
-                    
+
                     // Otherwise stop
                     break;
                 }
-                
+
                 let scalar_value = lines.join(" ");
                 Ok(Node::Str(
                     scalar_value,
@@ -641,7 +656,7 @@ pub fn parse_document(
                     // If we're here, there's a parsing issue
                     return Err(helpers::parse_error(
                         source,
-                        "Unexpected % after document content (directives must appear before content)"
+                        "Unexpected % after document content (directives must appear before content)",
                     ));
                 }
             }
@@ -710,8 +725,8 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
         let directives = parse_directives(source)?;
 
         // Track if we have explicit directives
-        let has_explicit_directives = directives.yaml_version.is_some() 
-            || directives.tag_prefixes.len() > 2;
+        let has_explicit_directives =
+            directives.yaml_version.is_some() || directives.tag_prefixes.len() > 2;
 
         // Check for document start marker (---)
         let has_document_marker = helpers::peek_ahead_for_document_start_end(source, '-');
@@ -719,7 +734,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
             source.next();
             source.next();
             source.next();
-            
+
             // After ---, only whitespace/comments allowed until end of line
             // Exception: block scalar indicators (>, |) and tags (!) are allowed
             skip_whitespace(source);
@@ -742,12 +757,12 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
                         source.next();
                     }
                     source.restore_state(state);
-                    
+
                     // If we found a colon on same line, it's invalid mapping on --- line
                     if found_colon {
                         return Err(helpers::parse_error(
                             source,
-                            "Document start marker (---) must be on its own line"
+                            "Document start marker (---) must be on its own line",
                         ));
                     }
                 }
@@ -765,7 +780,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
         if has_explicit_directives && !has_document_marker {
             return Err(helpers::parse_error(
                 source,
-                "Directives require a document (use --- to start document)"
+                "Directives require a document (use --- to start document)",
             ));
         }
 
@@ -777,7 +792,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
                     Document(nodes) => nodes.iter().all(node_is_blank),
                     _ => false,
                 };
-                
+
                 // Empty documents are valid after --- marker
                 if !is_blank_doc {
                     docs.push(doc)
@@ -816,7 +831,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
         if !source.more() {
             break;
         }
-        
+
         // Check if next content starts with directive without document-end marker
         // Peek ahead to see if we're about to parse directives for next document
         skip_whitespace(source);
@@ -824,7 +839,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
             // We have a directive after document content but no ... marker
             return Err(parse_error(
                 source,
-                "Directive requires document-end marker (...) before starting new document"
+                "Directive requires document-end marker (...) before starting new document",
             ));
         }
     }

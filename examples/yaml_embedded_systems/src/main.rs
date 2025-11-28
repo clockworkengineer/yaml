@@ -14,8 +14,8 @@ use yaml_lib::{parse, BufferSource, Node};
 use yaml_lib::embedded::{
     allocator::BumpAllocator,
     config::*,
-    limits::NodeValidator,
     lightweight_node::{LightNode, NodeArena},
+    limits::NodeValidator,
 };
 
 #[cfg(feature = "std")]
@@ -38,7 +38,7 @@ fn main() {
 #[cfg(feature = "std")]
 fn demo_resource_limits() {
     println!("--- Example 1: Resource Limits ---");
-    
+
     println!("Embedded configuration constants:");
     println!("  MAX_NESTING_DEPTH: {}", MAX_NESTING_DEPTH);
     println!("  MAX_DOCUMENT_SIZE: {} bytes", MAX_DOCUMENT_SIZE);
@@ -82,7 +82,7 @@ fn demo_lightweight_nodes() {
     println!("  String node: {} bytes", core::mem::size_of_val(&node1));
     println!("  Integer node: {} bytes", core::mem::size_of_val(&node2));
     println!("  Float node: {} bytes", core::mem::size_of_val(&node3));
-    
+
     let full_node_size = core::mem::size_of::<Node>();
     println!("\nFor comparison:");
     println!("  Full Node size: {} bytes", full_node_size);
@@ -93,7 +93,7 @@ fn demo_lightweight_nodes() {
     let mut arena = NodeArena::new();
     println!("  Arena created for managing collections of lightweight nodes");
     println!("  Supports efficient batch allocation of arrays and mappings");
-    
+
     // Create a small array in the arena
     let array_data = alloc::vec![
         LightNode::integer(1),
@@ -127,7 +127,7 @@ sensor_config:
 
     // Validate against embedded constraints
     let mut validator = NodeValidator::new();
-    
+
     match validator.validate(&doc) {
         Ok(()) => println!("✓ Document passed all validation checks"),
         Err(e) => println!("✗ Validation failed: {}", e),
@@ -136,7 +136,10 @@ sensor_config:
     // Try with deeply nested structure (should pass)
     let nested = create_nested_structure(30);
     match validator.validate(&nested) {
-        Ok(()) => println!("✓ 30-level nesting is within limits (max: {})", MAX_NESTING_DEPTH),
+        Ok(()) => println!(
+            "✓ 30-level nesting is within limits (max: {})",
+            MAX_NESTING_DEPTH
+        ),
         Err(e) => println!("✗ Validation failed: {}", e),
     }
 
@@ -174,7 +177,10 @@ device:
 
     // Check size before parsing
     if config_yaml.len() > MAX_DOCUMENT_SIZE {
-        println!("✗ Configuration exceeds MAX_DOCUMENT_SIZE ({} bytes)", MAX_DOCUMENT_SIZE);
+        println!(
+            "✗ Configuration exceeds MAX_DOCUMENT_SIZE ({} bytes)",
+            MAX_DOCUMENT_SIZE
+        );
         return;
     }
 
@@ -182,13 +188,13 @@ device:
     match parse(&mut source) {
         Ok(doc) => {
             println!("✓ Configuration parsed successfully");
-            
+
             // Validate
             let mut validator = NodeValidator::new();
             match validator.validate(&doc) {
                 Ok(()) => {
                     println!("✓ Configuration validated");
-                    
+
                     // Show structure
                     println!("\nConfiguration structure:");
                     doc.visit(|node, depth| {
@@ -223,12 +229,17 @@ fn create_nested_structure(depth: usize) -> Node {
         } else {
             Node::Mapping(alloc::vec![
                 (Node::from("level"), Node::from(current_depth as i32)),
-                (Node::from("nested"), build_nested(current_depth + 1, max_depth)),
+                (
+                    Node::from("nested"),
+                    build_nested(current_depth + 1, max_depth)
+                ),
             ])
         }
     }
 
-    Node::Documents(alloc::vec![Node::Document(alloc::vec![build_nested(0, depth)])])
+    Node::Documents(alloc::vec![Node::Document(alloc::vec![build_nested(
+        0, depth
+    )])])
 }
 
 // Additional examples for real embedded usage

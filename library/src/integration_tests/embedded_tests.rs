@@ -4,9 +4,9 @@
 #[cfg(feature = "embedded")]
 mod tests {
     use crate::embedded::limits::{LimitError, NodeValidator};
-    use crate::nodes::node::{make_set, Node, Numeric};
-    use crate::parser::document::parse;
     use crate::io::sources::buffer::Buffer as BufferSource;
+    use crate::nodes::node::{Node, Numeric, make_set};
+    use crate::parser::document::parse;
 
     #[test]
     fn test_parse_and_validate_simple_yaml() {
@@ -296,7 +296,11 @@ empty_mapping: {}
         let mut pairs = alloc::vec::Vec::new();
         pairs.push((
             Node::Str("name".to_string(), QuoteType::Unquoted, BlockStyle::None),
-            Node::Str("original".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            Node::Str(
+                "original".to_string(),
+                QuoteType::Unquoted,
+                BlockStyle::None,
+            ),
         ));
         pairs.push((
             Node::Str("count".to_string(), QuoteType::Unquoted, BlockStyle::None),
@@ -306,11 +310,7 @@ empty_mapping: {}
 
         // Mutate through safe access
         if let Some(name_node) = mapping.get_key_mut("name") {
-            *name_node = Node::Str(
-                "updated".to_string(),
-                QuoteType::Unquoted,
-                BlockStyle::None,
-            );
+            *name_node = Node::Str("updated".to_string(), QuoteType::Unquoted, BlockStyle::None);
         }
 
         if let Some(count_node) = mapping.get_key_mut("count") {
@@ -318,7 +318,10 @@ empty_mapping: {}
         }
 
         // Verify mutations
-        assert_eq!(mapping.get_key("name").and_then(|n| n.as_str()), Some("updated"));
+        assert_eq!(
+            mapping.get_key("name").and_then(|n| n.as_str()),
+            Some("updated")
+        );
         assert_eq!(mapping.get_key("count").and_then(|n| n.as_i32()), Some(42));
     }
 
@@ -390,18 +393,21 @@ device:
         match set {
             Node::Set(items) => {
                 assert_eq!(items.len(), 3); // Duplicate removed
-                assert!(items.iter().any(|n| matches!(
-                    n,
-                    Node::Number(Numeric::Int32(1))
-                )));
-                assert!(items.iter().any(|n| matches!(
-                    n,
-                    Node::Number(Numeric::Int32(2))
-                )));
-                assert!(items.iter().any(|n| matches!(
-                    n,
-                    Node::Number(Numeric::Int32(3))
-                )));
+                assert!(
+                    items
+                        .iter()
+                        .any(|n| matches!(n, Node::Number(Numeric::Int32(1))))
+                );
+                assert!(
+                    items
+                        .iter()
+                        .any(|n| matches!(n, Node::Number(Numeric::Int32(2))))
+                );
+                assert!(
+                    items
+                        .iter()
+                        .any(|n| matches!(n, Node::Number(Numeric::Int32(3))))
+                );
             }
             _ => panic!("Expected Set node"),
         }

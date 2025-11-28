@@ -109,7 +109,9 @@ mod tests {
                                     assert_eq!(items.len(), 3);
                                     return;
                                 }
-                                Node::Tagged(inner, tag) if tag == "!!set" || tag == "tag:yaml.org,2002:set" => {
+                                Node::Tagged(inner, tag)
+                                    if tag == "!!set" || tag == "tag:yaml.org,2002:set" =>
+                                {
                                     // Parser might not coerce flow format, check if it's valid
                                     match inner.as_ref() {
                                         Node::Mapping(mapping_pairs) => {

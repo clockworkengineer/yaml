@@ -35,7 +35,7 @@ impl<'a> NodeIterator<'a> {
     pub fn new(node: &'a Node, order: TraversalOrder) -> Self {
         let mut pending = VecDeque::new();
         pending.push_back(node);
-        
+
         Self { pending, order }
     }
 
@@ -82,12 +82,10 @@ impl<'a> NodeIterator<'a> {
                     }
                 }
             }
-            Node::Anchored(inner, _) | Node::Tagged(inner, _) => {
-                match self.order {
-                    TraversalOrder::DepthFirst => self.pending.push_front(inner),
-                    TraversalOrder::BreadthFirst => self.pending.push_back(inner),
-                }
-            }
+            Node::Anchored(inner, _) | Node::Tagged(inner, _) => match self.order {
+                TraversalOrder::DepthFirst => self.pending.push_front(inner),
+                TraversalOrder::BreadthFirst => self.pending.push_back(inner),
+            },
             _ => {}
         }
     }
@@ -110,26 +108,26 @@ impl<'a> Iterator for NodeIterator<'a> {
 pub trait NodeIteratorExt {
     /// Create an iterator that traverses the node tree depth-first
     fn iter_depth_first(&self) -> NodeIterator;
-    
+
     /// Create an iterator that traverses the node tree breadth-first
     fn iter_breadth_first(&self) -> NodeIterator;
-    
+
     /// Count nodes in the tree
     fn count_nodes(&self) -> usize;
-    
+
     /// Find first node matching a predicate
     fn find_node<F>(&self, predicate: F) -> Option<&Node>
     where
         F: Fn(&Node) -> bool;
-    
+
     /// Filter nodes by predicate
     fn filter_nodes<F>(&self, predicate: F) -> Vec<&Node>
     where
         F: Fn(&Node) -> bool;
-    
+
     /// Collect all string values in the tree
     fn collect_strings(&self) -> Vec<&str>;
-    
+
     /// Collect all numeric values in the tree
     fn collect_numbers(&self) -> Vec<i64>;
 }
@@ -138,22 +136,22 @@ impl NodeIteratorExt for Node {
     fn iter_depth_first(&self) -> NodeIterator {
         NodeIterator::depth_first(self)
     }
-    
+
     fn iter_breadth_first(&self) -> NodeIterator {
         NodeIterator::breadth_first(self)
     }
-    
+
     fn count_nodes(&self) -> usize {
         self.iter_depth_first().count()
     }
-    
+
     fn find_node<F>(&self, predicate: F) -> Option<&Node>
     where
         F: Fn(&Node) -> bool,
     {
         self.iter_depth_first().find(|node| predicate(node))
     }
-    
+
     fn filter_nodes<F>(&self, predicate: F) -> Vec<&Node>
     where
         F: Fn(&Node) -> bool,
@@ -162,7 +160,7 @@ impl NodeIteratorExt for Node {
             .filter(|node| predicate(node))
             .collect()
     }
-    
+
     fn collect_strings(&self) -> Vec<&str> {
         self.iter_depth_first()
             .filter_map(|node| match node {
@@ -171,7 +169,7 @@ impl NodeIteratorExt for Node {
             })
             .collect()
     }
-    
+
     fn collect_numbers(&self) -> Vec<i64> {
         self.iter_depth_first()
             .filter_map(|node| match node {
@@ -222,46 +220,41 @@ impl NodePath {
             segments: Vec::new(),
         }
     }
-    
+
     /// Create a path from segments
     pub fn from_segments(segments: Vec<PathSegment>) -> Self {
         Self { segments }
     }
-    
+
     /// Add a segment to the path
     pub fn push<T: Into<PathSegment>>(&mut self, segment: T) {
         self.segments.push(segment.into());
     }
-    
+
     /// Get path segments
     pub fn segments(&self) -> &[PathSegment] {
         &self.segments
     }
-    
+
     /// Access a node at this path
     pub fn get<'a>(&self, node: &'a Node) -> Option<&'a Node> {
         let mut current = node;
-        
+
         for segment in &self.segments {
             current = match (segment, current) {
-                (PathSegment::Key(key), Node::Mapping(pairs)) => {
-                    pairs.iter()
-                        .find(|(k, _)| match k {
-                            Node::Str(s, _, _) => s == key,
-                            _ => false,
-                        })
-                        .map(|(_, v)| v)?
-                }
-                (PathSegment::Index(idx), Node::Array(items)) => {
-                    items.get(*idx)?
-                }
-                (PathSegment::Index(idx), Node::Set(items)) => {
-                    items.get(*idx)?
-                }
+                (PathSegment::Key(key), Node::Mapping(pairs)) => pairs
+                    .iter()
+                    .find(|(k, _)| match k {
+                        Node::Str(s, _, _) => s == key,
+                        _ => false,
+                    })
+                    .map(|(_, v)| v)?,
+                (PathSegment::Index(idx), Node::Array(items)) => items.get(*idx)?,
+                (PathSegment::Index(idx), Node::Set(items)) => items.get(*idx)?,
                 _ => return None,
             };
         }
-        
+
         Some(current)
     }
 }
@@ -284,7 +277,7 @@ impl<'a> NodeStream<'a> {
             iterator: NodeIterator::depth_first(node),
         }
     }
-    
+
     /// Filter nodes in the stream
     pub fn filter<F>(self, predicate: F) -> FilterStream<'a, F>
     where
@@ -295,7 +288,7 @@ impl<'a> NodeStream<'a> {
             predicate,
         }
     }
-    
+
     /// Map nodes in the stream
     pub fn map<F, T>(self, mapper: F) -> MapStream<'a, F, T>
     where
@@ -306,7 +299,7 @@ impl<'a> NodeStream<'a> {
             mapper,
         }
     }
-    
+
     /// Fold/reduce the stream
     pub fn fold<T, F>(mut self, init: T, mut folder: F) -> T
     where
@@ -318,12 +311,12 @@ impl<'a> NodeStream<'a> {
         }
         accumulator
     }
-    
+
     /// Count nodes in the stream
     pub fn count(self) -> usize {
         self.iterator.count()
     }
-    
+
     /// Collect all nodes into a vector
     pub fn collect(self) -> Vec<&'a Node> {
         self.iterator.collect()
@@ -344,7 +337,7 @@ where
     F: FnMut(&Node) -> bool,
 {
     type Item = &'a Node;
-    
+
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(node) = self.iterator.next() {
             if (self.predicate)(node) {
@@ -369,7 +362,7 @@ where
     F: FnMut(&Node) -> T,
 {
     type Item = T;
-    
+
     fn next(&mut self) -> Option<Self::Item> {
         self.iterator.next().map(|node| (self.mapper)(node))
     }
@@ -387,7 +380,7 @@ mod tests {
             Node::Array(vec![Node::from(2), Node::from(3)]),
             Node::from(4),
         ]);
-        
+
         let nodes: Vec<_> = tree.iter_depth_first().collect();
         assert_eq!(nodes.len(), 6); // Array + 1 + Array + 2 + 3 + 4
     }
@@ -399,7 +392,7 @@ mod tests {
             Node::Array(vec![Node::from(2), Node::from(3)]),
             Node::from(4),
         ]);
-        
+
         let nodes: Vec<_> = tree.iter_breadth_first().collect();
         assert_eq!(nodes.len(), 6);
     }
@@ -410,22 +403,18 @@ mod tests {
             (Node::from("key1"), Node::from("value1")),
             (Node::from("key2"), Node::from(42)),
         ]);
-        
+
         // Mapping + key1 + value1 + key2 + 42
         assert_eq!(tree.count_nodes(), 5);
     }
 
     #[test]
     fn test_find_node() {
-        let tree = Node::Array(vec![
-            Node::from(1),
-            Node::from("hello"),
-            Node::from(3),
-        ]);
-        
+        let tree = Node::Array(vec![Node::from(1), Node::from("hello"), Node::from(3)]);
+
         let found = tree.find_node(|n| matches!(n, Node::Str(s, _, _) if s == "hello"));
         assert!(found.is_some());
-        
+
         let not_found = tree.find_node(|n| matches!(n, Node::Str(s, _, _) if s == "world"));
         assert!(not_found.is_none());
     }
@@ -438,7 +427,7 @@ mod tests {
             Node::from(2),
             Node::from("more"),
         ]);
-        
+
         let strings = tree.filter_nodes(|n| matches!(n, Node::Str(_, _, _)));
         assert_eq!(strings.len(), 2);
     }
@@ -449,7 +438,7 @@ mod tests {
             (Node::from("name"), Node::from("Alice")),
             (Node::from("city"), Node::from("NYC")),
         ]);
-        
+
         let strings = tree.collect_strings();
         assert_eq!(strings.len(), 4); // "name", "Alice", "city", "NYC"
     }
@@ -462,25 +451,26 @@ mod tests {
             Node::Number(Numeric::Integer(20)),
             Node::Number(Numeric::Integer(30)),
         ]);
-        
+
         let mut numbers = tree.collect_numbers();
-        numbers.sort();  // Sort since depth-first order may vary
+        numbers.sort(); // Sort since depth-first order may vary
         assert_eq!(numbers, vec![10, 20, 30]);
     }
 
     #[test]
     fn test_node_path_mapping() {
-        let tree = Node::Mapping(vec![
-            (Node::from("user"), Node::Mapping(vec![
+        let tree = Node::Mapping(vec![(
+            Node::from("user"),
+            Node::Mapping(vec![
                 (Node::from("name"), Node::from("Alice")),
                 (Node::from("age"), Node::from(30)),
-            ])),
-        ]);
-        
+            ]),
+        )]);
+
         let mut path = NodePath::new();
         path.push("user");
         path.push("name");
-        
+
         let result = path.get(&tree);
         assert!(result.is_some());
         assert!(matches!(result.unwrap(), Node::Str(s, _, _) if s == "Alice"));
@@ -490,16 +480,13 @@ mod tests {
     fn test_node_path_array() {
         let tree = Node::Array(vec![
             Node::from("first"),
-            Node::Array(vec![
-                Node::from("nested1"),
-                Node::from("nested2"),
-            ]),
+            Node::Array(vec![Node::from("nested1"), Node::from("nested2")]),
         ]);
-        
+
         let mut path = NodePath::new();
         path.push(1usize);
         path.push(0usize);
-        
+
         let result = path.get(&tree);
         assert!(result.is_some());
         assert!(matches!(result.unwrap(), Node::Str(s, _, _) if s == "nested1"));
@@ -513,30 +500,28 @@ mod tests {
             Node::Number(Numeric::Integer(3)),
             Node::Number(Numeric::Integer(4)),
         ]);
-        
+
         let stream = NodeStream::new(&tree);
-        let evens: Vec<_> = stream.filter(|n| {
-            matches!(n, Node::Number(Numeric::Integer(i)) if i % 2 == 0)
-        }).collect();
-        
+        let evens: Vec<_> = stream
+            .filter(|n| matches!(n, Node::Number(Numeric::Integer(i)) if i % 2 == 0))
+            .collect();
+
         assert_eq!(evens.len(), 2);
     }
 
     #[test]
     fn test_node_stream_map() {
-        let tree = Node::Array(vec![
-            Node::from(1),
-            Node::from(2),
-            Node::from(3),
-        ]);
-        
+        let tree = Node::Array(vec![Node::from(1), Node::from(2), Node::from(3)]);
+
         let stream = NodeStream::new(&tree);
-        let types: Vec<_> = stream.map(|n| match n {
-            Node::Array(_) => "array",
-            Node::Number(_) => "number",
-            _ => "other",
-        }).collect();
-        
+        let types: Vec<_> = stream
+            .map(|n| match n {
+                Node::Array(_) => "array",
+                Node::Number(_) => "number",
+                _ => "other",
+            })
+            .collect();
+
         assert_eq!(types.len(), 4); // Array + 3 numbers
         assert_eq!(types[0], "array");
     }
@@ -548,15 +533,13 @@ mod tests {
             Node::Number(Numeric::Integer(2)),
             Node::Number(Numeric::Integer(3)),
         ]);
-        
+
         let stream = NodeStream::new(&tree);
-        let sum = stream.fold(0, |acc, n| {
-            match n {
-                Node::Number(Numeric::Integer(i)) => acc + i,
-                _ => acc,
-            }
+        let sum = stream.fold(0, |acc, n| match n {
+            Node::Number(Numeric::Integer(i)) => acc + i,
+            _ => acc,
         });
-        
+
         assert_eq!(sum, 6);
     }
 
@@ -566,10 +549,10 @@ mod tests {
             (Node::from("a"), Node::from(1)),
             (Node::from("b"), Node::from(2)),
         ]);
-        
+
         let stream = NodeStream::new(&tree);
         let count = stream.count();
-        
+
         assert_eq!(count, 5); // Mapping + a + 1 + b + 2
     }
 }

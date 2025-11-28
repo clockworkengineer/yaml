@@ -2,9 +2,9 @@
 //!
 //! Provides tools for tracing execution flow and measuring performance.
 
+use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use alloc::format;
 
 #[cfg(feature = "std")]
 use std::time::Instant;
@@ -218,7 +218,8 @@ impl<'a> TraceGuard<'a> {
 
 impl<'a> Drop for TraceGuard<'a> {
     fn drop(&mut self) {
-        self.tracer.exit(self.location.clone(), "scope exit".to_string());
+        self.tracer
+            .exit(self.location.clone(), "scope exit".to_string());
     }
 }
 
@@ -257,11 +258,11 @@ mod tests {
     #[test]
     fn test_tracer_basic() {
         let mut tracer = Tracer::new();
-        
+
         tracer.enter("main".to_string(), "Starting".to_string());
         tracer.call("main".to_string(), "process()".to_string());
         tracer.exit("main".to_string(), "Done".to_string());
-        
+
         assert_eq!(tracer.count(), 3);
         assert_eq!(tracer.entries()[0].event, TraceEvent::Enter);
         assert_eq!(tracer.entries()[1].event, TraceEvent::Call);
@@ -271,16 +272,16 @@ mod tests {
     #[test]
     fn test_tracer_depth() {
         let mut tracer = Tracer::new();
-        
+
         tracer.enter("outer".to_string(), "Outer".to_string());
         assert_eq!(tracer.depth, 1);
-        
+
         tracer.enter("inner".to_string(), "Inner".to_string());
         assert_eq!(tracer.depth, 2);
-        
+
         tracer.exit("inner".to_string(), "Done".to_string());
         assert_eq!(tracer.depth, 1);
-        
+
         tracer.exit("outer".to_string(), "Done".to_string());
         assert_eq!(tracer.depth, 0);
     }
@@ -288,14 +289,14 @@ mod tests {
     #[test]
     fn test_tracer_enable_disable() {
         let mut tracer = Tracer::new();
-        
+
         tracer.enter("test".to_string(), "Message".to_string());
         assert_eq!(tracer.count(), 1);
-        
+
         tracer.disable();
         tracer.enter("test2".to_string(), "Message2".to_string());
         assert_eq!(tracer.count(), 1); // Should not increase
-        
+
         tracer.enable();
         tracer.enter("test3".to_string(), "Message3".to_string());
         assert_eq!(tracer.count(), 2);
@@ -304,12 +305,12 @@ mod tests {
     #[test]
     fn test_filter_by_event() {
         let mut tracer = Tracer::new();
-        
+
         tracer.enter("loc1".to_string(), "msg".to_string());
         tracer.call("loc2".to_string(), "func".to_string());
         tracer.error("loc3".to_string(), "err".to_string());
         tracer.exit("loc4".to_string(), "done".to_string());
-        
+
         let errors = tracer.filter_by_event(TraceEvent::Error);
         assert_eq!(errors.len(), 1);
         assert!(errors[0].message.contains("err"));
@@ -318,12 +319,12 @@ mod tests {
     #[test]
     fn test_trace_guard() {
         let mut tracer = Tracer::new();
-        
+
         {
             let _guard = TraceGuard::new(&mut tracer, "scope".to_string(), "enter".to_string());
             // Can't check tracer state while guard is active due to borrow
         } // Guard drops here
-        
+
         assert_eq!(tracer.count(), 2);
         assert_eq!(tracer.depth, 0);
         assert_eq!(tracer.entries()[1].event, TraceEvent::Exit);
@@ -332,11 +333,11 @@ mod tests {
     #[test]
     fn test_clear() {
         let mut tracer = Tracer::new();
-        
+
         tracer.enter("test".to_string(), "msg".to_string());
         tracer.exit("test".to_string(), "done".to_string());
         assert_eq!(tracer.count(), 2);
-        
+
         tracer.clear();
         assert_eq!(tracer.count(), 0);
         assert_eq!(tracer.depth, 0);
@@ -346,13 +347,13 @@ mod tests {
     #[test]
     fn test_traced_timer() {
         let timer = TracedTimer::start("test_operation".to_string());
-        
+
         // Simulate some work
         let _ = (0..1000).sum::<i32>();
-        
+
         let _elapsed = timer.elapsed_ms();
         // elapsed is always >= 0 for u128, no need to assert
-        
+
         let formatted = timer.format();
         assert!(formatted.contains("test_operation"));
     }

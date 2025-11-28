@@ -4,10 +4,10 @@
 //! problem and eliminates infinite loops.
 
 use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
-use crate::parser::token_stream::TokenStream;
-use crate::parser::lexer::Token;
-use crate::parser::document::scalar::parse_scalar;
 use crate::parser::directives::DirectiveContext;
+use crate::parser::document::scalar::parse_scalar;
+use crate::parser::lexer::Token;
+use crate::parser::token_stream::TokenStream;
 
 /// Try to coerce a value based on a tag
 fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
@@ -91,7 +91,7 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
                 // Validate that each item is a mapping with one key-value pair
                 for item in &items {
                     match item {
-                        Node::Mapping(pairs) if pairs.len() == 1 => {},
+                        Node::Mapping(pairs) if pairs.len() == 1 => {}
                         _ => return None, // Invalid omap format
                     }
                 }
@@ -104,12 +104,10 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
         },
         "!!pairs" | "!pairs" | "tag:yaml.org,2002:pairs" => match node {
             // Pairs - preserve as tagged array
-            Node::Array(items) => {
-                Some(Node::Tagged(
-                    Box::new(Node::Array(items)),
-                    "tag:yaml.org,2002:pairs".to_string(),
-                ))
-            }
+            Node::Array(items) => Some(Node::Tagged(
+                Box::new(Node::Array(items)),
+                "tag:yaml.org,2002:pairs".to_string(),
+            )),
             _ => None,
         },
         _ => None,
@@ -143,7 +141,7 @@ pub fn parse_value_with_tokens(
     if decorators.tag.is_some() || decorators.anchor.is_some() {
         // Skip whitespace/newlines after decorators to find the actual content
         stream.skip_whitespace()?;
-        
+
         // NOW check if we're at EOF or end of structure (empty decorated value)
         // This includes:
         // - EOF/None: end of document
@@ -152,7 +150,7 @@ pub fn parse_value_with_tokens(
         // - FlowMappingEnd/FlowSequenceEnd: end of flow collection
         // - DocumentStart/DocumentEnd: document boundary
         match stream.current() {
-            Some(Token::Eof) 
+            Some(Token::Eof)
             | Some(Token::Dash)
             | Some(Token::Colon)
             | Some(Token::FlowMappingEnd)
@@ -162,7 +160,7 @@ pub fn parse_value_with_tokens(
             | None => {
                 // Decorator with no content - empty value
                 let mut result = Node::Str(String::new(), QuoteType::Unquoted, BlockStyle::None);
-                
+
                 if let Some(tag) = decorators.tag {
                     if let Some(coerced) = try_coerce_tag(&tag, result.clone()) {
                         result = coerced;
@@ -170,11 +168,11 @@ pub fn parse_value_with_tokens(
                         result = Node::Tagged(Box::new(result), tag);
                     }
                 }
-                
+
                 if let Some(anchor_name) = decorators.anchor {
                     result = Node::Anchored(Box::new(result), anchor_name);
                 }
-                
+
                 return Ok(result);
             }
             _ => {
@@ -285,10 +283,10 @@ mod tests {
         let mut source = Buffer::new(b"!!str");
         let directives = DirectiveContext::default();
         let mut stream = TokenStream::new(&mut source, &directives).unwrap();
-        
+
         stream.next().unwrap(); // Initialize
         let result = parse_value_with_tokens(&mut stream, &directives).unwrap();
-        
+
         // Should parse as empty string
         assert!(matches!(result, Node::Str(s, _, _) if s.is_empty()));
     }
@@ -299,9 +297,9 @@ mod tests {
         let mut source = Buffer::new(b"&anchor");
         let directives = DirectiveContext::default();
         let mut stream = TokenStream::new(&mut source, &directives).unwrap();
-        
+
         let result = parse_value_with_tokens(&mut stream, &directives).unwrap();
-        
+
         // Should parse as anchored empty string
         match result {
             Node::Anchored(inner, name) => {
@@ -317,9 +315,9 @@ mod tests {
         let mut source = Buffer::new(b"!!str &anchor");
         let directives = DirectiveContext::default();
         let mut stream = TokenStream::new(&mut source, &directives).unwrap();
-        
+
         let result = parse_value_with_tokens(&mut stream, &directives).unwrap();
-        
+
         // Should parse as anchored empty string
         match result {
             Node::Anchored(inner, name) => {
@@ -335,10 +333,10 @@ mod tests {
         let mut source = Buffer::new(b"!!str hello");
         let directives = DirectiveContext::default();
         let mut stream = TokenStream::new(&mut source, &directives).unwrap();
-        
+
         stream.next().unwrap(); // Initialize
         let result = parse_value_with_tokens(&mut stream, &directives).unwrap();
-        
+
         // Should parse as string "hello"
         assert!(matches!(result, Node::Str(s, _, _) if s == "hello"));
     }
@@ -348,9 +346,9 @@ mod tests {
         let mut source = Buffer::new(b"&anchor 'hello'");
         let directives = DirectiveContext::default();
         let mut stream = TokenStream::new(&mut source, &directives).unwrap();
-        
+
         let result = parse_value_with_tokens(&mut stream, &directives).unwrap();
-        
+
         // Should parse as anchored string
         match result {
             Node::Anchored(inner, name) => {
@@ -366,9 +364,9 @@ mod tests {
         let mut source = Buffer::new(b"*myalias");
         let directives = DirectiveContext::default();
         let mut stream = TokenStream::new(&mut source, &directives).unwrap();
-        
+
         let result = parse_value_with_tokens(&mut stream, &directives).unwrap();
-        
+
         // Should parse as alias
         assert!(matches!(result, Node::Alias(name) if name == "myalias"));
     }

@@ -557,7 +557,7 @@ pub(crate) fn parse_mapping_key(
                 // After newline, validate no tabs in indentation
                 // Create temporary context for validation (assume block mapping at current indent)
                 let mut temp_ctx = crate::parser::document::context::ParsingContext::new(
-                    source.get_current_indent_level()
+                    source.get_current_indent_level(),
                 );
                 temp_ctx.mark_newline_consumed();
                 skip_whitespace_with_context(source, &temp_ctx)?;

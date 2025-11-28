@@ -6,8 +6,8 @@
 
 use alloc::vec::Vec;
 
-use crate::error::{ErrorKind, YamlError};
 use crate::error::enhanced::EnhancedError;
+use crate::error::{ErrorKind, YamlError};
 
 // Re-export RecoveryStrategy from enhanced module
 pub use crate::error::enhanced::RecoveryStrategy;
@@ -99,19 +99,19 @@ impl RecoveryHandler {
     pub fn new() -> Self {
         Self {
             strategies: [
-                RecoveryStrategy::SkipLine,       // SyntaxError
-                RecoveryStrategy::SkipLine,       // ParseError
-                RecoveryStrategy::Abort,          // UnterminatedString
-                RecoveryStrategy::SkipLine,       // InvalidTag
-                RecoveryStrategy::InsertDefault,  // UndefinedAlias
-                RecoveryStrategy::SkipLine,       // InvalidAnchor
-                RecoveryStrategy::SkipLine,       // DuplicateAnchor
-                RecoveryStrategy::Abort,          // IoError
-                RecoveryStrategy::SkipLine,       // ValidationError
-                RecoveryStrategy::Abort,          // UnexpectedEof
-                RecoveryStrategy::SkipLine,       // UnexpectedCharacter
-                RecoveryStrategy::SkipLine,       // InvalidEscape
-                RecoveryStrategy::Abort,          // Unsupported
+                RecoveryStrategy::SkipLine,      // SyntaxError
+                RecoveryStrategy::SkipLine,      // ParseError
+                RecoveryStrategy::Abort,         // UnterminatedString
+                RecoveryStrategy::SkipLine,      // InvalidTag
+                RecoveryStrategy::InsertDefault, // UndefinedAlias
+                RecoveryStrategy::SkipLine,      // InvalidAnchor
+                RecoveryStrategy::SkipLine,      // DuplicateAnchor
+                RecoveryStrategy::Abort,         // IoError
+                RecoveryStrategy::SkipLine,      // ValidationError
+                RecoveryStrategy::Abort,         // UnexpectedEof
+                RecoveryStrategy::SkipLine,      // UnexpectedCharacter
+                RecoveryStrategy::SkipLine,      // InvalidEscape
+                RecoveryStrategy::Abort,         // Unsupported
             ],
         }
     }
@@ -258,7 +258,10 @@ impl RecoveryContext {
             RecoveryStrategy::Abort => false,
             RecoveryStrategy::SkipLine => true,
             RecoveryStrategy::SkipToNextMapping => {
-                matches!(self.state, ParserState::BlockMapping | ParserState::FlowMapping)
+                matches!(
+                    self.state,
+                    ParserState::BlockMapping | ParserState::FlowMapping
+                )
             }
             RecoveryStrategy::SkipCollection => self.bracket_depth > 0 || self.indent_level > 0,
             RecoveryStrategy::InsertDefault => true,
@@ -284,7 +287,7 @@ mod tests {
 
         let error = EnhancedError::new(YamlError::new(ErrorKind::SyntaxError, "test"));
         collection.add(error);
-        
+
         assert_eq!(collection.len(), 1);
         assert!(!collection.is_empty());
     }
@@ -292,21 +295,27 @@ mod tests {
     #[test]
     fn test_error_collection_max() {
         let mut collection = ErrorCollection::with_config(true, 2);
-        
-        collection.add(EnhancedError::new(YamlError::new(ErrorKind::SyntaxError, "error1")));
+
+        collection.add(EnhancedError::new(YamlError::new(
+            ErrorKind::SyntaxError,
+            "error1",
+        )));
         assert!(collection.should_continue());
-        
-        collection.add(EnhancedError::new(YamlError::new(ErrorKind::SyntaxError, "error2")));
+
+        collection.add(EnhancedError::new(YamlError::new(
+            ErrorKind::SyntaxError,
+            "error2",
+        )));
         assert!(!collection.should_continue());
     }
 
     #[test]
     fn test_recovery_handler_default() {
         let handler = RecoveryHandler::new();
-        
+
         let error = YamlError::new(ErrorKind::SyntaxError, "test");
         assert_eq!(handler.recover(&error), RecoveryStrategy::SkipLine);
-        
+
         let error = YamlError::new(ErrorKind::UnexpectedEof, "test");
         assert_eq!(handler.recover(&error), RecoveryStrategy::Abort);
     }
@@ -314,7 +323,7 @@ mod tests {
     #[test]
     fn test_recovery_handler_strict() {
         let handler = RecoveryHandler::strict();
-        
+
         let error = YamlError::new(ErrorKind::SyntaxError, "test");
         assert_eq!(handler.recover(&error), RecoveryStrategy::Abort);
     }
@@ -322,7 +331,7 @@ mod tests {
     #[test]
     fn test_recovery_handler_lenient() {
         let handler = RecoveryHandler::lenient();
-        
+
         let error = YamlError::new(ErrorKind::UnexpectedEof, "test");
         assert_eq!(handler.recover(&error), RecoveryStrategy::SkipLine);
     }
@@ -331,7 +340,7 @@ mod tests {
     fn test_recovery_handler_custom() {
         let mut handler = RecoveryHandler::new();
         handler.set_strategy(&ErrorKind::SyntaxError, RecoveryStrategy::Abort);
-        
+
         let error = YamlError::new(ErrorKind::SyntaxError, "test");
         assert_eq!(handler.recover(&error), RecoveryStrategy::Abort);
     }
@@ -341,12 +350,12 @@ mod tests {
         let mut ctx = RecoveryContext::new();
         assert_eq!(ctx.state, ParserState::DocumentStart);
         assert!(!ctx.in_flow);
-        
+
         ctx.enter_flow_mapping();
         assert_eq!(ctx.state, ParserState::FlowMapping);
         assert!(ctx.in_flow);
         assert_eq!(ctx.bracket_depth, 1);
-        
+
         ctx.exit_flow();
         assert!(!ctx.in_flow);
         assert_eq!(ctx.bracket_depth, 0);
@@ -355,10 +364,10 @@ mod tests {
     #[test]
     fn test_recovery_context_can_recover() {
         let mut ctx = RecoveryContext::new();
-        
+
         assert!(ctx.can_recover(RecoveryStrategy::SkipLine));
         assert!(!ctx.can_recover(RecoveryStrategy::Abort));
-        
+
         ctx.enter_block_mapping();
         assert!(ctx.can_recover(RecoveryStrategy::SkipToNextMapping));
     }

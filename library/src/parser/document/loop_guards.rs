@@ -54,7 +54,9 @@ macro_rules! loop_guard_check {
         $counter += 1;
         if $counter >= $max {
             return Err(crate::parser::document::error_builder::limit_error(
-                $context, $max, "loop iterations"
+                $context,
+                $max,
+                "loop iterations",
             ));
         }
     }};
@@ -76,7 +78,7 @@ macro_rules! collection_size_check {
     ($collection:expr, $max:expr, $type_name:expr) => {
         if $collection.len() >= $max {
             return Err(crate::parser::document::error_builder::limit_error(
-                $type_name, $max, "items"
+                $type_name, $max, "items",
             ));
         }
     };
@@ -92,7 +94,7 @@ macro_rules! collection_size_check {
 /// ```ignore
 /// loop_guard_init!(counter);
 /// let mut items = Vec::new();
-/// 
+///
 /// while let Some(c) = source.current() {
 ///     combined_loop_guard!(counter, items, MAX_LOOP_ITERATIONS, MAX_ITEMS, "Sequence")?;
 ///     // ... parsing logic that adds to items
@@ -104,12 +106,14 @@ macro_rules! combined_loop_guard {
         $counter += 1;
         if $counter >= $max_iter {
             return Err(crate::parser::document::error_builder::limit_error(
-                &format!("{} parsing", $context), $max_iter, "loop iterations"
+                &format!("{} parsing", $context),
+                $max_iter,
+                "loop iterations",
             ));
         }
         if $collection.len() >= $max_size {
             return Err(crate::parser::document::error_builder::limit_error(
-                $context, $max_size, "items"
+                $context, $max_size, "items",
             ));
         }
     }};
@@ -123,15 +127,15 @@ mod tests {
         fn test_function() -> Result<(), String> {
             loop_guard_init!(counter);
             let mut items = Vec::new();
-            
+
             for i in 0..100 {
                 loop_guard_check!(counter, 1000, "Test");
                 items.push(i);
             }
-            
+
             Ok(())
         }
-        
+
         assert!(test_function().is_ok());
     }
 
@@ -139,7 +143,7 @@ mod tests {
     fn test_loop_guard_catches_infinite_loop() {
         fn test_function() -> Result<(), String> {
             loop_guard_init!(counter);
-            
+
             loop {
                 loop_guard_check!(counter, 100, "Test");
                 // Simulated infinite loop
@@ -147,13 +151,17 @@ mod tests {
                     break; // Safety for test
                 }
             }
-            
+
             Ok(())
         }
-        
+
         let result = test_function();
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("exceeded maximum loop iterations"));
+        assert!(
+            result
+                .unwrap_err()
+                .contains("exceeded maximum loop iterations")
+        );
     }
 
     #[test]
@@ -163,7 +171,7 @@ mod tests {
             collection_size_check!(items, 100, "Test collection");
             Ok(())
         }
-        
+
         assert!(test_function().is_ok());
     }
 
@@ -174,11 +182,15 @@ mod tests {
             collection_size_check!(items, 100, "Test collection");
             Ok(())
         }
-        
+
         let result = test_function();
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.contains("exceeded") || err.contains("items"), "Error: {}", err);
+        assert!(
+            err.contains("exceeded") || err.contains("items"),
+            "Error: {}",
+            err
+        );
     }
 
     #[test]
@@ -186,15 +198,15 @@ mod tests {
         fn test_function() -> Result<(), String> {
             loop_guard_init!(counter);
             let mut items = Vec::new();
-            
+
             for i in 0..50 {
                 combined_loop_guard!(counter, items, 1000, 100, "Test");
                 items.push(i);
             }
-            
+
             Ok(())
         }
-        
+
         assert!(test_function().is_ok());
     }
 
@@ -203,18 +215,22 @@ mod tests {
         fn test_function() -> Result<(), String> {
             loop_guard_init!(counter);
             let mut items = Vec::new();
-            
+
             for i in 0..150 {
                 combined_loop_guard!(counter, items, 100, 1000, "Test");
                 items.push(i);
             }
-            
+
             Ok(())
         }
-        
+
         let result = test_function();
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("exceeded maximum loop iterations"));
+        assert!(
+            result
+                .unwrap_err()
+                .contains("exceeded maximum loop iterations")
+        );
     }
 
     #[test]
@@ -222,18 +238,22 @@ mod tests {
         fn test_function() -> Result<(), String> {
             loop_guard_init!(counter);
             let mut items = Vec::new();
-            
+
             for i in 0..150 {
                 combined_loop_guard!(counter, items, 1000, 100, "Test");
                 items.push(i);
             }
-            
+
             Ok(())
         }
-        
+
         let result = test_function();
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.contains("exceeded") || err.contains("items"), "Error: {}", err);
+        assert!(
+            err.contains("exceeded") || err.contains("items"),
+            "Error: {}",
+            err
+        );
     }
 }

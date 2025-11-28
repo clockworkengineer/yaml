@@ -5,6 +5,7 @@
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+use log::warn;
 
 use crate::nodes::node::{Node, Numeric};
 use crate::validation::schema::{PropertySchema, Schema, SchemaType};
@@ -94,8 +95,9 @@ impl ValidationContext {
         }
     }
 
-    /// Record an error
+    /// Record an error and log it
     fn add_error(&mut self, error: ValidationError) {
+        warn!("Validation error at {}: {:?}", error.path, error);
         self.errors.push(error);
     }
 

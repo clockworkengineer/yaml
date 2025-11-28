@@ -12,11 +12,15 @@ mod tests {
         let yaml = b"content: !!str |\n  Line 1\n  Line 2\n  Line 3";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        
+
         println!("test_tag_with_block_literal_scalar result: {:?}", result);
-        
-        assert!(result.is_ok(), "Should parse tag with block literal: {:?}", result.err());
-        
+
+        assert!(
+            result.is_ok(),
+            "Should parse tag with block literal: {:?}",
+            result.err()
+        );
+
         if let Ok(Node::Documents(ref docs)) = result {
             if let Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
@@ -35,7 +39,10 @@ mod tests {
                                 assert!(s.contains("Line 3"));
                             }
                         }
-                        _ => panic!("Expected string node with literal block style, got: {:?}", v),
+                        _ => panic!(
+                            "Expected string node with literal block style, got: {:?}",
+                            v
+                        ),
                     }
                 }
             }
@@ -45,14 +52,19 @@ mod tests {
     #[test]
     fn test_tag_with_block_folded_scalar() {
         // Tag with folded block scalar on following lines
-        let yaml = b"description: !!str >\n  This is a long\n  line that should\n  be folded together";
+        let yaml =
+            b"description: !!str >\n  This is a long\n  line that should\n  be folded together";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        
+
         println!("test_tag_with_block_folded_scalar result: {:?}", result);
-        
-        assert!(result.is_ok(), "Should parse tag with block folded: {:?}", result.err());
-        
+
+        assert!(
+            result.is_ok(),
+            "Should parse tag with block folded: {:?}",
+            result.err()
+        );
+
         if let Ok(Node::Documents(ref docs)) = result {
             if let Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
@@ -81,11 +93,15 @@ mod tests {
         let yaml = b"items: !!seq\n  - item1\n  - item2\n  - item3";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        
+
         println!("test_tag_with_block_sequence result: {:?}", result);
-        
-        assert!(result.is_ok(), "Should parse tag with block sequence: {:?}", result.err());
-        
+
+        assert!(
+            result.is_ok(),
+            "Should parse tag with block sequence: {:?}",
+            result.err()
+        );
+
         if let Ok(Node::Documents(ref docs)) = result {
             if let Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
@@ -113,11 +129,15 @@ mod tests {
         let yaml = b"config: !!map\n  key1: value1\n  key2: value2\n  key3: value3";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        
+
         println!("test_tag_with_block_mapping result: {:?}", result);
-        
-        assert!(result.is_ok(), "Should parse tag with block mapping: {:?}", result.err());
-        
+
+        assert!(
+            result.is_ok(),
+            "Should parse tag with block mapping: {:?}",
+            result.err()
+        );
+
         if let Ok(Node::Documents(ref docs)) = result {
             if let Document(nodes) = &docs[0] {
                 // The parser might structure this differently - just verify content is present
@@ -139,11 +159,18 @@ mod tests {
         let yaml = b"!!str |\n  Standalone\n  literal block\n  content";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        
-        println!("test_standalone_tag_with_literal_block result: {:?}", result);
-        
-        assert!(result.is_ok(), "Should parse standalone tag with literal block: {:?}", result.err());
-        
+
+        println!(
+            "test_standalone_tag_with_literal_block result: {:?}",
+            result
+        );
+
+        assert!(
+            result.is_ok(),
+            "Should parse standalone tag with literal block: {:?}",
+            result.err()
+        );
+
         if let Ok(Node::Documents(ref docs)) = result {
             if let Document(nodes) = &docs[0] {
                 match &nodes[0] {
@@ -170,17 +197,21 @@ mod tests {
         let yaml = b"data: !!map\n  list1:\n    - a\n    - b\n  list2:\n    - c\n    - d";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        
+
         println!("test_tag_with_nested_block_structures result: {:?}", result);
-        
-        assert!(result.is_ok(), "Should parse tag with nested structures: {:?}", result.err());
-        
+
+        assert!(
+            result.is_ok(),
+            "Should parse tag with nested structures: {:?}",
+            result.err()
+        );
+
         if let Ok(Node::Documents(ref docs)) = result {
             if let Document(nodes) = &docs[0] {
                 println!("Document has {} nodes", nodes.len());
                 // The parser might structure this differently - just verify it parsed successfully
                 // and contains the expected data somewhere in the tree
-                
+
                 // Look for "list1", "list2", "a", "b", "c", "d" anywhere in the structure
                 let yaml_str = format!("{:?}", nodes);
                 assert!(yaml_str.contains("list1"), "Should contain 'list1'");
@@ -189,7 +220,7 @@ mod tests {
                 assert!(yaml_str.contains("\"b\""), "Should contain 'b'");
                 assert!(yaml_str.contains("\"c\""), "Should contain 'c'");
                 assert!(yaml_str.contains("\"d\""), "Should contain 'd'");
-                
+
                 // Ideally, we'd want the structure to be:
                 // Mapping([("data", Tagged(Mapping([("list1", Array([...])), ("list2", Array([...]))]), "!!map"))])
                 // But the parser's current behavior might differ. As long as all content is present,
@@ -204,11 +235,15 @@ mod tests {
         let yaml = b"poem: !custom |\n  Roses are red\n  Violets are blue";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        
+
         println!("test_custom_tag_with_block_literal result: {:?}", result);
-        
-        assert!(result.is_ok(), "Should parse custom tag with block literal: {:?}", result.err());
-        
+
+        assert!(
+            result.is_ok(),
+            "Should parse custom tag with block literal: {:?}",
+            result.err()
+        );
+
         if let Ok(Node::Documents(ref docs)) = result {
             if let Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {

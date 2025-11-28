@@ -12,12 +12,9 @@ use yaml_utility_lib::get_yaml_file_list;
 /// # Returns
 /// * `Result<(), String>` - Ok(()) if successful, Err with an error message if failed
 fn process_yaml_file(file_path: &str) -> Result<(), String> {
-
     let mut source = FileSource::new(file_path).map_err(|e| e.to_string())?;
 
-
     let node = parse(&mut source).map_err(|e| e.to_string())?;
-
 
     let mut destination = FileDestination::new(
         Path::new(file_path)
@@ -27,15 +24,12 @@ fn process_yaml_file(file_path: &str) -> Result<(), String> {
     )
     .map_err(|e| e.to_string())?;
 
-
     stringify(&node, &mut destination)?;
     Ok(())
 }
 
 fn main() {
-
     let yaml_files = get_yaml_file_list("files");
-
 
     for file_path in yaml_files {
         match process_yaml_file(&file_path) {
@@ -44,4 +38,3 @@ fn main() {
         }
     }
 }
-

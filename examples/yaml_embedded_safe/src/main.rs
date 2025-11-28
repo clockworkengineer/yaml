@@ -7,7 +7,7 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 use yaml_lib::embedded::limits::{LimitError, NodeValidator};
-use yaml_lib::{parse, BufferSource, Node, Numeric};
+use yaml_lib::{BufferSource, Node, Numeric, parse};
 
 fn main() {
     println!("=== Embedded-Safe YAML Example ===\n");

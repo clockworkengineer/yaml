@@ -101,10 +101,14 @@ mod tests {
         // of the plain scalar "item1".
         let mut source = BufferSource::new(b"---\n- item1\n  invalid item without dash");
         let res = parse(&mut source);
-        
+
         // This should now parse successfully as a multiline plain scalar
-        assert!(res.is_ok(), "Multiline plain scalars should be valid: {:?}", res.err());
-        
+        assert!(
+            res.is_ok(),
+            "Multiline plain scalars should be valid: {:?}",
+            res.err()
+        );
+
         if let Ok(doc) = res {
             if let Node::Documents(docs) = doc {
                 if let Some(Node::Document(items)) = docs.first() {

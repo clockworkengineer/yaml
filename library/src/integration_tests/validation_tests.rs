@@ -12,21 +12,36 @@ mod tests {
         let yaml = b"---\nkey: value\n... invalid\n";
         let mut source = Buffer::new(yaml);
         let result = parse(&mut source);
-        assert!(result.is_err(), "Should reject content after document end marker");
+        assert!(
+            result.is_err(),
+            "Should reject content after document end marker"
+        );
         if let Err(e) = result {
-            assert!(e.contains("Invalid content") || e.contains("document end"), "Error: {}", e);
+            assert!(
+                e.contains("Invalid content") || e.contains("document end"),
+                "Error: {}",
+                e
+            );
         }
     }
 
     #[test]
     fn test_4ejs_tabs_forbidden_as_indentation() {
         // Tabs as indentation in a mapping should be rejected
-        let yaml = b"key1: value1\nkey2:\n\tvalue2";  // Tab before 'value2'
+        let yaml = b"key1: value1\nkey2:\n\tvalue2"; // Tab before 'value2'
         let mut source = Buffer::new(yaml);
         let result = parse(&mut source);
-        assert!(result.is_err(), "Should reject tabs as indentation: {:?}", result);
+        assert!(
+            result.is_err(),
+            "Should reject tabs as indentation: {:?}",
+            result
+        );
         if let Err(e) = result {
-            assert!(e.to_lowercase().contains("tab"), "Error should mention tabs: {}", e);
+            assert!(
+                e.to_lowercase().contains("tab"),
+                "Error should mention tabs: {}",
+                e
+            );
         }
     }
 
@@ -36,7 +51,11 @@ mod tests {
         let yaml = b"key: \"value\twith\ttab\"";
         let mut source = Buffer::new(yaml);
         let result = parse(&mut source);
-        assert!(result.is_ok(), "Tabs inside quoted strings should be allowed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Tabs inside quoted strings should be allowed: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -45,7 +64,11 @@ mod tests {
         let yaml = b"key: value  #\tcomment\twith\ttabs";
         let mut source = Buffer::new(yaml);
         let result = parse(&mut source);
-        assert!(result.is_ok(), "Tabs in comments should be allowed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Tabs in comments should be allowed: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -54,9 +77,16 @@ mod tests {
         let yaml = b"[\n\titem\n]";
         let mut source = Buffer::new(yaml);
         let result = parse(&mut source);
-        assert!(result.is_err(), "Should reject tabs as indentation in flow collections");
+        assert!(
+            result.is_err(),
+            "Should reject tabs as indentation in flow collections"
+        );
         if let Err(e) = result {
-            assert!(e.to_lowercase().contains("tab"), "Error should mention tabs: {}", e);
+            assert!(
+                e.to_lowercase().contains("tab"),
+                "Error should mention tabs: {}",
+                e
+            );
         }
     }
 
@@ -65,7 +95,10 @@ mod tests {
         let yaml = b"top1: &node1\n  &k1 key1: val1\ntop2: &node2\n  &v2 val2\n";
         let mut source = Buffer::new(yaml);
         let result = parse(&mut source);
-        assert!(result.is_err(), "Should reject multiple anchors on same node");
+        assert!(
+            result.is_err(),
+            "Should reject multiple anchors on same node"
+        );
     }
 
     #[test]
@@ -81,9 +114,16 @@ mod tests {
         let yaml = b"--- |0\n";
         let mut source = Buffer::new(yaml);
         let result = parse(&mut source);
-        assert!(result.is_err(), "Should reject block scalar with indentation indicator 0");
+        assert!(
+            result.is_err(),
+            "Should reject block scalar with indentation indicator 0"
+        );
         if let Err(e) = result {
-            assert!(e.contains("indentation indicator") && e.contains("1-9"), "Error: {}", e);
+            assert!(
+                e.contains("indentation indicator") && e.contains("1-9"),
+                "Error: {}",
+                e
+            );
         }
     }
 
@@ -92,9 +132,16 @@ mod tests {
         let yaml = b"--- |10\n";
         let mut source = Buffer::new(yaml);
         let result = parse(&mut source);
-        assert!(result.is_err(), "Should reject block scalar with indentation indicator 10");
+        assert!(
+            result.is_err(),
+            "Should reject block scalar with indentation indicator 10"
+        );
         if let Err(e) = result {
-            assert!(e.contains("single digit") && e.contains("1-9"), "Error: {}", e);
+            assert!(
+                e.contains("single digit") && e.contains("1-9"),
+                "Error: {}",
+                e
+            );
         }
     }
 }

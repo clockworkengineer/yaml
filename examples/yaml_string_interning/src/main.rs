@@ -3,7 +3,7 @@
 //! This example demonstrates how to use string interning to reduce memory usage
 //! when working with YAML documents that contain many repeated strings.
 
-use yaml_lib::{StringInterner, CommonStrings};
+use yaml_lib::{CommonStrings, StringInterner};
 
 fn main() {
     println!("=== String Interning Demo ===\n");
@@ -46,7 +46,7 @@ fn demo_memory_savings() {
 
     // Simulate a YAML document with repeated keys
     let keys = ["name", "type", "value", "id", "status", "config"];
-    
+
     println!("Simulating 100 objects with 6 keys each...");
     for _ in 0..100 {
         for &key in &keys {
@@ -58,7 +58,10 @@ fn demo_memory_savings() {
 
     println!("Total bytes (without interning): {} bytes", total_bytes);
     println!("Interned bytes (with interning):  {} bytes", interned_bytes);
-    println!("Savings:                          {} bytes ({:.1}%)", savings, percent);
+    println!(
+        "Savings:                          {} bytes ({:.1}%)",
+        savings, percent
+    );
     println!("Unique strings:                   {}", interner.len());
     println!("Total references:                 {}", references.len());
 }
@@ -94,8 +97,8 @@ fn demo_performance_stats() {
     // Intern strings with varying hit rates
     for i in 0..1000 {
         let key = match i % 10 {
-            0..=5 => "common_key",      // 60% hit rate
-            6..=8 => "medium_key",       // 30% hit rate  
+            0..=5 => "common_key",         // 60% hit rate
+            6..=8 => "medium_key",         // 30% hit rate
             _ => &format!("unique_{}", i), // 10% unique
         };
         _refs.push(interner.intern(key));
@@ -103,7 +106,11 @@ fn demo_performance_stats() {
 
     let stats = interner.stats();
     println!("Total lookups:    {}", stats.hits + stats.misses);
-    println!("Cache hits:       {} ({:.1}%)", stats.hits, stats.hit_rate());
+    println!(
+        "Cache hits:       {} ({:.1}%)",
+        stats.hits,
+        stats.hit_rate()
+    );
     println!("Cache misses:     {}", stats.misses);
     println!("Unique strings:   {}", stats.unique_strings);
 }

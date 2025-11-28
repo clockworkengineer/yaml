@@ -14,7 +14,6 @@ use std::path::Path;
 ///
 /// A vector of strings containing paths to all .yaml files in the directory
 pub fn get_yaml_file_list(file_path: &str) -> Vec<String> {
-
     let files_dir = Path::new(file_path);
 
     if !files_dir.exists() {
@@ -22,11 +21,9 @@ pub fn get_yaml_file_list(file_path: &str) -> Vec<String> {
         return vec![];
     }
 
-
     fs::read_dir(files_dir)
         .expect("Failed to read directory")
         .filter_map(|entry| {
-
             let entry = entry.ok()?;
             let file_path = entry.path();
 

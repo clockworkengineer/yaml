@@ -18,7 +18,6 @@ pub trait ISource {
     /// Restore a previously-saved state.
     fn restore_state(&mut self, state: SaveState);
 
-
     fn is_whitespace(&self, c: char) -> bool {
         c == ' ' || c == '\t'
     }

@@ -315,10 +315,10 @@ mod tests {
         let mut ctx = FormatContext::new();
 
         assert_eq!(ctx.indent_str(&opts), "");
-        
+
         ctx.indent();
         assert_eq!(ctx.indent_str(&opts), "  ");
-        
+
         ctx.indent();
         assert_eq!(ctx.indent_str(&opts), "    ");
     }
@@ -327,10 +327,10 @@ mod tests {
     fn test_indent_str_custom() {
         let opts = FormatOptions::new().with_indent(4);
         let mut ctx = FormatContext::new();
-        
+
         ctx.indent();
         assert_eq!(ctx.indent_str(&opts), "    ");
-        
+
         ctx.indent();
         assert_eq!(ctx.indent_str(&opts), "        ");
     }

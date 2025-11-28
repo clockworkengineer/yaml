@@ -3,9 +3,9 @@
 //! Provides tools for generating random YAML inputs and detecting crashes,
 //! hangs, and incorrect behavior.
 
+use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
-use alloc::boxed::Box;
 
 use crate::nodes::node::{Node, Numeric};
 
@@ -24,7 +24,10 @@ impl FuzzRng {
     /// Generate next random number
     pub fn next(&mut self) -> u64 {
         // Linear congruential generator
-        self.state = self.state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        self.state = self
+            .state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         self.state
     }
 
@@ -117,7 +120,7 @@ impl YamlFuzzer {
     fn generate_string(&mut self) -> String {
         let len = self.rng.next_range(20) + 1;
         let mut s = String::new();
-        
+
         for _ in 0..len {
             let c = match self.rng.next_range(10) {
                 0 => ' ',
@@ -132,7 +135,7 @@ impl YamlFuzzer {
             };
             s.push(c);
         }
-        
+
         s
     }
 
@@ -140,12 +143,12 @@ impl YamlFuzzer {
     fn generate_identifier(&mut self) -> String {
         let len = self.rng.next_range(10) + 1;
         let mut s = String::new();
-        
+
         for _ in 0..len {
             let c = (b'a' + (self.rng.next_byte() % 26)) as char;
             s.push(c);
         }
-        
+
         s
     }
 
@@ -153,11 +156,11 @@ impl YamlFuzzer {
     fn generate_array(&mut self, depth: usize) -> Node {
         let size = self.rng.next_range(self.max_size.min(10));
         let mut items = Vec::new();
-        
+
         for _ in 0..size {
             items.push(self.generate_node(depth + 1));
         }
-        
+
         Node::Array(items)
     }
 
@@ -165,13 +168,13 @@ impl YamlFuzzer {
     fn generate_mapping(&mut self, depth: usize) -> Node {
         let size = self.rng.next_range(self.max_size.min(10));
         let mut pairs = Vec::new();
-        
+
         for _ in 0..size {
             let key = Node::from(self.generate_identifier());
             let value = self.generate_node(depth + 1);
             pairs.push((key, value));
         }
-        
+
         Node::Mapping(pairs)
     }
 
@@ -180,7 +183,7 @@ impl YamlFuzzer {
         let tags = ["!str", "!int", "!float", "!bool", "!null", "!custom"];
         let tag = tags[self.rng.next_range(tags.len())];
         let inner = self.generate_scalar();
-        
+
         Node::Tagged(Box::new(inner), tag.to_string())
     }
 
@@ -208,7 +211,7 @@ impl YamlFuzzer {
             "key: value\nkey: value2",
             "- item\n- item",
         ];
-        
+
         cases[self.rng.next_range(cases.len())].to_string()
     }
 }

@@ -9,7 +9,7 @@ use yaml_lib::*;
 fn parse_yaml(yaml: &str) -> Node {
     let mut source = BufferSource::new(yaml.as_bytes());
     let parsed = parse(&mut source).unwrap();
-    
+
     // Extract first document from Documents wrapper
     match parsed {
         Node::Documents(docs) => {
@@ -350,16 +350,17 @@ fn example_7_custom_validators() {
     println!("-----------------------------");
 
     // Custom validator: port number must be > 1024
-    let custom_validator = CustomValidator::new(
-        "Port must be greater than 1024",
-        |node| match node {
+    let custom_validator =
+        CustomValidator::new("Port must be greater than 1024", |node| match node {
             Node::Number(Numeric::Integer(port)) if *port > 1024 => Ok(()),
-            Node::Number(Numeric::Integer(port)) => {
-                Err(format!("Port {} is reserved (must be > 1024)", port))
-            }
-            _ => Err("Port must be an integer".to_string()),
-        },
-    );
+            Node::Number(Numeric::Integer(port)) => Err(ValidationError::Custom(format!(
+                "Port {} is reserved (must be > 1024)",
+                port
+            ))),
+            _ => Err(ValidationError::Custom(
+                "Port must be an integer".to_string(),
+            )),
+        });
 
     // Test valid port
     let valid_port = Node::Number(Numeric::Integer(8080));
@@ -372,7 +373,7 @@ fn example_7_custom_validators() {
     let invalid_port = Node::Number(Numeric::Integer(80));
     match custom_validator.validate(&invalid_port) {
         Ok(_) => println!("✗ Should have rejected port 80"),
-        Err(msg) => println!("✓ Correctly rejected: {}", msg),
+        Err(e) => println!("✓ Correctly rejected: {}", e),
     }
 
     println!();
@@ -444,8 +445,7 @@ fn example_8_real_world_config_validation() {
     );
     config_props.insert(
         "features".to_string(),
-        PropertySchema::new(SchemaType::Array)
-            .with_items(PropertySchema::new(SchemaType::String)),
+        PropertySchema::new(SchemaType::Array).with_items(PropertySchema::new(SchemaType::String)),
     );
 
     let schema = Schema::new(PropertySchema::new(SchemaType::Object).with_properties(config_props))

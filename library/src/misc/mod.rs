@@ -53,9 +53,7 @@ mod tests {
         let result = parse(&mut source).unwrap();
         assert_eq!(get_number_of_documents(&result).unwrap(), 3);
 
-
         let non_docs_node = Node::Str("test".to_string(), QuoteType::Unquoted, BlockStyle::None);
         assert!(get_number_of_documents(&non_docs_node).is_err());
     }
-
 }

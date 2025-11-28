@@ -7,7 +7,10 @@ mod test_flow_trailing_comma {
         let yaml = b"{ a: 1, b: 2, }";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        assert!(result.is_ok(), "Should parse flow mapping with trailing comma");
+        assert!(
+            result.is_ok(),
+            "Should parse flow mapping with trailing comma"
+        );
     }
 
     #[test]
@@ -15,7 +18,10 @@ mod test_flow_trailing_comma {
         let yaml = b"[ 1, 2, 3, ]";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        assert!(result.is_ok(), "Should parse flow sequence with trailing comma");
+        assert!(
+            result.is_ok(),
+            "Should parse flow sequence with trailing comma"
+        );
     }
 
     #[test]
@@ -42,7 +48,10 @@ mod test_flow_trailing_comma {
         let yaml = b"- {a: 1, b: 2}\n- {c: 3}";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        assert!(result.is_ok(), "Should parse block sequence with flow mappings");
+        assert!(
+            result.is_ok(),
+            "Should parse block sequence with flow mappings"
+        );
     }
 
     #[test]
@@ -51,7 +60,10 @@ mod test_flow_trailing_comma {
         let yaml = b"- [1, 2]\n- [3, 4]";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        assert!(result.is_ok(), "Should parse block sequence with flow sequences");
+        assert!(
+            result.is_ok(),
+            "Should parse block sequence with flow sequences"
+        );
     }
 
     #[test]

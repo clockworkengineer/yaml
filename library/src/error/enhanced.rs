@@ -372,7 +372,10 @@ impl SuggestionBuilder {
 
     /// Suggest closing quote
     pub fn unclosed_quote(quote_char: char) -> ErrorSuggestion {
-        ErrorSuggestion::new(format!("Add closing {} to terminate the string", quote_char))
+        ErrorSuggestion::new(format!(
+            "Add closing {} to terminate the string",
+            quote_char
+        ))
     }
 
     /// Suggest fixing typo in boolean value
@@ -384,7 +387,7 @@ impl SuggestionBuilder {
             "n" => "no",
             _ => return ErrorSuggestion::new("Use one of: true, false, yes, no, on, off"),
         };
-        
+
         ErrorSuggestion::new(format!("Did you mean '{}'?", suggestion))
             .with_replacement(suggestion.to_string())
     }
@@ -395,7 +398,7 @@ impl SuggestionBuilder {
             "nul" | "nil" | "none" => "null",
             _ => return ErrorSuggestion::new("Use 'null' or '~' for null values"),
         };
-        
+
         ErrorSuggestion::new(format!("Did you mean '{}'?", suggestion))
             .with_replacement(suggestion.to_string())
     }
@@ -408,7 +411,8 @@ impl SuggestionBuilder {
         }
 
         // Find closest match using simple string distance
-        let closest = available.iter()
+        let closest = available
+            .iter()
             .min_by_key(|anchor| edit_distance(alias, anchor))
             .unwrap();
 
@@ -427,8 +431,11 @@ impl SuggestionBuilder {
         } else {
             format!("Decrease indentation by {} spaces", actual - expected)
         };
-        
-        ErrorSuggestion::new(format!("Expected {} spaces, found {}. {}", expected, actual, action))
+
+        ErrorSuggestion::new(format!(
+            "Expected {} spaces, found {}. {}",
+            expected, actual, action
+        ))
     }
 }
 
@@ -436,7 +443,7 @@ impl SuggestionBuilder {
 fn edit_distance(a: &str, b: &str) -> usize {
     let len_a = a.len();
     let len_b = b.len();
-    
+
     if len_a == 0 {
         return len_b;
     }
@@ -458,10 +465,10 @@ fn edit_distance(a: &str, b: &str) -> usize {
             let cost = if ca == cb { 0 } else { 1 };
             matrix[i + 1][j + 1] = core::cmp::min(
                 core::cmp::min(
-                    matrix[i][j + 1] + 1,     // deletion
-                    matrix[i + 1][j] + 1,     // insertion
+                    matrix[i][j + 1] + 1, // deletion
+                    matrix[i + 1][j] + 1, // insertion
                 ),
-                matrix[i][j] + cost,          // substitution
+                matrix[i][j] + cost, // substitution
             );
         }
     }
@@ -493,18 +500,16 @@ mod tests {
 
     #[test]
     fn test_error_suggestion() {
-        let suggestion = ErrorSuggestion::new("Add colon")
-            .with_replacement("key: value");
-        
+        let suggestion = ErrorSuggestion::new("Add colon").with_replacement("key: value");
+
         assert_eq!(suggestion.message, "Add colon");
         assert_eq!(suggestion.replacement, Some("key: value".to_string()));
     }
 
     #[test]
     fn test_enhanced_error() {
-        let base = YamlError::new(ErrorKind::SyntaxError, "test error")
-            .with_position(5, 10);
-        
+        let base = YamlError::new(ErrorKind::SyntaxError, "test error").with_position(5, 10);
+
         let enhanced = EnhancedError::new(base)
             .with_code(ErrorCode::E001)
             .with_suggestion(ErrorSuggestion::new("Try this"))
@@ -549,9 +554,9 @@ mod tests {
 
     #[test]
     fn test_recovery_strategy() {
-        let recovery = ErrorRecovery::new(RecoveryStrategy::SkipLine)
-            .success("Skipped invalid line");
-        
+        let recovery =
+            ErrorRecovery::new(RecoveryStrategy::SkipLine).success("Skipped invalid line");
+
         assert!(recovery.recovered);
         assert_eq!(recovery.strategy, RecoveryStrategy::SkipLine);
     }

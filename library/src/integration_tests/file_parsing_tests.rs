@@ -32,7 +32,7 @@ mod tests {
             if file_path.contains("testfile038") {
                 continue;
             }
-            
+
             match FileSource::new(&file_path.to_string()) {
                 Ok(mut source) => {
                     let result = parse(&mut source);
@@ -172,7 +172,7 @@ mod tests {
             if file_path.contains("testfile038") {
                 continue;
             }
-            
+
             match FileSource::new(file_path) {
                 Ok(mut source) => {
                     let result = parse(&mut source);
