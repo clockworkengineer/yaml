@@ -21,11 +21,11 @@ struct TestCase {
 /// Load a test case from the data release format
 /// Each test is in a directory with: ===, in.yaml, and optionally error
 fn load_test_case(test_dir: &Path) -> Option<TestCase> {
-    // For flat .yaml files, use filename as ID and load content
-    let id = test_dir.file_stem()?.to_str()?.to_string();
-    let yaml = fs::read_to_string(test_dir).ok()?;
-    // No error metadata available
-    let has_error_file = false;
+    // For official test suite, use directory name as ID and load in.yaml
+    let id = test_dir.file_name()?.to_str()?.to_string();
+    let yaml_file = test_dir.join("in.yaml");
+    let yaml = fs::read_to_string(&yaml_file).ok()?;
+    let has_error_file = test_dir.join("error").exists();
     Some(TestCase {
         id,
         yaml,
@@ -35,33 +35,50 @@ fn load_test_case(test_dir: &Path) -> Option<TestCase> {
 
 /// Get all test directories (both single and multi-test)
 fn get_all_test_dirs(suite_dir: &Path) -> Vec<PathBuf> {
-    let mut test_files = Vec::new();
-    let entries = match fs::read_dir(suite_dir) {
-        Ok(e) => e,
-        Err(_) => return test_files,
-    };
-    for entry in entries.filter_map(|e| e.ok()) {
-        let path = entry.path();
-        if path.is_file() && path.extension().map_or(false, |ext| ext == "yaml") {
-            test_files.push(path);
+    fn collect_test_dirs(dir: &Path, out: &mut Vec<PathBuf>) {
+        if dir.is_dir() {
+            let entries = match fs::read_dir(dir) {
+                Ok(e) => e,
+                Err(_) => return,
+            };
+            for entry in entries.filter_map(|e| e.ok()) {
+                let path = entry.path();
+                if path.is_dir() {
+                    if path.join("in.yaml").exists() {
+                        out.push(path.clone());
+                    }
+                    collect_test_dirs(path.as_path(), out);
+                }
+            }
         }
     }
-    test_files
+    let mut test_dirs = Vec::new();
+    collect_test_dirs(suite_dir, &mut test_dirs);
+    test_dirs
 }
 
 /// Run all YAML test suite cases and assert pass rate >= 90%
 #[test]
 fn run_yaml_test_suite() {
     // Try multiple possible paths for the test suite
-    let suite_dir = Path::new("c:/Projects/yaml/yaml-test-suite/src");
-    if !suite_dir.exists() {
-        println!(
-            "YAML test suite repo directory not found at {:?}",
-            suite_dir
-        );
-        println!("Please clone https://github.com/yaml/yaml-test-suite.git to this location.");
-        return;
-    }
+    let possible_paths = vec![
+        Path::new("c:/Projects/yaml/yaml-test-suite/src"),
+    ];
+
+    let suite_dir = possible_paths.iter().find(|p| p.exists()).cloned();
+    let suite_dir = match suite_dir {
+        Some(dir) => dir,
+        None => {
+            println!("YAML test suite repo directory not found in any of these locations:");
+            for path in &possible_paths {
+                println!("  - {:?}", path);
+            }
+            println!(
+                "Please clone https://github.com/yaml/yaml-test-suite.git to one of these locations."
+            );
+            return;
+        }
+    };
 
     // Skip list now empty - infinite loop protection added to parser
     let skip_list: Vec<&str> = vec![];
