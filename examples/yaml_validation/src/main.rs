@@ -3,8 +3,8 @@
 //! Demonstrates JSON Schema-style validation for YAML documents.
 
 use std::collections::BTreeMap;
-use yaml_lib::*;
 use yaml_lib::validation::error::ValidationError;
+use yaml_lib::*;
 
 /// Helper to parse YAML from a string and get the first document
 fn parse_yaml(yaml: &str) -> Node {
