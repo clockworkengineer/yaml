@@ -4,6 +4,7 @@
 
 use std::collections::BTreeMap;
 use yaml_lib::*;
+use yaml_lib::validation::error::ValidationError;
 
 /// Helper to parse YAML from a string and get the first document
 fn parse_yaml(yaml: &str) -> Node {
