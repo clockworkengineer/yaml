@@ -156,33 +156,48 @@ impl SchemaValidator {
 
         // Type validation
         let type_validator = TypeValidator::new(schema.schema_type.clone());
-        if let Err(msg) = type_validator.validate(node) {
-            ctx.add_error(ValidationError::with_types(
-                ctx.current_path(),
-                msg,
-                schema.schema_type.clone(),
-                node_type_name(node).to_string(),
-            ));
+        if let Err(err) = type_validator.validate(node) {
+            ctx.add_error(ValidationError {
+                path: ctx.current_path(),
+                message: err.to_string(),
+                expected: Some(schema.schema_type.clone()),
+                actual: node_type_name(node).to_string(),
+            });
             return;
         }
 
         // Range validation for numbers
         if let (Some(min), Some(max)) = (schema.minimum, schema.maximum) {
             let validator = RangeValidator::new(Some(min), Some(max));
-            if let Err(msg) = validator.validate(node) {
-                ctx.add_error(ValidationError::new(ctx.current_path(), msg));
+            if let Err(err) = validator.validate(node) {
+                ctx.add_error(ValidationError {
+                    path: ctx.current_path(),
+                    message: err.to_string(),
+                    expected: Some(schema.schema_type.clone()),
+                    actual: node_type_name(node).to_string(),
+                });
                 return;
             }
         } else if let Some(min) = schema.minimum {
             let validator = RangeValidator::new(Some(min), None);
-            if let Err(msg) = validator.validate(node) {
-                ctx.add_error(ValidationError::new(ctx.current_path(), msg));
+            if let Err(err) = validator.validate(node) {
+                ctx.add_error(ValidationError {
+                    path: ctx.current_path(),
+                    message: err.to_string(),
+                    expected: Some(schema.schema_type.clone()),
+                    actual: node_type_name(node).to_string(),
+                });
                 return;
             }
         } else if let Some(max) = schema.maximum {
             let validator = RangeValidator::new(None, Some(max));
-            if let Err(msg) = validator.validate(node) {
-                ctx.add_error(ValidationError::new(ctx.current_path(), msg));
+            if let Err(err) = validator.validate(node) {
+                ctx.add_error(ValidationError {
+                    path: ctx.current_path(),
+                    message: err.to_string(),
+                    expected: Some(schema.schema_type.clone()),
+                    actual: node_type_name(node).to_string(),
+                });
                 return;
             }
         }
@@ -190,20 +205,35 @@ impl SchemaValidator {
         // Length validation for strings/arrays
         if let (Some(min), Some(max)) = (schema.min_length, schema.max_length) {
             let validator = LengthValidator::new(Some(min), Some(max));
-            if let Err(msg) = validator.validate(node) {
-                ctx.add_error(ValidationError::new(ctx.current_path(), msg));
+            if let Err(err) = validator.validate(node) {
+                ctx.add_error(ValidationError {
+                    path: ctx.current_path(),
+                    message: err.to_string(),
+                    expected: Some(schema.schema_type.clone()),
+                    actual: node_type_name(node).to_string(),
+                });
                 return;
             }
         } else if let Some(min) = schema.min_length {
             let validator = LengthValidator::new(Some(min), None);
-            if let Err(msg) = validator.validate(node) {
-                ctx.add_error(ValidationError::new(ctx.current_path(), msg));
+            if let Err(err) = validator.validate(node) {
+                ctx.add_error(ValidationError {
+                    path: ctx.current_path(),
+                    message: err.to_string(),
+                    expected: Some(schema.schema_type.clone()),
+                    actual: node_type_name(node).to_string(),
+                });
                 return;
             }
         } else if let Some(max) = schema.max_length {
             let validator = LengthValidator::new(None, Some(max));
-            if let Err(msg) = validator.validate(node) {
-                ctx.add_error(ValidationError::new(ctx.current_path(), msg));
+            if let Err(err) = validator.validate(node) {
+                ctx.add_error(ValidationError {
+                    path: ctx.current_path(),
+                    message: err.to_string(),
+                    expected: Some(schema.schema_type.clone()),
+                    actual: node_type_name(node).to_string(),
+                });
                 return;
             }
         }
@@ -211,8 +241,13 @@ impl SchemaValidator {
         // Pattern validation
         if let Some(ref pattern) = schema.pattern {
             let validator = PatternValidator::new(pattern.clone());
-            if let Err(msg) = validator.validate(node) {
-                ctx.add_error(ValidationError::new(ctx.current_path(), msg));
+            if let Err(err) = validator.validate(node) {
+                ctx.add_error(ValidationError {
+                    path: ctx.current_path(),
+                    message: err.to_string(),
+                    expected: Some(schema.schema_type.clone()),
+                    actual: node_type_name(node).to_string(),
+                });
                 return;
             }
         }
@@ -220,8 +255,13 @@ impl SchemaValidator {
         // Enum validation
         if let Some(ref allowed) = schema.enum_values {
             let validator = EnumValidator::new(allowed.clone());
-            if let Err(msg) = validator.validate(node) {
-                ctx.add_error(ValidationError::new(ctx.current_path(), msg));
+            if let Err(err) = validator.validate(node) {
+                ctx.add_error(ValidationError {
+                    path: ctx.current_path(),
+                    message: err.to_string(),
+                    expected: Some(schema.schema_type.clone()),
+                    actual: node_type_name(node).to_string(),
+                });
                 return;
             }
         }

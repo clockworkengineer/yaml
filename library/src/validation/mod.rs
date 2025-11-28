@@ -8,6 +8,7 @@
 
 pub mod engine;
 pub mod schema;
+pub mod error;
 pub mod validators;
 
 pub use engine::{SchemaValidator, ValidationContext, ValidationError};

@@ -9,10 +9,11 @@ use alloc::vec::Vec;
 use regex::Regex;
 
 use crate::nodes::node::{Node, Numeric};
+use crate::validation::error::ValidationError;
 use crate::validation::schema::SchemaType;
 
 /// Result of a validation operation
-pub type ValidationResult = Result<(), String>;
+pub type ValidationResult = Result<(), ValidationError>;
 
 /// Trait for validators that can check nodes against rules
 pub trait Validator {
@@ -57,11 +58,10 @@ impl Validator for TypeValidator {
         if matches {
             Ok(())
         } else {
-            Err(format!(
-                "Type mismatch: expected {:?}, got {:?}",
-                self.expected_type,
-                node_type_name(node)
-            ))
+            Err(ValidationError::TypeMismatch {
+                expected: format!("{:?}", self.expected_type),
+                found: node_type_name(node).to_string(),
+            })
         }
     }
 
@@ -95,18 +95,31 @@ impl Validator for RangeValidator {
             Node::Number(Numeric::UInt16(u)) => *u as f64,
             Node::Number(Numeric::Int8(i)) => *i as f64,
             Node::Number(Numeric::Byte(b)) => *b as f64,
-            _ => return Err("RangeValidator only applies to numeric values".to_string()),
+            _ => {
+                return Err(ValidationError::InvalidNodeType {
+                    validator: "RangeValidator".to_string(),
+                    found: node_type_name(node).to_string(),
+                });
+            }
         };
 
         if let Some(min) = self.min {
             if value < min {
-                return Err(format!("Value {} is less than minimum {}", value, min));
+                return Err(ValidationError::RangeError {
+                    value,
+                    min: self.min,
+                    max: self.max,
+                });
             }
         }
 
         if let Some(max) = self.max {
             if value > max {
-                return Err(format!("Value {} is greater than maximum {}", value, max));
+                return Err(ValidationError::RangeError {
+                    value,
+                    min: self.min,
+                    max: self.max,
+                });
             }
         }
 
@@ -142,18 +155,31 @@ impl Validator for LengthValidator {
             Node::Str(s, _, _) => s.len(),
             Node::Array(arr) => arr.len(),
             Node::Set(set) => set.len(),
-            _ => return Err("LengthValidator only applies to strings and arrays".to_string()),
+            _ => {
+                return Err(ValidationError::InvalidNodeType {
+                    validator: "LengthValidator".to_string(),
+                    found: node_type_name(node).to_string(),
+                });
+            }
         };
 
         if let Some(min) = self.min {
             if length < min {
-                return Err(format!("Length {} is less than minimum {}", length, min));
+                return Err(ValidationError::LengthError {
+                    length,
+                    min: self.min,
+                    max: self.max,
+                });
             }
         }
 
         if let Some(max) = self.max {
             if length > max {
-                return Err(format!("Length {} is greater than maximum {}", length, max));
+                return Err(ValidationError::LengthError {
+                    length,
+                    min: self.min,
+                    max: self.max,
+                });
             }
         }
 
@@ -201,10 +227,16 @@ impl Validator for PatternValidator {
                 if self.matches(s) {
                     Ok(())
                 } else {
-                    Err(format!("String does not match regex pattern '{}'", self.pattern))
+                    Err(ValidationError::PatternMismatch {
+                        pattern: self.pattern.clone(),
+                        value: s.clone(),
+                    })
                 }
             }
-            _ => Err("PatternValidator only applies to strings".to_string()),
+            _ => Err(ValidationError::InvalidNodeType {
+                validator: "PatternValidator".to_string(),
+                found: node_type_name(node).to_string(),
+            }),
         }
     }
 
@@ -254,14 +286,16 @@ impl Validator for EnumValidator {
                 if self.allowed.contains(&value) {
                     Ok(())
                 } else {
-                    Err(format!(
-                        "Value '{}' is not one of: {}",
+                    Err(ValidationError::EnumMismatch {
+                        allowed: self.allowed.clone(),
                         value,
-                        self.allowed.join(", ")
-                    ))
+                    })
                 }
             }
-            None => Err("EnumValidator only applies to scalar values (string, number, boolean, null)".to_string()),
+            None => Err(ValidationError::InvalidNodeType {
+                validator: "EnumValidator".to_string(),
+                found: node_type_name(node).to_string(),
+            }),
         }
     }
 
@@ -288,36 +322,39 @@ impl Validator for RequiredValidator {
     fn validate(&self, node: &Node) -> ValidationResult {
         match node {
             Node::Mapping(pairs) => {
-                let found = pairs.iter().any(|(k, _)| {
-                    match k {
-                        Node::Str(s, _, _) => s == &self.field_name,
-                        Node::Number(n) => {
-                            let key_str = match n {
-                                Numeric::Integer(i) => i.to_string(),
-                                Numeric::Float(f) => f.to_string(),
-                                Numeric::UInteger(u) => u.to_string(),
-                                Numeric::Byte(b) => b.to_string(),
-                                Numeric::Int32(i) => i.to_string(),
-                                Numeric::UInt32(u) => u.to_string(),
-                                Numeric::Int16(i) => i.to_string(),
-                                Numeric::UInt16(u) => u.to_string(),
-                                Numeric::Int8(i) => i.to_string(),
-                            };
-                            key_str == self.field_name
-                        },
-                        Node::Boolean(b) => b.to_string() == self.field_name,
-                        Node::None => self.field_name == "null",
-                        _ => false,
+                let found = pairs.iter().any(|(k, _)| match k {
+                    Node::Str(s, _, _) => s == &self.field_name,
+                    Node::Number(n) => {
+                        let key_str = match n {
+                            Numeric::Integer(i) => i.to_string(),
+                            Numeric::Float(f) => f.to_string(),
+                            Numeric::UInteger(u) => u.to_string(),
+                            Numeric::Byte(b) => b.to_string(),
+                            Numeric::Int32(i) => i.to_string(),
+                            Numeric::UInt32(u) => u.to_string(),
+                            Numeric::Int16(i) => i.to_string(),
+                            Numeric::UInt16(u) => u.to_string(),
+                            Numeric::Int8(i) => i.to_string(),
+                        };
+                        key_str == self.field_name
                     }
+                    Node::Boolean(b) => b.to_string() == self.field_name,
+                    Node::None => self.field_name == "null",
+                    _ => false,
                 });
 
                 if found {
                     Ok(())
                 } else {
-                    Err(format!("Required field '{}' is missing", self.field_name))
+                    Err(ValidationError::RequiredFieldMissing {
+                        field: self.field_name.clone(),
+                    })
                 }
             }
-            _ => Err("RequiredValidator only applies to mappings".to_string()),
+            _ => Err(ValidationError::InvalidNodeType {
+                validator: "RequiredValidator".to_string(),
+                found: node_type_name(node).to_string(),
+            }),
         }
     }
 
@@ -415,7 +452,6 @@ mod tests {
         assert!(validator.validate(&Node::from("verylongstring")).is_err());
     }
 
-
     #[test]
     fn test_pattern_validator() {
         // Simple substring pattern
@@ -430,9 +466,12 @@ mod tests {
         assert!(validator.validate(&Node::from("@domain.com")).is_err());
 
         // Non-string node
-        assert!(validator.validate(&Node::Number(Numeric::Integer(42))).is_err());
+        assert!(
+            validator
+                .validate(&Node::Number(Numeric::Integer(42)))
+                .is_err()
+        );
     }
-
 
     #[test]
     fn test_enum_validator() {
@@ -447,8 +486,16 @@ mod tests {
 
         // Integer values
         let validator = EnumValidator::new(vec!["1".to_string(), "2".to_string()]);
-        assert!(validator.validate(&Node::Number(Numeric::Integer(1))).is_ok());
-        assert!(validator.validate(&Node::Number(Numeric::Integer(3))).is_err());
+        assert!(
+            validator
+                .validate(&Node::Number(Numeric::Integer(1)))
+                .is_ok()
+        );
+        assert!(
+            validator
+                .validate(&Node::Number(Numeric::Integer(3)))
+                .is_err()
+        );
 
         // Boolean values
         let validator = EnumValidator::new(vec!["true".to_string(), "false".to_string()]);
@@ -467,7 +514,6 @@ mod tests {
         assert!(validator.validate(&Node::Array(vec![])).is_err());
     }
 
-
     #[test]
     fn test_required_validator() {
         // String key
@@ -482,35 +528,29 @@ mod tests {
 
         // Integer key
         let validator = RequiredValidator::new("42");
-        let mapping = Node::Mapping(vec![
-            (Node::Number(Numeric::Integer(42)), Node::from("answer")),
-        ]);
+        let mapping = Node::Mapping(vec![(
+            Node::Number(Numeric::Integer(42)),
+            Node::from("answer"),
+        )]);
         assert!(validator.validate(&mapping).is_ok());
-        let mapping2 = Node::Mapping(vec![
-            (Node::Number(Numeric::Integer(43)), Node::from("not answer")),
-        ]);
+        let mapping2 = Node::Mapping(vec![(
+            Node::Number(Numeric::Integer(43)),
+            Node::from("not answer"),
+        )]);
         assert!(validator.validate(&mapping2).is_err());
 
         // Boolean key
         let validator = RequiredValidator::new("true");
-        let mapping = Node::Mapping(vec![
-            (Node::Boolean(true), Node::from("yes")),
-        ]);
+        let mapping = Node::Mapping(vec![(Node::Boolean(true), Node::from("yes"))]);
         assert!(validator.validate(&mapping).is_ok());
-        let mapping2 = Node::Mapping(vec![
-            (Node::Boolean(false), Node::from("no")),
-        ]);
+        let mapping2 = Node::Mapping(vec![(Node::Boolean(false), Node::from("no"))]);
         assert!(validator.validate(&mapping2).is_err());
 
         // Null key
         let validator = RequiredValidator::new("null");
-        let mapping = Node::Mapping(vec![
-            (Node::None, Node::from("missing")),
-        ]);
+        let mapping = Node::Mapping(vec![(Node::None, Node::from("missing"))]);
         assert!(validator.validate(&mapping).is_ok());
-        let mapping2 = Node::Mapping(vec![
-            (Node::from("notnull"), Node::from("not missing")),
-        ]);
+        let mapping2 = Node::Mapping(vec![(Node::from("notnull"), Node::from("not missing"))]);
         assert!(validator.validate(&mapping2).is_err());
 
         // Non-mapping node
@@ -521,8 +561,10 @@ mod tests {
     fn test_custom_validator() {
         let validator = CustomValidator::new("Must be positive", |node| match node {
             Node::Number(Numeric::Integer(i)) if *i > 0 => Ok(()),
-            Node::Number(Numeric::Integer(_)) => Err("Number must be positive".to_string()),
-            _ => Err("Not a number".to_string()),
+            Node::Number(Numeric::Integer(_)) => Err(ValidationError::Custom(
+                "Number must be positive".to_string(),
+            )),
+            _ => Err(ValidationError::Custom("Not a number".to_string())),
         });
 
         assert!(
