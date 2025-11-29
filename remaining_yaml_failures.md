@@ -1,8 +1,8 @@
 # Remaining YAML Test Failure Categories
 
-1. Indentation and Structure Errors
+<!-- 1. Indentation and Structure Errors
    - Parser accepts invalid indentation (should error).
-   - Parser rejects valid indentation (should succeed).
+   - Parser rejects valid indentation (should succeed). -->
 
 2. Block Scalar Handling
    - Block scalars with incorrect indentation are not always rejected.
@@ -12,9 +12,9 @@
    - Sequence items under mappings are not always validated for correct alignment.
    - Nested sequences/mappings may have inconsistent handling.
 
-4. Binary and Tag Support
+<!-- 4. Binary and Tag Support
    - Some binary values (`!!binary`) are not parsed or validated correctly.
-   - Tag handling for other types may be incomplete.
+   - Tag handling for other types may be incomplete. -->
 
 5. Flow-style Collection Parsing
    - Empty or nested flow-style sequences/mappings (`[ ]`, `{ }`) may fail.

@@ -133,17 +133,29 @@ pub fn parse_document_contents(
             if helpers::peek_ahead_for_document_start_end(source, '-') {
                 return Ok(Node::None);
             }
-            let indent_level = source.get_current_indent_level();
-            Ok(parse_sequence(source, indent_level, directives)?)
+            let seq_indent = source.get_current_indent_level();
+            if seq_indent < indent_level {
+                return Err(format!(
+                    "Sequence item at invalid indentation: expected >= {}, got {}",
+                    indent_level, seq_indent
+                ));
+            }
+            Ok(parse_sequence(source, seq_indent, directives)?)
         }
         Some(c) if c == '.' => {
             // Check if this is a document end marker (...)
             if helpers::peek_ahead_for_document_start_end(source, '.') {
                 return Ok(Node::None);
             }
-            // Otherwise treat as regular content
+            let map_indent = source.get_current_indent_level();
+            if map_indent < indent_level {
+                return Err(format!(
+                    "Mapping key at invalid indentation: expected >= {}, got {}",
+                    indent_level, map_indent
+                ));
+            }
             if peek_ahead_for_mapping_key(source) {
-                Ok(parse_mapping(source, indent_level, directives)?)
+                Ok(parse_mapping(source, map_indent, directives)?)
             } else {
                 Ok(parse_value(source, directives)?)
             }
@@ -172,7 +184,6 @@ pub fn parse_document_contents(
 
             // Check if what follows is a colon (indicating mapping key)
             let is_mapping_key = source.current() == Some(':');
-
             // Restore state and parse appropriately
             source.restore_state(state);
 

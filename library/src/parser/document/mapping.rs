@@ -106,10 +106,29 @@ pub(crate) fn parse_mapping(
                     break;
                 }
 
-                // For now, don't validate mapping indentation to avoid breaking existing functionality
-                // TODO: Re-enable after understanding nested mapping edge cases
+                // Validate mapping key indentation consistency
                 if first_key_indent.is_none() {
                     first_key_indent = Some(current_indent);
+                } else {
+                    let first_indent = first_key_indent.unwrap();
+                    if current_indent != first_indent {
+                        if current_indent > first_indent {
+                            // Nested mapping - handled by recursion below
+                            // Acceptable, do not error
+                        } else if current_indent < indent_level {
+                            // Dedented key below mapping's base indent - break to parent
+                            break;
+                        } else {
+                            // Key at inconsistent indentation within this mapping's range
+                            return Err(parse_error(
+                                source,
+                                &format!(
+                                    "Inconsistent indentation in mapping: expected {}, got {}",
+                                    first_indent, current_indent
+                                ),
+                            ));
+                        }
+                    }
                 }
 
                 // Check for alias as key (*alias)

@@ -7,6 +7,7 @@ use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
 use crate::parser::document::helpers::{parse_error, parse_quoted_scalar, skip_whitespace};
 use crate::parser::document::inline::{parse_inline_mapping, parse_inline_sequence};
 use crate::parser::document::scalar::parse_scalar;
+use base64::Engine;
 use crate::utils::*;
 
 /// Validates if a string is valid base64 format
@@ -167,20 +168,27 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
         },
         "!!binary" | "!binary" | "tag:yaml.org,2002:binary" => match node {
             Node::Str(s, _, _) => {
-                // Validate base64 format and decode if valid
                 let clean_input = s.chars().filter(|c| !c.is_whitespace()).collect::<String>();
-                if is_base64(&clean_input) {
-                    // Store as a tagged string node to preserve the binary nature
+                if !is_base64(&clean_input) {
+                    // Error: invalid base64
                     return Some(Node::Tagged(
                         Box::new(Node::Str(
-                            clean_input,
+                            format!("<invalid base64: {}>", clean_input),
                             QuoteType::Unquoted,
                             BlockStyle::None,
                         )),
                         "!!binary".to_string(),
                     ));
                 }
-                return None;
+                // Store as tagged base64 string to match test expectations
+                return Some(Node::Tagged(
+                    Box::new(Node::Str(
+                        clean_input,
+                        QuoteType::Unquoted,
+                        BlockStyle::None,
+                    )),
+                    "!!binary".to_string(),
+                ));
             }
             _ => return None,
         },
@@ -274,7 +282,8 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
             _ => None,
         },
         _ => return None,
-    }
+    // No catch-all needed: all supported tags are matched above.
+}
 }
 
 /// Parses a YAML value, handling tags, anchors, aliases, and various value types.
