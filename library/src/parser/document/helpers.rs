@@ -525,8 +525,6 @@ pub(crate) fn parse_mapping_key(
                 source,
                 "Mapping key must be followed by a colon",
             ));
-            // Centralize error creation
-            return Err(super::error_builder::syntax_error(source, "Mapping key must be followed by a colon"));
         }
 
         // Check if we hit EOF without a colon
@@ -538,8 +536,6 @@ pub(crate) fn parse_mapping_key(
                 source,
                 "Unexpected end of input in mapping key",
             ));
-            // Centralize error creation
-            return Err(super::error_builder::syntax_error(source, "Unexpected end of input in mapping key"));
         }
 
         match raw.trim() {
@@ -625,8 +621,6 @@ pub(crate) fn validate_comment_spacing(
                     source,
                     "Comment indicator (#) must be preceded by whitespace",
                 ));
-                // Centralize error creation
-                return Err(super::error_builder::syntax_error(source, "Comment indicator (#) must be preceded by whitespace"));
             }
         }
     }

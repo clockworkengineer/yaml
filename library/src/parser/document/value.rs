@@ -7,7 +7,6 @@ use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
 use crate::parser::document::helpers::{parse_error, parse_quoted_scalar, skip_whitespace};
 use crate::parser::document::inline::{parse_inline_mapping, parse_inline_sequence};
 use crate::parser::document::scalar::parse_scalar;
-use base64::Engine;
 use crate::utils::*;
 
 /// Validates if a string is valid base64 format
@@ -282,8 +281,8 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
             _ => None,
         },
         _ => return None,
-    // No catch-all needed: all supported tags are matched above.
-}
+        // No catch-all needed: all supported tags are matched above.
+    }
 }
 
 /// Parses a YAML value, handling tags, anchors, aliases, and various value types.
@@ -322,7 +321,10 @@ pub(crate) fn parse_value(
         let rest = collect_until(source, |c| c == CHAR_SPACE || c == CHAR_NEWLINE);
         let tag = format!("!{}", rest);
         if tag.trim().is_empty() {
-            return Err(crate::parser::document::error_builder::syntax_error(source, "Empty tag"));
+            return Err(crate::parser::document::error_builder::syntax_error(
+                source,
+                "Empty tag",
+            ));
         }
 
         // Resolve tag handle using directive context
@@ -371,7 +373,10 @@ pub(crate) fn parse_value(
                         parse_value(source, directives)?
                     }
                 } else {
-                    return Err(crate::parser::document::error_builder::syntax_error(source, ERR_UNEXPECTED_EOF_AFTER_ANCHOR));
+                    return Err(crate::parser::document::error_builder::syntax_error(
+                        source,
+                        ERR_UNEXPECTED_EOF_AFTER_ANCHOR,
+                    ));
                 }
             }
             Some('\n') => {
@@ -452,7 +457,10 @@ pub(crate) fn parse_value(
                 || c == CHAR_RBRACE
         });
         if name.trim().is_empty() {
-            return Err(crate::parser::document::error_builder::syntax_error(source, ERR_EMPTY_ALIAS_NAME));
+            return Err(crate::parser::document::error_builder::syntax_error(
+                source,
+                ERR_EMPTY_ALIAS_NAME,
+            ));
         }
         return Ok(Node::Alias(name));
     }
@@ -502,7 +510,10 @@ pub(crate) fn parse_value(
         }
 
         if name.trim().is_empty() {
-            return Err(crate::parser::document::error_builder::syntax_error(source, ERR_EMPTY_ANCHOR_NAME));
+            return Err(crate::parser::document::error_builder::syntax_error(
+                source,
+                ERR_EMPTY_ANCHOR_NAME,
+            ));
         }
         skip_whitespace(source);
 
@@ -597,7 +608,10 @@ pub(crate) fn parse_value(
         };
         // Check for nested anchors (not allowed)
         if matches!(node, Node::Anchored(_, _)) {
-            return Err(crate::parser::document::error_builder::structure_error(source, "A node cannot have multiple anchors"));
+            return Err(crate::parser::document::error_builder::structure_error(
+                source,
+                "A node cannot have multiple anchors",
+            ));
         }
         // Check for anchor applied to alias (not allowed - aliases reference existing anchors)
         if matches!(node, Node::Alias(_)) {
@@ -684,10 +698,10 @@ pub(crate) fn parse_value(
                     if first.is_ascii_digit() {
                         // Check if indent indicator is 0 (invalid)
                         if first == '0' {
-                                    return Err(crate::parser::document::error_builder::indentation_error(
-                                        source,
-                                        "Block scalar indentation indicator must be between 1-9, not 0",
-                                    ));
+                            return Err(crate::parser::document::error_builder::indentation_error(
+                                source,
+                                "Block scalar indentation indicator must be between 1-9, not 0",
+                            ));
                         }
                         // Check if there's a second digit (invalid - must be single digit 1-9)
                         if let Some(second) = chars.clone().next() {

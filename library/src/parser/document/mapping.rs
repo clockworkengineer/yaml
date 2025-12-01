@@ -1,5 +1,4 @@
-//! Module: parser/document/mapping.rs
-
+/// Module: parser/document/mapping.rs
 use crate::constants::*;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
@@ -116,7 +115,6 @@ pub(crate) fn parse_mapping(
                             // Nested mapping - handled by recursion below
                             // Acceptable, do not error
                         } else if current_indent < indent_level {
-                            // Dedented key below mapping's base indent - break to parent
                             break;
                         } else {
                             // Key at inconsistent indentation within this mapping's range
