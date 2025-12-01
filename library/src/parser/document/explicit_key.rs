@@ -2,7 +2,7 @@
 
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
-use crate::parser::document::helpers;
+use crate::parser::document::error_builder::syntax_error;
 
 /// Checks if the current position starts an explicit key (?)
 #[allow(dead_code)]
@@ -23,10 +23,7 @@ pub(crate) fn parse_explicit_mapping_entry(
 ) -> Result<(Node, Node), String> {
     // Skip the '?' indicator
     if source.current() != Some('?') {
-        return Err(helpers::parse_error(
-            source,
-            "Expected '?' for explicit key",
-        ));
+        return Err(syntax_error(source, "Expected '?' for explicit key"));
     }
     source.next();
 

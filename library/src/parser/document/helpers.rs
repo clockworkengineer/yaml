@@ -7,7 +7,7 @@ use crate::nodes::node::Node;
 use crate::nodes::node::Node::Document;
 use crate::nodes::node::{BlockStyle, QuoteType};
 use crate::parser::document::context::ParsingContext;
-use crate::parser::document::error_builder::forbidden_error;
+use crate::parser::document::error_builder::indentation_error;
 use crate::utils::*;
 
 /// Creates a formatted error message with current parser context information.
@@ -81,7 +81,10 @@ pub(crate) fn validate_indentation(
     // From indentation position, any tab encountered before actual content is forbidden
     while let Some(c) = source.current() {
         if c == CHAR_TAB {
-            return Err(forbidden_error(source, "Tabs", "as indentation in YAML"));
+            return Err(indentation_error(
+                source,
+                "Tabs are not allowed as indentation in YAML",
+            ));
         } else if c == CHAR_SPACE {
             source.next();
             continue;
@@ -170,7 +173,7 @@ pub(crate) fn skip_whitespace_no_tabs(source: &mut dyn ISource) -> Result<(), St
             // Found actual non-whitespace content
             if found_tab_after_newline {
                 // Tabs were used as indentation - error
-                return Err(crate::parser::document::parse_error(
+                return Err(indentation_error(
                     source,
                     "Tabs are not allowed as indentation in YAML",
                 ));
@@ -238,9 +241,14 @@ pub(crate) fn parse_quoted_scalar(source: &mut dyn ISource) -> Result<String, St
         Some(c) if c == CHAR_SINGLE_QUOTE || c == CHAR_DOUBLE_QUOTE => c,
         Some(other) => {
             let msg = ERR_EXPECT_QUOTE_FORMAT.replace("{}", &other.to_string());
-            return Err(parse_error(source, &msg).to_string());
+            return Err(super::error_builder::syntax_error(source, &msg));
         }
-        None => return Err(parse_error(source, ERR_UNEXPECTED_EOF_EXPECTING_QUOTE)),
+        None => {
+            return Err(super::error_builder::syntax_error(
+                source,
+                ERR_UNEXPECTED_EOF_EXPECTING_QUOTE,
+            ));
+        }
     };
     let mut out = String::new();
     out.push(quote);
@@ -254,7 +262,7 @@ pub(crate) fn parse_quoted_scalar(source: &mut dyn ISource) -> Result<String, St
                 // Check for document markers at line start
                 if at_line_start && (c == '-' || c == '.') {
                     if peek_ahead_for_document_start_end(source, c) {
-                        return Err(parse_error(
+                        return Err(super::error_builder::structure_error(
                             source,
                             "Document marker found inside quoted string - quotes must be closed before document markers",
                         ));
@@ -292,7 +300,10 @@ pub(crate) fn parse_quoted_scalar(source: &mut dyn ISource) -> Result<String, St
                 }
             }
             None => {
-                return Err(parse_error(source, ERR_UNTERMINATED_QUOTED_FLOW));
+                return Err(super::error_builder::syntax_error(
+                    source,
+                    ERR_UNTERMINATED_QUOTED_FLOW,
+                ));
             }
         }
     }
@@ -301,14 +312,14 @@ pub(crate) fn parse_quoted_scalar(source: &mut dyn ISource) -> Result<String, St
     if quote == CHAR_DOUBLE_QUOTE && out.len() >= 2 {
         let inner = &out[1..out.len() - 1];
         if let Err(e) = crate::utils::validate_double_quoted_escapes(inner) {
-            return Err(parse_error(source, &e));
+            return Err(super::error_builder::syntax_error(source, &e));
         }
     }
 
     // Validate comment spacing after quoted scalar
     // After closing quote, if next char is #, it's invalid (needs whitespace)
     if source.current() == Some(CHAR_HASH) {
-        return Err(parse_error(
+        return Err(super::error_builder::syntax_error(
             source,
             "Comment indicator (#) must be preceded by whitespace",
         ));
@@ -514,6 +525,8 @@ pub(crate) fn parse_mapping_key(
                 source,
                 "Mapping key must be followed by a colon",
             ));
+            // Centralize error creation
+            return Err(super::error_builder::syntax_error(source, "Mapping key must be followed by a colon"));
         }
 
         // Check if we hit EOF without a colon
@@ -525,6 +538,8 @@ pub(crate) fn parse_mapping_key(
                 source,
                 "Unexpected end of input in mapping key",
             ));
+            // Centralize error creation
+            return Err(super::error_builder::syntax_error(source, "Unexpected end of input in mapping key"));
         }
 
         match raw.trim() {
@@ -610,6 +625,8 @@ pub(crate) fn validate_comment_spacing(
                     source,
                     "Comment indicator (#) must be preceded by whitespace",
                 ));
+                // Centralize error creation
+                return Err(super::error_builder::syntax_error(source, "Comment indicator (#) must be preceded by whitespace"));
             }
         }
     }

@@ -5,6 +5,7 @@
 
 use crate::nodes::node::Node;
 use crate::parser::directives::DirectiveContext;
+use crate::parser::document::error_builder::syntax_error;
 use crate::parser::document::tokens::value::parse_value_with_tokens;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
@@ -41,18 +42,27 @@ pub fn parse_inline_sequence_with_tokens(
             Some(Token::Comma) => {
                 if expect_item && !items.is_empty() {
                     // Comma after comma or at start (invalid)
-                    return Err("Unexpected comma in flow sequence".to_string());
+                    return Err(syntax_error(
+                        stream.source_mut(),
+                        "Unexpected comma in flow sequence",
+                    ));
                 }
                 stream.next()?;
                 expect_item = true;
             }
             None | Some(Token::Eof) => {
-                return Err("Unexpected end of input in flow sequence".to_string());
+                return Err(syntax_error(
+                    stream.source_mut(),
+                    "Unexpected end of input in flow sequence",
+                ));
             }
             _ => {
                 if !expect_item {
                     // Found value without comma separator
-                    return Err("Expected comma or ] in flow sequence".to_string());
+                    return Err(syntax_error(
+                        stream.source_mut(),
+                        "Expected comma or ] in flow sequence",
+                    ));
                 }
 
                 // Parse the value
@@ -98,18 +108,27 @@ pub fn parse_inline_mapping_with_tokens(
             Some(Token::Comma) => {
                 if expect_entry && !pairs.is_empty() {
                     // Comma after comma or at start (invalid)
-                    return Err("Unexpected comma in flow mapping".to_string());
+                    return Err(syntax_error(
+                        stream.source_mut(),
+                        "Unexpected comma in flow mapping",
+                    ));
                 }
                 stream.next()?;
                 expect_entry = true;
             }
             None | Some(Token::Eof) => {
-                return Err("Unexpected end of input in flow mapping".to_string());
+                return Err(syntax_error(
+                    stream.source_mut(),
+                    "Unexpected end of input in flow mapping",
+                ));
             }
             _ => {
                 if !expect_entry {
-                    // Found key without comma separator
-                    return Err("Expected comma or } in flow mapping".to_string());
+                    // Found key-value without comma separator
+                    return Err(syntax_error(
+                        stream.source_mut(),
+                        "Expected comma or } in flow mapping",
+                    ));
                 }
 
                 // Parse the key
@@ -120,7 +139,10 @@ pub fn parse_inline_mapping_with_tokens(
 
                 // Expect colon
                 if !matches!(stream.current(), Some(Token::Colon)) {
-                    return Err("Expected : after mapping key in flow mapping".to_string());
+                    return Err(syntax_error(
+                        stream.source_mut(),
+                        "Expected : after mapping key in flow mapping",
+                    ));
                 }
                 stream.next()?;
 

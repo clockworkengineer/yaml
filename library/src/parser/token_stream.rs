@@ -247,6 +247,11 @@ impl<'a> TokenStream<'a> {
 
         Ok(has_colon)
     }
+
+    /// Expose a mutable reference to the underlying source for error reporting
+    pub fn source_mut(&mut self) -> &mut dyn crate::io::traits::ISource {
+        self.lexer.source
+    }
 }
 
 /// Type of scalar value

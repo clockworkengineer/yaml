@@ -5,6 +5,7 @@
 
 use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
 use crate::parser::directives::DirectiveContext;
+use crate::parser::document::error_builder::{structure_error, syntax_error};
 use crate::parser::document::scalar::parse_scalar;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
@@ -196,7 +197,10 @@ pub fn parse_value_with_tokens(
 
         if let Some(anchor_name) = decorators.anchor {
             if matches!(result, Node::Anchored(_, _)) {
-                return Err("A node cannot have multiple anchors".to_string());
+                return Err(structure_error(
+                    stream.source_mut(),
+                    "A node cannot have multiple anchors",
+                ));
             }
             result = Node::Anchored(Box::new(result), anchor_name);
         }
@@ -268,7 +272,10 @@ fn parse_value_content(
                 BlockStyle::None,
             ))
         }
-        Some(token) => Err(format!("Unexpected token in value: {:?}", token)),
+        Some(token) => {
+            let token_str = format!("Unexpected token in value: {:?}", token);
+            Err(syntax_error(stream.source_mut(), &token_str))
+        }
     }
 }
 

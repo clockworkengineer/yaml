@@ -76,7 +76,7 @@ pub enum Token {
 
 /// Tokenizer state for YAML lexical analysis
 pub struct Lexer<'a> {
-    source: &'a mut dyn ISource,
+    pub(crate) source: &'a mut dyn ISource,
     current_token: Option<Token>,
     peeked_token: Option<Token>,
     at_line_start: bool,
