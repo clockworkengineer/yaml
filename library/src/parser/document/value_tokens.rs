@@ -229,12 +229,12 @@ fn parse_value_content(
         Some(Token::SingleQuoted(s)) | Some(Token::DoubleQuoted(s)) => {
             let content = s.clone();
             stream.next()?;
-            Ok(parse_scalar(&content, directives))
+            parse_scalar(&content, directives)
         }
         Some(Token::Plain(s)) => {
             let content = s.clone();
             stream.next()?;
-            Ok(parse_scalar(&content, directives))
+            parse_scalar(&content, directives)
         }
         Some(Token::Dash) => {
             // Nested sequence

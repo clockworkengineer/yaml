@@ -35,10 +35,9 @@ pub(crate) fn parse_value(
         return parse_value_bridged(source, directives);
     }
 
-    use crate::parser::token_stream::TokenStream;
     use crate::parser::document::tokens::value::parse_value_with_tokens;
+    use crate::parser::token_stream::TokenStream;
 
     let mut stream = TokenStream::new(source, directives)?;
     return parse_value_with_tokens(&mut stream, directives);
 }
-

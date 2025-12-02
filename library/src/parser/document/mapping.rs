@@ -60,89 +60,58 @@ pub(crate) fn parse_mapping(
     use crate::parser::token_stream::TokenStream;
 
     let mut pairs: Vec<(Node, Node)> = Vec::new();
-    let mut decorators: Option<(Option<String>, Option<String>, Option<String>)> = None; // (Tag, Anchor, Alias)
     let mut stream = TokenStream::new(source, directives)?;
 
     loop {
-        let token = match stream.current() {
-            Some(t) => t,
-            None => break,
+        // Parse key (with decorators)
+        let key_node = match stream.current() {
+            Some(Token::DocumentEnd)
+            | Some(Token::DocumentStart)
+            | Some(Token::Directive(_))
+            | Some(Token::Eof)
+            | None => break,
+            _ => parse_value_with_tokens(&mut stream, directives)?,
         };
 
-        match token {
-            Token::Tag(tag) => {
-                decorators.get_or_insert((Some(tag.clone()), None, None));
-                stream.next()?;
-            }
-            Token::Anchor(anchor) => {
-                decorators.get_or_insert((None, Some(anchor.clone()), None));
-                stream.next()?;
-            }
-            Token::Alias(alias) => {
-                decorators.get_or_insert((None, None, Some(alias.clone())));
-                stream.next()?;
-            }
-            Token::Plain(_s) | Token::SingleQuoted(_s) | Token::DoubleQuoted(_s) => {
-                let mut key_node = match token {
-                    Token::Plain(s) => Node::Str(s.clone(), QuoteType::Unquoted, BlockStyle::None),
-                    Token::SingleQuoted(s) => {
-                        Node::Str(s.clone(), QuoteType::Single, BlockStyle::None)
-                    }
-                    Token::DoubleQuoted(s) => {
-                        Node::Str(s.clone(), QuoteType::Double, BlockStyle::None)
-                    }
-                    _ => unreachable!(),
-                };
-                if let Some((tag, anchor, alias)) = decorators.take() {
-                    if let Some(t) = tag {
-                        key_node = Node::Tagged(Box::new(key_node), t);
-                    }
-                    if let Some(a) = anchor {
-                        key_node = Node::Anchored(Box::new(key_node), a);
-                    }
-                    if let Some(al) = alias {
-                        key_node = Node::Alias(al);
-                    }
-                }
-                stream.next()?;
-                let value_node = match stream.current() {
-                    Some(Token::Colon) => {
-                        stream.next()?;
-                        parse_value_with_tokens(&mut stream, directives)?
-                    }
-                    Some(Token::Newline) => Node::None,
-                    Some(Token::Comma) => {
-                        stream.next()?;
-                        parse_value_with_tokens(&mut stream, directives)?
-                    }
-                    Some(Token::Dash) => parse_value_with_tokens(&mut stream, directives)?,
-                    Some(Token::FlowMappingStart) | Some(Token::FlowSequenceStart) => {
-                        parse_value_with_tokens(&mut stream, directives)?
-                    }
-                    Some(Token::Comment(_)) => {
-                        stream.next()?;
-                        parse_value_with_tokens(&mut stream, directives)?
-                    }
-                    Some(Token::Eof) | None => Node::None,
-                    _ => parse_value_with_tokens(&mut stream, directives)?,
-                };
-                pairs.push((key_node, value_node));
-            }
-            Token::FlowMappingStart => {
-                stream.next()?;
-            }
-            Token::Indent(_) | Token::Newline => {
-                stream.next()?;
-            }
-            Token::Comment(_) => {
-                stream.next()?;
-            }
-            Token::DocumentStart | Token::DocumentEnd | Token::Directive(_) | Token::Eof => {
-                break;
-            }
-            _ => {
-                stream.next()?;
-            }
+        // Expect colon after key (skip comments/newlines)
+        while matches!(
+            stream.current(),
+            Some(Token::Comment(_)) | Some(Token::Newline) | Some(Token::Indent(_))
+        ) {
+            stream.next()?;
+        }
+        if !matches!(stream.current(), Some(Token::Colon)) {
+            // If not a colon, treat as mapping end or error
+            break;
+        }
+        stream.next()?;
+
+        // Parse value (with decorators)
+        while matches!(
+            stream.current(),
+            Some(Token::Comment(_)) | Some(Token::Newline) | Some(Token::Indent(_))
+        ) {
+            stream.next()?;
+        }
+        let value_node = match stream.current() {
+            Some(Token::DocumentEnd)
+            | Some(Token::DocumentStart)
+            | Some(Token::Directive(_))
+            | Some(Token::Eof)
+            | None => Node::None,
+            _ => parse_value_with_tokens(&mut stream, directives)?,
+        };
+        pairs.push((key_node, value_node));
+
+        // Skip trailing commas/comments/newlines/indents before next key
+        while matches!(
+            stream.current(),
+            Some(Token::Comma)
+                | Some(Token::Comment(_))
+                | Some(Token::Newline)
+                | Some(Token::Indent(_))
+        ) {
+            stream.next()?;
         }
     }
     Ok(Node::Mapping(pairs))

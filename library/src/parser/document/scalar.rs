@@ -23,17 +23,21 @@ use crate::parser::directives::DirectiveContext;
 /// # Returns
 ///
 /// A Node representing the parsed scalar value
-pub(crate) fn parse_scalar(value: &str, directives: &DirectiveContext) -> Node {
+pub(crate) fn parse_scalar(value: &str, directives: &DirectiveContext) -> Result<Node, String> {
     match value {
-        v if v.starts_with('#') => Node::Str(v.to_string(), QuoteType::Unquoted, BlockStyle::None),
-        "null" | "~" => Node::None,
-        "true" => Node::Boolean(true),
-        "false" => Node::Boolean(false),
+        v if v.starts_with('#') => Ok(Node::Str(
+            v.to_string(),
+            QuoteType::Unquoted,
+            BlockStyle::None,
+        )),
+        "null" | "~" => Ok(Node::None),
+        "true" => Ok(Node::Boolean(true)),
+        "false" => Ok(Node::Boolean(false)),
         // YAML 1.1 specific boolean values
-        "yes" | "Yes" | "YES" if directives.is_yaml_11() => Node::Boolean(true),
-        "no" | "No" | "NO" if directives.is_yaml_11() => Node::Boolean(false),
-        "on" | "On" | "ON" if directives.is_yaml_11() => Node::Boolean(true),
-        "off" | "Off" | "OFF" if directives.is_yaml_11() => Node::Boolean(false),
+        "yes" | "Yes" | "YES" if directives.is_yaml_11() => Ok(Node::Boolean(true)),
+        "no" | "No" | "NO" if directives.is_yaml_11() => Ok(Node::Boolean(false)),
+        "on" | "On" | "ON" if directives.is_yaml_11() => Ok(Node::Boolean(true)),
+        "off" | "Off" | "OFF" if directives.is_yaml_11() => Ok(Node::Boolean(false)),
         v => {
             // Only treat | or > as block scalar indicators in block context, not in flow collections
             // For flow context, these should be part of the string
@@ -43,23 +47,14 @@ pub(crate) fn parse_scalar(value: &str, directives: &DirectiveContext) -> Node {
                 let mut chars = v.chars();
                 let indicator = chars.next().unwrap();
                 let mut chomping = None;
-                let mut indent = None;
+                let mut indent_str = String::new();
                 let mut rest = String::new();
                 // Parse optional chomping and indentation
                 while let Some(c) = chars.next() {
                     match c {
                         '+' | '-' if chomping.is_none() => chomping = Some(c),
-                        d if d.is_ascii_digit() && indent.is_none() => {
-                            let mut num = d.to_string();
-                            while let Some(next) = chars.clone().next() {
-                                if next.is_ascii_digit() {
-                                    num.push(next);
-                                    chars.next();
-                                } else {
-                                    break;
-                                }
-                            }
-                            indent = num.parse::<usize>().ok();
+                        d if d.is_ascii_digit() => {
+                            indent_str.push(d);
                         }
                         ' ' => continue,
                         _ => {
@@ -69,6 +64,23 @@ pub(crate) fn parse_scalar(value: &str, directives: &DirectiveContext) -> Node {
                         }
                     }
                 }
+                // Validate indentation indicator
+                if !indent_str.is_empty() {
+                    if indent_str == "0" {
+                        return Err("Invalid block scalar indentation indicator: 0. Only 1-9 allowed. See YAML spec. Error: indentation indicator must be 1-9".to_string());
+                    }
+                    if indent_str.len() > 1 {
+                        return Err(format!(
+                            "Invalid block scalar indentation indicator: {}. Only single digit 1-9 allowed. Error: indentation indicator must be 1-9, single digit",
+                            indent_str
+                        ));
+                    }
+                }
+                let indent = if indent_str.is_empty() {
+                    None
+                } else {
+                    indent_str.parse::<usize>().ok()
+                };
                 let content = if rest.is_empty() {
                     v[1..].trim_start()
                 } else {
@@ -140,30 +152,30 @@ pub(crate) fn parse_scalar(value: &str, directives: &DirectiveContext) -> Node {
                         }
                     }
                 }
-                return Node::Str(result, QuoteType::Unquoted, style);
+                return Ok(Node::Str(result, QuoteType::Unquoted, style));
             }
             // Try parsing as octal first (version-specific)
             if v.starts_with('0') && v.len() > 1 {
                 // YAML 1.2: 0o prefix for octal
                 if v.starts_with("0o") || v.starts_with("0O") {
                     if let Ok(i) = i64::from_str_radix(&v[2..], 8) {
-                        return Node::Number(Numeric::Integer(i));
+                        return Ok(Node::Number(Numeric::Integer(i)));
                     }
                 }
                 // YAML 1.1: plain 0 prefix for octal (e.g., 0755)
                 else if directives.is_yaml_11() && v.chars().skip(1).all(|c| c >= '0' && c <= '7')
                 {
                     if let Ok(i) = i64::from_str_radix(&v[1..], 8) {
-                        return Node::Number(Numeric::Integer(i));
+                        return Ok(Node::Number(Numeric::Integer(i)));
                     }
                 }
             }
 
             // Try standard integer parsing
             if let Ok(i) = v.parse::<i64>() {
-                Node::Number(Numeric::Integer(i))
+                Ok(Node::Number(Numeric::Integer(i)))
             } else if let Ok(f) = v.parse::<f64>() {
-                Node::Number(Numeric::Float(f))
+                Ok(Node::Number(Numeric::Float(f)))
             } else {
                 let (content, qt, style) = if v.len() >= 2 {
                     let first = v.chars().next().unwrap();
@@ -253,7 +265,7 @@ pub(crate) fn parse_scalar(value: &str, directives: &DirectiveContext) -> Node {
                 } else {
                     (v.to_string(), QuoteType::Unquoted, BlockStyle::None)
                 };
-                Node::Str(content, qt, style)
+                Ok(Node::Str(content, qt, style))
             }
         }
     }

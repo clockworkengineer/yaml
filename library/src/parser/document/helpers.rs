@@ -539,11 +539,13 @@ pub(crate) fn parse_mapping_key(
         }
 
         match raw.trim() {
-            v if v.starts_with(CHAR_HASH) => {
-                Node::Str(v.to_string(), QuoteType::Unquoted, BlockStyle::None)
-            }
+            v if v.starts_with(CHAR_HASH) => Ok(Node::Str(
+                v.to_string(),
+                QuoteType::Unquoted,
+                BlockStyle::None,
+            )),
             v => crate::parser::document::scalar::parse_scalar(v, directives),
-        }
+        }?
     };
 
     // Now consume the colon and check for newline
