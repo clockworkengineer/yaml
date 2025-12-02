@@ -1,14 +1,10 @@
 /// Module: parser/document/mapping.rs
-use crate::constants::*;
 use crate::io::traits::ISource;
-use crate::nodes::node::Node;
-use crate::nodes::node::{BlockStyle, QuoteType};
-use crate::parser::document::context::{CollectionType, ParsingContext};
-use crate::parser::document::helpers::{parse_comment, parse_error, parse_mapping_key};
-use crate::parser::document::loop_guards::{MAX_LOOP_ITERATIONS, MAX_MAPPING_PAIRS};
-use crate::parser::document::value::parse_value;
-use crate::utils::collect_until;
-use crate::{combined_loop_guard, loop_guard_init};
+use crate::nodes::node::{BlockStyle, Node, QuoteType};
+use crate::parser::document::mapping_tokens::parse_mapping_with_tokens;
+use crate::parser::document::parse_value;
+use crate::parser::document::sequence_tokens::parse_sequence_with_tokens;
+use crate::parser::document::tokens::value::parse_value_with_tokens;
 
 /// Parses a YAML mapping (dictionary) with the specified indentation level.
 ///
@@ -27,7 +23,7 @@ use crate::{combined_loop_guard, loop_guard_init};
 /// Result containing a Mapping Node or an error string
 pub(crate) fn parse_mapping(
     source: &mut dyn ISource,
-    indent_level: usize,
+    _indent_level: usize,
     directives: &crate::parser::directives::DirectiveContext,
 ) -> Result<Node, String> {
     /// Checks if a string value can be safely represented as plain (unquoted) YAML.
@@ -60,263 +56,93 @@ pub(crate) fn parse_mapping(
         is_plain_safe_value(s) && !s.contains(':')
     }
 
+    use crate::parser::lexer::Token;
+    use crate::parser::token_stream::TokenStream;
+
     let mut pairs: Vec<(Node, Node)> = Vec::new();
-    let mut last_was_nested: bool;
-    loop_guard_init!(loop_counter);
+    let mut decorators: Option<(Option<String>, Option<String>, Option<String>)> = None; // (Tag, Anchor, Alias)
+    let mut stream = TokenStream::new(source, directives)?;
 
-    // Track the indentation of the first key for validation
-    let mut first_key_indent: Option<usize> = None;
+    loop {
+        let token = match stream.current() {
+            Some(t) => t,
+            None => break,
+        };
 
-    // Create parsing context for validation
-    let mut ctx = ParsingContext::new(indent_level);
-    ctx.collection_type = CollectionType::BlockMapping;
-
-    while let Some(c) = source.current() {
-        // Prevent infinite loop and excessive memory usage
-        combined_loop_guard!(
-            loop_counter,
-            pairs,
-            MAX_LOOP_ITERATIONS,
-            MAX_MAPPING_PAIRS,
-            "Mapping"
-        );
-
-        last_was_nested = false;
-        match c {
-            CHAR_DASH | CHAR_DOT
-                if crate::parser::document::helpers::peek_ahead_for_document_start_end(
-                    source, c,
-                ) =>
-            {
+        match token {
+            Token::Tag(tag) => {
+                decorators.get_or_insert((Some(tag.clone()), None, None));
+                stream.next()?;
+            }
+            Token::Anchor(anchor) => {
+                decorators.get_or_insert((None, Some(anchor.clone()), None));
+                stream.next()?;
+            }
+            Token::Alias(alias) => {
+                decorators.get_or_insert((None, None, Some(alias.clone())));
+                stream.next()?;
+            }
+            Token::Plain(_s) | Token::SingleQuoted(_s) | Token::DoubleQuoted(_s) => {
+                let mut key_node = match token {
+                    Token::Plain(s) => Node::Str(s.clone(), QuoteType::Unquoted, BlockStyle::None),
+                    Token::SingleQuoted(s) => {
+                        Node::Str(s.clone(), QuoteType::Single, BlockStyle::None)
+                    }
+                    Token::DoubleQuoted(s) => {
+                        Node::Str(s.clone(), QuoteType::Double, BlockStyle::None)
+                    }
+                    _ => unreachable!(),
+                };
+                if let Some((tag, anchor, alias)) = decorators.take() {
+                    if let Some(t) = tag {
+                        key_node = Node::Tagged(Box::new(key_node), t);
+                    }
+                    if let Some(a) = anchor {
+                        key_node = Node::Anchored(Box::new(key_node), a);
+                    }
+                    if let Some(al) = alias {
+                        key_node = Node::Alias(al);
+                    }
+                }
+                stream.next()?;
+                let value_node = match stream.current() {
+                    Some(Token::Colon) => {
+                        stream.next()?;
+                        parse_value_with_tokens(&mut stream, directives)?
+                    }
+                    Some(Token::Newline) => Node::None,
+                    Some(Token::Comma) => {
+                        stream.next()?;
+                        parse_value_with_tokens(&mut stream, directives)?
+                    }
+                    Some(Token::Dash) => parse_value_with_tokens(&mut stream, directives)?,
+                    Some(Token::FlowMappingStart) | Some(Token::FlowSequenceStart) => {
+                        parse_value_with_tokens(&mut stream, directives)?
+                    }
+                    Some(Token::Comment(_)) => {
+                        stream.next()?;
+                        parse_value_with_tokens(&mut stream, directives)?
+                    }
+                    Some(Token::Eof) | None => Node::None,
+                    _ => parse_value_with_tokens(&mut stream, directives)?,
+                };
+                pairs.push((key_node, value_node));
+            }
+            Token::FlowMappingStart => {
+                stream.next()?;
+            }
+            Token::Indent(_) | Token::Newline => {
+                stream.next()?;
+            }
+            Token::Comment(_) => {
+                stream.next()?;
+            }
+            Token::DocumentStart | Token::DocumentEnd | Token::Directive(_) | Token::Eof => {
                 break;
             }
-            CHAR_HASH => {
-                parse_comment(source);
+            _ => {
+                stream.next()?;
             }
-            c if c.is_alphanumeric()
-                || c == CHAR_SINGLE_QUOTE
-                || c == CHAR_DOUBLE_QUOTE
-                || c == CHAR_AMPERSAND
-                || c == CHAR_ASTERISK =>
-            {
-                let current_indent = source.get_current_indent_level();
-                if current_indent < indent_level {
-                    // eprintln!("DEBUG: Breaking from mapping - indent {} < {}", current_indent, indent_level);
-                    break;
-                }
-
-                // Validate mapping key indentation consistency
-                if first_key_indent.is_none() {
-                    first_key_indent = Some(current_indent);
-                } else {
-                    let first_indent = first_key_indent.unwrap();
-                    if current_indent != first_indent {
-                        if current_indent > first_indent {
-                            // Nested mapping - handled by recursion below
-                            // Acceptable, do not error
-                        } else if current_indent < indent_level {
-                            break;
-                        } else {
-                            // Key at inconsistent indentation within this mapping's range
-                            return Err(parse_error(
-                                source,
-                                &format!(
-                                    "Inconsistent indentation in mapping: expected {}, got {}",
-                                    first_indent, current_indent
-                                ),
-                            ));
-                        }
-                    }
-                }
-
-                // Check for alias as key (*alias)
-                let (mut key_node, newline) = if source.current() == Some(CHAR_ASTERISK) {
-                    source.next();
-                    let alias_name = collect_until(source, |c| {
-                        c == CHAR_SPACE
-                            || c == CHAR_TAB
-                            || c == CHAR_NEWLINE
-                            || c == CHAR_CARRIAGE_RETURN
-                            || c == CHAR_HASH
-                            || c == CHAR_COLON
-                    });
-                    if alias_name.trim().is_empty() {
-                        return Err(parse_error(source, "Alias name cannot be empty"));
-                    }
-
-                    crate::parser::document::helpers::skip_whitespace(source);
-
-                    // Must have colon after alias
-                    if source.current() != Some(CHAR_COLON) {
-                        return Err(parse_error(
-                            source,
-                            "Alias used as key must be followed by colon",
-                        ));
-                    }
-                    source.next(); // consume colon
-
-                    let mut newline = false;
-                    crate::parser::document::helpers::skip_whitespace(source);
-                    if source.current() == Some(CHAR_HASH) {
-                        crate::utils::consume_inline_comment_and_newline(source);
-                        newline = true;
-                    } else if source.current() == Some(CHAR_CARRIAGE_RETURN) {
-                        source.next();
-                        newline = true;
-                    }
-                    if source.current() == Some(CHAR_NEWLINE) {
-                        source.next();
-                        newline = true;
-                    }
-                    if newline {
-                        crate::parser::document::helpers::skip_whitespace_no_tabs(source)?;
-                    }
-
-                    (Node::Alias(alias_name), newline)
-                } else {
-                    // Check for anchor on the mapping key
-                    let anchor_name = if source.current() == Some(CHAR_AMPERSAND) {
-                        source.next();
-                        let name = collect_until(source, |c| {
-                            c == CHAR_SPACE
-                                || c == CHAR_TAB
-                                || c == CHAR_NEWLINE
-                                || c == CHAR_CARRIAGE_RETURN
-                                || c == CHAR_HASH
-                                || c == CHAR_COMMA
-                                || c == CHAR_LBRACKET
-                                || c == CHAR_RBRACKET
-                                || c == CHAR_LBRACE
-                                || c == CHAR_RBRACE
-                        });
-                        if name.trim().is_empty() {
-                            return Err(parse_error(source, "Anchor name cannot be empty"));
-                        }
-                        crate::parser::document::helpers::skip_whitespace(source);
-                        Some(name)
-                    } else {
-                        None
-                    };
-
-                    let (mut key_node, newline) = parse_mapping_key(source, directives)?;
-
-                    // Wrap the key in an Anchored node if we found an anchor
-                    if let Some(name) = anchor_name {
-                        // Check if we're trying to anchor an alias (not allowed)
-                        if matches!(key_node, Node::Alias(_)) {
-                            return Err(parse_error(
-                                source,
-                                "Cannot apply anchor to an alias - aliases reference existing anchors",
-                            ));
-                        }
-                        key_node = Node::Anchored(Box::new(key_node), name);
-                    }
-
-                    (key_node, newline)
-                };
-                if let Node::Str(ref mut s, ref mut qt, ref mut _style) = key_node {
-                    if matches!(*qt, QuoteType::Single | QuoteType::Double) && is_plain_safe_key(s)
-                    {
-                        *qt = QuoteType::Unquoted;
-                    }
-                }
-
-                // Check for sequence on same line as mapping key (error case)
-                if !newline {
-                    crate::parser::document::helpers::skip_whitespace_no_tabs(source)?;
-                    if source.current() == Some('-') {
-                        let state = source.save_state();
-                        source.next();
-                        if let Some(c) = source.current() {
-                            if c.is_whitespace() || c == '\n' {
-                                // This is a sequence item on the same line as a key - error
-                                source.restore_state(state);
-                                return Err(parse_error(
-                                    source,
-                                    "Sequence cannot start on same line as mapping key",
-                                ));
-                            }
-                        }
-                        source.restore_state(state);
-                    }
-                }
-
-                let next_indent = source.get_current_indent_level();
-                if next_indent > indent_level && newline {
-                    pairs.push((
-                        key_node,
-                        crate::parser::document::parse_document_contents(
-                            source,
-                            next_indent,
-                            directives,
-                        )?,
-                    ));
-                    continue;
-                } else {
-                    let mut value_node = parse_value(source, directives)?;
-                    if let Node::Str(ref mut s, ref mut qt, ref mut style) = value_node {
-                        if matches!(*qt, QuoteType::Single | QuoteType::Double)
-                            && is_plain_safe_value(s)
-                        {
-                            if !matches!(*style, BlockStyle::Literal) {
-                                *style = BlockStyle::None;
-                            }
-                            *qt = QuoteType::Unquoted;
-                        }
-                    }
-                    last_was_nested = matches!(value_node, Node::Anchored(_, _))
-                        || matches!(value_node, Node::Str(_, _, BlockStyle::Literal));
-                    pairs.push((key_node, value_node));
-                }
-            }
-            '\t' => {
-                // Tab at line start = indentation = forbidden
-                return Err(parse_error(
-                    source,
-                    "Tabs are not allowed as indentation in YAML",
-                ));
-            }
-            c if c.is_whitespace() => {
-                source.next();
-                continue;
-            }
-            '!' => {
-                // Tag at start of mapping key
-                let current_indent = source.get_current_indent_level();
-                if current_indent < indent_level {
-                    break;
-                }
-
-                if first_key_indent.is_none() {
-                    first_key_indent = Some(current_indent);
-                }
-
-                // Parse as a mapping key-value pair (tag will be handled by parse_mapping_key)
-                let (key_node, newline) = parse_mapping_key(source, directives)?;
-
-                let next_indent = source.get_current_indent_level();
-                if next_indent > indent_level && newline {
-                    pairs.push((
-                        key_node,
-                        crate::parser::document::parse_document_contents(
-                            source,
-                            next_indent,
-                            directives,
-                        )?,
-                    ));
-                    continue;
-                } else {
-                    let value_node = parse_value(source, directives)?;
-                    last_was_nested = matches!(value_node, Node::Anchored(_, _))
-                        || matches!(value_node, Node::Str(_, _, BlockStyle::Literal));
-                    pairs.push((key_node, value_node));
-                }
-            }
-            _ => break,
-        }
-        if !last_was_nested {
-            crate::utils::skip_until_newline(source);
-            crate::parser::document::helpers::skip_whitespace_no_tabs(source)?;
         }
     }
     Ok(Node::Mapping(pairs))
