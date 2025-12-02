@@ -67,6 +67,28 @@ pub fn parse_sequence_with_tokens(
                         items.push(Node::None);
                         // Don't consume - let next iteration handle it
                     }
+                    Some(Token::Indent(_)) | Some(Token::Plain(_)) => {
+                        // Mapping after dash: parse as mapping
+                        use crate::parser::document::mapping_tokens::parse_mapping_with_tokens;
+                        let indent = match stream.current() {
+                            Some(Token::Indent(level)) => *level,
+                            _ => 0,
+                        };
+                        let mapping = parse_mapping_with_tokens(stream, indent, directives)?;
+                        items.push(mapping);
+                        // Skip trailing whitespace/newlines until we see next dash or end
+                        loop {
+                            match stream.current() {
+                                Some(Token::Newline) => {
+                                    stream.next()?;
+                                }
+                                Some(Token::Indent(_)) | Some(Token::Dash) | None => {
+                                    break;
+                                }
+                                _ => break,
+                            }
+                        }
+                    }
                     _ => {
                         // Parse the value
                         let value = parse_value_with_tokens(stream, directives)?;

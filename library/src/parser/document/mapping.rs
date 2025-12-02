@@ -56,63 +56,8 @@ pub(crate) fn parse_mapping(
         is_plain_safe_value(s) && !s.contains(':')
     }
 
-    use crate::parser::lexer::Token;
     use crate::parser::token_stream::TokenStream;
 
-    let mut pairs: Vec<(Node, Node)> = Vec::new();
     let mut stream = TokenStream::new(source, directives)?;
-
-    loop {
-        // Parse key (with decorators)
-        let key_node = match stream.current() {
-            Some(Token::DocumentEnd)
-            | Some(Token::DocumentStart)
-            | Some(Token::Directive(_))
-            | Some(Token::Eof)
-            | None => break,
-            _ => parse_value_with_tokens(&mut stream, directives)?,
-        };
-
-        // Expect colon after key (skip comments/newlines)
-        while matches!(
-            stream.current(),
-            Some(Token::Comment(_)) | Some(Token::Newline) | Some(Token::Indent(_))
-        ) {
-            stream.next()?;
-        }
-        if !matches!(stream.current(), Some(Token::Colon)) {
-            // If not a colon, treat as mapping end or error
-            break;
-        }
-        stream.next()?;
-
-        // Parse value (with decorators)
-        while matches!(
-            stream.current(),
-            Some(Token::Comment(_)) | Some(Token::Newline) | Some(Token::Indent(_))
-        ) {
-            stream.next()?;
-        }
-        let value_node = match stream.current() {
-            Some(Token::DocumentEnd)
-            | Some(Token::DocumentStart)
-            | Some(Token::Directive(_))
-            | Some(Token::Eof)
-            | None => Node::None,
-            _ => parse_value_with_tokens(&mut stream, directives)?,
-        };
-        pairs.push((key_node, value_node));
-
-        // Skip trailing commas/comments/newlines/indents before next key
-        while matches!(
-            stream.current(),
-            Some(Token::Comma)
-                | Some(Token::Comment(_))
-                | Some(Token::Newline)
-                | Some(Token::Indent(_))
-        ) {
-            stream.next()?;
-        }
-    }
-    Ok(Node::Mapping(pairs))
+    parse_mapping_with_tokens(&mut stream, _indent_level, directives)
 }

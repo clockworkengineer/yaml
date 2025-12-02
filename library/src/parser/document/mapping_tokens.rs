@@ -35,37 +35,45 @@ pub fn parse_mapping_with_tokens(
     // Skip initial whitespace/newlines
     stream.skip_whitespace()?;
 
-    loop {
-        // Check what we're looking at
-        match stream.current() {
-            Some(Token::Newline) => {
-                // Skip empty lines
+    // Track current indentation level
+    let mut current_indent: Option<usize> = None;
+
+    while let Some(token) = stream.current() {
+        match token {
+            Token::Newline | Token::Comment(_) => {
                 stream.next()?;
                 continue;
             }
-            Some(Token::Indent(_level)) => {
-                // Check indentation - consume for now
-                stream.next()?;
-                continue;
+            Token::Indent(level) => {
+                if current_indent.is_none() {
+                    current_indent = Some(*level);
+                    stream.next()?;
+                    continue;
+                } else if let Some(cur) = current_indent {
+                    if *level < cur {
+                        break;
+                    } else if *level > cur {
+                        let nested = parse_mapping_with_tokens(stream, *level, directives)?;
+                        if let Some((last_key, last_value)) = pairs.pop() {
+                            let new_value = match last_value {
+                                Node::None => nested,
+                                _ => last_value,
+                            };
+                            pairs.push((last_key, new_value));
+                        }
+                        continue;
+                    } else {
+                        stream.next()?;
+                        continue;
+                    }
+                }
             }
-            None | Some(Token::Eof) | Some(Token::DocumentEnd) | Some(Token::DocumentStart) => {
-                // End of mapping
-                break;
-            }
-            Some(Token::Dash) => {
-                // Dash means we're in a sequence context, not mapping
-                break;
-            }
-            Some(Token::FlowMappingEnd) | Some(Token::FlowSequenceEnd) => {
-                // End of flow collection
+            Token::Eof | Token::DocumentEnd | Token::DocumentStart | Token::Dash | Token::FlowMappingEnd | Token::FlowSequenceEnd => {
                 break;
             }
             _ => {
-                // Parse a key-value pair
                 let (key, value) = parse_mapping_pair(stream, directives)?;
                 pairs.push((key, value));
-
-                // Skip trailing whitespace
                 stream.skip_whitespace()?;
             }
         }
@@ -118,10 +126,21 @@ fn parse_mapping_pair(
         parse_value_with_tokens(stream, directives)?
     };
 
-    // Skip whitespace after key
-    stream.skip_whitespace()?;
 
-    // Expect colon
+    // Skip whitespace and comments after key
+    loop {
+        stream.skip_whitespace()?;
+        match stream.current() {
+            Some(Token::Comment(_)) => {
+                stream.next()?;
+                continue;
+            }
+            _ => break,
+        }
+    }
+
+
+    // Expect colon, or treat as empty value if next token is a valid key
     match stream.current() {
         Some(Token::Colon) => {
             stream.next()?;
@@ -130,31 +149,41 @@ fn parse_mapping_pair(
             // Explicit key might have colon on next line
             if matches!(stream.current(), Some(Token::Newline)) {
                 stream.next()?;
-                stream.skip_whitespace()?;
+                // Skip whitespace and comments again
+                loop {
+                    stream.skip_whitespace()?;
+                    match stream.current() {
+                        Some(Token::Comment(_)) => {
+                            stream.next()?;
+                            continue;
+                        }
+                        _ => break,
+                    }
+                }
                 if matches!(stream.current(), Some(Token::Colon)) {
                     stream.next()?;
                 } else {
-                    return Err("Expected colon after explicit key".to_string());
+                    // If next token is a valid key, treat as empty value
+                    match stream.current() {
+                        Some(Token::Plain(_)) | Some(Token::Tag(_)) | Some(Token::Anchor(_)) | Some(Token::QuestionMark) => {
+                            return Ok((key, Node::None));
+                        }
+                        _ => {
+                            return Err("Expected colon after explicit key".to_string());
+                        }
+                    }
                 }
             } else {
                 return Err("Expected colon after explicit key".to_string());
             }
         }
-        // Defensive fallback: if we somehow see EOF here, try advancing once
-        // (some lexers may emit Eof sentinel that advances to a real token on next())
         Some(Token::Eof) | None => {
-            if let Some(tok) = stream.next()? {
-                if matches!(tok, Token::Colon) {
-                    // already advanced and consumed colon
-                } else {
-                    return Err(format!(
-                        "Expected colon after key, got after advance: {:?}",
-                        tok
-                    ));
-                }
-            } else {
-                return Err("Expected colon after key, got EOF".to_string());
-            }
+            // Treat EOF or None as valid empty value
+            return Ok((key, Node::None));
+        }
+        // If next token is a valid key, treat as empty value
+        Some(Token::Plain(_)) | Some(Token::Tag(_)) | Some(Token::Anchor(_)) | Some(Token::QuestionMark) => {
+            return Ok((key, Node::None));
         }
         _ => {
             return Err(format!(
@@ -169,6 +198,11 @@ fn parse_mapping_pair(
         Some(Token::Newline) | None | Some(Token::Eof) => {
             // Empty value - don't consume the newline/eof
             Node::None
+        }
+        Some(Token::Indent(level)) => {
+            // Increased indentation: parse nested mapping as value
+            let nested = parse_mapping_with_tokens(stream, *level, directives)?;
+            nested
         }
         _ => {
             // Skip whitespace before value

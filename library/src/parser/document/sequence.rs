@@ -206,13 +206,16 @@ pub(crate) fn parse_sequence(
                 // More indented - likely continuation of previous item or new nested content
                 // Don't try to parse here - this creates loops. Just break and let parent handle it.
                 match source.current() {
-                    Some(_) => {
-                        // Other characters at higher indent - unclear what to do
-                        return Err(format!(
-                            "Expected sequence item starting with CHAR_DASH, got '{}' at indent {}",
-                            source.current().unwrap_or('\0'),
-                            current_indent
-                        ));
+                    Some(c) => {
+                        // If at correct indent and a mapping key, parse mapping as sequence item
+                        if current_indent > indent_level {
+                            use crate::parser::document::mapping::parse_mapping;
+                            let mapping = parse_mapping(source, current_indent, directives)?;
+                            items.push(mapping);
+                            continue;
+                        } else {
+                            break;
+                        }
                     }
                     None => break,
                 }

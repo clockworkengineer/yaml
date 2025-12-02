@@ -217,6 +217,10 @@ fn parse_value_content(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
 ) -> Result<Node, String> {
+    // Skip comments before parsing value
+    while matches!(stream.current(), Some(Token::Comment(_))) {
+        stream.next()?;
+    }
     match stream.current() {
         Some(Token::FlowMappingStart) => {
             use crate::parser::document::inline_tokens::parse_inline_mapping_with_tokens;
@@ -232,17 +236,56 @@ fn parse_value_content(
             parse_scalar(&content, directives)
         }
         Some(Token::Plain(s)) => {
-            let content = s.clone();
+            let mut content = s.clone();
             stream.next()?;
-            parse_scalar(&content, directives)
+            // If the plain token starts with '|', collect all indented lines as block scalar content
+            if content.starts_with('|') || content.starts_with('>') {
+                let mut block_content = String::new();
+                block_content.push_str(content.as_str());
+                // Collect all subsequent indented lines and plain tokens
+                loop {
+                    stream.skip_whitespace_and_comments()?;
+                    match stream.current() {
+                        Some(Token::Indent(_)) => {
+                            stream.next()?;
+                            if let Some(Token::Plain(line)) = stream.current() {
+                                block_content.push('\n');
+                                block_content.push_str(line.as_str());
+                                stream.next()?;
+                            } else if let Some(Token::Newline) = stream.current() {
+                                block_content.push('\n');
+                                stream.next()?;
+                            } else {
+                                break;
+                            }
+                        }
+                        Some(Token::Plain(line)) => {
+                            block_content.push('\n');
+                            block_content.push_str(line.as_str());
+                            stream.next()?;
+                        }
+                        _ => break,
+                    }
+                }
+                let mut node = parse_scalar(&block_content, directives)?;
+                if let Node::Str(_, _, ref mut style) = node {
+                    *style = if content.starts_with('|') { BlockStyle::Literal } else { BlockStyle::Folded };
+                }
+                Ok(node)
+            } else {
+                parse_scalar(&content, directives)
+            }
         }
         Some(Token::Dash) => {
-            // Nested sequence
             use crate::parser::document::sequence_tokens::parse_sequence_with_tokens;
             parse_sequence_with_tokens(stream, 0, directives)
         }
-        Some(Token::Newline) | Some(Token::Indent(_)) => {
-            // Decorator followed by newline = empty value (THIS WORKS NOW!)
+        Some(Token::Indent(level)) => {
+            // Indented value: parse nested mapping
+            use crate::parser::document::mapping_tokens::parse_mapping_with_tokens;
+            parse_mapping_with_tokens(stream, *level, directives)
+        }
+        Some(Token::Newline) => {
             Ok(Node::Str(
                 String::new(),
                 QuoteType::Unquoted,
@@ -250,7 +293,6 @@ fn parse_value_content(
             ))
         }
         Some(Token::Eof) | None => {
-            // Decorator at EOF = empty value (THIS WORKS NOW!)
             Ok(Node::Str(
                 String::new(),
                 QuoteType::Unquoted,
@@ -258,14 +300,11 @@ fn parse_value_content(
             ))
         }
         Some(Token::Alias(name)) => {
-            // Alias reference - consume and return
             let alias_name = name.clone();
             stream.next()?;
             Ok(Node::Alias(alias_name))
         }
         Some(Token::Colon) => {
-            // Decorator followed by colon = empty value used as mapping key
-            // Don't consume the colon - let the mapping parser handle it
             Ok(Node::Str(
                 String::new(),
                 QuoteType::Unquoted,
