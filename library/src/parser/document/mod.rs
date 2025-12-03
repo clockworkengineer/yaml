@@ -335,8 +335,10 @@ pub fn parse_document_contents(
                 } else if matches!(source.current(), Some('|') | Some('>')) {
                     let is_folded = source.current() == Some('>');
 
-                    // Use the consolidated block scalar parser
-                    let content = block_scalar::parse_block_scalar(source, is_folded)?;
+                    // Use the consolidated block scalar parser with a token stream
+                    let mut stream =
+                        crate::parser::token_stream::TokenStream::new(source, directives)?;
+                    let content = block_scalar::parse_block_scalar(&mut stream, is_folded)?;
 
                     let mut escaped_key = content;
                     escaped_key.push_str("\\n");
