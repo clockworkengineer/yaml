@@ -1,71 +1,64 @@
 //! Helper functions for parsing explicit mapping keys (? indicator)
 
-use crate::io::traits::ISource;
+use crate::parser::token_stream::TokenStream;
+use crate::parser::lexer::Token;
 use crate::nodes::node::Node;
 use crate::parser::document::error_builder::syntax_error;
 
-/// Checks if the current position starts an explicit key (?)
+/// Checks if the current token starts an explicit key (Token::QuestionMark)
 #[allow(dead_code)]
-pub(crate) fn is_explicit_key_start(source: &mut dyn ISource) -> bool {
-    source.current() == Some('?')
+pub(crate) fn is_explicit_key_start(stream: &mut TokenStream) -> bool {
+    matches!(stream.current(), Some(Token::QuestionMark))
 }
 
-/// Parses an explicit mapping key-value pair
-///
-/// Format: ? key\n  : value
-/// The ? must be at the start of a line
+/// Parses an explicit mapping key-value pair using tokens
 /// Returns (key_node, value_node)
 #[allow(dead_code)]
 pub(crate) fn parse_explicit_mapping_entry(
-    source: &mut dyn ISource,
-    indent_level: usize,
+    stream: &mut TokenStream,
     directives: &crate::parser::directives::DirectiveContext,
 ) -> Result<(Node, Node), String> {
-    // Skip the '?' indicator
-    if source.current() != Some('?') {
-        return Err(syntax_error(source, "Expected '?' for explicit key"));
+    // Check for explicit key indicator
+    if !is_explicit_key_start(stream) {
+        return Err("Expected '?' token for explicit key".to_string());
     }
-    source.next();
+    stream.next()?;
+    stream.skip_whitespace()?;
 
-    // Skip whitespace after ?
-    crate::parser::document::helpers::skip_whitespace(source);
-
-    // Parse the key
-    let key_node = if source.current() == Some('\n') {
-        // Empty explicit key
-        source.next();
-        crate::parser::document::helpers::skip_whitespace(source);
-        let key_indent = source.get_current_indent_level();
-        crate::parser::document::parse_document_contents(source, key_indent, directives)?
-    } else {
-        // Key on same line as ?
-        crate::parser::document::parse_value(source, directives)?
+    // Parse the key (may be empty)
+    let key_node = match stream.current() {
+        Some(Token::Newline) => {
+            stream.next()?;
+            stream.skip_whitespace()?;
+            // Parse document contents as key (empty explicit key)
+            crate::parser::document::tokens::value::parse_value_with_tokens(stream, directives)?
+        }
+        _ => {
+            crate::parser::document::tokens::value::parse_value_with_tokens(stream, directives)?
+        }
     };
 
-    // Look for the : indicator
-    crate::parser::document::helpers::skip_whitespace(source);
+    // Skip whitespace/comments after key
+    stream.skip_whitespace()?;
 
-    let value_node = if source.current() == Some(':') {
-        source.next();
-        crate::parser::document::helpers::skip_whitespace(source);
-
-        if source.current() == Some('\n') {
-            // Value on next line
-            source.next();
-            crate::parser::document::helpers::skip_whitespace(source);
-            let value_indent = source.get_current_indent_level();
-            if value_indent > indent_level {
-                crate::parser::document::parse_document_contents(source, value_indent, directives)?
-            } else {
-                Node::None
+    // Look for the colon indicator
+    let value_node = match stream.current() {
+        Some(Token::Colon) => {
+            stream.next()?;
+            stream.skip_whitespace()?;
+            match stream.current() {
+                Some(Token::Newline) => {
+                    stream.next()?;
+                    stream.skip_whitespace()?;
+                    crate::parser::document::tokens::value::parse_value_with_tokens(stream, directives)?
+                }
+                _ => {
+                    crate::parser::document::tokens::value::parse_value_with_tokens(stream, directives)?
+                }
             }
-        } else {
-            // Value on same line
-            crate::parser::document::parse_value(source, directives)?
         }
-    } else {
         // No value indicator, key only
-        Node::None
+        _ => Node::None,
     };
 
     Ok((key_node, value_node))
