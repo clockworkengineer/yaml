@@ -233,7 +233,7 @@ fn parse_value_content(
         Some(Token::SingleQuoted(s)) | Some(Token::DoubleQuoted(s)) => {
             let content = s.clone();
             stream.next()?;
-            parse_scalar(&content, directives)
+            crate::parser::document::scalar::parse_scalar_with_tokens(stream, directives)
         }
         Some(Token::Plain(s)) => {
             let mut content = s.clone();

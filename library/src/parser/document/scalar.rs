@@ -1,3 +1,29 @@
+use crate::parser::token_stream::TokenStream;
+use crate::parser::lexer::Token;
+
+/// Parses a scalar value from tokens (TokenStream)
+pub(crate) fn parse_scalar_with_tokens(
+    stream: &mut TokenStream,
+    directives: &DirectiveContext,
+) -> Result<Node, String> {
+    match stream.current() {
+        Some(Token::SingleQuoted(s)) => {
+            stream.next()?;
+            Ok(Node::Str(s.clone(), QuoteType::Single, BlockStyle::None))
+        }
+        Some(Token::DoubleQuoted(s)) => {
+            stream.next()?;
+            let unescaped = crate::utils::unescape_double_quoted(s);
+            Ok(Node::Str(unescaped, QuoteType::Double, BlockStyle::None))
+        }
+        Some(Token::Plain(s)) => {
+            stream.next()?;
+            // Use legacy parse_scalar for type detection (null, bool, number, etc.)
+            parse_scalar(s, directives)
+        }
+        _ => Err("Expected a scalar token".to_string()),
+    }
+}
 //! Module: parser/document/scalar.rs
 
 use crate::nodes::node::Node;
