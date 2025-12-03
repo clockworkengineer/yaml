@@ -269,7 +269,11 @@ fn parse_value_content(
                 }
                 let mut node = parse_scalar(&block_content, directives)?;
                 if let Node::Str(_, _, ref mut style) = node {
-                    *style = if content.starts_with('|') { BlockStyle::Literal } else { BlockStyle::Folded };
+                    *style = if content.starts_with('|') {
+                        BlockStyle::Literal
+                    } else {
+                        BlockStyle::Folded
+                    };
                 }
                 Ok(node)
             } else {
@@ -285,32 +289,26 @@ fn parse_value_content(
             use crate::parser::document::mapping_tokens::parse_mapping_with_tokens;
             parse_mapping_with_tokens(stream, *level, directives)
         }
-        Some(Token::Newline) => {
-            Ok(Node::Str(
-                String::new(),
-                QuoteType::Unquoted,
-                BlockStyle::None,
-            ))
-        }
-        Some(Token::Eof) | None => {
-            Ok(Node::Str(
-                String::new(),
-                QuoteType::Unquoted,
-                BlockStyle::None,
-            ))
-        }
+        Some(Token::Newline) => Ok(Node::Str(
+            String::new(),
+            QuoteType::Unquoted,
+            BlockStyle::None,
+        )),
+        Some(Token::Eof) | None => Ok(Node::Str(
+            String::new(),
+            QuoteType::Unquoted,
+            BlockStyle::None,
+        )),
         Some(Token::Alias(name)) => {
             let alias_name = name.clone();
             stream.next()?;
             Ok(Node::Alias(alias_name))
         }
-        Some(Token::Colon) => {
-            Ok(Node::Str(
-                String::new(),
-                QuoteType::Unquoted,
-                BlockStyle::None,
-            ))
-        }
+        Some(Token::Colon) => Ok(Node::Str(
+            String::new(),
+            QuoteType::Unquoted,
+            BlockStyle::None,
+        )),
         Some(token) => {
             let token_str = format!("Unexpected token in value: {:?}", token);
             Err(syntax_error(stream.source_mut(), &token_str))

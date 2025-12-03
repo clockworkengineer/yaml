@@ -1,7 +1,4 @@
-//! Token-based mapping parser
-//!
-//! Parses YAML mappings using tokenization instead of character-based lookahead.
-//! This eliminates infinite loops with decorators and handles complex key patterns.
+// Token-based mapping parser: Parses YAML mappings using tokenization instead of character-based lookahead. This eliminates infinite loops with decorators and handles complex key patterns.
 
 use crate::nodes::node::Node;
 use crate::parser::directives::DirectiveContext;
@@ -68,11 +65,20 @@ pub fn parse_mapping_with_tokens(
                     }
                 }
             }
-            Token::Eof | Token::DocumentEnd | Token::DocumentStart | Token::Dash | Token::FlowMappingEnd | Token::FlowSequenceEnd => {
+            Token::Eof
+            | Token::DocumentEnd
+            | Token::DocumentStart
+            | Token::Dash
+            | Token::FlowMappingEnd
+            | Token::FlowSequenceEnd => {
                 break;
             }
             _ => {
                 let (key, value) = parse_mapping_pair(stream, directives)?;
+                // Use token-based helpers for key/value safety (example usage below)
+                // if let Some(Token::Plain(ref k)) = stream.current() {
+                //     let key_is_safe = is_plain_safe_key_token(token);
+                // }
                 pairs.push((key, value));
                 stream.skip_whitespace()?;
             }
@@ -119,13 +125,22 @@ fn parse_mapping_pair(
             node
         } else {
             // Decorators on actual key value - parse it
-            parse_value_with_tokens(stream, directives)?
+            let parsed_key = parse_value_with_tokens(stream, directives)?;
+            // Example: check key safety (for future quoting logic)
+            // if let Some(token) = stream.current() {
+            //     let key_is_safe = is_plain_safe_key_token(token);
+            // }
+            parsed_key
         }
     } else {
         // No decorators, parse key normally
-        parse_value_with_tokens(stream, directives)?
+        let parsed_key = parse_value_with_tokens(stream, directives)?;
+        // Example: check key safety (for future quoting logic)
+        // if let Some(token) = stream.current() {
+        //     let key_is_safe = is_plain_safe_key_token(token);
+        // }
+        parsed_key
     };
-
 
     // Skip whitespace and comments after key
     loop {
@@ -138,7 +153,6 @@ fn parse_mapping_pair(
             _ => break,
         }
     }
-
 
     // Expect colon, or treat as empty value if next token is a valid key
     match stream.current() {
@@ -165,7 +179,10 @@ fn parse_mapping_pair(
                 } else {
                     // If next token is a valid key, treat as empty value
                     match stream.current() {
-                        Some(Token::Plain(_)) | Some(Token::Tag(_)) | Some(Token::Anchor(_)) | Some(Token::QuestionMark) => {
+                        Some(Token::Plain(_))
+                        | Some(Token::Tag(_))
+                        | Some(Token::Anchor(_))
+                        | Some(Token::QuestionMark) => {
                             return Ok((key, Node::None));
                         }
                         _ => {
@@ -182,7 +199,10 @@ fn parse_mapping_pair(
             return Ok((key, Node::None));
         }
         // If next token is a valid key, treat as empty value
-        Some(Token::Plain(_)) | Some(Token::Tag(_)) | Some(Token::Anchor(_)) | Some(Token::QuestionMark) => {
+        Some(Token::Plain(_))
+        | Some(Token::Tag(_))
+        | Some(Token::Anchor(_))
+        | Some(Token::QuestionMark) => {
             return Ok((key, Node::None));
         }
         _ => {

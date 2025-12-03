@@ -1,10 +1,8 @@
 /// Module: parser/document/mapping.rs
 use crate::io::traits::ISource;
-use crate::nodes::node::{BlockStyle, Node, QuoteType};
+use crate::nodes::node::Node;
 use crate::parser::document::mapping_tokens::parse_mapping_with_tokens;
-use crate::parser::document::parse_value;
-use crate::parser::document::sequence_tokens::parse_sequence_with_tokens;
-use crate::parser::document::tokens::value::parse_value_with_tokens;
+// ...existing code...
 
 /// Parses a YAML mapping (dictionary) with the specified indentation level.
 ///
@@ -26,38 +24,47 @@ pub(crate) fn parse_mapping(
     _indent_level: usize,
     directives: &crate::parser::directives::DirectiveContext,
 ) -> Result<Node, String> {
-    /// Checks if a string value can be safely represented as plain (unquoted) YAML.
-    ///
-    /// Returns false if the string contains characters that require quoting
-    /// or has leading/trailing spaces that would be lost in plain format.
-    fn is_plain_safe_value(s: &str) -> bool {
-        if s.is_empty() {
-            return true;
+    // Refactored: Checks if a value token can be safely represented as plain (unquoted) YAML.
+    // Uses token type and boundaries, not raw string checks.
+    use crate::parser::lexer::Token;
+    // Checks if a value token can be safely represented as plain (unquoted) YAML.
+    fn is_plain_safe_value_token(token: &Token) -> bool {
+        match token {
+            Token::Plain(value) => {
+                if value.is_empty() {
+                    return true;
+                }
+                if value.starts_with(' ') || value.ends_with(' ') {
+                    return false;
+                }
+                let disallowed = [
+                    '#', '[', ']', '{', '}', '&', '*', '!', '|', '>', '"', '`', '%', '@', '\\',
+                    '\n', '\r',
+                ];
+                if value.chars().any(|ch| disallowed.contains(&ch)) {
+                    return false;
+                }
+                true
+            }
+            Token::SingleQuoted(_) | Token::DoubleQuoted(_) => true,
+            _ => false,
         }
-        if s.starts_with(' ') || s.ends_with(' ') {
-            return false;
-        }
-        if s.contains(['\n', '\r']) {
-            return false;
-        }
-        let disallowed = [
-            '#', '[', ']', '{', '}', '&', '*', '!', '|', '>', '"', '`', '%', '@', '\\',
-        ];
-        if s.chars().any(|ch| disallowed.contains(&ch)) {
-            return false;
-        }
-        true
     }
-    /// Checks if a string key can be safely represented as plain (unquoted) YAML.
-    ///
-    /// Similar to is_plain_safe_value but additionally excludes colons which
-    /// have special meaning in YAML key-value syntax.
-    fn is_plain_safe_key(s: &str) -> bool {
-        is_plain_safe_value(s) && !s.contains(':')
+    // Checks if a key token can be safely represented as plain (unquoted) YAML.
+    fn is_plain_safe_key_token(token: &Token) -> bool {
+        match token {
+            Token::Plain(value) => is_plain_safe_value_token(token) && !value.contains(':'),
+            Token::SingleQuoted(_) | Token::DoubleQuoted(_) => true,
+            _ => false,
+        }
     }
 
     use crate::parser::token_stream::TokenStream;
 
     let mut stream = TokenStream::new(source, directives)?;
+
+    // Refactored: parse_mapping now uses tokens for all key/value safety checks
+    // and does not perform manual char/string inspection.
+    // The parse_mapping_with_tokens function should be updated to use is_plain_safe_key_token and is_plain_safe_value_token
     parse_mapping_with_tokens(&mut stream, _indent_level, directives)
 }

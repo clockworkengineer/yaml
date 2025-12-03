@@ -22,4 +22,4 @@ pub const CHAR_TAB: char = '\t';
 
 pub const STR_EOF: &str = "<EOF>";
 pub const STR_LITERAL_BLOCK: &str = "|";
-pub const STR_FOLDED_BLOCK: &str = ">";
+// ...existing code...
