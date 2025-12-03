@@ -21,59 +21,12 @@ pub(crate) fn parse_sequence(
     indent_level: usize,
     directives: &crate::parser::directives::DirectiveContext,
 ) -> Result<crate::nodes::node::Node, String> {
-    let mut items = Vec::new();
     let mut stream = TokenStream::new(source, directives)?;
-
-    while let Some(token) = stream.current() {
-        match token {
-            crate::parser::lexer::Token::Newline | crate::parser::lexer::Token::Comment(_) => {
-                stream.next()?;
-                continue;
-            }
-            crate::parser::lexer::Token::Indent(level) => {
-                if *level < indent_level {
-                    break;
-                }
-                stream.next()?;
-                continue;
-            }
-            crate::parser::lexer::Token::Dash => {
-                stream.next()?;
-                stream.skip_whitespace()?;
-                match stream.current() {
-                    Some(crate::parser::lexer::Token::Dash) => {
-                        // Use the same token stream for recursion
-                        let nested =
-                            parse_sequence_inner(&mut stream, indent_level + 1, directives)?;
-                        items.push(nested);
-                        continue;
-                    }
-                    Some(crate::parser::lexer::Token::FlowSequenceStart)
-                    | Some(crate::parser::lexer::Token::FlowMappingStart) => {
-                        use crate::parser::document::tokens::value::parse_value_with_tokens;
-                        let value = parse_value_with_tokens(&mut stream, directives)?;
-                        items.push(value);
-                        continue;
-                    }
-                    _ => {
-                        use crate::parser::document::tokens::value::parse_value_with_tokens;
-                        let value = parse_value_with_tokens(&mut stream, directives)?;
-                        items.push(value);
-                        continue;
-                    }
-                }
-            }
-            crate::parser::lexer::Token::Eof
-            | crate::parser::lexer::Token::DocumentEnd
-            | crate::parser::lexer::Token::DocumentStart => {
-                break;
-            }
-            _ => {
-                stream.next()?;
-            }
-        }
-    }
-    Ok(crate::nodes::node::Node::Array(items))
+    crate::parser::document::sequence_tokens::parse_sequence_with_tokens(
+        &mut stream,
+        indent_level,
+        directives,
+    )
 }
 
 // Helper for nested sequence parsing to avoid double mutable borrow

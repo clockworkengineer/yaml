@@ -1,3 +1,11 @@
+/// Parse a single key-value mapping pair (for sequence items)
+pub fn parse_single_mapping_pair_with_tokens(
+    stream: &mut TokenStream,
+    directives: &DirectiveContext,
+) -> Result<Node, String> {
+    let (key, value) = parse_mapping_pair(stream, directives)?;
+    Ok(Node::Mapping(vec![(key, value)]))
+}
 // Token-based mapping parser: Parses YAML mappings using tokenization instead of character-based lookahead. This eliminates infinite loops with decorators and handles complex key patterns.
 
 use crate::nodes::node::Node;
@@ -28,6 +36,7 @@ pub fn parse_mapping_with_tokens(
     directives: &DirectiveContext,
 ) -> Result<Node, String> {
     let mut pairs = Vec::new();
+    // ...existing code...
 
     // Skip initial whitespace/newlines
     stream.skip_whitespace()?;
@@ -85,6 +94,10 @@ pub fn parse_mapping_with_tokens(
         }
     }
 
+    println!(
+        "DEBUG: mapping_tokens: Finished mapping parser, node = {:?}",
+        pairs
+    );
     Ok(Node::Mapping(pairs))
 }
 
@@ -94,6 +107,10 @@ fn parse_mapping_pair(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
 ) -> Result<(Node, Node), String> {
+    println!(
+        "DEBUG: mapping_pair: Starting at token = {:?}",
+        stream.current()
+    );
     // Check for explicit key indicator (?)
     // Lexer emits a dedicated token for '?', not a plain scalar
     let explicit_key = if matches!(stream.current(), Some(Token::QuestionMark)) {
@@ -126,19 +143,16 @@ fn parse_mapping_pair(
         } else {
             // Decorators on actual key value - parse it
             let parsed_key = parse_value_with_tokens(stream, directives)?;
-            // Example: check key safety (for future quoting logic)
-            // if let Some(token) = stream.current() {
-            //     let key_is_safe = is_plain_safe_key_token(token);
-            // }
+            println!(
+                "DEBUG: mapping_pair: Parsed decorated key = {:?}",
+                parsed_key
+            );
             parsed_key
         }
     } else {
         // No decorators, parse key normally
         let parsed_key = parse_value_with_tokens(stream, directives)?;
-        // Example: check key safety (for future quoting logic)
-        // if let Some(token) = stream.current() {
-        //     let key_is_safe = is_plain_safe_key_token(token);
-        // }
+        println!("DEBUG: mapping_pair: Parsed key = {:?}", parsed_key);
         parsed_key
     };
 
@@ -154,6 +168,10 @@ fn parse_mapping_pair(
         }
     }
 
+    println!(
+        "DEBUG: mapping_pair: After key, token = {:?}",
+        stream.current()
+    );
     // Expect colon, or treat as empty value if next token is a valid key
     match stream.current() {
         Some(Token::Colon) => {
@@ -213,6 +231,10 @@ fn parse_mapping_pair(
         }
     }
 
+    println!(
+        "DEBUG: mapping_pair: Before value, token = {:?}",
+        stream.current()
+    );
     // Parse the value - check for empty value BEFORE skipping whitespace
     let value = match stream.current() {
         Some(Token::Newline) | None | Some(Token::Eof) => {
@@ -228,10 +250,16 @@ fn parse_mapping_pair(
             // Skip whitespace before value
             stream.skip_whitespace()?;
             // Parse the actual value
-            parse_value_with_tokens(stream, directives)?
+            let v = parse_value_with_tokens(stream, directives)?;
+            println!("DEBUG: mapping_pair: Parsed value = {:?}", v);
+            v
         }
     };
 
+    println!(
+        "DEBUG: mapping_pair: Returning pair = ({:?}, {:?})",
+        key, value
+    );
     Ok((key, value))
 }
 

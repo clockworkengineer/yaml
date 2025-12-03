@@ -54,6 +54,7 @@ pub fn parse_sequence_with_tokens(
                 stream.skip_whitespace()?;
 
                 // Check what follows the dash
+                // ...existing code...
                 match stream.current() {
                     Some(Token::Newline) | None => {
                         // Empty item (dash followed by newline or EOF)
@@ -67,8 +68,8 @@ pub fn parse_sequence_with_tokens(
                         items.push(Node::None);
                         // Don't consume - let next iteration handle it
                     }
-                    Some(Token::Indent(_)) | Some(Token::Plain(_)) => {
-                        // Mapping after dash: parse as mapping
+                    Some(Token::Indent(_)) => {
+                        // Indented block after dash: always parse as mapping
                         use crate::parser::document::mapping_tokens::parse_mapping_with_tokens;
                         let indent = match stream.current() {
                             Some(Token::Indent(level)) => *level,
@@ -86,6 +87,56 @@ pub fn parse_sequence_with_tokens(
                                     break;
                                 }
                                 _ => break,
+                            }
+                        }
+                    }
+                    Some(Token::Plain(_)) => {
+                        // Check for mapping pattern: plain token followed by colon
+                        // Skip whitespace/comments after dash
+                        stream.skip_whitespace_and_comments()?;
+                        let mut is_colon = false;
+                        if let Some(Token::Plain(_)) = stream.current() {
+                            // Peek ahead for colon without advancing
+                            if let Some(Token::Colon) = stream.peek()? {
+                                is_colon = true;
+                            }
+                        }
+
+                        if is_colon {
+                            use crate::parser::document::mapping_tokens::parse_mapping_with_tokens;
+                            let indent = base_indent;
+                            let mapping = parse_mapping_with_tokens(stream, indent, directives)?;
+                            items.push(mapping);
+                            // Skip trailing whitespace/newlines until we see next dash or end
+                            loop {
+                                match stream.current() {
+                                    Some(Token::Newline) => {
+                                        stream.next()?;
+                                    }
+                                    Some(Token::Indent(_)) | Some(Token::Dash) | None => {
+                                        break;
+                                    }
+                                    _ => break,
+                                }
+                            }
+                        } else {
+                            println!(
+                                "DEBUG: sequence_tokens: Parsing value after dash (not mapping)"
+                            );
+                            let value = parse_value_with_tokens(stream, directives)?;
+                            println!("DEBUG: sequence_tokens: value node = {:?}", value);
+                            items.push(value);
+                            // Skip trailing whitespace/newlines until we see next dash or end
+                            loop {
+                                match stream.current() {
+                                    Some(Token::Newline) => {
+                                        stream.next()?;
+                                    }
+                                    Some(Token::Indent(_)) | Some(Token::Dash) | None => {
+                                        break;
+                                    }
+                                    _ => break,
+                                }
                             }
                         }
                     }
