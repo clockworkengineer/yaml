@@ -71,7 +71,7 @@ use crate::error::messages::*;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::parser::document::helpers::{
-    parse_error, skip_whitespace_no_tabs,
+    parse_error,
 };
 // ...existing code...
 use crate::parser::document::value::parse_value;
@@ -287,7 +287,7 @@ fn parse_inline_mapping_with_colons(
 
         let key_node = parse_value(source, directives)?;
 
-        skip_whitespace_no_tabs(source)?;
+        skip_whitespace_and_comments_validate_tabs(source)?;
 
         let value_node = parse_value(source, directives)?;
 

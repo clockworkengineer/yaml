@@ -142,56 +142,10 @@ pub(crate) fn skip_whitespace_with_context(
     Ok(())
 }
 
-/// Skips whitespace but returns an error if tabs are found as line indentation.
+/// Backward-compatible wrapper that validates no tabs are used for indentation in block context.
 ///
-/// **DEPRECATED**: Use `skip_whitespace_with_context()` with proper ParsingContext instead.
-/// This function is kept for backward compatibility during refactoring.
-///
-/// Handles newlines and tracks whether tabs appear after them (which would be indentation).
-/// Per YAML 1.2 spec, tabs cannot be used for indentation.
-/// Note: This function assumes it may be called after a newline has already been consumed,
-/// so it starts by assuming we're at the beginning of a line and validates from there.
-pub(crate) fn skip_whitespace_no_tabs(source: &mut dyn ISource) -> Result<(), String> {
-    let mut found_tab_after_newline = false;
-    let mut after_newline = true; // Assume we start after a newline (caller consumed it)
-
-    while let Some(c) = source.current() {
-        if c == '\n' || c == '\r' {
-            // Consume newline and mark that we're at line start
-            source.next();
-            after_newline = true;
-            found_tab_after_newline = false; // Reset for new line
-        } else if c == '\t' {
-            if after_newline {
-                // Tab after newline = indentation = forbidden
-                found_tab_after_newline = true;
-            }
-            source.next();
-        } else if c == ' ' {
-            source.next();
-        } else {
-            // Found actual non-whitespace content
-            if found_tab_after_newline {
-                // Tabs were used as indentation - error
-                return Err(indentation_error(
-                    source,
-                    "Tabs are not allowed as indentation in YAML",
-                ));
-            }
-            break;
-        }
-    }
-    Ok(())
-}
-
-/// Validate that there are no tabs in the leading whitespace at line start.
-///
-/// **DEPRECATED**: Use `validate_indentation()` with proper ParsingContext instead.
-/// This function is kept for backward compatibility during refactoring.
-///
-/// This should be called after processing a newline, before any content
+/// Assumes the current position is at an indentation point (start of a new line) in block context.
 pub(crate) fn validate_no_tab_indentation(source: &mut dyn ISource) -> Result<(), String> {
-    // Create a temporary context for validation (assumes block context after newline)
     let mut ctx = ParsingContext::new(source.get_current_indent_level());
     ctx.mark_newline_consumed();
     validate_indentation(source, &ctx)
