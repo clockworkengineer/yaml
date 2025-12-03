@@ -1,11 +1,14 @@
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
+// Recursion guard removed
 
 /// Parses a scalar value from tokens (TokenStream)
 pub(crate) fn parse_scalar_with_tokens(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
+    _depth: usize,
 ) -> Result<Node, String> {
+    // Recursion guard removed
     // Clone the current token to avoid holding an immutable borrow while advancing the stream.
     let current = stream.current().cloned();
     match current {
@@ -25,7 +28,7 @@ pub(crate) fn parse_scalar_with_tokens(
                 stream.next()?;
                 let mut block_content = String::new();
                 block_content.push_str(s.as_str());
-                // Collect all subsequent indented lines and plain tokens
+                // Iteratively collect all subsequent indented lines and plain tokens
                 loop {
                     stream.skip_whitespace_and_comments()?;
                     match stream.current() {
@@ -50,16 +53,13 @@ pub(crate) fn parse_scalar_with_tokens(
                         _ => break,
                     }
                 }
-                // Use legacy parse_scalar for block scalar folding/chomping
-                let mut node = parse_scalar(&block_content, directives)?;
-                if let Node::Str(_, _, ref mut style) = node {
-                    *style = if indicator == '|' {
-                        BlockStyle::Literal
-                    } else {
-                        BlockStyle::Folded
-                    };
-                }
-                Ok(node)
+                // Directly construct the Node for block scalar (no recursion)
+                let style = if indicator == '|' {
+                    BlockStyle::Literal
+                } else {
+                    BlockStyle::Folded
+                };
+                Ok(Node::Str(block_content, QuoteType::Unquoted, style))
             } else {
                 stream.next()?;
                 parse_scalar(&s, directives)
@@ -93,6 +93,7 @@ use crate::parser::directives::DirectiveContext;
 /// # Returns
 ///
 /// A Node representing the parsed scalar value
+#[deprecated(note = "Use parse_scalar_with_tokens instead")]
 pub(crate) fn parse_scalar(value: &str, directives: &DirectiveContext) -> Result<Node, String> {
     match value {
         v if v.starts_with('#') => Ok(Node::Str(
