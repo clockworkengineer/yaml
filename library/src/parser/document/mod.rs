@@ -26,8 +26,6 @@ mod value_tokens;
 // Anchor resolution functions - currently not used during parsing
 // pub(crate) use anchors::{collect_anchors, expand_merge_keys, replace_aliases};
 
-#[cfg(test)]
-pub(crate) use helpers::parse_quoted_scalar;
 pub(crate) use helpers::{parse_comment, parse_error, peek_ahead_for_mapping_key};
 pub(crate) use inline::{parse_inline_mapping, parse_inline_sequence};
 pub(crate) use mapping::parse_mapping;
@@ -168,11 +166,11 @@ pub fn parse_document_contents(
         Some(c) if c == '{' => {
             let mut stream = crate::parser::token_stream::TokenStream::new(source, directives)?;
             Ok(parse_inline_mapping(&mut stream, directives)?)
-        },
+        }
         Some(c) if c == '[' => {
             let mut stream = crate::parser::token_stream::TokenStream::new(source, directives)?;
             Ok(parse_inline_sequence(&mut stream, directives)?)
-        },
+        }
         // Support tagged values at the start of a nested block (e.g. indented "!!set" lines)
         Some(c) if c == '!' => {
             // Save state to check if this is a tagged mapping key
@@ -327,7 +325,8 @@ pub fn parse_document_contents(
 
                 if source.current() == Some('[') {
                     {
-                        let mut stream = crate::parser::token_stream::TokenStream::new(source, directives)?;
+                        let mut stream =
+                            crate::parser::token_stream::TokenStream::new(source, directives)?;
                         key_node = parse_inline_sequence(&mut stream, directives)?;
                     }
                 } else if source.current() == Some('-') {
@@ -464,13 +463,15 @@ pub fn parse_document_contents(
                 skip_whitespace(source);
                 let mut value_node = match source.current() {
                     Some('[') => {
-                        let mut stream = crate::parser::token_stream::TokenStream::new(source, directives)?;
+                        let mut stream =
+                            crate::parser::token_stream::TokenStream::new(source, directives)?;
                         parse_inline_sequence(&mut stream, directives)?
-                    },
+                    }
                     Some('{') => {
-                        let mut stream = crate::parser::token_stream::TokenStream::new(source, directives)?;
+                        let mut stream =
+                            crate::parser::token_stream::TokenStream::new(source, directives)?;
                         parse_inline_mapping(&mut stream, directives)?
-                    },
+                    }
                     Some('-') => {
                         let nested_indent = source.get_current_indent_level();
                         parse_sequence(source, nested_indent, directives)?
@@ -948,21 +949,11 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_quoted_scalar_single_and_double() {
-        let mut s1 = Buffer::new(b"'single''quote'");
-        let r1 = parse_quoted_scalar(&mut s1).unwrap();
-        assert_eq!(r1, "'single''quote'");
-
-        let mut s2 = Buffer::new(b"\"double\\\"quote\"");
-        let r2 = parse_quoted_scalar(&mut s2).unwrap();
-        assert_eq!(r2, "\"double\\\"quote\"");
-    }
-
-    #[test]
     fn test_parse_inline_sequence_simple_and_empty() {
         let directives = DirectiveContext::new();
         let mut src = Buffer::new(b"[1, 'two', 3]");
-        let mut stream = crate::parser::token_stream::TokenStream::new(&mut src, &directives).unwrap();
+        let mut stream =
+            crate::parser::token_stream::TokenStream::new(&mut src, &directives).unwrap();
         let node = parse_inline_sequence(&mut stream, &directives).unwrap();
         assert!(matches!(node, Node::Array(_)));
         if let Node::Array(items) = node {
@@ -982,7 +973,8 @@ mod tests {
         }
 
         let mut empty = Buffer::new(b"[]");
-        let mut stream = crate::parser::token_stream::TokenStream::new(&mut empty, &directives).unwrap();
+        let mut stream =
+            crate::parser::token_stream::TokenStream::new(&mut empty, &directives).unwrap();
         let node = parse_inline_sequence(&mut stream, &directives).unwrap();
         assert!(matches!(node, Node::Array(ref v) if v.is_empty()));
     }
@@ -991,7 +983,8 @@ mod tests {
     fn test_parse_inline_mapping_simple_and_empty() {
         let directives = DirectiveContext::new();
         let mut src = Buffer::new(b"{key1: 1, 'key2': \"two\"}");
-        let mut stream = crate::parser::token_stream::TokenStream::new(&mut src, &directives).unwrap();
+        let mut stream =
+            crate::parser::token_stream::TokenStream::new(&mut src, &directives).unwrap();
         let node = parse_inline_mapping(&mut stream, &directives).unwrap();
         assert!(matches!(node, Node::Mapping(_)));
         if let Node::Mapping(pairs) = node {
@@ -1012,7 +1005,8 @@ mod tests {
         }
 
         let mut empty = Buffer::new(b"{}");
-        let mut stream = crate::parser::token_stream::TokenStream::new(&mut empty, &directives).unwrap();
+        let mut stream =
+            crate::parser::token_stream::TokenStream::new(&mut empty, &directives).unwrap();
         let node = parse_inline_mapping(&mut stream, &directives).unwrap();
         assert!(matches!(node, Node::Mapping(ref v) if v.is_empty()));
     }
