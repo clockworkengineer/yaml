@@ -6,7 +6,7 @@
 use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
 use crate::parser::directives::DirectiveContext;
 use crate::parser::document::error_builder::{structure_error, syntax_error};
-use crate::parser::document::scalar::parse_scalar;
+// ...existing code...
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
 
@@ -231,7 +231,7 @@ fn parse_value_content(
             parse_inline_sequence_with_tokens(stream, directives)
         }
         Some(Token::SingleQuoted(_)) | Some(Token::DoubleQuoted(_)) | Some(Token::Plain(_)) => {
-            crate::parser::document::scalar::parse_scalar_with_tokens(stream, directives)
+            crate::parser::document::scalar::parse_scalar_with_tokens(stream, directives, 0)
         }
         Some(Token::Dash) => {
             use crate::parser::document::sequence_tokens::parse_sequence_with_tokens;
@@ -267,7 +267,7 @@ fn parse_value_content(
             Err(syntax_error(stream.source_mut(), &token_str))
         }
     }
-}
+    }
 
 #[cfg(test)]
 mod tests {
