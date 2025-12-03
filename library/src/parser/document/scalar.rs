@@ -1,30 +1,74 @@
-use crate::parser::token_stream::TokenStream;
 use crate::parser::lexer::Token;
+use crate::parser::token_stream::TokenStream;
 
 /// Parses a scalar value from tokens (TokenStream)
 pub(crate) fn parse_scalar_with_tokens(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
 ) -> Result<Node, String> {
-    match stream.current() {
+    // Clone the current token to avoid holding an immutable borrow while advancing the stream.
+    let current = stream.current().cloned();
+    match current {
         Some(Token::SingleQuoted(s)) => {
             stream.next()?;
-            Ok(Node::Str(s.clone(), QuoteType::Single, BlockStyle::None))
+            Ok(Node::Str(s, QuoteType::Single, BlockStyle::None))
         }
         Some(Token::DoubleQuoted(s)) => {
             stream.next()?;
-            let unescaped = crate::utils::unescape_double_quoted(s);
+            let unescaped = crate::utils::unescape_double_quoted(&s);
             Ok(Node::Str(unescaped, QuoteType::Double, BlockStyle::None))
         }
         Some(Token::Plain(s)) => {
-            stream.next()?;
-            // Use legacy parse_scalar for type detection (null, bool, number, etc.)
-            parse_scalar(s, directives)
+            // Block scalar detection: if plain token starts with | or >, collect indented lines
+            if s.starts_with('|') || s.starts_with('>') {
+                let indicator = s.chars().next().unwrap();
+                stream.next()?;
+                let mut block_content = String::new();
+                block_content.push_str(s.as_str());
+                // Collect all subsequent indented lines and plain tokens
+                loop {
+                    stream.skip_whitespace_and_comments()?;
+                    match stream.current() {
+                        Some(Token::Indent(_)) => {
+                            stream.next()?;
+                            if let Some(Token::Plain(line)) = stream.current() {
+                                block_content.push('\n');
+                                block_content.push_str(line.as_str());
+                                stream.next()?;
+                            } else if let Some(Token::Newline) = stream.current() {
+                                block_content.push('\n');
+                                stream.next()?;
+                            } else {
+                                break;
+                            }
+                        }
+                        Some(Token::Plain(line)) => {
+                            block_content.push('\n');
+                            block_content.push_str(line.as_str());
+                            stream.next()?;
+                        }
+                        _ => break,
+                    }
+                }
+                // Use legacy parse_scalar for block scalar folding/chomping
+                let mut node = parse_scalar(&block_content, directives)?;
+                if let Node::Str(_, _, ref mut style) = node {
+                    *style = if indicator == '|' {
+                        BlockStyle::Literal
+                    } else {
+                        BlockStyle::Folded
+                    };
+                }
+                Ok(node)
+            } else {
+                stream.next()?;
+                parse_scalar(&s, directives)
+            }
         }
         _ => Err("Expected a scalar token".to_string()),
     }
 }
-//! Module: parser/document/scalar.rs
+// Module: parser/document/scalar.rs
 
 use crate::nodes::node::Node;
 use crate::nodes::node::{BlockStyle, Numeric, QuoteType};

@@ -230,55 +230,8 @@ fn parse_value_content(
             use crate::parser::document::inline_tokens::parse_inline_sequence_with_tokens;
             parse_inline_sequence_with_tokens(stream, directives)
         }
-        Some(Token::SingleQuoted(s)) | Some(Token::DoubleQuoted(s)) => {
-            let content = s.clone();
-            stream.next()?;
+        Some(Token::SingleQuoted(_)) | Some(Token::DoubleQuoted(_)) | Some(Token::Plain(_)) => {
             crate::parser::document::scalar::parse_scalar_with_tokens(stream, directives)
-        }
-        Some(Token::Plain(s)) => {
-            let mut content = s.clone();
-            stream.next()?;
-            // If the plain token starts with '|', collect all indented lines as block scalar content
-            if content.starts_with('|') || content.starts_with('>') {
-                let mut block_content = String::new();
-                block_content.push_str(content.as_str());
-                // Collect all subsequent indented lines and plain tokens
-                loop {
-                    stream.skip_whitespace_and_comments()?;
-                    match stream.current() {
-                        Some(Token::Indent(_)) => {
-                            stream.next()?;
-                            if let Some(Token::Plain(line)) = stream.current() {
-                                block_content.push('\n');
-                                block_content.push_str(line.as_str());
-                                stream.next()?;
-                            } else if let Some(Token::Newline) = stream.current() {
-                                block_content.push('\n');
-                                stream.next()?;
-                            } else {
-                                break;
-                            }
-                        }
-                        Some(Token::Plain(line)) => {
-                            block_content.push('\n');
-                            block_content.push_str(line.as_str());
-                            stream.next()?;
-                        }
-                        _ => break,
-                    }
-                }
-                let mut node = parse_scalar(&block_content, directives)?;
-                if let Node::Str(_, _, ref mut style) = node {
-                    *style = if content.starts_with('|') {
-                        BlockStyle::Literal
-                    } else {
-                        BlockStyle::Folded
-                    };
-                }
-                Ok(node)
-            } else {
-                parse_scalar(&content, directives)
-            }
         }
         Some(Token::Dash) => {
             use crate::parser::document::sequence_tokens::parse_sequence_with_tokens;
