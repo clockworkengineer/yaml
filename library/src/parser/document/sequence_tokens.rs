@@ -34,6 +34,10 @@ pub fn parse_sequence_with_tokens(
     stream.skip_whitespace()?;
 
     loop {
+        // Skip comments and newlines between sequence items
+        while matches!(stream.current(), Some(Token::Comment(_)) | Some(Token::Newline)) {
+            stream.next()?;
+        }
         // Check for indentation change that would end the sequence
         if let Some(Token::Indent(level)) = stream.current() {
             if *level < base_indent {
@@ -50,11 +54,12 @@ pub fn parse_sequence_with_tokens(
                 // Consume the dash
                 stream.next()?;
 
-                // Skip whitespace after dash
-                stream.skip_whitespace()?;
+                // Skip whitespace and comments after dash
+                while matches!(stream.current(), Some(Token::Comment(_)) | Some(Token::Newline)) {
+                    stream.next()?;
+                }
 
                 // Check what follows the dash
-                // ...existing code...
                 match stream.current() {
                     Some(Token::Newline) | None => {
                         // Empty item (dash followed by newline or EOF)
