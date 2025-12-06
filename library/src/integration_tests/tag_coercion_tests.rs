@@ -20,6 +20,8 @@ mod tests {
                         assert_eq!(s.as_str(), "123");
                         assert_eq!(*qt, QuoteType::Unquoted);
                         return;
+                    } else {
+                        println!("DEBUG: Got node: {:?}", v);
                     }
                 }
             }

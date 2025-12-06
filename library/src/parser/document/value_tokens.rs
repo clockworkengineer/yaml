@@ -199,7 +199,18 @@ pub fn parse_value_with_tokens(
         let mut result = inner;
 
         if let Some(tag) = decorators.tag {
-            if let Some(coerced) = try_coerce_tag(&tag, result.clone()) {
+            if tag == "!!str" || tag == "!str" || tag == "tag:yaml.org,2002:str" {
+                // Always coerce !!str to plain string, never wrap in Tagged
+                let s = match &result {
+                    Node::Str(s, _, _) => s.clone(),
+                    Node::Number(Numeric::Integer(i)) => i.to_string(),
+                    Node::Number(Numeric::Float(f)) => f.to_string(),
+                    Node::Boolean(b) => b.to_string(),
+                    Node::None => String::new(),
+                    _ => format!("{:?}", result),
+                };
+                result = Node::Str(s, QuoteType::Unquoted, BlockStyle::None);
+            } else if let Some(coerced) = try_coerce_tag(&tag, result.clone()) {
                 result = coerced;
             } else {
                 result = Node::Tagged(Box::new(result), tag);

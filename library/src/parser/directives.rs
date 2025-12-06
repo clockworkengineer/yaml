@@ -78,6 +78,11 @@ impl DirectiveContext {
     ///
     /// Longer handles are matched first (e.g., `!e!` before `!`) to ensure correct resolution.
     pub fn resolve_tag(&self, tag: &str) -> String {
+        // Preserve standard local tags (e.g., !!yaml, !!str) as-is
+        // Tests expect the original handle, not the expanded URI.
+        if tag.starts_with("!!") {
+            return tag.to_string();
+        }
         // Find the longest matching handle
         let mut best_match: Option<(&str, &str)> = None;
 

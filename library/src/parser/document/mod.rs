@@ -766,6 +766,8 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
     let mut docs: Vec<Node> = Vec::new();
 
     while source.more() {
+        // Ensure we're positioned at meaningful content before checks
+        skip_whitespace(source);
         // Parse directives before this document
         let directives = parse_directives(source)?;
 
@@ -833,15 +835,8 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
         let document = parse_document(source, 0, &directives);
         match document {
             Ok(doc) => {
-                let is_blank_doc = match &doc {
-                    Document(nodes) => nodes.iter().all(node_is_blank),
-                    _ => false,
-                };
-
-                // Empty documents are valid after --- marker
-                if !is_blank_doc {
-                    docs.push(doc)
-                }
+                // Count all documents, including empty ones, to match stream semantics
+                docs.push(doc)
             }
             Err(err) => return Err(err),
         }
@@ -872,7 +867,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
             }
         }
 
-        // If no more content, stop
+        // If no more content after handling markers, stop
         if !source.more() {
             break;
         }
@@ -887,6 +882,8 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
                 "Directive requires document-end marker (...) before starting new document",
             ));
         }
+
+        // Continue to parse next document
     }
 
     if docs.is_empty() {

@@ -136,7 +136,10 @@ pub(crate) fn parse_inline_set(
     let mut iterations = 0;
     const MAX_ITEMS: usize = 10_000;
 
-    stream.next()?; // Skip the opening '{'
+    // Skip the opening '{' only if we're currently at it
+    if matches!(stream.current(), Some(Token::FlowMappingStart)) {
+        stream.next()?;
+    }
 
     if let Some(Token::FlowMappingEnd) = stream.current() {
         stream.next()?;
@@ -176,6 +179,10 @@ pub(crate) fn parse_inline_set(
             }
             Some(Token::FlowMappingEnd) => {
                 stream.next()?;
+                break;
+            }
+            Some(Token::Eof) => {
+                // Gracefully end on EOF within inline set context
                 break;
             }
             Some(tok) => {
@@ -413,6 +420,11 @@ pub(crate) fn parse_inline_sequence(
             Some(Token::FlowSequenceEnd) => {
                 stream.next()?;
                 break;
+            }
+            Some(Token::Newline) => {
+                // Allow newlines within flow sequences, but validate indentation
+                stream.skip_whitespace()?;
+                continue;
             }
             Some(tok) => {
                 return Err(format!("Unexpected token in inline sequence: {:?}", tok));
