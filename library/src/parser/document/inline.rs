@@ -67,7 +67,10 @@ fn parse_inline_mapping_with_colons_tokens(
 }
 // Check-in: Current version of inline.rs as shown in attachments
 use crate::constants::*;
-use crate::error::messages::*;
+use crate::error::messages::{
+    ERR_EOF_INLINE_MAPPING,
+    ERR_UNEXPECTED_CHAR_INLINE_MAPPING_PREFIX,
+};
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::parser::document::helpers::{
@@ -81,6 +84,7 @@ use crate::parser::document::value::parse_value;
 use crate::utils::skip_whitespace_and_comments_validate_tabs;
 /// Collects a flow scalar from the token stream until a stop predicate is met.
 /// Handles quoted scalars and line folding.
+#[allow(dead_code)]
 pub(crate) fn collect_flow_scalar(
     stream: &mut TokenStream,
     stop_pred: impl Fn(&Token) -> bool,
@@ -211,8 +215,8 @@ pub(crate) fn parse_inline_mapping(
 ) -> Result<Node, String> {
     // Look ahead to see if this is a set (no colons) or a mapping (has colons)
     let mut has_colons = false;
-    let mut depth = 0;
-    let mut iterations = 0;
+    let depth = 0;
+    let iterations = 0;
     const MAX_LOOKAHEAD: usize = 10_000;
 
     stream.next()?; // Skip opening brace
@@ -254,6 +258,7 @@ pub(crate) fn parse_inline_mapping(
     }
 }
 /// Parses an inline YAML mapping with key-value pairs (original implementation).
+#[allow(dead_code)]
 fn parse_inline_mapping_with_colons(
     source: &mut dyn ISource,
     directives: &crate::parser::directives::DirectiveContext,

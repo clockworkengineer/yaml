@@ -657,6 +657,8 @@ pub fn parse_document(
     indent_level: usize,
     directives: &DirectiveContext,
 ) -> Result<Node, String> {
+    #[cfg(feature = "debug-trace")]
+    log::debug!("parse_document: start at indent {}", indent_level);
     skip_whitespace(source);
 
     let mut document_nodes = Vec::new();
@@ -728,6 +730,18 @@ pub fn parse_document(
     // expand_merge_keys(&mut doc_node, &anchors)?;
     // replace_aliases(&mut doc_node, &anchors)?;
 
+    #[cfg(feature = "debug-trace")]
+    {
+        // Safe to compute lightweight stats for debug purposes
+        let node_count = match &doc_node {
+            Document(nodes) => nodes.len(),
+            _ => 0,
+        };
+        log::debug!(
+            "parse_document: completed with {} top-level node(s)",
+            node_count
+        );
+    }
     Ok(doc_node)
 }
 
@@ -747,6 +761,8 @@ pub fn parse_document(
 ///
 /// Result containing a Documents Node with all parsed documents or an error string
 pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
+    #[cfg(feature = "debug-trace")]
+    log::debug!("parse: begin stream");
     let mut docs: Vec<Node> = Vec::new();
 
     while source.more() {
@@ -876,6 +892,8 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
     if docs.is_empty() {
         docs.push(Document(Vec::new()))
     }
+    #[cfg(feature = "debug-trace")]
+    log::debug!("parse: end stream with {} document(s)", docs.len());
     Ok(Node::Documents(docs))
 }
 

@@ -28,6 +28,11 @@ pub fn parse_sequence_with_tokens(
     base_indent: usize,
     directives: &DirectiveContext,
 ) -> Result<Node, String> {
+    #[cfg(feature = "debug-trace")]
+    log::debug!(
+        "sequence_tokens: start parse_sequence_with_tokens at indent {}",
+        base_indent
+    );
     let mut items = Vec::new();
 
     // Skip initial whitespace/newlines but track where we start
@@ -125,11 +130,13 @@ pub fn parse_sequence_with_tokens(
                                 }
                             }
                         } else {
-                            println!(
-                                "DEBUG: sequence_tokens: Parsing value after dash (not mapping)"
+                            #[cfg(feature = "debug-trace")]
+                            log::debug!(
+                                "sequence_tokens: Parsing value after dash (not mapping)"
                             );
                             let value = parse_value_with_tokens(stream, directives)?;
-                            println!("DEBUG: sequence_tokens: value node = {:?}", value);
+                            #[cfg(feature = "debug-trace")]
+                            log::debug!("sequence_tokens: parsed value node = {:?}", value);
                             items.push(value);
                             // Skip trailing whitespace/newlines until we see next dash or end
                             loop {
@@ -180,6 +187,11 @@ pub fn parse_sequence_with_tokens(
         }
     }
 
+    #[cfg(feature = "debug-trace")]
+    log::debug!(
+        "sequence_tokens: end parse_sequence_with_tokens with {} item(s)",
+        items.len()
+    );
     Ok(Node::Array(items))
 }
 

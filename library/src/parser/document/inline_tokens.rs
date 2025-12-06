@@ -23,6 +23,8 @@ pub fn parse_inline_sequence_with_tokens(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
 ) -> Result<Node, String> {
+    #[cfg(feature = "debug-trace")]
+    log::debug!("inline_tokens: start flow sequence at token = {:?}", stream.current());
     // Expect opening bracket
     stream.expect(Token::FlowSequenceStart)?;
 
@@ -67,12 +69,18 @@ pub fn parse_inline_sequence_with_tokens(
 
                 // Parse the value
                 let value = parse_value_with_tokens(stream, directives)?;
+                #[cfg(feature = "debug-trace")]
+                log::debug!("inline_tokens: seq item -> {:?}", value);
                 items.push(value);
                 expect_item = false;
             }
         }
     }
-
+    #[cfg(feature = "debug-trace")]
+    log::debug!(
+        "inline_tokens: end flow sequence with {} item(s)",
+        items.len()
+    );
     Ok(Node::Array(items))
 }
 
@@ -89,6 +97,8 @@ pub fn parse_inline_mapping_with_tokens(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
 ) -> Result<Node, String> {
+    #[cfg(feature = "debug-trace")]
+    log::debug!("inline_tokens: start flow mapping at token = {:?}", stream.current());
     // Expect opening brace
     stream.expect(Token::FlowMappingStart)?;
 
@@ -151,13 +161,19 @@ pub fn parse_inline_mapping_with_tokens(
 
                 // Parse the value
                 let value = parse_value_with_tokens(stream, directives)?;
+                #[cfg(feature = "debug-trace")]
+                log::debug!("inline_tokens: map entry -> ({:?}, {:?})", key, value);
 
                 pairs.push((key, value));
                 expect_entry = false;
             }
         }
     }
-
+    #[cfg(feature = "debug-trace")]
+    log::debug!(
+        "inline_tokens: end flow mapping with {} pair(s)",
+        pairs.len()
+    );
     Ok(Node::Mapping(pairs))
 }
 

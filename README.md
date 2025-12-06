@@ -273,6 +273,50 @@ cargo test error_handling
 cargo test -- --nocapture
 ```
 
+## 🪵 Debug Logging
+
+Debug logging is opt-in and disabled by default to avoid overhead. Enable it with the `debug-trace` feature and a logger (e.g., `env_logger`).
+
+### Enable in tests (Windows PowerShell)
+
+```powershell
+# Enable logging for this session
+$env:RUST_LOG = 'yaml_lib=debug'
+
+# Promote token-stream internals to debug without global trace
+$env:YAML_TRACE_TOKENS = '1'
+
+# Run tests with logging enabled
+cargo test -p yaml_lib --features debug-trace -- --nocapture
+
+# For very verbose internals, use full trace instead of YAML_TRACE_TOKENS
+# $env:RUST_LOG = 'yaml_lib=trace'
+```
+
+### Enable in binaries/examples
+
+Add a logger init (once) in your `main`:
+
+```rust
+fn main() {
+  // Initialize any `log` compatible logger
+  let _ = env_logger::try_init();
+  // ... your code
+}
+```
+
+Run with the feature and env vars as needed:
+
+```powershell
+$env:RUST_LOG = 'yaml_lib=debug'; $env:YAML_TRACE_TOKENS = '1'
+cargo run --features debug-trace
+```
+
+Notes:
+- `yaml_lib=debug` shows high-level parser decisions; token-stream stays quiet unless `YAML_TRACE_TOKENS` is set.
+- Set `yaml_lib=trace` for maximum verbosity (may be very chatty).
+- Feature-gating ensures zero overhead when `debug-trace` is not enabled.
+
 ## 🔧 Performance
 
 YAML_lib is designed for performance:

@@ -114,6 +114,7 @@ pub fn skip_whitespace_and_comments(source: &mut dyn ISource) {
 /// # Returns
 ///
 /// `Ok(())` if successful, `Err(String)` if tabs found as indentation
+#[allow(dead_code)]
 pub fn skip_whitespace_and_comments_validate_tabs(source: &mut dyn ISource) -> Result<(), String> {
     let mut iterations = 0;
     const MAX_ITERATIONS: usize = 100_000;
@@ -195,6 +196,7 @@ pub fn skip_until_newline(source: &mut dyn ISource) {
 /// # Arguments
 ///
 /// * `source` - A mutable reference to a source implementing ISource trait
+#[allow(dead_code)]
 pub fn consume_inline_comment_and_newline(source: &mut dyn ISource) {
     if source.current() != Some(CHAR_HASH) {
         return;
@@ -294,6 +296,7 @@ pub fn node_to_inline_string(node: &Node) -> String {
 /// # Returns
 ///
 /// Result with Ok(()) if valid, or Err with error message if invalid
+#[allow(dead_code)]
 pub fn validate_double_quoted_escapes(s: &str) -> Result<(), String> {
     let mut chars = s.chars().peekable();
 

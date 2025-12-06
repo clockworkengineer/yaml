@@ -21,6 +21,25 @@ pub struct TokenStream<'a> {
     directives: &'a DirectiveContext,
 }
 
+// Env-controlled logging for token stream internals
+#[cfg(feature = "debug-trace")]
+#[inline]
+fn ts_log(msg: String) {
+    #[cfg(feature = "std")]
+    {
+        if let Ok(v) = std::env::var("YAML_TRACE_TOKENS") {
+            if v.eq_ignore_ascii_case("1")
+                || v.eq_ignore_ascii_case("true")
+                || v.eq_ignore_ascii_case("on")
+            {
+                log::debug!("{}", msg);
+                return;
+            }
+        }
+    }
+    log::trace!("{}", msg);
+}
+
 #[allow(dead_code)]
 impl<'a> TokenStream<'a> {
     /// Create a new token stream and load the first token
@@ -33,7 +52,10 @@ impl<'a> TokenStream<'a> {
         let mut lexer = Lexer::new(source);
         // Load the first token - propagate errors
         lexer.next()?;
-        Ok(TokenStream { lexer, directives })
+        let ts = TokenStream { lexer, directives };
+        #[cfg(feature = "debug-trace")]
+        ts_log(format!("token_stream: new -> current = {:?}", ts.current()));
+        Ok(ts)
     }
 
     /// Get the current token without consuming it
@@ -45,13 +67,28 @@ impl<'a> TokenStream<'a> {
     /// Advance to the next token
     #[inline]
     pub fn next(&mut self) -> Result<Option<Token>, String> {
-        self.lexer.next()
+        let _prev = self.lexer.current().cloned();
+        let out = self.lexer.next();
+        #[cfg(feature = "debug-trace")]
+        if let Ok(ref _t) = out {
+            ts_log(format!(
+                "token_stream: next {:?} -> {:?}",
+                _prev,
+                self.lexer.current()
+            ));
+        }
+        out
     }
 
     /// Peek at the next token without consuming it
     #[inline]
     pub fn peek(&mut self) -> Result<Option<&Token>, String> {
-        self.lexer.peek()
+        let res = self.lexer.peek();
+        #[cfg(feature = "debug-trace")]
+        if let Ok(tok) = res {
+            ts_log(format!("token_stream: peek -> {:?}", tok));
+        }
+        res
     }
 
     /// Check if current token matches a predicate
@@ -79,6 +116,11 @@ impl<'a> TokenStream<'a> {
     /// Skip whitespace tokens (newlines, indents)
     #[inline]
     pub fn skip_whitespace(&mut self) -> Result<(), String> {
+        #[cfg(feature = "debug-trace")]
+        ts_log(format!(
+            "token_stream: skip_whitespace at {:?}",
+            self.current()
+        ));
         while self
             .current()
             .map_or(false, |t| matches!(t, Token::Newline | Token::Indent(_)))
@@ -91,6 +133,11 @@ impl<'a> TokenStream<'a> {
     /// Skip comments
     #[inline]
     pub fn skip_comments(&mut self) -> Result<(), String> {
+        #[cfg(feature = "debug-trace")]
+        ts_log(format!(
+            "token_stream: skip_comments at {:?}",
+            self.current()
+        ));
         while matches!(self.current(), Some(Token::Comment(_))) {
             self.next()?;
         }
@@ -100,6 +147,11 @@ impl<'a> TokenStream<'a> {
     /// Skip whitespace and comments
     #[inline]
     pub fn skip_whitespace_and_comments(&mut self) -> Result<(), String> {
+        #[cfg(feature = "debug-trace")]
+        ts_log(format!(
+            "token_stream: skip_whitespace_and_comments at {:?}",
+            self.current()
+        ));
         while self.current().map_or(false, |t| Self::is_trivia(t)) {
             self.next()?;
         }
@@ -145,6 +197,11 @@ impl<'a> TokenStream<'a> {
             }
         }
 
+        #[cfg(feature = "debug-trace")]
+        ts_log(format!(
+            "token_stream: consume_decorators -> {:?}",
+            decorators
+        ));
         Ok(decorators)
     }
 
@@ -245,6 +302,11 @@ impl<'a> TokenStream<'a> {
         // In a real implementation, we'd need a more sophisticated approach
         // For now, this is a simplified version
 
+        #[cfg(feature = "debug-trace")]
+        ts_log(format!(
+            "token_stream: has_colon_ahead -> {}",
+            has_colon
+        ));
         Ok(has_colon)
     }
 

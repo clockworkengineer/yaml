@@ -126,11 +126,18 @@ pub fn parse_value_with_tokens(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
 ) -> Result<Node, String> {
+    #[cfg(feature = "debug-trace")]
+    log::debug!(
+        "value_tokens: start parse_value_with_tokens at token = {:?}",
+        stream.current()
+    );
     // Handle aliases first (they don't have content)
     if matches!(stream.current(), Some(Token::Alias(_))) {
         if let Some(Token::Alias(name)) = stream.current() {
             let alias = name.clone();
             stream.next()?;
+            #[cfg(feature = "debug-trace")]
+            log::debug!("value_tokens: parsed alias = {}", alias);
             return Ok(Node::Alias(alias));
         }
     }
@@ -140,6 +147,8 @@ pub fn parse_value_with_tokens(
 
     // If we have decorators, parse the content
     if decorators.tag.is_some() || decorators.anchor.is_some() {
+        #[cfg(feature = "debug-trace")]
+        log::debug!("value_tokens: decorators = {:?}", decorators);
         // Skip whitespace/newlines after decorators to find the actual content
         stream.skip_whitespace()?;
 
@@ -174,6 +183,8 @@ pub fn parse_value_with_tokens(
                     result = Node::Anchored(Box::new(result), anchor_name);
                 }
 
+                #[cfg(feature = "debug-trace")]
+                log::debug!("value_tokens: empty decorated value -> {:?}", result);
                 return Ok(result);
             }
             _ => {
@@ -205,11 +216,18 @@ pub fn parse_value_with_tokens(
             result = Node::Anchored(Box::new(result), anchor_name);
         }
 
+        #[cfg(feature = "debug-trace")]
+        log::debug!("value_tokens: decorated value -> {:?}", result);
         return Ok(result);
     }
 
     // No decorators - parse plain value
-    parse_value_content(stream, directives)
+    let node = parse_value_content(stream, directives);
+    #[cfg(feature = "debug-trace")]
+    if let Ok(ref n) = node {
+        log::debug!("value_tokens: plain value -> {:?}", n);
+    }
+    node
 }
 
 /// Parse value content (the actual value after decorators)
@@ -217,6 +235,11 @@ fn parse_value_content(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
 ) -> Result<Node, String> {
+    #[cfg(feature = "debug-trace")]
+    log::debug!(
+        "value_tokens: parse_value_content at token = {:?}",
+        stream.current()
+    );
     // Skip comments before parsing value
     while matches!(stream.current(), Some(Token::Comment(_))) {
         stream.next()?;
@@ -264,6 +287,8 @@ fn parse_value_content(
         )),
         Some(token) => {
             let token_str = format!("Unexpected token in value: {:?}", token);
+            #[cfg(feature = "debug-trace")]
+            log::debug!("value_tokens: error -> {}", token_str);
             Err(syntax_error(stream.source_mut(), &token_str))
         }
     }

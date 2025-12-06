@@ -1,4 +1,5 @@
 /// Parse a single key-value mapping pair (for sequence items)
+#[allow(dead_code)]
 pub fn parse_single_mapping_pair_with_tokens(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
@@ -35,6 +36,8 @@ pub fn parse_mapping_with_tokens(
     _base_indent: usize,
     directives: &DirectiveContext,
 ) -> Result<Node, String> {
+    #[cfg(feature = "debug-trace")]
+    log::debug!("mapping_tokens: start parse_mapping_with_tokens");
     let mut pairs = Vec::new();
     // ...existing code...
 
@@ -94,9 +97,10 @@ pub fn parse_mapping_with_tokens(
         }
     }
 
-    println!(
-        "DEBUG: mapping_tokens: Finished mapping parser, node = {:?}",
-        pairs
+    #[cfg(feature = "debug-trace")]
+    log::debug!(
+        "mapping_tokens: end parse_mapping_with_tokens with {} pair(s)",
+        pairs.len()
     );
     Ok(Node::Mapping(pairs))
 }
@@ -107,8 +111,9 @@ fn parse_mapping_pair(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
 ) -> Result<(Node, Node), String> {
-    println!(
-        "DEBUG: mapping_pair: Starting at token = {:?}",
+    #[cfg(feature = "debug-trace")]
+    log::debug!(
+        "mapping_pair: start at token = {:?}",
         stream.current()
     );
     // Check for explicit key indicator (?)
@@ -143,16 +148,15 @@ fn parse_mapping_pair(
         } else {
             // Decorators on actual key value - parse it
             let parsed_key = parse_value_with_tokens(stream, directives)?;
-            println!(
-                "DEBUG: mapping_pair: Parsed decorated key = {:?}",
-                parsed_key
-            );
+            #[cfg(feature = "debug-trace")]
+            log::debug!("mapping_pair: parsed decorated key = {:?}", parsed_key);
             parsed_key
         }
     } else {
         // No decorators, parse key normally
         let parsed_key = parse_value_with_tokens(stream, directives)?;
-        println!("DEBUG: mapping_pair: Parsed key = {:?}", parsed_key);
+        #[cfg(feature = "debug-trace")]
+        log::debug!("mapping_pair: parsed key = {:?}", parsed_key);
         parsed_key
     };
 
@@ -168,10 +172,8 @@ fn parse_mapping_pair(
         }
     }
 
-    println!(
-        "DEBUG: mapping_pair: After key, token = {:?}",
-        stream.current()
-    );
+    #[cfg(feature = "debug-trace")]
+    log::debug!("mapping_pair: after key, token = {:?}", stream.current());
     // Expect colon, or treat as empty value if next token is a valid key
     match stream.current() {
         Some(Token::Colon) => {
@@ -231,10 +233,8 @@ fn parse_mapping_pair(
         }
     }
 
-    println!(
-        "DEBUG: mapping_pair: Before value, token = {:?}",
-        stream.current()
-    );
+    #[cfg(feature = "debug-trace")]
+    log::debug!("mapping_pair: before value, token = {:?}", stream.current());
     // Parse the value - check for empty value BEFORE skipping whitespace
     let value = match stream.current() {
         Some(Token::Newline) | None | Some(Token::Eof) => {
@@ -251,15 +251,13 @@ fn parse_mapping_pair(
             stream.skip_whitespace()?;
             // Parse the actual value
             let v = parse_value_with_tokens(stream, directives)?;
-            println!("DEBUG: mapping_pair: Parsed value = {:?}", v);
+            #[cfg(feature = "debug-trace")]
+            log::debug!("mapping_pair: parsed value = {:?}", v);
             v
         }
     };
-
-    println!(
-        "DEBUG: mapping_pair: Returning pair = ({:?}, {:?})",
-        key, value
-    );
+    #[cfg(feature = "debug-trace")]
+    log::debug!("mapping_pair: return pair = ({:?}, {:?})", key, value);
     Ok((key, value))
 }
 

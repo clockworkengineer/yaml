@@ -3,6 +3,7 @@ use crate::parser::token_stream::TokenStream;
 // Recursion guard removed
 
 /// Parses a scalar value from tokens (TokenStream)
+#[allow(deprecated)]
 pub(crate) fn parse_scalar_with_tokens(
     stream: &mut TokenStream,
     directives: &DirectiveContext,

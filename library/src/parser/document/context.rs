@@ -38,6 +38,7 @@ pub struct ParsingContext {
     pub after_newline: bool,
 
     /// The type of collection context we're in (if any)
+    #[allow(dead_code)]
     pub collection_type: CollectionType,
 
     /// Reference to parent context for nested structure validation

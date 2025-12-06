@@ -1,7 +1,6 @@
 //! Module: parser/document/helpers.rs
 
 use crate::constants::*;
-use crate::error::messages::*;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::nodes::node::Node::Document;
@@ -64,6 +63,7 @@ pub(crate) fn parse_error(source: &mut dyn ISource, msg: &str) -> String {
 /// let ctx = ParsingContext::new(0);
 /// validate_indentation(source, &ctx)?;
 /// ```
+#[allow(dead_code)]
 pub(crate) fn validate_indentation(
     source: &mut dyn ISource,
     ctx: &ParsingContext,
@@ -132,6 +132,7 @@ pub(crate) fn skip_whitespace(source: &mut dyn ISource) {
 /// # Returns
 ///
 /// `Ok(())` if successful, `Err(String)` if tabs found in forbidden context
+#[allow(dead_code)]
 pub(crate) fn skip_whitespace_with_context(
     source: &mut dyn ISource,
     ctx: &ParsingContext,
@@ -145,6 +146,7 @@ pub(crate) fn skip_whitespace_with_context(
 /// Backward-compatible wrapper that validates no tabs are used for indentation in block context.
 ///
 /// Assumes the current position is at an indentation point (start of a new line) in block context.
+#[allow(dead_code)]
 pub(crate) fn validate_no_tab_indentation(source: &mut dyn ISource) -> Result<(), String> {
     let mut ctx = ParsingContext::new(source.get_current_indent_level());
     ctx.mark_newline_consumed();
@@ -349,6 +351,8 @@ pub(crate) fn peek_ahead_for_mapping_key(source: &mut dyn ISource) -> bool {
 /// # Returns
 ///
 /// Result containing a tuple of (key_node, is_complex_key) or an error string
+#[allow(dead_code)]
+#[allow(deprecated)]
 pub(crate) fn parse_mapping_key(
     source: &mut dyn ISource,
     directives: &crate::parser::directives::DirectiveContext,
@@ -460,6 +464,7 @@ pub(crate) fn parse_comment(source: &mut dyn ISource) -> String {
 /// # Returns
 ///
 /// Result with Ok(()) if valid, Err with error message if invalid
+#[allow(dead_code)]
 pub(crate) fn validate_comment_spacing(
     source: &mut dyn ISource,
     prev_char: Option<char>,

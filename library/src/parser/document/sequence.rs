@@ -30,6 +30,7 @@ pub(crate) fn parse_sequence(
 }
 
 // Helper for nested sequence parsing to avoid double mutable borrow
+#[allow(dead_code)]
 fn parse_sequence_inner(
     stream: &mut TokenStream,
     indent_level: usize,

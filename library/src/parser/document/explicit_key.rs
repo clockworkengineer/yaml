@@ -3,7 +3,6 @@
 use crate::parser::token_stream::TokenStream;
 use crate::parser::lexer::Token;
 use crate::nodes::node::Node;
-use crate::parser::document::error_builder::syntax_error;
 
 /// Checks if the current token starts an explicit key (Token::QuestionMark)
 #[allow(dead_code)]
