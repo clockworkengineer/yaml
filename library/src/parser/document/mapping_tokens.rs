@@ -112,10 +112,7 @@ fn parse_mapping_pair(
     directives: &DirectiveContext,
 ) -> Result<(Node, Node), String> {
     #[cfg(feature = "debug-trace")]
-    log::debug!(
-        "mapping_pair: start at token = {:?}",
-        stream.current()
-    );
+    log::debug!("mapping_pair: start at token = {:?}", stream.current());
     // Check for explicit key indicator (?)
     // Lexer emits a dedicated token for '?', not a plain scalar
     let explicit_key = if matches!(stream.current(), Some(Token::QuestionMark)) {

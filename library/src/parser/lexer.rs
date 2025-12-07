@@ -198,9 +198,17 @@ impl<'a> Lexer<'a> {
                 match (self.source.current(), self.peek_ahead(2)) {
                     (Some('-'), Some('-')) => {
                         // Document start: ---
-                        self.source.next();
-                        self.source.next();
-                        Ok(Some(Token::DocumentStart))
+                        // Only emit at indent 0
+                        let indent = self.indent_level();
+                        if indent == 0 {
+                            self.source.next();
+                            self.source.next();
+                            Ok(Some(Token::DocumentStart))
+                        } else {
+                            // Not at indent 0, treat as plain scalar
+                            self.source.restore_state(state);
+                            Ok(Some(self.scan_plain_scalar()?))
+                        }
                     }
                     (Some(c), _) if c.is_whitespace() || c == CHAR_NEWLINE => {
                         // Dash (sequence indicator)
@@ -221,9 +229,17 @@ impl<'a> Lexer<'a> {
                 match (self.source.current(), self.peek_ahead(2)) {
                     (Some('.'), Some('.')) => {
                         // Document end: ...
-                        self.source.next();
-                        self.source.next();
-                        Ok(Some(Token::DocumentEnd))
+                        // Only emit at indent 0
+                        let indent = self.indent_level();
+                        if indent == 0 {
+                            self.source.next();
+                            self.source.next();
+                            Ok(Some(Token::DocumentEnd))
+                        } else {
+                            // Not at indent 0, treat as plain scalar
+                            self.source.restore_state(state);
+                            Ok(Some(self.scan_plain_scalar()?))
+                        }
                     }
                     _ => {
                         // Plain scalar starting with dot
