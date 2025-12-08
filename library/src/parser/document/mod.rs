@@ -192,89 +192,54 @@ pub fn parse_document_contents(
             let mut stream = crate::parser::token_stream::TokenStream::new(source, directives)?;
             Ok(parse_inline_sequence(&mut stream, directives)?)
         }
-        // Support tagged values at the start of a nested block (e.g. indented "!!set" lines)
+        // Support tagged values or tagged keys using TokenStream
         Some(c) if c == '!' => {
-            // Save state to check if this is a tagged mapping key
-            let state = source.save_state();
-            source.next(); // skip first !
-
-            // Skip the tag
-            while let Some(ch) = source.current() {
-                if ch == ' ' || ch == '\t' || ch == '\n' {
-                    break;
+            let mut stream = crate::parser::token_stream::TokenStream::new(source, directives)?;
+            // If a tag token appears and is followed by a colon at same level, treat as mapping key
+            match stream.current() {
+                Some(crate::parser::lexer::Token::Tag(_)) => {
+                    stream.next()?;
+                    stream.skip_whitespace_and_comments()?;
+                    let is_mapping_key = matches!(stream.current(), Some(crate::parser::lexer::Token::Colon));
+                    if is_mapping_key {
+                        Ok(parse_mapping(source, indent_level, directives)?)
+                    } else {
+                        Ok(crate::parser::document::tokens::value::parse_value_with_tokens(&mut stream, directives)?)
+                    }
                 }
-                source.next();
-            }
-            crate::parser::document::helpers::skip_whitespace(source);
-
-            // Check if what follows is a colon (indicating mapping key)
-            let is_mapping_key = source.current() == Some(':');
-            // Restore state and parse appropriately
-            source.restore_state(state);
-
-            if is_mapping_key {
-                Ok(parse_mapping(source, indent_level, directives)?)
-            } else {
-                Ok(crate::parser::document::value::parse_value(
-                    source, directives,
-                )?)
+                _ => Ok(crate::parser::document::tokens::value::parse_value_with_tokens(&mut stream, directives)?),
             }
         }
-        // Support anchors at document level (e.g. "&anchor key: value")
+        // Support anchors using TokenStream
         Some(c) if c == '&' => {
-            // Save state to check if this is an anchored mapping key
-            let state = source.save_state();
-            source.next(); // skip &
-
-            // Collect anchor name
-            let _anchor_name = crate::utils::collect_until(source, |c| {
-                c == ' '
-                    || c == '\t'
-                    || c == '\n'
-                    || c == '\r'
-                    || c == '#'
-                    || c == ','
-                    || c == '['
-                    || c == ']'
-                    || c == '{'
-                    || c == '}'
-            });
-            crate::parser::document::helpers::skip_whitespace(source);
-
-            // Check if what follows looks like a mapping key
-            let is_mapping = peek_ahead_for_mapping_key(source);
-
-            // Restore state and parse appropriately
-            source.restore_state(state);
-
-            if is_mapping {
-                Ok(parse_mapping(source, indent_level, directives)?)
-            } else {
-                Ok(crate::parser::document::value::parse_value(
-                    source, directives,
-                )?)
+            let mut stream = crate::parser::token_stream::TokenStream::new(source, directives)?;
+            match stream.current() {
+                Some(crate::parser::lexer::Token::Anchor(_)) => {
+                    stream.next()?;
+                    stream.skip_whitespace_and_comments()?;
+                    let is_mapping_key = matches!(stream.current(), Some(crate::parser::lexer::Token::Colon));
+                    if is_mapping_key {
+                        Ok(parse_mapping(source, indent_level, directives)?)
+                    } else {
+                        Ok(crate::parser::document::tokens::value::parse_value_with_tokens(&mut stream, directives)?)
+                    }
+                }
+                _ => Ok(crate::parser::document::tokens::value::parse_value_with_tokens(&mut stream, directives)?),
             }
         }
         // Support aliases at document level (e.g. "*anchor")
         Some(c) if c == '*' => Ok(crate::parser::document::value::parse_value(
             source, directives,
         )?),
-        // Handle explicit value indicator (: value) with missing/null key
+        // Handle explicit value indicator (: value) with missing/null key using tokens
         Some(c) if c == ':' => {
             let current_indent = source.get_current_indent_level();
             let mut pairs: Vec<(Node, Node)> = Vec::new();
-
-            // Parse all consecutive mapping entries with omitted keys at this indent level
             loop {
-                // Check if we're still at the same indent and have a colon
-                if source.get_current_indent_level() != current_indent
-                    || source.current() != Some(':')
-                {
+                if source.get_current_indent_level() != current_indent || source.current() != Some(':') {
                     break;
                 }
-
-                source.next(); // Skip ':'
-                // Tabs are not allowed immediately after ':' indicator
+                source.next();
                 if source.current() == Some('\t') {
                     return Err(helpers::parse_error(
                         source,
@@ -283,27 +248,18 @@ pub fn parse_document_contents(
                 }
                 skip_whitespace(source);
 
-                // Parse the value
-                let value_node = if source.current() == Some('\n') || source.current().is_none() {
-                    // Just ":" with no value - null key and null value
-                    if source.current() == Some('\n') {
-                        source.next();
-                    }
-                    Node::None
-                } else {
-                    parse_value(source, directives)?
+                let mut stream = crate::parser::token_stream::TokenStream::new(source, directives)?;
+                let value_node = match stream.current() {
+                    Some(crate::parser::lexer::Token::Newline) | None => Node::None,
+                    _ => crate::parser::document::tokens::value::parse_value_with_tokens(&mut stream, directives)?,
                 };
 
                 pairs.push((Node::None, value_node));
 
-                // Move to next line
                 crate::utils::skip_until_newline(source);
-                if source.current() == Some('\n') {
-                    source.next();
-                }
+                if source.current() == Some('\n') { source.next(); }
                 skip_whitespace(source);
             }
-
             Ok(Node::Mapping(pairs))
         }
         Some(c) if c == '?' => {
@@ -467,105 +423,12 @@ pub fn parse_document_contents(
         Some(c) if c.is_alphanumeric() => {
             if peek_ahead_for_mapping_key(source) {
                 Ok(parse_mapping(source, indent_level, directives)?)
-            } else if indent_level > 0 {
-                let base_indent = source.get_current_indent_level();
-                let mut parts: Vec<String> = Vec::new();
-                loop {
-                    let line = crate::utils::read_line_trimmed_into_string(source);
-                    if !line.is_empty() {
-                        parts.push(line);
-                    }
-                    if source.current() == Some('\n') {
-                        source.next();
-                    }
-                    let st = source.save_state();
-                    skip_whitespace(source);
-                    let cur_indent = source.get_current_indent_level();
-                    let next_char = source.current();
-                    source.restore_state(st);
-                    if next_char.is_none() || cur_indent < base_indent {
-                        break;
-                    }
-                    if matches!(
-                        next_char,
-                        Some('-') | Some('{') | Some('[') | Some('?') | Some('#')
-                    ) {
-                        break;
-                    }
-                }
-                let joined = parts.join(" ");
-                Ok(Node::Str(
-                    joined,
-                    crate::nodes::node::QuoteType::Unquoted,
-                    crate::nodes::node::BlockStyle::None,
-                ))
             } else {
-                // At root level (indent_level == 0) without a colon, parse as multiline plain scalar
-                let mut lines = Vec::new();
-                let start_indent = source.get_current_indent_level();
-
-                loop {
-                    // Read the current line
-                    let line = crate::utils::read_line_trimmed_into_string(source);
-                    if !line.is_empty() {
-                        lines.push(line);
-                    }
-
-                    // Skip newline if present
-                    if source.current() == Some('\n') {
-                        source.next();
-                    }
-
-                    // Check what comes next
-                    if !source.more() {
-                        break;
-                    }
-
-                    // Skip whitespace to check indent of next line
-                    skip_whitespace(source);
-
-                    if !source.more() {
-                        break;
-                    }
-
-                    let line_indent = source.get_current_indent_level();
-                    let ch = source.current();
-
-                    // Stop if we hit a document marker
-                    if ch == Some('-') && helpers::peek_ahead_for_document_start_end(source, '-') {
-                        break;
-                    }
-                    if ch == Some('.') && helpers::peek_ahead_for_document_start_end(source, '.') {
-                        break;
-                    }
-
-                    // Stop if we hit a directive
-                    if ch == Some('%') && line_indent == 0 {
-                        break;
-                    }
-
-                    // Stop on dedent (but not at indent 0, where all lines are the same)
-                    if start_indent > 0 && line_indent < start_indent {
-                        break;
-                    }
-
-                    // Stop on comment
-                    if ch == Some('#') {
-                        break;
-                    }
-
-                    // Continue if at same or greater indent
-                    if line_indent >= start_indent {
-                        continue;
-                    }
-
-                    // Otherwise stop
-                    break;
-                }
-
-                let scalar_value = lines.join(" ");
+                // Use TokenStream to consume a plain scalar possibly spanning lines
+                let mut stream = crate::parser::token_stream::TokenStream::new(source, directives)?;
+                let s = stream.consume_plain_scalar()?;
                 Ok(Node::Str(
-                    scalar_value,
+                    s,
                     crate::nodes::node::QuoteType::Unquoted,
                     crate::nodes::node::BlockStyle::None,
                 ))
