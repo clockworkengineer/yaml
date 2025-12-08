@@ -178,7 +178,15 @@ pub fn parse_document_contents(
         Some(c) if c == '-' => {
             // Check if this is a document marker (---)
             let seq_indent = source.get_current_indent_level();
-            if helpers::peek_ahead_for_document_start_end(source, '-') {
+            // Prefer token-based detection for document start
+            let is_doc_start = {
+                let st = source.save_state();
+                let mut ts = crate::parser::token_stream::TokenStream::new(source, directives)?;
+                let res = matches!(ts.current(), Some(crate::parser::lexer::Token::DocumentStart));
+                source.restore_state(st);
+                res
+            };
+            if is_doc_start {
                 if seq_indent == 0 {
                     return Ok(Node::None);
                 } else {
@@ -212,7 +220,14 @@ pub fn parse_document_contents(
         Some(c) if c == '.' => {
             // Check if this is a document end marker (...)
             let map_indent = source.get_current_indent_level();
-            if helpers::peek_ahead_for_document_start_end(source, '.') {
+            let is_doc_end = {
+                let st = source.save_state();
+                let mut ts = crate::parser::token_stream::TokenStream::new(source, directives)?;
+                let res = matches!(ts.current(), Some(crate::parser::lexer::Token::DocumentEnd));
+                source.restore_state(st);
+                res
+            };
+            if is_doc_end {
                 if map_indent == 0 {
                     return Ok(Node::None);
                 } else {
@@ -548,9 +563,15 @@ pub fn parse_document(
     let mut document_nodes = Vec::new();
 
     while let Some(c) = source.current() {
-        if (c == '-' || c == '.')
-            && crate::parser::document::helpers::peek_ahead_for_document_start_end(source, c)
-        {
+        // Break if at document marker tokens
+        let is_marker = {
+            let st = source.save_state();
+            let mut ts = crate::parser::token_stream::TokenStream::new(source, directives)?;
+            let res = matches!(ts.current(), Some(crate::parser::lexer::Token::DocumentStart | crate::parser::lexer::Token::DocumentEnd));
+            source.restore_state(st);
+            res
+        };
+        if is_marker {
             // Found document marker - just break, let parse() handle it
             break;
         }
@@ -660,7 +681,13 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
             directives.yaml_version.is_some() || directives.tag_prefixes.len() > 2;
 
         // Check for document start marker (---)
-        let has_document_marker = helpers::peek_ahead_for_document_start_end(source, '-');
+        let has_document_marker = {
+            let st = source.save_state();
+            let mut ts = crate::parser::token_stream::TokenStream::new(source, &directives)?;
+            let res = matches!(ts.current(), Some(crate::parser::lexer::Token::DocumentStart));
+            source.restore_state(st);
+            res
+        };
         if has_document_marker {
             source.next();
             source.next();
@@ -727,7 +754,13 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
 
         // Check for document end marker (...)
         skip_whitespace(source);
-        let has_document_end = helpers::peek_ahead_for_document_start_end(source, '.');
+        let has_document_end = {
+            let st = source.save_state();
+            let mut ts = crate::parser::token_stream::TokenStream::new(source, &directives)?;
+            let res = matches!(ts.current(), Some(crate::parser::lexer::Token::DocumentEnd));
+            source.restore_state(st);
+            res
+        };
         if has_document_end {
             source.next();
             source.next();
