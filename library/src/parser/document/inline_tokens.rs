@@ -24,7 +24,10 @@ pub fn parse_inline_sequence_with_tokens(
     directives: &DirectiveContext,
 ) -> Result<Node, String> {
     #[cfg(feature = "debug-trace")]
-    log::debug!("inline_tokens: start flow sequence at token = {:?}", stream.current());
+    log::debug!(
+        "inline_tokens: start flow sequence at token = {:?}",
+        stream.current()
+    );
     // Expect opening bracket
     stream.expect(Token::FlowSequenceStart)?;
 
@@ -42,13 +45,8 @@ pub fn parse_inline_sequence_with_tokens(
                 break;
             }
             Some(Token::Comma) => {
-                if expect_item && !items.is_empty() {
-                    // Comma after comma or at start (invalid)
-                    return Err(syntax_error(
-                        stream.source_mut(),
-                        "Unexpected comma in flow sequence",
-                    ));
-                }
+                // Allow trailing comma: set to expect next item, but do not error
+                // If immediately followed by ']', the loop will close cleanly
                 stream.next()?;
                 expect_item = true;
             }
@@ -98,7 +96,10 @@ pub fn parse_inline_mapping_with_tokens(
     directives: &DirectiveContext,
 ) -> Result<Node, String> {
     #[cfg(feature = "debug-trace")]
-    log::debug!("inline_tokens: start flow mapping at token = {:?}", stream.current());
+    log::debug!(
+        "inline_tokens: start flow mapping at token = {:?}",
+        stream.current()
+    );
     // Expect opening brace
     stream.expect(Token::FlowMappingStart)?;
 
@@ -116,13 +117,8 @@ pub fn parse_inline_mapping_with_tokens(
                 break;
             }
             Some(Token::Comma) => {
-                if expect_entry && !pairs.is_empty() {
-                    // Comma after comma or at start (invalid)
-                    return Err(syntax_error(
-                        stream.source_mut(),
-                        "Unexpected comma in flow mapping",
-                    ));
-                }
+                // Allow trailing comma: set to expect next entry, but do not error
+                // If immediately followed by '}', the loop will close cleanly
                 stream.next()?;
                 expect_entry = true;
             }

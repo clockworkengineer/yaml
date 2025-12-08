@@ -67,15 +67,10 @@ fn parse_inline_mapping_with_colons_tokens(
 }
 // Check-in: Current version of inline.rs as shown in attachments
 use crate::constants::*;
-use crate::error::messages::{
-    ERR_EOF_INLINE_MAPPING,
-    ERR_UNEXPECTED_CHAR_INLINE_MAPPING_PREFIX,
-};
+use crate::error::messages::{ERR_EOF_INLINE_MAPPING, ERR_UNEXPECTED_CHAR_INLINE_MAPPING_PREFIX};
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
-use crate::parser::document::helpers::{
-    parse_error,
-};
+use crate::parser::document::helpers::parse_error;
 // ...existing code...
 use crate::parser::document::value::parse_value;
 // ...existing code...

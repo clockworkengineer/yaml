@@ -1,8 +1,8 @@
 //! Helper functions for parsing explicit mapping keys (? indicator)
 
-use crate::parser::token_stream::TokenStream;
-use crate::parser::lexer::Token;
 use crate::nodes::node::Node;
+use crate::parser::lexer::Token;
+use crate::parser::token_stream::TokenStream;
 
 /// Checks if the current token starts an explicit key (Token::QuestionMark)
 #[allow(dead_code)]
@@ -32,9 +32,7 @@ pub(crate) fn parse_explicit_mapping_entry(
             // Parse document contents as key (empty explicit key)
             crate::parser::document::tokens::value::parse_value_with_tokens(stream, directives)?
         }
-        _ => {
-            crate::parser::document::tokens::value::parse_value_with_tokens(stream, directives)?
-        }
+        _ => crate::parser::document::tokens::value::parse_value_with_tokens(stream, directives)?,
     };
 
     // Skip whitespace/comments after key
@@ -49,11 +47,13 @@ pub(crate) fn parse_explicit_mapping_entry(
                 Some(Token::Newline) => {
                     stream.next()?;
                     stream.skip_whitespace()?;
-                    crate::parser::document::tokens::value::parse_value_with_tokens(stream, directives)?
+                    crate::parser::document::tokens::value::parse_value_with_tokens(
+                        stream, directives,
+                    )?
                 }
-                _ => {
-                    crate::parser::document::tokens::value::parse_value_with_tokens(stream, directives)?
-                }
+                _ => crate::parser::document::tokens::value::parse_value_with_tokens(
+                    stream, directives,
+                )?,
             }
         }
         // No value indicator, key only

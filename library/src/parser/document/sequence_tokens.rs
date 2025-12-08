@@ -40,8 +40,24 @@ pub fn parse_sequence_with_tokens(
 
     loop {
         // Skip comments and newlines between sequence items
-        while matches!(stream.current(), Some(Token::Comment(_)) | Some(Token::Newline)) {
+        while matches!(
+            stream.current(),
+            Some(Token::Comment(_)) | Some(Token::Newline)
+        ) {
             stream.next()?;
+        }
+        // If a stray comma remains after an inline flow item, consume it
+        if matches!(stream.current(), Some(Token::Comma)) {
+            stream.next()?;
+            // Also consume an optional closing flow token following it
+            if matches!(
+                stream.current(),
+                Some(Token::FlowMappingEnd) | Some(Token::FlowSequenceEnd)
+            ) {
+                stream.next()?;
+            }
+            // Normalize whitespace/comments after consuming
+            stream.skip_whitespace_and_comments()?;
         }
         // Check for indentation change that would end the sequence
         if let Some(Token::Indent(level)) = stream.current() {
@@ -60,9 +76,7 @@ pub fn parse_sequence_with_tokens(
                 stream.next()?;
 
                 // Skip whitespace and comments after dash
-                while matches!(stream.current(), Some(Token::Comment(_)) | Some(Token::Newline)) {
-                    stream.next()?;
-                }
+                stream.skip_whitespace_and_comments()?;
 
                 // Check what follows the dash
                 match stream.current() {
@@ -87,10 +101,10 @@ pub fn parse_sequence_with_tokens(
                         };
                         let mapping = parse_mapping_with_tokens(stream, indent, directives)?;
                         items.push(mapping);
-                        // Skip trailing whitespace/newlines until we see next dash or end
+                        // Skip trailing whitespace/comments/newlines until next dash or end
                         loop {
                             match stream.current() {
-                                Some(Token::Newline) => {
+                                Some(Token::Newline) | Some(Token::Comment(_)) => {
                                     stream.next()?;
                                 }
                                 Some(Token::Indent(_)) | Some(Token::Dash) | None => {
@@ -117,10 +131,24 @@ pub fn parse_sequence_with_tokens(
                             let indent = base_indent;
                             let mapping = parse_mapping_with_tokens(stream, indent, directives)?;
                             items.push(mapping);
-                            // Skip trailing whitespace/newlines until we see next dash or end
+                            // Normalize whitespace/comments after item
+                            stream.skip_whitespace_and_comments()?;
+                            // Guard: if a stray comma precedes a closing flow bracket across lines,
+                            // consume it and the closing token to fully terminate the inline value.
+                            if matches!(stream.current(), Some(Token::Comma)) {
+                                stream.next()?;
+                                if matches!(
+                                    stream.current(),
+                                    Some(Token::FlowMappingEnd) | Some(Token::FlowSequenceEnd)
+                                ) {
+                                    stream.next()?;
+                                }
+                                stream.skip_whitespace_and_comments()?;
+                            }
+                            // Skip trailing whitespace/comments/newlines until next dash or end
                             loop {
                                 match stream.current() {
-                                    Some(Token::Newline) => {
+                                    Some(Token::Newline) | Some(Token::Comment(_)) => {
                                         stream.next()?;
                                     }
                                     Some(Token::Indent(_)) | Some(Token::Dash) | None => {
@@ -131,13 +159,26 @@ pub fn parse_sequence_with_tokens(
                             }
                         } else {
                             #[cfg(feature = "debug-trace")]
-                            log::debug!(
-                                "sequence_tokens: Parsing value after dash (not mapping)"
-                            );
+                            log::debug!("sequence_tokens: Parsing value after dash (not mapping)");
                             let value = parse_value_with_tokens(stream, directives)?;
                             #[cfg(feature = "debug-trace")]
                             log::debug!("sequence_tokens: parsed value node = {:?}", value);
                             items.push(value);
+                            // Normalize and aggressively consume separators/closers
+                            loop {
+                                stream.skip_whitespace_and_comments()?;
+                                match stream.current() {
+                                    Some(Token::Comma) => {
+                                        stream.next()?;
+                                        continue;
+                                    }
+                                    Some(Token::FlowMappingEnd) | Some(Token::FlowSequenceEnd) => {
+                                        stream.next()?;
+                                        continue;
+                                    }
+                                    _ => break,
+                                }
+                            }
                             // Skip trailing whitespace/newlines until we see next dash or end
                             loop {
                                 match stream.current() {
@@ -157,10 +198,26 @@ pub fn parse_sequence_with_tokens(
                         let value = parse_value_with_tokens(stream, directives)?;
                         items.push(value);
 
-                        // Skip trailing whitespace/newlines until we see next dash or end
+                        // Normalize and aggressively consume separators/closers
+                        loop {
+                            stream.skip_whitespace_and_comments()?;
+                            match stream.current() {
+                                Some(Token::Comma) => {
+                                    stream.next()?;
+                                    continue;
+                                }
+                                Some(Token::FlowMappingEnd) | Some(Token::FlowSequenceEnd) => {
+                                    stream.next()?;
+                                    continue;
+                                }
+                                _ => break,
+                            }
+                        }
+
+                        // Skip trailing whitespace/comments/newlines until next dash or end
                         loop {
                             match stream.current() {
-                                Some(Token::Newline) => {
+                                Some(Token::Newline) | Some(Token::Comment(_)) => {
                                     stream.next()?;
                                 }
                                 Some(Token::Indent(_)) | Some(Token::Dash) | None => {

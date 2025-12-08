@@ -13,7 +13,7 @@ use crate::parser::token_stream::TokenStream;
 /// Try to coerce a value based on a tag
 fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
     match tag {
-        "!!str" | "!str" => {
+        "!!str" | "!str" | "tag:yaml.org,2002:str" => {
             let s = match node {
                 Node::Str(s, _, _) => s,
                 Node::Number(Numeric::Integer(i)) => i.to_string(),
@@ -24,7 +24,7 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
             };
             Some(Node::Str(s, QuoteType::Unquoted, BlockStyle::None))
         }
-        "!!int" | "!int" => match node {
+        "!!int" | "!int" | "tag:yaml.org,2002:int" => match node {
             Node::Number(Numeric::Integer(i)) => Some(Node::Number(Numeric::Integer(i))),
             Node::Str(s, _, _) => {
                 if let Ok(i) = s.parse::<i64>() {
@@ -35,7 +35,7 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
             }
             _ => None,
         },
-        "!!float" | "!float" => match node {
+        "!!float" | "!float" | "tag:yaml.org,2002:float" => match node {
             Node::Number(Numeric::Float(f)) => Some(Node::Number(Numeric::Float(f))),
             Node::Number(Numeric::Integer(i)) => Some(Node::Number(Numeric::Float(i as f64))),
             Node::Str(s, _, _) => {
@@ -47,7 +47,7 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
             }
             _ => None,
         },
-        "!!bool" | "!bool" => match node {
+        "!!bool" | "!bool" | "tag:yaml.org,2002:bool" => match node {
             Node::Boolean(b) => Some(Node::Boolean(b)),
             Node::Str(s, _, _) => {
                 let sl = s.to_ascii_lowercase();
@@ -111,6 +111,36 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
             )),
             _ => None,
         },
+        // Null coercion: map to Node::None
+        "!!null" | "!null" | "tag:yaml.org,2002:null" => Some(Node::None),
+
+        // Timestamp coercion: keep as plain string (tests expect string preservation)
+        "!!timestamp" | "!timestamp" | "tag:yaml.org,2002:timestamp" => match node {
+            Node::Str(s, _, _) => Some(Node::Str(s, QuoteType::Unquoted, BlockStyle::None)),
+            // If numeric or boolean provided (unlikely), stringify
+            Node::Number(Numeric::Integer(i)) => Some(Node::Str(
+                i.to_string(),
+                QuoteType::Unquoted,
+                BlockStyle::None,
+            )),
+            Node::Number(Numeric::Float(f)) => Some(Node::Str(
+                f.to_string(),
+                QuoteType::Unquoted,
+                BlockStyle::None,
+            )),
+            Node::Boolean(b) => Some(Node::Str(
+                b.to_string(),
+                QuoteType::Unquoted,
+                BlockStyle::None,
+            )),
+            Node::None => Some(Node::Str(
+                String::new(),
+                QuoteType::Unquoted,
+                BlockStyle::None,
+            )),
+            _ => None,
+        },
+
         _ => None,
     }
 }
@@ -174,11 +204,13 @@ pub fn parse_value_with_tokens(
                 // Decorator with no content - empty value
                 let mut result = Node::Str(String::new(), QuoteType::Unquoted, BlockStyle::None);
 
-                if let Some(tag) = decorators.tag {
-                    if let Some(coerced) = try_coerce_tag(&tag, result.clone()) {
+                if let Some(tag_raw) = decorators.tag {
+                    let resolved = directives.resolve_tag(&tag_raw);
+                    if let Some(coerced) = try_coerce_tag(&resolved, result.clone()) {
                         result = coerced;
                     } else {
-                        result = Node::Tagged(Box::new(result), tag);
+                        // Preserve the original tag text when not coercing
+                        result = Node::Tagged(Box::new(result), tag_raw);
                     }
                 }
 
@@ -201,8 +233,12 @@ pub fn parse_value_with_tokens(
         // Apply tag coercion first, then wrap with anchor
         let mut result = inner;
 
-        if let Some(tag) = decorators.tag {
-            if tag == "!!str" || tag == "!str" || tag == "tag:yaml.org,2002:str" {
+        if let Some(tag_raw) = decorators.tag {
+            let tag_resolved = directives.resolve_tag(&tag_raw);
+            if tag_resolved == "!!str"
+                || tag_resolved == "!str"
+                || tag_resolved == "tag:yaml.org,2002:str"
+            {
                 // Always coerce !!str to plain string, never wrap in Tagged
                 let s = match &result {
                     Node::Str(s, _, _) => s.clone(),
@@ -213,10 +249,11 @@ pub fn parse_value_with_tokens(
                     _ => format!("{:?}", result),
                 };
                 result = Node::Str(s, QuoteType::Unquoted, BlockStyle::None);
-            } else if let Some(coerced) = try_coerce_tag(&tag, result.clone()) {
+            } else if let Some(coerced) = try_coerce_tag(&tag_resolved, result.clone()) {
                 result = coerced;
             } else {
-                result = Node::Tagged(Box::new(result), tag);
+                // Preserve the original tag text when not coercing
+                result = Node::Tagged(Box::new(result), tag_raw);
             }
         }
 

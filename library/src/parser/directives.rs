@@ -78,10 +78,16 @@ impl DirectiveContext {
     ///
     /// Longer handles are matched first (e.g., `!e!` before `!`) to ensure correct resolution.
     pub fn resolve_tag(&self, tag: &str) -> String {
-        // Preserve standard local tags (e.g., !!yaml, !!str) as-is
-        // Tests expect the original handle, not the expanded URI.
+        // Resolve default !! handle to the YAML 1.2 prefix
         if tag.starts_with("!!") {
-            return tag.to_string();
+            let suffix = &tag[2..];
+            // Use the registered default prefix for !! if present, otherwise fallback
+            let default_prefix = self
+                .tag_prefixes
+                .get("!!")
+                .cloned()
+                .unwrap_or_else(|| "tag:yaml.org,2002:".to_string());
+            return alloc::format!("{}{}", default_prefix, suffix);
         }
         // Find the longest matching handle
         let mut best_match: Option<(&str, &str)> = None;

@@ -169,7 +169,7 @@ impl<'a> TokenStream<'a> {
     /// - tag then anchor: `!!str &name`
     /// - anchor then tag: `&name !!str`
     ///
-    /// Returns the decorators and resolves tags using the directive context.
+    /// Returns the decorators without resolving tag handles.
     pub fn consume_decorators(&mut self) -> Result<Decorators, String> {
         let mut decorators = Decorators::default();
 
@@ -181,9 +181,8 @@ impl<'a> TokenStream<'a> {
                     if decorators.tag.is_some() {
                         return Err("Duplicate tag found".to_string());
                     }
-                    // Resolve the tag using directive context
-                    let resolved = self.directives.resolve_tag(tag_str);
-                    decorators.tag = Some(resolved);
+                    // Preserve raw tag handle; resolve later in value parsing
+                    decorators.tag = Some(tag_str.clone());
                     self.next()?;
                 }
                 Some(Token::Anchor(name)) => {
@@ -303,10 +302,7 @@ impl<'a> TokenStream<'a> {
         // For now, this is a simplified version
 
         #[cfg(feature = "debug-trace")]
-        ts_log(format!(
-            "token_stream: has_colon_ahead -> {}",
-            has_colon
-        ));
+        ts_log(format!("token_stream: has_colon_ahead -> {}", has_colon));
         Ok(has_colon)
     }
 

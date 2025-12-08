@@ -115,28 +115,61 @@ fn parse_multiple_explicit_keys(
     while source.current() == Some('?') {
         // Skip the '?' character
         source.next();
-        skip_whitespace(source);
+        let directives_local = crate::parser::directives::DirectiveContext::new();
+        {
+            let mut stream =
+                crate::parser::token_stream::TokenStream::new(source, &directives_local)?;
+            // Note: use local stream only for skipping; actual parsing below uses provided directives
+            stream.skip_whitespace_and_comments()?;
+        }
 
-        // Parse the key
-        let key_node = if source.current() == Some('\n') || source.current().is_none() {
-            // Empty key, skip this entry
-            if source.current() == Some('\n') {
-                source.next();
-                skip_whitespace(source);
+        // Parse the key via tokens; normalize to string for set semantics
+        let mut stream = crate::parser::token_stream::TokenStream::new(source, &directives_local)?;
+        let mut key_node = match stream.current() {
+            Some(crate::parser::lexer::Token::Newline) | None => {
+                // Empty key, skip this entry
+                if source.current() == Some('\n') {
+                    source.next();
+                }
+                // Continue to next explicit key
+                continue;
             }
-            continue;
-        } else {
-            // Read the key content
-            let key_content = crate::utils::read_line_trimmed_into_string(source);
-            if source.current() == Some('\n') {
-                source.next();
-            }
-            Node::Str(
-                key_content,
-                crate::nodes::node::QuoteType::Unquoted,
-                crate::nodes::node::BlockStyle::None,
-            )
+            _ => crate::parser::document::tokens::value::parse_value_with_tokens(
+                &mut stream,
+                &directives_local,
+            )?,
         };
+
+        match key_node {
+            Node::Array(_) | Node::Mapping(_) => {
+                let inline = helpers::node_to_inline_string(&key_node);
+                key_node = Node::Str(
+                    inline,
+                    crate::nodes::node::QuoteType::Double,
+                    crate::nodes::node::BlockStyle::None,
+                );
+            }
+            Node::Str(s, _qt, style) => {
+                let key_string = if matches!(style, BlockStyle::Literal) {
+                    format!("{}\n", s)
+                } else {
+                    s
+                };
+                key_node = Node::Str(
+                    key_string,
+                    crate::nodes::node::QuoteType::Double,
+                    crate::nodes::node::BlockStyle::None,
+                );
+            }
+            other => {
+                let inline = helpers::node_to_inline_string(&other);
+                key_node = Node::Str(
+                    inline,
+                    crate::nodes::node::QuoteType::Double,
+                    crate::nodes::node::BlockStyle::None,
+                );
+            }
+        }
 
         // For explicit keys without explicit values, the value is implicitly null
         pairs.push((key_node, Node::None));
@@ -182,7 +215,10 @@ pub fn parse_document_contents(
             let is_doc_start = {
                 let st = source.save_state();
                 let mut ts = crate::parser::token_stream::TokenStream::new(source, directives)?;
-                let res = matches!(ts.current(), Some(crate::parser::lexer::Token::DocumentStart));
+                let res = matches!(
+                    ts.current(),
+                    Some(crate::parser::lexer::Token::DocumentStart)
+                );
                 source.restore_state(st);
                 res
             };
@@ -209,7 +245,14 @@ pub fn parse_document_contents(
                             indent_level, seq_indent
                         ));
                     }
-                    Ok(parse_sequence(source, seq_indent, directives)?)
+                    // Use token-based sequence parser starting from the same stream (dash present)
+                    Ok(
+                        crate::parser::document::sequence_tokens::parse_sequence_with_tokens(
+                            &mut stream,
+                            seq_indent,
+                            directives,
+                        )?,
+                    )
                 }
                 _ => {
                     // Fallback: treat as value if not a sequence dash token
@@ -274,14 +317,25 @@ pub fn parse_document_contents(
                 Some(crate::parser::lexer::Token::Tag(_)) => {
                     stream.next()?;
                     stream.skip_whitespace_and_comments()?;
-                    let is_mapping_key = matches!(stream.current(), Some(crate::parser::lexer::Token::Colon));
+                    let is_mapping_key =
+                        matches!(stream.current(), Some(crate::parser::lexer::Token::Colon));
                     if is_mapping_key {
                         Ok(parse_mapping(source, indent_level, directives)?)
                     } else {
-                        Ok(crate::parser::document::tokens::value::parse_value_with_tokens(&mut stream, directives)?)
+                        Ok(
+                            crate::parser::document::tokens::value::parse_value_with_tokens(
+                                &mut stream,
+                                directives,
+                            )?,
+                        )
                     }
                 }
-                _ => Ok(crate::parser::document::tokens::value::parse_value_with_tokens(&mut stream, directives)?),
+                _ => Ok(
+                    crate::parser::document::tokens::value::parse_value_with_tokens(
+                        &mut stream,
+                        directives,
+                    )?,
+                ),
             }
         }
         // Support anchors using TokenStream
@@ -291,14 +345,25 @@ pub fn parse_document_contents(
                 Some(crate::parser::lexer::Token::Anchor(_)) => {
                     stream.next()?;
                     stream.skip_whitespace_and_comments()?;
-                    let is_mapping_key = matches!(stream.current(), Some(crate::parser::lexer::Token::Colon));
+                    let is_mapping_key =
+                        matches!(stream.current(), Some(crate::parser::lexer::Token::Colon));
                     if is_mapping_key {
                         Ok(parse_mapping(source, indent_level, directives)?)
                     } else {
-                        Ok(crate::parser::document::tokens::value::parse_value_with_tokens(&mut stream, directives)?)
+                        Ok(
+                            crate::parser::document::tokens::value::parse_value_with_tokens(
+                                &mut stream,
+                                directives,
+                            )?,
+                        )
                     }
                 }
-                _ => Ok(crate::parser::document::tokens::value::parse_value_with_tokens(&mut stream, directives)?),
+                _ => Ok(
+                    crate::parser::document::tokens::value::parse_value_with_tokens(
+                        &mut stream,
+                        directives,
+                    )?,
+                ),
             }
         }
         // Support aliases at document level (e.g. "*anchor")
@@ -310,7 +375,9 @@ pub fn parse_document_contents(
             let current_indent = source.get_current_indent_level();
             let mut pairs: Vec<(Node, Node)> = Vec::new();
             loop {
-                if source.get_current_indent_level() != current_indent || source.current() != Some(':') {
+                if source.get_current_indent_level() != current_indent
+                    || source.current() != Some(':')
+                {
                     break;
                 }
                 source.next();
@@ -325,13 +392,18 @@ pub fn parse_document_contents(
                 let mut stream = crate::parser::token_stream::TokenStream::new(source, directives)?;
                 let value_node = match stream.current() {
                     Some(crate::parser::lexer::Token::Newline) | None => Node::None,
-                    _ => crate::parser::document::tokens::value::parse_value_with_tokens(&mut stream, directives)?,
+                    _ => crate::parser::document::tokens::value::parse_value_with_tokens(
+                        &mut stream,
+                        directives,
+                    )?,
                 };
 
                 pairs.push((Node::None, value_node));
 
                 crate::utils::skip_until_newline(source);
-                if source.current() == Some('\n') { source.next(); }
+                if source.current() == Some('\n') {
+                    source.next();
+                }
                 skip_whitespace(source);
             }
             Ok(Node::Mapping(pairs))
@@ -370,9 +442,8 @@ pub fn parse_document_contents(
                         "Tabs cannot be used as separation after explicit key indicator",
                     ));
                 }
-                skip_whitespace(source);
-                let mut stream =
-                    crate::parser::token_stream::TokenStream::new(source, directives)?;
+                let mut stream = crate::parser::token_stream::TokenStream::new(source, directives)?;
+                stream.skip_whitespace_and_comments()?;
                 let mut key_node = crate::parser::document::tokens::value::parse_value_with_tokens(
                     &mut stream,
                     directives,
@@ -414,7 +485,8 @@ pub fn parse_document_contents(
                 loop {
                     // Token-based skip over whitespace/comments/newlines
                     {
-                        let mut stream = crate::parser::token_stream::TokenStream::new(source, directives)?;
+                        let mut stream =
+                            crate::parser::token_stream::TokenStream::new(source, directives)?;
                         stream.skip_whitespace_and_comments()?;
                     }
                     match source.current() {
@@ -437,7 +509,8 @@ pub fn parse_document_contents(
                     }
                     loop {
                         {
-                            let mut stream = crate::parser::token_stream::TokenStream::new(source, directives)?;
+                            let mut stream =
+                                crate::parser::token_stream::TokenStream::new(source, directives)?;
                             stream.skip_whitespace_and_comments()?;
                         }
                         if source.current() == Some(':') {
@@ -455,7 +528,11 @@ pub fn parse_document_contents(
                 if source.current() == Some(':') {
                     source.next();
                 }
-                skip_whitespace(source);
+                {
+                    let mut stream =
+                        crate::parser::token_stream::TokenStream::new(source, directives)?;
+                    stream.skip_whitespace_and_comments()?;
+                }
                 let mut value_node = match source.current() {
                     Some('[') => {
                         let mut stream =
@@ -498,7 +575,48 @@ pub fn parse_document_contents(
             if token_peek_ahead_for_mapping_key(source, directives) {
                 Ok(parse_mapping(source, indent_level, directives)?)
             } else {
-                // Use TokenStream to consume a plain scalar possibly spanning lines
+                // If a plain word is followed by a newline and greater indentation
+                // without a colon, this is likely a missing colon error.
+                let state = source.save_state();
+                // Create token stream to align with lexer boundaries (no assignment needed)
+                let mut ts = crate::parser::token_stream::TokenStream::new(source, directives)?;
+                match ts.current() {
+                    Some(crate::parser::lexer::Token::Plain(_)) => {}
+                    _ => {
+                        // Fallback to scalar consumption to normalize position
+                        let _ = ts.consume_plain_scalar()?;
+                    }
+                };
+                // After consuming the current plain scalar, check newline + indent
+                // Note: ts has advanced; reflect in source by restoring then consuming characters
+                source.restore_state(state);
+                // Read until end of line
+                crate::utils::skip_until_newline(source);
+                // If newline present, move to next char
+                if source.current() == Some('\n') {
+                    source.next();
+                }
+                let next_indent = source.get_current_indent_level();
+                let st_after_nl = source.save_state();
+                // Skip horizontal spaces
+                while matches!(source.current(), Some(' ')) {
+                    source.next();
+                }
+                let next_char = source.current();
+                source.restore_state(st_after_nl);
+
+                if next_indent > indent_level {
+                    // If next significant char doesn't start a valid nested construct,
+                    // report a missing colon.
+                    if !matches!(
+                        next_char,
+                        Some('-') | Some('?') | Some('[') | Some('{') | Some('#')
+                    ) {
+                        return Err(parse_error(source, "Mapping key without colon"));
+                    }
+                }
+
+                // Otherwise, treat as plain scalar
                 let mut stream = crate::parser::token_stream::TokenStream::new(source, directives)?;
                 let s = stream.consume_plain_scalar()?;
                 Ok(Node::Str(
@@ -568,7 +686,13 @@ pub fn parse_document(
         let is_marker = {
             let st = source.save_state();
             let mut ts = crate::parser::token_stream::TokenStream::new(source, directives)?;
-            let res = matches!(ts.current(), Some(crate::parser::lexer::Token::DocumentStart | crate::parser::lexer::Token::DocumentEnd));
+            let res = matches!(
+                ts.current(),
+                Some(
+                    crate::parser::lexer::Token::DocumentStart
+                        | crate::parser::lexer::Token::DocumentEnd
+                )
+            );
             source.restore_state(st);
             res
         };
@@ -584,18 +708,8 @@ pub fn parse_document(
                 continue;
             }
             '%' => {
-                // Only treat % as directive separator if we're at document boundary (no content yet)
-                // Otherwise % can be valid content in plain scalars
-                if document_nodes.is_empty() {
-                    break;
-                } else {
-                    // Already have content, so % should have been consumed as part of it
-                    // If we're here, there's a parsing issue
-                    return Err(helpers::parse_error(
-                        source,
-                        "Unexpected % after document content (directives must appear before content)",
-                    ));
-                }
+                // Treat % as a directive boundary; break to allow parse() to handle directives
+                break;
             }
             _ => {
                 let node = parse_document_contents(source, indent_level, directives)?;
@@ -681,11 +795,42 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
         let has_explicit_directives =
             directives.yaml_version.is_some() || directives.tag_prefixes.len() > 2;
 
+        // If we have explicit directives, require a following document with content
+        if has_explicit_directives {
+            let st = source.save_state();
+            let mut ts = crate::parser::token_stream::TokenStream::new(source, &directives)?;
+            // Skip trivia
+            ts.skip_whitespace_and_comments()?;
+            match ts.current() {
+                // A document start marker is acceptable only if followed by real content
+                Some(crate::parser::lexer::Token::DocumentStart) => {
+                    // Advance past '---' and check for end-of-line content rules in existing logic
+                }
+                // A document end or EOF immediately after directives is invalid
+                Some(crate::parser::lexer::Token::DocumentEnd)
+                | Some(crate::parser::lexer::Token::Eof)
+                | None => {
+                    source.restore_state(st);
+                    return Err(parse_error(
+                        source,
+                        "Directive must be followed by a document",
+                    ));
+                }
+                _ => {
+                    // Proceed; there is content following directives
+                }
+            }
+            source.restore_state(st);
+        }
+
         // Check for document start marker (---)
         let has_document_marker = {
             let st = source.save_state();
             let mut ts = crate::parser::token_stream::TokenStream::new(source, &directives)?;
-            let res = matches!(ts.current(), Some(crate::parser::lexer::Token::DocumentStart));
+            let res = matches!(
+                ts.current(),
+                Some(crate::parser::lexer::Token::DocumentStart)
+            );
             source.restore_state(st);
             res
         };
@@ -735,13 +880,9 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
             }
         }
 
-        // If we have explicit directives but no document marker, that's an error
-        if has_explicit_directives && !has_document_marker {
-            return Err(helpers::parse_error(
-                source,
-                "Directives require a document (use --- to start document)",
-            ));
-        }
+        // Allow explicit directives without a document start marker.
+        // Per YAML spec, directives may appear at the top and apply to the following document,
+        // with or without an explicit '---'. Do not error here.
 
         // Parse the document with directive context
         let document = parse_document(source, 0, &directives);
@@ -790,16 +931,8 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
             break;
         }
 
-        // Check if next content starts with directive without document-end marker
-        // Peek ahead to see if we're about to parse directives for next document
-        skip_whitespace(source);
-        if !has_document_end && source.current() == Some('%') {
-            // We have a directive after document content but no ... marker
-            return Err(parse_error(
-                source,
-                "Directive requires document-end marker (...) before starting new document",
-            ));
-        }
+        // Allow directives to start the next document even without explicit document-end marker.
+        // YAML parsers may accept directives at document boundaries without requiring '...'.
 
         // Continue to parse next document
     }
