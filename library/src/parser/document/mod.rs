@@ -191,13 +191,23 @@ pub fn parse_document_contents(
                     ));
                 }
             }
-            if seq_indent < indent_level {
-                return Err(format!(
-                    "Sequence item at invalid indentation: expected >= {}, got {}",
-                    indent_level, seq_indent
-                ));
+            // Tokenize to confirm dash is a sequence indicator at this position
+            let mut stream = crate::parser::token_stream::TokenStream::new(source, directives)?;
+            match stream.current() {
+                Some(crate::parser::lexer::Token::Dash) => {
+                    if seq_indent < indent_level {
+                        return Err(format!(
+                            "Sequence item at invalid indentation: expected >= {}, got {}",
+                            indent_level, seq_indent
+                        ));
+                    }
+                    Ok(parse_sequence(source, seq_indent, directives)?)
+                }
+                _ => {
+                    // Fallback: treat as value if not a sequence dash token
+                    Ok(parse_value(source, directives)?)
+                }
             }
-            Ok(parse_sequence(source, seq_indent, directives)?)
         }
         Some(c) if c == '.' => {
             // Check if this is a document end marker (...)
