@@ -306,7 +306,7 @@ fn parse_value_content(
             Err(syntax_error(stream.source_mut(), &token_str))
         }
     }
-    }
+}
 
 #[cfg(test)]
 mod tests {
