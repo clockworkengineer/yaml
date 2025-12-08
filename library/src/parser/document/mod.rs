@@ -128,10 +128,16 @@ pub fn parse_document_contents(
     match source.current() {
         Some(c) if c == '-' => {
             // Check if this is a document marker (---)
-            if helpers::peek_ahead_for_document_start_end(source, '-') {
-                return Ok(Node::None);
-            }
             let seq_indent = source.get_current_indent_level();
+            if helpers::peek_ahead_for_document_start_end(source, '-') {
+                if seq_indent == 0 {
+                    return Ok(Node::None);
+                } else {
+                    // Not at indent 0, treat as unquoted string
+                    let s = crate::utils::read_line_trimmed_into_string(source);
+                    return Ok(Node::Str(s, crate::nodes::node::QuoteType::Unquoted, crate::nodes::node::BlockStyle::None));
+                }
+            }
             if seq_indent < indent_level {
                 return Err(format!(
                     "Sequence item at invalid indentation: expected >= {}, got {}",
@@ -142,10 +148,16 @@ pub fn parse_document_contents(
         }
         Some(c) if c == '.' => {
             // Check if this is a document end marker (...)
-            if helpers::peek_ahead_for_document_start_end(source, '.') {
-                return Ok(Node::None);
-            }
             let map_indent = source.get_current_indent_level();
+            if helpers::peek_ahead_for_document_start_end(source, '.') {
+                if map_indent == 0 {
+                    return Ok(Node::None);
+                } else {
+                    // Not at indent 0, treat as unquoted string
+                    let s = crate::utils::read_line_trimmed_into_string(source);
+                    return Ok(Node::Str(s, crate::nodes::node::QuoteType::Unquoted, crate::nodes::node::BlockStyle::None));
+                }
+            }
             if map_indent < indent_level {
                 return Err(format!(
                     "Mapping key at invalid indentation: expected >= {}, got {}",
