@@ -332,9 +332,8 @@ pub fn parse_document_contents(
                 // Parse multiple explicit keys (typically for sets)
                 return Ok(parse_multiple_explicit_keys(source, current_indent)?);
             } else {
-                // Original single explicit key logic
+                // Refactored single explicit key logic to use TokenStream-based parsing
                 source.next();
-                // Tabs are not allowed immediately after '?' indicator
                 if source.current() == Some('\t') {
                     return Err(helpers::parse_error(
                         source,
@@ -342,69 +341,12 @@ pub fn parse_document_contents(
                     ));
                 }
                 skip_whitespace(source);
-                let mut key_node: Node;
-
-                if source.current() == Some('[') {
-                    {
-                        let mut stream =
-                            crate::parser::token_stream::TokenStream::new(source, directives)?;
-                        key_node = parse_inline_sequence(&mut stream, directives)?;
-                    }
-                } else if source.current() == Some('-') {
-                    let nested_indent = source.get_current_indent_level();
-                    key_node = parse_sequence(source, nested_indent, directives)?;
-                } else if matches!(source.current(), Some('|') | Some('>')) {
-                    let is_folded = source.current() == Some('>');
-
-                    // Use the consolidated block scalar parser with a token stream
-                    let mut stream =
-                        crate::parser::token_stream::TokenStream::new(source, directives)?;
-                    let content = block_scalar::parse_block_scalar(&mut stream, is_folded)?;
-
-                    let mut escaped_key = content;
-                    escaped_key.push_str("\\n");
-                    key_node = Node::Str(
-                        escaped_key,
-                        crate::nodes::node::QuoteType::Double,
-                        crate::nodes::node::BlockStyle::None,
-                    );
-                } else if matches!(
-                    source.current(),
-                    Some('"') | Some('\'') | Some('&') | Some('*') | Some('!')
-                ) {
-                    // Quoted strings, anchors, aliases, and tags need special parsing
-                    key_node = crate::parser::document::value::parse_value(source, directives)?;
-                } else if source.current() == Some('#') || source.current() == Some('\n') {
-                    let st = source.save_state();
-                    let _ = crate::utils::read_line_trimmed_into_string(source);
-                    if source.current() == Some('\n') {
-                        source.next();
-                    }
-                    skip_whitespace(source);
-                    if source.current() == Some('-') {
-                        let nested_indent = source.get_current_indent_level();
-                        key_node = parse_sequence(source, nested_indent, directives)?;
-                    } else {
-                        source.restore_state(st);
-                        key_node = Node::Str(
-                            crate::utils::read_line_trimmed_into_string(source),
-                            crate::nodes::node::QuoteType::Unquoted,
-                            crate::nodes::node::BlockStyle::None,
-                        );
-                    }
-                } else if source.current().is_some() {
-                    key_node = Node::Str(
-                        crate::utils::read_line_trimmed_into_string(source),
-                        crate::nodes::node::QuoteType::Unquoted,
-                        crate::nodes::node::BlockStyle::None,
-                    );
-                } else {
-                    key_node = Node::Str(
-                        String::new(),
-                        crate::nodes::node::QuoteType::Unquoted,
-                        crate::nodes::node::BlockStyle::None,
-                    );
-                }
+                let mut stream =
+                    crate::parser::token_stream::TokenStream::new(source, directives)?;
+                let mut key_node = crate::parser::document::tokens::value::parse_value_with_tokens(
+                    &mut stream,
+                    directives,
+                )?;
 
                 match key_node {
                     Node::Array(_) | Node::Mapping(_) => {
