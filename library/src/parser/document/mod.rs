@@ -135,7 +135,11 @@ pub fn parse_document_contents(
                 } else {
                     // Not at indent 0, treat as unquoted string
                     let s = crate::utils::read_line_trimmed_into_string(source);
-                    return Ok(Node::Str(s, crate::nodes::node::QuoteType::Unquoted, crate::nodes::node::BlockStyle::None));
+                    return Ok(Node::Str(
+                        s,
+                        crate::nodes::node::QuoteType::Unquoted,
+                        crate::nodes::node::BlockStyle::None,
+                    ));
                 }
             }
             if seq_indent < indent_level {
@@ -155,7 +159,11 @@ pub fn parse_document_contents(
                 } else {
                     // Not at indent 0, treat as unquoted string
                     let s = crate::utils::read_line_trimmed_into_string(source);
-                    return Ok(Node::Str(s, crate::nodes::node::QuoteType::Unquoted, crate::nodes::node::BlockStyle::None));
+                    return Ok(Node::Str(
+                        s,
+                        crate::nodes::node::QuoteType::Unquoted,
+                        crate::nodes::node::BlockStyle::None,
+                    ));
                 }
             }
             if map_indent < indent_level {

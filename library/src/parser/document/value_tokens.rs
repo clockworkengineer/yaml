@@ -149,8 +149,11 @@ pub fn parse_value_with_tokens(
     if decorators.tag.is_some() || decorators.anchor.is_some() {
         #[cfg(feature = "debug-trace")]
         log::debug!("value_tokens: decorators = {:?}", decorators);
-        // Skip whitespace/newlines after decorators to find the actual content
-        stream.skip_whitespace()?;
+        // Do NOT skip indentation/newlines here. Indentation signals nested
+        // block structures (e.g., a mapping following a tag like !!set), and
+        // consuming it would hide structure boundaries from the value parser.
+        // Only skip comments; structural whitespace must be preserved.
+        stream.skip_comments()?;
 
         // NOW check if we're at EOF or end of structure (empty decorated value)
         // This includes:

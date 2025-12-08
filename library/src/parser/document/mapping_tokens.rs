@@ -177,10 +177,13 @@ fn parse_mapping_pair(
             stream.next()?;
         }
         _ if explicit_key => {
-            // Explicit key might have colon on next line
+            // Explicit key may omit a value entirely (e.g., !!set with '? key').
+            // YAML allows explicit keys without a following colon to indicate an
+            // empty value. If the colon isn't found on the next non-trivia token,
+            // treat the value as empty rather than error.
             if matches!(stream.current(), Some(Token::Newline)) {
                 stream.next()?;
-                // Skip whitespace and comments again
+                // Skip indentation and comments
                 loop {
                     stream.skip_whitespace()?;
                     match stream.current() {
@@ -194,21 +197,16 @@ fn parse_mapping_pair(
                 if matches!(stream.current(), Some(Token::Colon)) {
                     stream.next()?;
                 } else {
-                    // If next token is a valid key, treat as empty value
-                    match stream.current() {
-                        Some(Token::Plain(_))
-                        | Some(Token::Tag(_))
-                        | Some(Token::Anchor(_))
-                        | Some(Token::QuestionMark) => {
-                            return Ok((key, Node::None));
-                        }
-                        _ => {
-                            return Err("Expected colon after explicit key".to_string());
-                        }
-                    }
+                    // No colon: treat as empty value for explicit key
+                    return Ok((key, Node::None));
                 }
             } else {
-                return Err("Expected colon after explicit key".to_string());
+                // No newline after explicit key: if colon absent, treat as empty
+                if !matches!(stream.current(), Some(Token::Colon)) {
+                    return Ok((key, Node::None));
+                } else {
+                    stream.next()?;
+                }
             }
         }
         Some(Token::Eof) | None => {
@@ -329,6 +327,26 @@ mod tests {
             assert_eq!(pairs.len(), 2);
             // First key should be tagged null (empty)
             // Second value should be tagged empty string
+        } else {
+            panic!("Expected Mapping node, got: {:?}", result);
+        }
+    }
+
+    #[test]
+    fn test_explicit_keys_block_mapping() {
+        // Explicit keys without values should produce Node::None values
+        let yaml = b"? item1\n? item2\n? item3\n";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+
+        let result = parse_mapping_with_tokens(&mut stream, 0, &directives).unwrap();
+
+        if let Node::Mapping(pairs) = result {
+            assert_eq!(pairs.len(), 3);
+            assert!(matches!(pairs[0].1, Node::None));
+            assert!(matches!(pairs[1].1, Node::None));
+            assert!(matches!(pairs[2].1, Node::None));
         } else {
             panic!("Expected Mapping node, got: {:?}", result);
         }

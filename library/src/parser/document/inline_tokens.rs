@@ -147,24 +147,26 @@ pub fn parse_inline_mapping_with_tokens(
                 // Skip whitespace
                 stream.skip_whitespace_and_comments()?;
 
-                // Expect colon
-                if !matches!(stream.current(), Some(Token::Colon)) {
-                    return Err(syntax_error(
-                        stream.source_mut(),
-                        "Expected : after mapping key in flow mapping",
-                    ));
+                // Expect colon for regular mappings; if absent, treat as
+                // an empty value entry (useful for !!set like {a, b, c}).
+                if matches!(stream.current(), Some(Token::Colon)) {
+                    stream.next()?;
+
+                    // Skip whitespace
+                    stream.skip_whitespace_and_comments()?;
+
+                    // Parse the value
+                    let value = parse_value_with_tokens(stream, directives)?;
+                    #[cfg(feature = "debug-trace")]
+                    log::debug!("inline_tokens: map entry -> ({:?}, {:?})", key, value);
+
+                    pairs.push((key, value));
+                } else {
+                    // No colon: record as key with empty value
+                    #[cfg(feature = "debug-trace")]
+                    log::debug!("inline_tokens: map entry (empty) -> ({:?}, None)", key);
+                    pairs.push((key, Node::None));
                 }
-                stream.next()?;
-
-                // Skip whitespace
-                stream.skip_whitespace_and_comments()?;
-
-                // Parse the value
-                let value = parse_value_with_tokens(stream, directives)?;
-                #[cfg(feature = "debug-trace")]
-                log::debug!("inline_tokens: map entry -> ({:?}, {:?})", key, value);
-
-                pairs.push((key, value));
                 expect_entry = false;
             }
         }
