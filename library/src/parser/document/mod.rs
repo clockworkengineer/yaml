@@ -253,8 +253,9 @@ pub fn parse_document_contents(
             }
         }
         Some(c) if c == '#' => {
-            parse_comment(source);
-            skip_whitespace(source);
+            // Use token stream to skip comments and whitespace uniformly
+            let mut stream = crate::parser::token_stream::TokenStream::new(source, directives)?;
+            stream.skip_whitespace_and_comments()?;
             parse_document_contents(source, indent_level, directives)
         }
         Some(c) if c == '{' => {
@@ -411,19 +412,16 @@ pub fn parse_document_contents(
                 let st_colon = source.save_state();
                 let mut found_colon = false;
                 loop {
-                    skip_whitespace(source);
+                    // Token-based skip over whitespace/comments/newlines
+                    {
+                        let mut stream = crate::parser::token_stream::TokenStream::new(source, directives)?;
+                        stream.skip_whitespace_and_comments()?;
+                    }
                     match source.current() {
                         Some(':') => {
                             source.next();
                             found_colon = true;
                             break;
-                        }
-                        Some('#') => {
-                            parse_comment(source);
-                            if source.current() == Some('\n') {
-                                source.next();
-                            }
-                            continue;
                         }
                         Some('\n') => {
                             source.next();
@@ -438,7 +436,10 @@ pub fn parse_document_contents(
                         source.next();
                     }
                     loop {
-                        skip_whitespace(source);
+                        {
+                            let mut stream = crate::parser::token_stream::TokenStream::new(source, directives)?;
+                            stream.skip_whitespace_and_comments()?;
+                        }
                         if source.current() == Some(':') {
                             break;
                         }
@@ -578,8 +579,8 @@ pub fn parse_document(
 
         match c {
             '#' => {
-                parse_comment(source);
-                skip_whitespace(source);
+                let mut stream = crate::parser::token_stream::TokenStream::new(source, directives)?;
+                stream.skip_whitespace_and_comments()?;
                 continue;
             }
             '%' => {

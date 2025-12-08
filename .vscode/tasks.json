@@ -1,0 +1,183 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "cargo test parser::document::tests",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"--package",
+				"yaml_lib",
+				"--lib",
+				"--",
+				"parser::document::tests",
+				"--nocapture"
+			]
+		},
+		{
+			"label": "cargo test all",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"--package",
+				"yaml_lib",
+				"--lib",
+				"--nocapture"
+			]
+		},
+		{
+			"label": "cargo test all fixed",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"--package",
+				"yaml_lib",
+				"--lib",
+				"--",
+				"--nocapture"
+			]
+		},
+		{
+			"label": "cargo test lib nocapture",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"--package",
+				"yaml_lib",
+				"--lib",
+				"--",
+				"--nocapture"
+			]
+		},
+		{
+			"label": "cargo test document unit",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"--package",
+				"yaml_lib",
+				"--lib",
+				"--",
+				"parser::document::tests",
+				"--nocapture"
+			]
+		},
+		{
+			"label": "cargo test document unit retry",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"--package",
+				"yaml_lib",
+				"--lib",
+				"--",
+				"parser::document::tests",
+				"--nocapture"
+			]
+		},
+		{
+			"label": "cargo test document unit final",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"--package",
+				"yaml_lib",
+				"--lib",
+				"--",
+				"parser::document::tests",
+				"--nocapture"
+			]
+		},
+		{
+			"label": "cargo test document unit final retry",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"--package",
+				"yaml_lib",
+				"--lib",
+				"--",
+				"parser::document::tests",
+				"--nocapture"
+			]
+		},
+		{
+			"label": "cargo test doc unit run",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"--package",
+				"yaml_lib",
+				"--lib",
+				"--",
+				"parser::document::tests",
+				"--nocapture"
+			]
+		},
+		{
+			"label": "cargo test document after sequence change",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"--package",
+				"yaml_lib",
+				"--lib",
+				"--",
+				"parser::document::tests",
+				"--nocapture"
+			]
+		},
+		{
+			"label": "cargo test document after marker change",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"--package",
+				"yaml_lib",
+				"--lib",
+				"--",
+				"parser::document::tests",
+				"--nocapture"
+			]
+		},
+		{
+			"label": "cargo test after whitespace normalization",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"--package",
+				"yaml_lib",
+				"--lib",
+				"--",
+				"parser::document::tests",
+				"--nocapture"
+			]
+		},
+		{
+			"label": "cargo test after explicit key whitespace change",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"--package",
+				"yaml_lib",
+				"--lib",
+				"--",
+				"parser::document::tests",
+				"--nocapture"
+			]
+		}
+	]
+}
