@@ -30,7 +30,8 @@ pub(crate) use helpers::{parse_comment, parse_error, peek_ahead_for_mapping_key}
 pub(crate) use inline::{parse_inline_mapping, parse_inline_sequence};
 pub(crate) use mapping::parse_mapping;
 #[cfg(test)]
-pub(crate) use scalar::parse_scalar;
+#[cfg(test)]
+pub(crate) use scalar::parse_scalar_with_tokens;
 pub(crate) use sequence::parse_sequence;
 pub(crate) use value::parse_value;
 
@@ -920,33 +921,46 @@ mod tests {
     use crate::io::sources::buffer::Buffer;
 
     #[test]
-    fn test_parse_scalar() {
+    fn test_parse_scalar_with_tokens() {
+        use crate::io::sources::buffer::Buffer;
         let directives = crate::parser::directives::DirectiveContext::new();
-        assert_eq!(parse_scalar("null", &directives), Ok(Node::None));
-        assert_eq!(parse_scalar("~", &directives), Ok(Node::None));
-        assert_eq!(parse_scalar("true", &directives), Ok(Node::Boolean(true)));
-        assert_eq!(parse_scalar("false", &directives), Ok(Node::Boolean(false)));
+
+        // Helper to parse a single-token scalar through TokenStream
+        fn parse_one(
+            input: &str,
+            directives: &crate::parser::directives::DirectiveContext,
+        ) -> Result<Node, String> {
+            let mut src = Buffer::new(input.as_bytes());
+            let mut stream = crate::parser::token_stream::TokenStream::new(&mut src, directives)?;
+            parse_scalar_with_tokens(&mut stream, directives, 0)
+        }
+
+        assert_eq!(parse_one("null", &directives), Ok(Node::None));
+        assert_eq!(parse_one("~", &directives), Ok(Node::None));
+        assert_eq!(parse_one("true", &directives), Ok(Node::Boolean(true)));
+        assert_eq!(parse_one("false", &directives), Ok(Node::Boolean(false)));
         assert_eq!(
-            parse_scalar("42", &directives),
+            parse_one("42", &directives),
             Ok(Node::Number(crate::nodes::node::Numeric::Integer(42)))
         );
         assert_eq!(
-            parse_scalar("3.14", &directives),
+            parse_one("3.14", &directives),
             Ok(Node::Number(crate::nodes::node::Numeric::Float(3.14)))
         );
         assert_eq!(
-            parse_scalar("hello", &directives),
+            parse_one("hello", &directives),
             Ok(Node::Str(
                 "hello".to_string(),
                 crate::nodes::node::QuoteType::Unquoted,
                 crate::nodes::node::BlockStyle::None
             ))
         );
+        // In token-based parsing, leading '#' starts a comment, so quote to treat as scalar
         assert_eq!(
-            parse_scalar("#comment", &directives),
+            parse_one("'#comment'", &directives),
             Ok(Node::Str(
                 "#comment".to_string(),
-                crate::nodes::node::QuoteType::Unquoted,
+                crate::nodes::node::QuoteType::Single,
                 crate::nodes::node::BlockStyle::None
             ))
         );
