@@ -45,6 +45,54 @@ use crate::parser::directives::{DirectiveContext, parse_directives};
 use helpers::node_is_blank;
 use helpers::skip_whitespace;
 
+/// Token-based lookahead to determine if the current position starts a mapping key (key: ...)
+/// Scans tokens until end-of-line and returns true if a colon token appears at the same nesting level
+/// and not inside flow collections.
+fn token_peek_ahead_for_mapping_key(
+    source: &mut dyn ISource,
+    directives: &DirectiveContext,
+) -> bool {
+    if !source.more() {
+        return false;
+    }
+    // Preserve source position
+    let state = source.save_state();
+    let mut result = false;
+    if let Ok(mut stream) = crate::parser::token_stream::TokenStream::new(source, directives) {
+        // Track flow depth to ignore colons inside [] or {}
+        let mut flow_depth: i32 = 0;
+        // Walk tokens until newline or EOF
+        while let Some(tok) = stream.current() {
+            use crate::parser::lexer::Token;
+            match tok {
+                Token::Newline | Token::Eof => break,
+                Token::FlowSequenceStart | Token::FlowMappingStart => {
+                    flow_depth += 1;
+                    let _ = stream.next();
+                }
+                Token::FlowSequenceEnd | Token::FlowMappingEnd => {
+                    flow_depth = std::cmp::max(0, flow_depth - 1);
+                    let _ = stream.next();
+                }
+                Token::Colon => {
+                    // Colon at base (non-flow) level indicates mapping key
+                    if flow_depth == 0 {
+                        result = true;
+                        break;
+                    }
+                    let _ = stream.next();
+                }
+                _ => {
+                    let _ = stream.next();
+                }
+            }
+        }
+    }
+    // Restore original source position
+    source.restore_state(state);
+    result
+}
+
 /// Parses multiple explicit keys for sets or mappings.
 ///
 /// Handles the case where we have multiple consecutive lines starting with '?'
@@ -173,7 +221,7 @@ pub fn parse_document_contents(
                     indent_level, map_indent
                 ));
             }
-            if peek_ahead_for_mapping_key(source) {
+            if token_peek_ahead_for_mapping_key(source, directives) {
                 Ok(parse_mapping(source, map_indent, directives)?)
             } else {
                 Ok(parse_value(source, directives)?)
@@ -421,7 +469,7 @@ pub fn parse_document_contents(
             }
         }
         Some(c) if c.is_alphanumeric() => {
-            if peek_ahead_for_mapping_key(source) {
+            if token_peek_ahead_for_mapping_key(source, directives) {
                 Ok(parse_mapping(source, indent_level, directives)?)
             } else {
                 // Use TokenStream to consume a plain scalar possibly spanning lines
@@ -444,7 +492,7 @@ pub fn parse_document_contents(
         }
         Some(c) if matches!(c, '<' | '>' | '"' | '\'' | '|') => {
             if matches!(source.current(), Some('"') | Some('\''))
-                && peek_ahead_for_mapping_key(source)
+                && token_peek_ahead_for_mapping_key(source, directives)
             {
                 Ok(parse_mapping(source, indent_level, directives)?)
             } else {
