@@ -342,3 +342,62 @@ pub(crate) fn parse_scalar(value: &str, directives: &DirectiveContext) -> Result
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::io::sources::buffer::Buffer;
+
+    #[test]
+    fn test_block_literal_basic_via_tokens() {
+        let mut source = Buffer::new(b"|\n  line1\n  line2\n");
+        let directives = DirectiveContext::new();
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let node = parse_scalar_with_tokens(&mut stream, &directives, 0).unwrap();
+        assert!(
+            matches!(node, Node::Str(ref s, QuoteType::Unquoted, BlockStyle::Literal) if s == "|\nline1\nline2")
+        );
+    }
+
+    #[test]
+    fn test_block_folded_basic_via_tokens() {
+        let mut source = Buffer::new(b">\n  line1\n  line2\n");
+        let directives = DirectiveContext::new();
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let node = parse_scalar_with_tokens(&mut stream, &directives, 0).unwrap();
+        assert!(
+            matches!(node, Node::Str(ref s, QuoteType::Unquoted, BlockStyle::Folded) if s == ">\nline1\nline2")
+        );
+    }
+
+    #[test]
+    fn test_block_scalar_chomping_strip_minus() {
+        // Using string-based parser path to verify chomping behavior
+        let directives = DirectiveContext::new();
+        let value = "| -\n  a\n  b\n\n";
+        let node = parse_scalar(value, &directives).unwrap();
+        assert!(
+            matches!(node, Node::Str(ref s, QuoteType::Unquoted, BlockStyle::Literal) if !s.ends_with('\n'))
+        );
+    }
+
+    #[test]
+    fn test_block_scalar_chomping_keep_plus() {
+        let directives = DirectiveContext::new();
+        let value = "| +\n  a\n  b\n\n\n";
+        let node = parse_scalar(value, &directives).unwrap();
+        assert!(
+            matches!(node, Node::Str(ref s, QuoteType::Unquoted, BlockStyle::Literal) if s.ends_with("\n\n"))
+        );
+    }
+
+    #[test]
+    fn test_block_scalar_indent_indicator() {
+        let directives = DirectiveContext::new();
+        let value = "| 2\n    a\n    b\n";
+        let node = parse_scalar(value, &directives).unwrap();
+        assert!(
+            matches!(node, Node::Str(ref s, QuoteType::Unquoted, BlockStyle::Literal) if s.contains("a") && s.contains("b"))
+        );
+    }
+}
