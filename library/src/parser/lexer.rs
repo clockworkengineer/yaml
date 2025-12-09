@@ -173,7 +173,11 @@ impl<'a> Lexer<'a> {
                 Ok(Some(Token::FlowMappingStart))
             }
             CHAR_RBRACE => {
+                // Check for comment immediately after } with no whitespace
                 self.source.next();
+                if let Some('#') = self.source.current() {
+                    return Err("YAML syntax error: comment must be preceded by whitespace after '}' in flow collection".to_string());
+                }
                 Ok(Some(Token::FlowMappingEnd))
             }
             CHAR_LBRACKET => {
@@ -181,7 +185,11 @@ impl<'a> Lexer<'a> {
                 Ok(Some(Token::FlowSequenceStart))
             }
             CHAR_RBRACKET => {
+                // Check for comment immediately after ] with no whitespace
                 self.source.next();
+                if let Some('#') = self.source.current() {
+                    return Err("YAML syntax error: comment must be preceded by whitespace after ']' in flow collection".to_string());
+                }
                 Ok(Some(Token::FlowSequenceEnd))
             }
             CHAR_COMMA => {

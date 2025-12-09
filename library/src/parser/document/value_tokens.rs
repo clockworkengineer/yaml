@@ -160,7 +160,11 @@ pub fn parse_value_with_tokens(
     if depth > MAX_NESTING_DEPTH {
         return Err("Nesting too deep: possible malicious or malformed YAML".to_string());
     }
-    println!("DEBUG: ENTER parse_value_with_tokens (depth {}), current token: {:?}", depth, stream.current());
+    println!(
+        "DEBUG: ENTER parse_value_with_tokens (depth {}), current token: {:?}",
+        depth,
+        stream.current()
+    );
     #[cfg(feature = "debug-trace")]
     log::debug!(
         "value_tokens: start parse_value_with_tokens at token = {:?}",
@@ -246,7 +250,9 @@ pub fn parse_value_with_tokens(
             {
                 // For block scalars, preserve block style; otherwise, coerce to plain string
                 match &result {
-                    Node::Str(s, q, style) if *style == BlockStyle::Literal || *style == BlockStyle::Folded => {
+                    Node::Str(s, q, style)
+                        if *style == BlockStyle::Literal || *style == BlockStyle::Folded =>
+                    {
                         result = Node::Str(s.clone(), q.clone(), style.clone());
                     }
                     Node::Str(s, _, _) => {
@@ -265,28 +271,40 @@ pub fn parse_value_with_tokens(
                         result = Node::Str(String::new(), QuoteType::Unquoted, BlockStyle::None);
                     }
                     _ => {
-                        result = Node::Str(format!("{:?}", result), QuoteType::Unquoted, BlockStyle::None);
+                        result = Node::Str(
+                            format!("{:?}", result),
+                            QuoteType::Unquoted,
+                            BlockStyle::None,
+                        );
                     }
                 }
             } else if tag_resolved == "!!seq" || tag_resolved == "tag:yaml.org,2002:seq" {
                 // Always wrap as Tagged with canonical tag for sequences
                 match &result {
                     Node::Array(items) => {
-                        result = Node::Tagged(Box::new(Node::Array(items.clone())), "tag:yaml.org,2002:seq".to_string());
+                        result = Node::Tagged(
+                            Box::new(Node::Array(items.clone())),
+                            "tag:yaml.org,2002:seq".to_string(),
+                        );
                     }
                     _ => {
                         // If not an array, still wrap whatever is there
-                        result = Node::Tagged(Box::new(result), "tag:yaml.org,2002:seq".to_string());
+                        result =
+                            Node::Tagged(Box::new(result), "tag:yaml.org,2002:seq".to_string());
                     }
                 }
             } else if tag_resolved == "!!map" || tag_resolved == "tag:yaml.org,2002:map" {
                 // Always wrap as Tagged with canonical tag for mappings
                 match &result {
                     Node::Mapping(pairs) => {
-                        result = Node::Tagged(Box::new(Node::Mapping(pairs.clone())), "tag:yaml.org,2002:map".to_string());
+                        result = Node::Tagged(
+                            Box::new(Node::Mapping(pairs.clone())),
+                            "tag:yaml.org,2002:map".to_string(),
+                        );
                     }
                     _ => {
-                        result = Node::Tagged(Box::new(result), "tag:yaml.org,2002:map".to_string());
+                        result =
+                            Node::Tagged(Box::new(result), "tag:yaml.org,2002:map".to_string());
                     }
                 }
             } else if let Some(coerced) = try_coerce_tag(&tag_resolved, result.clone()) {
@@ -316,7 +334,7 @@ pub fn parse_value_with_tokens(
     let node = parse_value_content(stream, directives, depth + 1);
     #[cfg(feature = "debug-trace")]
     if let Ok(ref n) = node {
-           log::debug!("value_tokens: plain value -> {:?}", n);
+        log::debug!("value_tokens: plain value -> {:?}", n);
     }
     node
 }
@@ -394,7 +412,7 @@ mod tests {
     #[test]
     fn test_tag_on_empty_value() {
         // This is the FH7J pattern that caused infinite loops!
-            let mut source = Buffer::new(b"!!str");
+        let mut source = Buffer::new(b"!!str");
         let directives = DirectiveContext::default();
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
@@ -408,7 +426,7 @@ mod tests {
     #[test]
     fn test_anchor_on_empty_value() {
         // This is the PW8X pattern that caused infinite loops!
-            let mut source = Buffer::new(b"&anchor");
+        let mut source = Buffer::new(b"&anchor");
         let directives = DirectiveContext::default();
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
@@ -427,7 +445,7 @@ mod tests {
     #[test]
     fn test_both_decorators_on_empty() {
         let mut source = Buffer::new(b"!!str &anchor");
-            let directives = DirectiveContext::default();
+        let directives = DirectiveContext::default();
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
         let result = parse_value_with_tokens(&mut stream, &directives, 0).unwrap();
@@ -445,7 +463,7 @@ mod tests {
     #[test]
     fn test_tag_with_plain_value() {
         let mut source = Buffer::new(b"!!str hello");
-            let directives = DirectiveContext::default();
+        let directives = DirectiveContext::default();
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
         stream.next().unwrap(); // Initialize
@@ -458,7 +476,7 @@ mod tests {
     #[test]
     fn test_anchor_with_quoted_value() {
         let mut source = Buffer::new(b"&anchor 'hello'");
-            let directives = DirectiveContext::default();
+        let directives = DirectiveContext::default();
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
         let result = parse_value_with_tokens(&mut stream, &directives, 0).unwrap();
@@ -476,7 +494,7 @@ mod tests {
     #[test]
     fn test_alias() {
         let mut source = Buffer::new(b"*myalias");
-            let directives = DirectiveContext::default();
+        let directives = DirectiveContext::default();
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
         let result = parse_value_with_tokens(&mut stream, &directives, 0).unwrap();
@@ -488,7 +506,7 @@ mod tests {
     #[test]
     fn test_error_on_multiple_anchors_for_single_node() {
         // Two anchors adjacent should error (single-anchor per node)
-            let mut source = Buffer::new(b"&a &b 123");
+        let mut source = Buffer::new(b"&a &b 123");
         let directives = DirectiveContext::default();
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
@@ -502,7 +520,7 @@ mod tests {
     #[test]
     fn test_tag_followed_by_indented_mapping() {
         // Decorator then indented block value should parse nested mapping
-            let mut source = Buffer::new(b"!!set\n  a: null\n  b: null\n");
+        let mut source = Buffer::new(b"!!set\n  a: null\n  b: null\n");
         let directives = DirectiveContext::default();
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
@@ -520,7 +538,7 @@ mod tests {
     #[test]
     fn test_anchor_followed_by_indented_mapping() {
         // Anchor then indented block value should wrap nested mapping in Anchored
-            let mut source = Buffer::new(b"&root\n  key: value\n");
+        let mut source = Buffer::new(b"&root\n  key: value\n");
         let directives = DirectiveContext::default();
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
