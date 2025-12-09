@@ -412,9 +412,12 @@ mod tests {
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
         // Inline empty mapping should parse via inline_tokens, but base parser should gracefully handle
-        let node =
-            super::super::inline_tokens::parse_inline_mapping_with_tokens(&mut stream, &directives, 0)
-                .unwrap();
+        let node = super::super::inline_tokens::parse_inline_mapping_with_tokens(
+            &mut stream,
+            &directives,
+            0,
+        )
+        .unwrap();
         assert!(matches!(node, Node::Mapping(ref v) if v.is_empty()));
     }
 

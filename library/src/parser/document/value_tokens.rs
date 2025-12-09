@@ -244,16 +244,51 @@ pub fn parse_value_with_tokens(
                 || tag_resolved == "!str"
                 || tag_resolved == "tag:yaml.org,2002:str"
             {
-                // Always coerce !!str to plain string, never wrap in Tagged
-                let s = match &result {
-                    Node::Str(s, _, _) => s.clone(),
-                    Node::Number(Numeric::Integer(i)) => i.to_string(),
-                    Node::Number(Numeric::Float(f)) => f.to_string(),
-                    Node::Boolean(b) => b.to_string(),
-                    Node::None => String::new(),
-                    _ => format!("{:?}", result),
-                };
-                result = Node::Str(s, QuoteType::Unquoted, BlockStyle::None);
+                // For block scalars, preserve block style; otherwise, coerce to plain string
+                match &result {
+                    Node::Str(s, q, style) if *style == BlockStyle::Literal || *style == BlockStyle::Folded => {
+                        result = Node::Str(s.clone(), q.clone(), style.clone());
+                    }
+                    Node::Str(s, _, _) => {
+                        result = Node::Str(s.clone(), QuoteType::Unquoted, BlockStyle::None);
+                    }
+                    Node::Number(Numeric::Integer(i)) => {
+                        result = Node::Str(i.to_string(), QuoteType::Unquoted, BlockStyle::None);
+                    }
+                    Node::Number(Numeric::Float(f)) => {
+                        result = Node::Str(f.to_string(), QuoteType::Unquoted, BlockStyle::None);
+                    }
+                    Node::Boolean(b) => {
+                        result = Node::Str(b.to_string(), QuoteType::Unquoted, BlockStyle::None);
+                    }
+                    Node::None => {
+                        result = Node::Str(String::new(), QuoteType::Unquoted, BlockStyle::None);
+                    }
+                    _ => {
+                        result = Node::Str(format!("{:?}", result), QuoteType::Unquoted, BlockStyle::None);
+                    }
+                }
+            } else if tag_resolved == "!!seq" || tag_resolved == "tag:yaml.org,2002:seq" {
+                // Always wrap as Tagged with canonical tag for sequences
+                match &result {
+                    Node::Array(items) => {
+                        result = Node::Tagged(Box::new(Node::Array(items.clone())), "tag:yaml.org,2002:seq".to_string());
+                    }
+                    _ => {
+                        // If not an array, still wrap whatever is there
+                        result = Node::Tagged(Box::new(result), "tag:yaml.org,2002:seq".to_string());
+                    }
+                }
+            } else if tag_resolved == "!!map" || tag_resolved == "tag:yaml.org,2002:map" {
+                // Always wrap as Tagged with canonical tag for mappings
+                match &result {
+                    Node::Mapping(pairs) => {
+                        result = Node::Tagged(Box::new(Node::Mapping(pairs.clone())), "tag:yaml.org,2002:map".to_string());
+                    }
+                    _ => {
+                        result = Node::Tagged(Box::new(result), "tag:yaml.org,2002:map".to_string());
+                    }
+                }
             } else if let Some(coerced) = try_coerce_tag(&tag_resolved, result.clone()) {
                 result = coerced;
             } else {
