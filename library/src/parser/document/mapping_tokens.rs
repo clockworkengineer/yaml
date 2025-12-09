@@ -221,30 +221,66 @@ fn parse_mapping_pair(
     #[cfg(feature = "debug-trace")]
     log::debug!("mapping_pair: before value, token = {:?}", stream.current());
     // Parse the value - check for empty value BEFORE skipping whitespace
-    let value = match stream.current() {
+    let cur_token = stream.current().cloned();
+    #[cfg(feature = "debug-trace")]
+    log::debug!("mapping_pair: value parse branch, cur_token = {:?}", cur_token);
+    let value = match cur_token {
         Some(Token::Newline) | None | Some(Token::Eof) => {
-            // Empty value - don't consume the newline/eof
-            // But if the next token is an Indent with greater indent, parse nested mapping as value
-            let peeked_indent = if let Ok(Some(Token::Indent(level))) = stream.peek() {
-                Some(*level)
+            // After colon and newline, check for indent and dash for block sequence value
+            // Consume newline
+            if matches!(stream.current(), Some(Token::Newline)) {
+                stream.next()?;
+            }
+            // Check for indent
+            let indent_level = if let Some(Token::Indent(level)) = stream.current() {
+                if *level > cur_indent {
+                    let lvl = *level;
+                    stream.next()?; // consume Indent
+                    Some(lvl)
+                } else {
+                    None
+                }
             } else {
                 None
             };
-            if let Some(level) = peeked_indent {
-                if level > cur_indent {
-                    stream.next()?; // consume Indent
-                    return Ok((
-                        key,
-                        parse_mapping_with_tokens(stream, level, directives, depth + 1)?,
-                    ));
+            if let Some(level) = indent_level {
+                // After indent, skip newlines/comments before checking for dash
+                loop {
+                    match stream.current() {
+                        Some(Token::Newline) | Some(Token::Comment(_)) => { stream.next()?; }
+                        _ => break,
+                    }
+                }
+                if matches!(stream.current(), Some(Token::Dash)) {
+                    // Parse block sequence as value
+                    use crate::parser::document::sequence_tokens::parse_sequence_with_tokens;
+                    #[cfg(feature = "debug-trace")]
+                    log::debug!("mapping_pair: parsing sequence as value for key {:?}", key);
+                    let seq = parse_sequence_with_tokens(stream, level, directives, depth + 1)?;
+                    #[cfg(feature = "debug-trace")]
+                    log::debug!("mapping_pair: sequence node for key {:?}: {:?}", key, seq);
+                    return Ok((key, seq));
+                } else {
+                    // Parse nested mapping as value
+                    #[cfg(feature = "debug-trace")]
+                    log::debug!("mapping_pair: parsing mapping as value for key {:?}", key);
+                    let map = parse_mapping_with_tokens(stream, level, directives, depth + 1)?;
+                    #[cfg(feature = "debug-trace")]
+                    log::debug!("mapping_pair: mapping node for key {:?}: {:?}", key, map);
+                    return Ok((key, map));
                 }
             }
             Node::None
         }
         Some(Token::Indent(level)) => {
-            // Increased indentation: parse nested mapping as value
-            let nested = parse_mapping_with_tokens(stream, *level, directives, depth + 1)?;
-            nested
+            // Increased indentation: parse nested mapping or sequence as value
+            stream.next()?; // consume Indent
+            if matches!(stream.current(), Some(Token::Dash)) {
+                use crate::parser::document::sequence_tokens::parse_sequence_with_tokens;
+                parse_sequence_with_tokens(stream, level, directives, depth + 1)?
+            } else {
+                parse_mapping_with_tokens(stream, level, directives, depth + 1)?
+            }
         }
         _ => {
             // Skip whitespace before value
