@@ -570,19 +570,21 @@ mod tests {
         ctx.mark_newline_consumed();
 
         let directives = crate::parser::directives::DirectiveContext::new();
-        let mut stream =
-            TokenStream::new(&mut source, &directives, false).expect("TokenStream creation failed");
-        let result = skip_whitespace_with_context_tokens(&mut stream, &ctx);
-        assert!(
-            result.is_ok(),
-            "Whitespace skipping in block context should succeed"
-        );
-        // After skipping whitespace, the buffer should be at 'c'
-        assert_eq!(
-            source.current(),
-            Some('c'),
-            "Buffer should be at 'c' after skipping whitespace"
-        );
+        {
+            let mut stream = TokenStream::new(&mut source, &directives, false).expect("TokenStream creation failed");
+            let result = skip_whitespace_with_context_tokens(&mut stream, &ctx);
+            assert!(
+                result.is_ok(),
+                "Whitespace skipping in block context should succeed"
+            );
+            // Also check the token stream's current token
+            match stream.current() {
+                Some(Token::Plain(s)) => {
+                    assert!(s.starts_with('c'), "TokenStream should be at plain scalar starting with 'c'");
+                }
+                other => panic!("TokenStream not at expected plain scalar after whitespace: {:?}", other),
+            }
+        }
     }
 
     #[test]
