@@ -443,4 +443,18 @@ mod tests {
         // Should parse as alias
         assert!(matches!(result, Node::Alias(name) if name == "myalias"));
     }
+
+    #[test]
+    fn test_error_on_multiple_anchors_for_single_node() {
+        // Two anchors adjacent should error (single-anchor per node)
+        let mut source = Buffer::new(b"&a &b 123");
+        let directives = DirectiveContext::default();
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+
+        let err = parse_value_with_tokens(&mut stream, &directives).unwrap_err();
+        assert!(
+            err.to_ascii_lowercase().contains("duplicate anchor")
+                || err.to_ascii_lowercase().contains("multiple anchors")
+        );
+    }
 }
