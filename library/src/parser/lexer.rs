@@ -289,7 +289,7 @@ impl<'a> Lexer<'a> {
                 self.source.next();
             } else if ch == CHAR_TAB {
                 if !in_flow {
-                    return Err("Tabs cannot be used for indentation in YAML".to_string());
+                    return Err("Tabs are not allowed as indentation in YAML".to_string());
                 } else {
                     // In flow context, treat tab as content, not indentation
                     break;
