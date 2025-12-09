@@ -5,7 +5,7 @@ Date: 2025-12-08
 - [x] Finalize directive boundary validation
 - [x] Harden missing-colon detection
 - [x] Enforce single-anchor per node
-- [ ] Explicit key parsing via tokens
+- [x] Explicit key parsing via tokens
 - [ ] Handle indented values post-decorators
 - [ ] Mapping edge cases (empty/multiline)
 - [ ] Roundtrip stability tests

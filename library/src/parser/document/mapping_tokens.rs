@@ -351,4 +351,46 @@ mod tests {
             panic!("Expected Mapping node, got: {:?}", result);
         }
     }
+
+    #[test]
+    fn test_explicit_key_with_value() {
+        // Explicit key followed by value on same line
+        let yaml = b"? key1: value1\n? key2\n: value2\n";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+
+        let result = parse_mapping_with_tokens(&mut stream, 0, &directives).unwrap();
+
+        if let Node::Mapping(pairs) = result {
+            assert_eq!(pairs.len(), 2);
+            // key1 has value1; key2 should have value2
+            assert!(matches!(pairs[0].0, Node::Str(_, _, _)));
+            assert!(matches!(pairs[0].1, Node::Str(ref s, _, _) if s == "value1"));
+            assert!(matches!(pairs[1].0, Node::Str(_, _, _)));
+            assert!(matches!(pairs[1].1, Node::Str(ref s, _, _) if s == "value2"));
+        } else {
+            panic!("Expected Mapping node, got: {:?}", result);
+        }
+    }
+
+    #[test]
+    fn test_explicit_complex_key_array() {
+        // Complex explicit key (array) should normalize to string key
+        let yaml = b"? [a, b, c]: 1\n";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+
+        let result = parse_mapping_with_tokens(&mut stream, 0, &directives).unwrap();
+
+        if let Node::Mapping(pairs) = result {
+            assert_eq!(pairs.len(), 1);
+            // Key should be a string representation of the array
+            assert!(matches!(pairs[0].0, Node::Str(ref s, _, _) if s.contains("a") && s.contains("b") && s.contains("c")));
+            assert!(matches!(pairs[0].1, Node::Number(crate::nodes::node::Numeric::Integer(1))));
+        } else {
+            panic!("Expected Mapping node, got: {:?}", result);
+        }
+    }
 }
