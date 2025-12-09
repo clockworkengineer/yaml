@@ -454,4 +454,56 @@ mod tests {
             panic!("Expected Mapping node, got: {:?}", result);
         }
     }
+
+    #[test]
+    fn test_decorated_empty_keys_tag_and_anchor() {
+        // Decorated empty keys should produce empty-string keys wrapped by tag/anchor
+        let yaml = b"!!str: one\n&root: two\n";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+
+        let result = parse_mapping_with_tokens(&mut stream, 0, &directives).unwrap();
+
+        if let Node::Mapping(pairs) = result {
+            assert_eq!(pairs.len(), 2);
+            // First key is tagged empty string
+            match &pairs[0].0 {
+                Node::Tagged(inner, tag) => {
+                    assert!(matches!(**inner, Node::Str(ref s, _, _) if s.is_empty()));
+                    assert!(tag.starts_with("!!") || tag.starts_with("!"));
+                }
+                other => panic!("Expected Tagged empty key, got {:?}", other),
+            }
+            // Second key is anchored empty string
+            match &pairs[1].0 {
+                Node::Anchored(inner, name) => {
+                    assert_eq!(name, "root");
+                    assert!(matches!(**inner, Node::Str(ref s, _, _) if s.is_empty()));
+                }
+                other => panic!("Expected Anchored empty key, got {:?}", other),
+            }
+        } else {
+            panic!("Expected Mapping node, got: {:?}", result);
+        }
+    }
+
+    #[test]
+    fn test_explicit_keys_with_nested_sequence_values() {
+        // Explicit keys followed by nested sequences
+        let yaml = b"? key1\n: \n  - a\n  - b\n? key2\n: \n  - 1\n  - 2\n";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+
+        let result = parse_mapping_with_tokens(&mut stream, 0, &directives).unwrap();
+
+        if let Node::Mapping(pairs) = result {
+            assert_eq!(pairs.len(), 2);
+            assert!(matches!(pairs[0].1, Node::Array(ref v) if v.len() == 2));
+            assert!(matches!(pairs[1].1, Node::Array(ref v) if v.len() == 2));
+        } else {
+            panic!("Expected Mapping node, got: {:?}", result);
+        }
+    }
 }

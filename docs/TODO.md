@@ -22,7 +22,7 @@ Upcoming Work (Detailed)
 	- [x] Replace char-based `sequence.rs` with `sequence_tokens.rs`
 	- [x] Route `parse_document_contents` to token paths (`Indent`/`Dash`)
 	- [x] Normalize whitespace/comments via `TokenStream` helpers
-	- [ ] Add tests: decorated empty keys, explicit keys, nested sequences
+	- [x] Add tests: decorated empty keys, explicit keys, nested sequences
 - [ ] Merge key handling (<<) during parse
 - [ ] Error spans via token boundaries
 - [ ] Performance pass on TokenStream skip operations
