@@ -416,6 +416,10 @@ pub(crate) fn parse_inline_sequence(
                     stream.next()?;
                     break;
                 }
+                    // Check for double comma
+                    if let Some(Token::Comma) = stream.current() {
+                        return Err("Double comma in flow sequence is not allowed".to_string());
+                    }
                 continue;
             }
             Some(Token::FlowSequenceEnd) => {
