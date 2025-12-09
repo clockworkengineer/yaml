@@ -21,7 +21,7 @@ Upcoming Work (Detailed)
 	- [x] Replace char-based `mapping.rs` with `mapping_tokens.rs`
 	- [x] Replace char-based `sequence.rs` with `sequence_tokens.rs`
 	- [x] Route `parse_document_contents` to token paths (`Indent`/`Dash`)
-	- [ ] Normalize whitespace/comments via `TokenStream` helpers
+	- [x] Normalize whitespace/comments via `TokenStream` helpers
 	- [ ] Add tests: decorated empty keys, explicit keys, nested sequences
 - [ ] Merge key handling (<<) during parse
 - [ ] Error spans via token boundaries
