@@ -113,25 +113,18 @@ fn parse_mapping_pair(
 ) -> Result<(Node, Node), String> {
     #[cfg(feature = "debug-trace")]
     log::debug!("mapping_pair: start at token = {:?}", stream.current());
-    // Check for explicit key indicator (?)
-    // Lexer emits a dedicated token for '?', not a plain scalar
-    let explicit_key = if matches!(stream.current(), Some(Token::QuestionMark)) {
+    // Unify explicit and implicit key handling: always use token stream for key detection
+    // If the next token is a question mark, it's an explicit key
+    let mut explicit_key = false;
+    if matches!(stream.current(), Some(Token::QuestionMark)) {
         stream.next()?;
         stream.skip_whitespace()?;
-        true
-    } else {
-        false
-    };
+        explicit_key = true;
+    }
 
-    // Check if we have decorators on an implicit empty key (decorator followed by colon)
-    let key = if matches!(
-        stream.current(),
-        Some(Token::Tag(_)) | Some(Token::Anchor(_))
-    ) {
-        // Consume decorators
+    // Handle decorators (tag/anchor) and parse the key value
+    let key = if matches!(stream.current(), Some(Token::Tag(_)) | Some(Token::Anchor(_))) {
         let decorators = stream.consume_decorators()?;
-
-        // Check if followed immediately by colon (implicit empty key)
         if matches!(stream.current(), Some(Token::Colon)) {
             use crate::nodes::node::{BlockStyle, QuoteType};
             let mut node = Node::Str("".to_string(), QuoteType::Unquoted, BlockStyle::None);
@@ -143,14 +136,12 @@ fn parse_mapping_pair(
             }
             node
         } else {
-            // Decorators on actual key value - parse it
             let parsed_key = parse_value_with_tokens(stream, directives)?;
             #[cfg(feature = "debug-trace")]
             log::debug!("mapping_pair: parsed decorated key = {:?}", parsed_key);
             parsed_key
         }
     } else {
-        // No decorators, parse key normally
         let parsed_key = parse_value_with_tokens(stream, directives)?;
         #[cfg(feature = "debug-trace")]
         log::debug!("mapping_pair: parsed key = {:?}", parsed_key);

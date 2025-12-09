@@ -223,119 +223,67 @@ pub(crate) fn peek_ahead_for_document_start_end(source: &mut dyn ISource, c: cha
 /// # Returns
 ///
 /// true if a mapping key pattern is detected, false otherwise
-pub(crate) fn peek_ahead_for_mapping_key(source: &mut dyn ISource) -> bool {
-    let mut found = false;
+/// 
+// (Old character-based peek_ahead_for_mapping_key removed; use token-based version below)
+/// Token-based lookahead to determine if the current position starts a mapping key (key: ...)
+/// Scans tokens until end-of-line and returns true if a colon token appears at the same nesting level
+/// and not inside flow collections.
+use crate::parser::token_stream::TokenStream;
+use crate::parser::lexer::Token;
+use crate::parser::directives::DirectiveContext;
+pub(crate) fn peek_ahead_for_mapping_key(source: &mut dyn ISource, directives: &DirectiveContext) -> bool {
+    if !source.more() {
+        return false;
+    }
+    // Preserve source position
     let state = source.save_state();
-
-    // Skip tags (!!tag or !tag) if present
-    while source.current() == Some('!') {
-        source.next(); // Skip first !
-        // Check for second ! (!!tag)
-        if source.current() == Some('!') {
-            source.next(); // Skip second !
-        }
-        // Skip tag name (alphanumeric, -, _, . but NOT colon - that would consume the mapping separator)
-        while let Some(c) = source.current() {
-            if c.is_alphanumeric() || c == CHAR_DASH || c == '_' || c == CHAR_DOT {
-                source.next();
-            } else {
-                break;
-            }
-        }
-        // Skip whitespace after tag
-        while matches!(source.current(), Some(CHAR_SPACE) | Some(CHAR_TAB)) {
-            source.next();
-        }
-    }
-
-    // Skip anchors (&name) if present
-    if source.current() == Some(CHAR_AMPERSAND) {
-        source.next(); // Skip &
-        // Skip anchor name (but NOT colon - anchor names with colons are allowed per spec,
-        // but in this context we're looking for mapping keys, so stop at colon)
-        while let Some(c) = source.current() {
-            if c.is_alphanumeric() || c == CHAR_DASH || c == '_' {
-                source.next();
-            } else {
-                break;
-            }
-        }
-        // Skip whitespace after anchor
-        while matches!(source.current(), Some(CHAR_SPACE) | Some(CHAR_TAB)) {
-            source.next();
-        }
-    }
-
-    // Handle quoted strings specially - they can span multiple lines
-    if matches!(
-        source.current(),
-        Some(CHAR_SINGLE_QUOTE) | Some(CHAR_DOUBLE_QUOTE)
-    ) {
-        let quote = source.current().unwrap();
-        source.next(); // Skip opening quote
-
-        // Scan until we find the closing quote
-        let mut prev_was_backslash = false;
-        while let Some(c) = source.current() {
-            source.next(); // Move past current character
-
-            if c == quote {
-                if quote == CHAR_SINGLE_QUOTE {
-                    // Check for doubled single quote (escape mechanism)
-                    if source.current() == Some(CHAR_SINGLE_QUOTE) {
-                        source.next(); // Skip the second quote
-                        prev_was_backslash = false;
-                        continue;
-                    } else {
-                        break; // Found true closing quote
+    let mut result = false;
+    if let Ok(mut stream) = TokenStream::new(source, directives) {
+        // Track flow depth to ignore colons inside [] or {}
+        let mut flow_depth: i32 = 0;
+        // Walk tokens until newline or EOF
+        while let Some(tok) = stream.current() {
+            match tok {
+                Token::Newline | Token::Eof => break,
+                Token::FlowSequenceStart | Token::FlowMappingStart => {
+                    flow_depth += 1;
+                    let _ = stream.next();
+                }
+                Token::FlowSequenceEnd | Token::FlowMappingEnd => {
+                    flow_depth = std::cmp::max(0, flow_depth - 1);
+                    let _ = stream.next();
+                }
+                Token::Colon => {
+                    // Colon at base (non-flow) level indicates mapping key
+                    if flow_depth == 0 {
+                        result = true;
+                        break;
                     }
-                } else if !prev_was_backslash {
-                    break; // Found true closing double quote
+                    let _ = stream.next();
                 }
-            }
-
-            if quote == CHAR_DOUBLE_QUOTE && c == CHAR_BACKSLASH {
-                prev_was_backslash = !prev_was_backslash;
-            } else {
-                prev_was_backslash = false;
-            }
-        }
-
-        // After the quoted string, skip whitespace (not newlines) and check for colon
-        while let Some(c) = source.current() {
-            if c == CHAR_SPACE || c == CHAR_TAB {
-                source.next();
-            } else {
-                break;
-            }
-        }
-
-        // Check for colon (not after newline)
-        if source.current() == Some(CHAR_COLON) {
-            found = true;
-        }
-    } else {
-        // Non-quoted case: look for colon before newline
-        while let Some(c) = source.current() {
-            match c {
-                CHAR_COLON => {
-                    found = true;
-                    break;
+                // Skip trivia tokens (whitespace, comments)
+                Token::Indent(_) | Token::Comment(_) => {
+                    let _ = stream.next();
                 }
-                CHAR_NEWLINE | CHAR_CARRIAGE_RETURN => {
-                    break;
+                // Never treat a sequence dash as a mapping key
+                Token::Dash => {
+                    // If a dash is encountered at base level, this is a sequence, not a mapping key
+                    if flow_depth == 0 {
+                        result = false;
+                        break;
+                    } else {
+                        let _ = stream.next();
+                    }
                 }
                 _ => {
-                    if source.more() {
-                        source.next();
-                    }
+                    let _ = stream.next();
                 }
             }
         }
     }
-
+    // Restore original source position
     source.restore_state(state);
-    found
+    result
 }
 
 /// Parses a mapping key and determines if it has an explicit complex structure.

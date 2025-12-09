@@ -26,7 +26,7 @@ mod value_tokens;
 // Anchor resolution functions - currently not used during parsing
 // pub(crate) use anchors::{collect_anchors, expand_merge_keys, replace_aliases};
 
-pub(crate) use helpers::{parse_comment, parse_error, peek_ahead_for_mapping_key};
+pub(crate) use helpers::parse_error;
 pub(crate) use inline::{parse_inline_mapping, parse_inline_sequence};
 pub(crate) use mapping::parse_mapping;
 #[cfg(test)]
@@ -48,50 +48,6 @@ use helpers::skip_whitespace;
 /// Token-based lookahead to determine if the current position starts a mapping key (key: ...)
 /// Scans tokens until end-of-line and returns true if a colon token appears at the same nesting level
 /// and not inside flow collections.
-fn token_peek_ahead_for_mapping_key(
-    source: &mut dyn ISource,
-    directives: &DirectiveContext,
-) -> bool {
-    if !source.more() {
-        return false;
-    }
-    // Preserve source position
-    let state = source.save_state();
-    let mut result = false;
-    if let Ok(mut stream) = crate::parser::token_stream::TokenStream::new(source, directives) {
-        // Track flow depth to ignore colons inside [] or {}
-        let mut flow_depth: i32 = 0;
-        // Walk tokens until newline or EOF
-        while let Some(tok) = stream.current() {
-            use crate::parser::lexer::Token;
-            match tok {
-                Token::Newline | Token::Eof => break,
-                Token::FlowSequenceStart | Token::FlowMappingStart => {
-                    flow_depth += 1;
-                    let _ = stream.next();
-                }
-                Token::FlowSequenceEnd | Token::FlowMappingEnd => {
-                    flow_depth = std::cmp::max(0, flow_depth - 1);
-                    let _ = stream.next();
-                }
-                Token::Colon => {
-                    // Colon at base (non-flow) level indicates mapping key
-                    if flow_depth == 0 {
-                        result = true;
-                        break;
-                    }
-                    let _ = stream.next();
-                }
-                _ => {
-                    let _ = stream.next();
-                }
-            }
-        }
-    }
-    // Restore original source position
-    source.restore_state(state);
-    result
-}
 
 /// Parses multiple explicit keys for sets or mappings.
 ///
@@ -327,7 +283,7 @@ pub fn parse_document_contents(
                     indent_level, map_indent
                 ));
             }
-            if token_peek_ahead_for_mapping_key(source, directives) {
+            if helpers::peek_ahead_for_mapping_key(source, directives) {
                 Ok(parse_mapping(source, map_indent, directives)?)
             } else {
                 Ok(parse_value(source, directives)?)
@@ -610,7 +566,7 @@ pub fn parse_document_contents(
             }
         }
         Some(c) if c.is_alphanumeric() => {
-            if token_peek_ahead_for_mapping_key(source, directives) {
+            if helpers::peek_ahead_for_mapping_key(source, directives) {
                 Ok(parse_mapping(source, indent_level, directives)?)
             } else {
                 // If a plain word is followed by a newline and greater indentation
@@ -674,7 +630,7 @@ pub fn parse_document_contents(
         }
         Some(c) if matches!(c, '<' | '>' | '"' | '\'' | '|') => {
             if matches!(source.current(), Some('"') | Some('\''))
-                && token_peek_ahead_for_mapping_key(source, directives)
+                && helpers::peek_ahead_for_mapping_key(source, directives)
             {
                 Ok(parse_mapping(source, indent_level, directives)?)
             } else {
@@ -985,6 +941,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
 
 #[cfg(test)]
 mod tests {
+    use crate::parser::document::helpers::parse_comment;
     use super::*;
     use crate::io::sources::buffer::Buffer;
 
@@ -1038,33 +995,38 @@ mod tests {
     fn test_peek_ahead_for_mapping_key_basic() {
         let mut source = Buffer::new(b"key: value");
         assert_eq!(source.get_current_indent_level(), 0);
-        assert!(peek_ahead_for_mapping_key(&mut source));
+        let directives = crate::parser::directives::DirectiveContext::new();
+        assert!(crate::parser::document::helpers::peek_ahead_for_mapping_key(&mut source, &directives));
         assert_eq!(source.get_current_indent_level(), 0);
     }
 
     #[test]
     fn test_peek_ahead_for_mapping_key_no_colon() {
         let mut source = Buffer::new(b"key value");
-        assert!(!peek_ahead_for_mapping_key(&mut source));
+        let directives = crate::parser::directives::DirectiveContext::new();
+        assert!(!crate::parser::document::helpers::peek_ahead_for_mapping_key(&mut source, &directives));
         assert_eq!(source.get_current_indent_level(), 0);
     }
 
     #[test]
     fn test_peek_ahead_for_mapping_key_colon_after_newline() {
         let mut source = Buffer::new(b"key\n: value");
-        assert!(!peek_ahead_for_mapping_key(&mut source));
+        let directives = crate::parser::directives::DirectiveContext::new();
+        assert!(!crate::parser::document::helpers::peek_ahead_for_mapping_key(&mut source, &directives));
     }
 
     #[test]
     fn test_peek_ahead_for_mapping_key_spaces_before_colon() {
         let mut source = Buffer::new(b"key   : value");
-        assert!(peek_ahead_for_mapping_key(&mut source));
+        let directives = crate::parser::directives::DirectiveContext::new();
+        assert!(crate::parser::document::helpers::peek_ahead_for_mapping_key(&mut source, &directives));
     }
 
     #[test]
     fn test_peek_ahead_for_mapping_key_empty() {
         let mut source = Buffer::new(b"");
-        assert!(!peek_ahead_for_mapping_key(&mut source));
+        let directives = crate::parser::directives::DirectiveContext::new();
+        assert!(!crate::parser::document::helpers::peek_ahead_for_mapping_key(&mut source, &directives));
     }
 
     #[test]
