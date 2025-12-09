@@ -387,8 +387,69 @@ mod tests {
         if let Node::Mapping(pairs) = result {
             assert_eq!(pairs.len(), 1);
             // Key should be a string representation of the array
-            assert!(matches!(pairs[0].0, Node::Str(ref s, _, _) if s.contains("a") && s.contains("b") && s.contains("c")));
-            assert!(matches!(pairs[0].1, Node::Number(crate::nodes::node::Numeric::Integer(1))));
+            assert!(
+                matches!(pairs[0].0, Node::Str(ref s, _, _) if s.contains("a") && s.contains("b") && s.contains("c"))
+            );
+            assert!(matches!(
+                pairs[0].1,
+                Node::Number(crate::nodes::node::Numeric::Integer(1))
+            ));
+        } else {
+            panic!("Expected Mapping node, got: {:?}", result);
+        }
+    }
+
+    #[test]
+    fn test_empty_mapping() {
+        let yaml = b"{}\n";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+
+        // Inline empty mapping should parse via inline_tokens, but base parser should gracefully handle
+        let node =
+            super::super::inline_tokens::parse_inline_mapping_with_tokens(&mut stream, &directives)
+                .unwrap();
+        assert!(matches!(node, Node::Mapping(ref v) if v.is_empty()));
+    }
+
+    #[test]
+    fn test_multiline_key_value_mapping() {
+        // Multiline plain scalar key and value using block scalar-like lines
+        let yaml = b"? |\n  multi\n  line\n: |\n  val\n  ue\n";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+
+        let result = parse_mapping_with_tokens(&mut stream, 0, &directives).unwrap();
+
+        if let Node::Mapping(pairs) = result {
+            assert_eq!(pairs.len(), 1);
+            // Keys/values produced by scalar parser should be strings (literal preserves newlines)
+            assert!(
+                matches!(pairs[0].0, Node::Str(ref s, _, _) if s.contains("multi") && s.contains("line"))
+            );
+            assert!(
+                matches!(pairs[0].1, Node::Str(ref s, _, _) if s.contains("val") && s.contains("ue"))
+            );
+        } else {
+            panic!("Expected Mapping node, got: {:?}", result);
+        }
+    }
+
+    #[test]
+    fn test_empty_value_on_same_line_and_next_line() {
+        let yaml = b"key1: \nkey2:\n  - 1\n";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+
+        let result = parse_mapping_with_tokens(&mut stream, 0, &directives).unwrap();
+
+        if let Node::Mapping(pairs) = result {
+            assert_eq!(pairs.len(), 2);
+            assert!(matches!(pairs[0].1, Node::None));
+            assert!(matches!(pairs[1].1, Node::Array(_)));
         } else {
             panic!("Expected Mapping node, got: {:?}", result);
         }

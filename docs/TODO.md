@@ -7,7 +7,7 @@ Date: 2025-12-08
 - [x] Enforce single-anchor per node
 - [x] Explicit key parsing via tokens
 - [x] Handle indented values post-decorators
-- [ ] Mapping edge cases (empty/multiline)
+- [x] Mapping edge cases (empty/multiline)
 - [ ] Roundtrip stability tests
 - [ ] Property/fuzz test harness
 - [ ] Serializer: preserve raw tag handles
