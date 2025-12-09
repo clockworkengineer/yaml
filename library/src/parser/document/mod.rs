@@ -207,6 +207,44 @@ pub fn parse_document_contents(
     indent_level: usize,
     directives: &DirectiveContext,
 ) -> Result<Node, String> {
+    // Fast token-dispatch for block constructs to prefer tokenized paths
+    {
+        let st = source.save_state();
+        if let Ok(mut ts) = crate::parser::token_stream::TokenStream::new(source, directives) {
+            match ts.current() {
+                Some(crate::parser::lexer::Token::Indent(lvl)) => {
+                    let level_val = *lvl;
+                    // Route to tokenized block mapping when encountering indentation
+                    source.restore_state(st);
+                    let mut stream =
+                        crate::parser::token_stream::TokenStream::new(source, directives)?;
+                    return crate::parser::document::mapping_tokens::parse_mapping_with_tokens(
+                        &mut stream,
+                        level_val,
+                        directives,
+                    );
+                }
+                Some(crate::parser::lexer::Token::Dash) => {
+                    // Route to tokenized block sequence when encountering dash at line start
+                    source.restore_state(st);
+                    let seq_indent = source.get_current_indent_level();
+                    let mut stream =
+                        crate::parser::token_stream::TokenStream::new(source, directives)?;
+                    return crate::parser::document::sequence_tokens::parse_sequence_with_tokens(
+                        &mut stream,
+                        seq_indent,
+                        directives,
+                    );
+                }
+                _ => {
+                    // continue with existing char-dispatch below
+                    source.restore_state(st);
+                }
+            }
+        } else {
+            source.restore_state(st);
+        }
+    }
     match source.current() {
         Some(c) if c == '-' => {
             // Check if this is a document marker (---)
@@ -214,7 +252,7 @@ pub fn parse_document_contents(
             // Prefer token-based detection for document start
             let is_doc_start = {
                 let st = source.save_state();
-                let mut ts = crate::parser::token_stream::TokenStream::new(source, directives)?;
+                let ts = crate::parser::token_stream::TokenStream::new(source, directives)?;
                 let res = matches!(
                     ts.current(),
                     Some(crate::parser::lexer::Token::DocumentStart)
@@ -685,7 +723,7 @@ pub fn parse_document(
         // Break if at document marker tokens
         let is_marker = {
             let st = source.save_state();
-            let mut ts = crate::parser::token_stream::TokenStream::new(source, directives)?;
+            let ts = crate::parser::token_stream::TokenStream::new(source, directives)?;
             let res = matches!(
                 ts.current(),
                 Some(
@@ -826,7 +864,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
         // Check for document start marker (---)
         let has_document_marker = {
             let st = source.save_state();
-            let mut ts = crate::parser::token_stream::TokenStream::new(source, &directives)?;
+            let ts = crate::parser::token_stream::TokenStream::new(source, &directives)?;
             let res = matches!(
                 ts.current(),
                 Some(crate::parser::lexer::Token::DocumentStart)
@@ -898,7 +936,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
         skip_whitespace(source);
         let has_document_end = {
             let st = source.save_state();
-            let mut ts = crate::parser::token_stream::TokenStream::new(source, &directives)?;
+            let ts = crate::parser::token_stream::TokenStream::new(source, &directives)?;
             let res = matches!(ts.current(), Some(crate::parser::lexer::Token::DocumentEnd));
             source.restore_state(st);
             res

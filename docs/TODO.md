@@ -20,7 +20,7 @@ Upcoming Work (Detailed)
 - [ ] Full tokenization of block mappings/sequences
 	- [x] Replace char-based `mapping.rs` with `mapping_tokens.rs`
 	- [x] Replace char-based `sequence.rs` with `sequence_tokens.rs`
-	- [ ] Route `parse_document_contents` to token paths (`Indent`/`Dash`)
+	- [x] Route `parse_document_contents` to token paths (`Indent`/`Dash`)
 	- [ ] Normalize whitespace/comments via `TokenStream` helpers
 	- [ ] Add tests: decorated empty keys, explicit keys, nested sequences
 - [ ] Merge key handling (<<) during parse
