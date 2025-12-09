@@ -18,6 +18,11 @@ Date: 2025-12-09
 Upcoming Work (Detailed)
 - [x] Block scalar tokens: folded/literal, chomping, indent
 - [ ] Full tokenization of block mappings/sequences
+	- [x] Replace char-based `mapping.rs` with `mapping_tokens.rs`
+	- [ ] Replace char-based `sequence.rs` with `sequence_tokens.rs`
+	- [ ] Route `parse_document_contents` to token paths (`Indent`/`Dash`)
+	- [ ] Normalize whitespace/comments via `TokenStream` helpers
+	- [ ] Add tests: decorated empty keys, explicit keys, nested sequences
 - [ ] Merge key handling (<<) during parse
 - [ ] Error spans via token boundaries
 - [ ] Performance pass on TokenStream skip operations
