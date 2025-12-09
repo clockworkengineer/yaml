@@ -457,4 +457,40 @@ mod tests {
                 || err.to_ascii_lowercase().contains("multiple anchors")
         );
     }
+
+    #[test]
+    fn test_tag_followed_by_indented_mapping() {
+        // Decorator then indented block value should parse nested mapping
+        let mut source = Buffer::new(b"!!set\n  a: null\n  b: null\n");
+        let directives = DirectiveContext::default();
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+
+        let result = parse_value_with_tokens(&mut stream, &directives).unwrap();
+
+        // !!set should coerce mapping/nulls into a Set
+        match result {
+            Node::Set(items) => {
+                assert_eq!(items.len(), 2);
+            }
+            other => panic!("Expected Set, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_anchor_followed_by_indented_mapping() {
+        // Anchor then indented block value should wrap nested mapping in Anchored
+        let mut source = Buffer::new(b"&root\n  key: value\n");
+        let directives = DirectiveContext::default();
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+
+        let result = parse_value_with_tokens(&mut stream, &directives).unwrap();
+
+        match result {
+            Node::Anchored(inner, name) => {
+                assert_eq!(name, "root");
+                assert!(matches!(*inner, Node::Mapping(_)));
+            }
+            _ => panic!("Expected Anchored mapping"),
+        }
+    }
 }
