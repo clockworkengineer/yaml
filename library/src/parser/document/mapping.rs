@@ -63,10 +63,10 @@ pub(crate) fn parse_mapping(
 
     use crate::parser::token_stream::TokenStream;
 
-    let mut stream = TokenStream::new(source, directives)?;
+    let mut stream = TokenStream::new(source, directives, false)?;
 
     // Refactored: parse_mapping now uses tokens for all key/value safety checks
     // and does not perform manual char/string inspection.
     // The parse_mapping_with_tokens function should be updated to use is_plain_safe_key_token and is_plain_safe_value_token
-    parse_mapping_with_tokens(&mut stream, _indent_level, directives)
+    parse_mapping_with_tokens(&mut stream, _indent_level, directives, 0)
 }

@@ -4,7 +4,7 @@ pub fn parse_single_mapping_pair_with_tokens(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
 ) -> Result<Node, String> {
-    let (key, value) = parse_mapping_pair(stream, directives)?;
+    let (key, value) = parse_mapping_pair(stream, directives, 0, 0)?;
     Ok(Node::Mapping(vec![(key, value)]))
 }
 // Token-based mapping parser: Parses YAML mappings using tokenization instead of character-based lookahead. This eliminates infinite loops with decorators and handles complex key patterns.
@@ -35,6 +35,7 @@ pub fn parse_mapping_with_tokens(
     stream: &mut TokenStream,
     _base_indent: usize,
     directives: &DirectiveContext,
+    depth: usize,
 ) -> Result<Node, String> {
     #[cfg(feature = "debug-trace")]
     log::debug!("mapping_tokens: start parse_mapping_with_tokens");
@@ -60,16 +61,11 @@ pub fn parse_mapping_with_tokens(
                     continue;
                 } else if let Some(cur) = current_indent {
                     if *level < cur {
+                        // Indent decreased: end current mapping
                         break;
                     } else if *level > cur {
-                        let nested = parse_mapping_with_tokens(stream, *level, directives)?;
-                        if let Some((last_key, last_value)) = pairs.pop() {
-                            let new_value = match last_value {
-                                Node::None => nested,
-                                _ => last_value,
-                            };
-                            pairs.push((last_key, new_value));
-                        }
+                        // Indent increased: skip, let parse_mapping_pair handle as value
+                        stream.next()?;
                         continue;
                     } else {
                         stream.next()?;
@@ -86,13 +82,10 @@ pub fn parse_mapping_with_tokens(
                 break;
             }
             _ => {
-                let (key, value) = parse_mapping_pair(stream, directives)?;
-                // Use token-based helpers for key/value safety (example usage below)
-                // if let Some(Token::Plain(ref k)) = stream.current() {
-                //     let key_is_safe = is_plain_safe_key_token(token);
-                // }
-                pairs.push((key, value));
+                let cur_indent = current_indent.unwrap_or(0);
+                let (key, value) = parse_mapping_pair(stream, directives, cur_indent, depth)?;
                 stream.skip_whitespace()?;
+                pairs.push((key, value));
             }
         }
     }
@@ -110,6 +103,8 @@ pub fn parse_mapping_with_tokens(
 fn parse_mapping_pair(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
+    cur_indent: usize,
+    depth: usize,
 ) -> Result<(Node, Node), String> {
     #[cfg(feature = "debug-trace")]
     log::debug!("mapping_pair: start at token = {:?}", stream.current());
@@ -139,13 +134,13 @@ fn parse_mapping_pair(
             }
             node
         } else {
-            let parsed_key = parse_value_with_tokens(stream, directives)?;
+            let parsed_key = parse_value_with_tokens(stream, directives, depth + 1)?;
             #[cfg(feature = "debug-trace")]
             log::debug!("mapping_pair: parsed decorated key = {:?}", parsed_key);
             parsed_key
         }
     } else {
-        let parsed_key = parse_value_with_tokens(stream, directives)?;
+        let parsed_key = parse_value_with_tokens(stream, directives, depth + 1)?;
         #[cfg(feature = "debug-trace")]
         log::debug!("mapping_pair: parsed key = {:?}", parsed_key);
         parsed_key
@@ -229,18 +224,33 @@ fn parse_mapping_pair(
     let value = match stream.current() {
         Some(Token::Newline) | None | Some(Token::Eof) => {
             // Empty value - don't consume the newline/eof
+            // But if the next token is an Indent with greater indent, parse nested mapping as value
+            let peeked_indent = if let Ok(Some(Token::Indent(level))) = stream.peek() {
+                Some(*level)
+            } else {
+                None
+            };
+            if let Some(level) = peeked_indent {
+                if level > cur_indent {
+                    stream.next()?; // consume Indent
+                    return Ok((
+                        key,
+                        parse_mapping_with_tokens(stream, level, directives, depth + 1)?,
+                    ));
+                }
+            }
             Node::None
         }
         Some(Token::Indent(level)) => {
             // Increased indentation: parse nested mapping as value
-            let nested = parse_mapping_with_tokens(stream, *level, directives)?;
+            let nested = parse_mapping_with_tokens(stream, *level, directives, depth + 1)?;
             nested
         }
         _ => {
             // Skip whitespace before value
             stream.skip_whitespace()?;
             // Parse the actual value
-            let v = parse_value_with_tokens(stream, directives)?;
+            let v = parse_value_with_tokens(stream, directives, depth + 1)?;
             #[cfg(feature = "debug-trace")]
             log::debug!("mapping_pair: parsed value = {:?}", v);
             v
@@ -262,9 +272,9 @@ mod tests {
         let yaml = b"key1: value1\nkey2: value2";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_mapping_with_tokens(&mut stream, 0, &directives).unwrap();
+        let result = parse_mapping_with_tokens(&mut stream, 0, &directives, 0).unwrap();
 
         if let Node::Mapping(pairs) = result {
             assert_eq!(pairs.len(), 2);
@@ -278,9 +288,9 @@ mod tests {
         let yaml = b"key1:\nkey2: value2";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_mapping_with_tokens(&mut stream, 0, &directives).unwrap();
+        let result = parse_mapping_with_tokens(&mut stream, 0, &directives, 0).unwrap();
 
         if let Node::Mapping(pairs) = result {
             assert_eq!(pairs.len(), 2);
@@ -295,9 +305,9 @@ mod tests {
         let yaml = b"!!str: value\n&anchor: value2";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_mapping_with_tokens(&mut stream, 0, &directives).unwrap();
+        let result = parse_mapping_with_tokens(&mut stream, 0, &directives, 0).unwrap();
 
         if let Node::Mapping(pairs) = result {
             assert_eq!(pairs.len(), 2);
@@ -314,9 +324,9 @@ mod tests {
         let yaml = b"!!null: a\nb: !!str";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_mapping_with_tokens(&mut stream, 0, &directives).unwrap();
+        let result = parse_mapping_with_tokens(&mut stream, 0, &directives, 0).unwrap();
 
         if let Node::Mapping(pairs) = result {
             assert_eq!(pairs.len(), 2);
@@ -333,9 +343,9 @@ mod tests {
         let yaml = b"? item1\n? item2\n? item3\n";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_mapping_with_tokens(&mut stream, 0, &directives).unwrap();
+        let result = parse_mapping_with_tokens(&mut stream, 0, &directives, 0).unwrap();
 
         if let Node::Mapping(pairs) = result {
             assert_eq!(pairs.len(), 3);
@@ -353,9 +363,9 @@ mod tests {
         let yaml = b"? key1: value1\n? key2\n: value2\n";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_mapping_with_tokens(&mut stream, 0, &directives).unwrap();
+        let result = parse_mapping_with_tokens(&mut stream, 0, &directives, 0).unwrap();
 
         if let Node::Mapping(pairs) = result {
             assert_eq!(pairs.len(), 2);
@@ -375,9 +385,9 @@ mod tests {
         let yaml = b"? [a, b, c]: 1\n";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_mapping_with_tokens(&mut stream, 0, &directives).unwrap();
+        let result = parse_mapping_with_tokens(&mut stream, 0, &directives, 0).unwrap();
 
         if let Node::Mapping(pairs) = result {
             assert_eq!(pairs.len(), 1);
@@ -399,11 +409,11 @@ mod tests {
         let yaml = b"{}\n";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
         // Inline empty mapping should parse via inline_tokens, but base parser should gracefully handle
         let node =
-            super::super::inline_tokens::parse_inline_mapping_with_tokens(&mut stream, &directives)
+            super::super::inline_tokens::parse_inline_mapping_with_tokens(&mut stream, &directives, 0)
                 .unwrap();
         assert!(matches!(node, Node::Mapping(ref v) if v.is_empty()));
     }
@@ -414,9 +424,9 @@ mod tests {
         let yaml = b"? |\n  multi\n  line\n: |\n  val\n  ue\n";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_mapping_with_tokens(&mut stream, 0, &directives).unwrap();
+        let result = parse_mapping_with_tokens(&mut stream, 0, &directives, 0).unwrap();
 
         if let Node::Mapping(pairs) = result {
             assert_eq!(pairs.len(), 1);
@@ -437,9 +447,9 @@ mod tests {
         let yaml = b"key1: \nkey2:\n  - 1\n";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_mapping_with_tokens(&mut stream, 0, &directives).unwrap();
+        let result = parse_mapping_with_tokens(&mut stream, 0, &directives, 0).unwrap();
 
         if let Node::Mapping(pairs) = result {
             assert_eq!(pairs.len(), 2);
@@ -456,9 +466,9 @@ mod tests {
         let yaml = b"!!str: one\n&root: two\n";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_mapping_with_tokens(&mut stream, 0, &directives).unwrap();
+        let result = parse_mapping_with_tokens(&mut stream, 0, &directives, 0).unwrap();
 
         if let Node::Mapping(pairs) = result {
             assert_eq!(pairs.len(), 2);
@@ -489,9 +499,9 @@ mod tests {
         let yaml = b"? key1\n: \n  - a\n  - b\n? key2\n: \n  - 1\n  - 2\n";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_mapping_with_tokens(&mut stream, 0, &directives).unwrap();
+        let result = parse_mapping_with_tokens(&mut stream, 0, &directives, 0).unwrap();
 
         if let Node::Mapping(pairs) = result {
             assert_eq!(pairs.len(), 2);

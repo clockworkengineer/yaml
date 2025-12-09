@@ -38,6 +38,6 @@ pub(crate) fn parse_value(
     use crate::parser::document::tokens::value::parse_value_with_tokens;
     use crate::parser::token_stream::TokenStream;
 
-    let mut stream = TokenStream::new(source, directives)?;
-    return parse_value_with_tokens(&mut stream, directives);
+    let mut stream = TokenStream::new(source, directives, false)?;
+    return parse_value_with_tokens(&mut stream, directives, 0);
 }

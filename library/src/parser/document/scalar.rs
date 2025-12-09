@@ -352,7 +352,7 @@ mod tests {
     fn test_block_literal_basic_via_tokens() {
         let mut source = Buffer::new(b"|\n  line1\n  line2\n");
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
         let node = parse_scalar_with_tokens(&mut stream, &directives, 0).unwrap();
         assert!(
             matches!(node, Node::Str(ref s, QuoteType::Unquoted, BlockStyle::Literal) if s == "|\nline1\nline2")
@@ -363,7 +363,7 @@ mod tests {
     fn test_block_folded_basic_via_tokens() {
         let mut source = Buffer::new(b">\n  line1\n  line2\n");
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
         let node = parse_scalar_with_tokens(&mut stream, &directives, 0).unwrap();
         assert!(
             matches!(node, Node::Str(ref s, QuoteType::Unquoted, BlockStyle::Folded) if s == ">\nline1\nline2")

@@ -30,9 +30,9 @@ pub(crate) fn parse_explicit_mapping_entry(
             stream.next()?;
             stream.skip_whitespace()?;
             // Parse document contents as key (empty explicit key)
-            crate::parser::document::tokens::value::parse_value_with_tokens(stream, directives)?
+            crate::parser::document::tokens::value::parse_value_with_tokens(stream, directives, 0)?
         }
-        _ => crate::parser::document::tokens::value::parse_value_with_tokens(stream, directives)?,
+        _ => crate::parser::document::tokens::value::parse_value_with_tokens(stream, directives, 0)?,
     };
 
     // Skip whitespace/comments after key
@@ -48,11 +48,11 @@ pub(crate) fn parse_explicit_mapping_entry(
                     stream.next()?;
                     stream.skip_whitespace()?;
                     crate::parser::document::tokens::value::parse_value_with_tokens(
-                        stream, directives,
+                        stream, directives, 0
                     )?
                 }
                 _ => crate::parser::document::tokens::value::parse_value_with_tokens(
-                    stream, directives,
+                    stream, directives, 0
                 )?,
             }
         }

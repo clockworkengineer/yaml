@@ -26,7 +26,7 @@ fn parse_inline_mapping_with_colons_tokens(
 
         // Parse key
         use crate::parser::document::tokens::value::parse_value_with_tokens;
-        let key_node = parse_value_with_tokens(stream, directives)?;
+        let key_node = parse_value_with_tokens(stream, directives, 0)?;
 
         // Expect colon
         match stream.current() {
@@ -38,7 +38,7 @@ fn parse_inline_mapping_with_colons_tokens(
         }
 
         // Parse value
-        let value_node = parse_value_with_tokens(stream, directives)?;
+        let value_node = parse_value_with_tokens(stream, directives, 0)?;
 
         pairs.push((key_node, value_node));
 
@@ -156,7 +156,7 @@ pub(crate) fn parse_inline_set(
 
         // Parse the value (set item)
         use crate::parser::document::tokens::value::parse_value_with_tokens;
-        let item_node = parse_value_with_tokens(stream, directives)?;
+        let item_node = parse_value_with_tokens(stream, directives, 0)?;
 
         // Add item as a key with null value (set format)
         pairs.push((item_node, Node::None));
@@ -226,7 +226,7 @@ pub(crate) fn parse_inline_mapping(
     // Manual lookahead: create a temporary TokenStream from the current state
     // This requires access to the underlying source and directives
     let source_snapshot = stream.source_mut().save_state();
-    let mut lookahead_stream = TokenStream::new(stream.source_mut(), directives)?;
+    let mut lookahead_stream = TokenStream::new(stream.source_mut(), directives, false)?;
     // Advance lookahead_stream to the same position as the original stream
     for _ in 0..iterations {
         lookahead_stream.next()?;
@@ -398,7 +398,7 @@ pub(crate) fn parse_inline_sequence(
 
         // Parse the value (sequence item)
         use crate::parser::document::tokens::value::parse_value_with_tokens;
-        let item_node = parse_value_with_tokens(stream, directives)?;
+        let item_node = parse_value_with_tokens(stream, directives, 0)?;
         items.push(item_node);
 
         // Skip comma or end

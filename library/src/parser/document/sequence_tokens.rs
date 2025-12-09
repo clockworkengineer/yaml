@@ -27,6 +27,7 @@ pub fn parse_sequence_with_tokens(
     stream: &mut TokenStream,
     base_indent: usize,
     directives: &DirectiveContext,
+    depth: usize,
 ) -> Result<Node, String> {
     #[cfg(feature = "debug-trace")]
     log::debug!(
@@ -99,7 +100,7 @@ pub fn parse_sequence_with_tokens(
                             Some(Token::Indent(level)) => *level,
                             _ => 0,
                         };
-                        let mapping = parse_mapping_with_tokens(stream, indent, directives)?;
+                        let mapping = parse_mapping_with_tokens(stream, indent, directives, depth + 1)?;
                         items.push(mapping);
                         // Skip trailing whitespace/comments/newlines until next dash or end
                         loop {
@@ -116,7 +117,7 @@ pub fn parse_sequence_with_tokens(
                     }
                     // Standard-compliant: handle flow collections (empty or not) after dash at any nesting
                     Some(Token::FlowSequenceStart) | Some(Token::FlowMappingStart) => {
-                        let value = parse_value_with_tokens(stream, directives)?;
+                        let value = parse_value_with_tokens(stream, directives, depth + 1)?;
                         items.push(value);
                         // Normalize and aggressively consume separators/closers
                         loop {
@@ -161,7 +162,7 @@ pub fn parse_sequence_with_tokens(
                         if is_colon {
                             use crate::parser::document::mapping_tokens::parse_mapping_with_tokens;
                             let indent = base_indent;
-                            let mapping = parse_mapping_with_tokens(stream, indent, directives)?;
+                            let mapping = parse_mapping_with_tokens(stream, indent, directives, depth + 1)?;
                             items.push(mapping);
                             // Normalize whitespace/comments after item
                             stream.skip_whitespace_and_comments()?;
@@ -192,7 +193,7 @@ pub fn parse_sequence_with_tokens(
                         } else {
                             #[cfg(feature = "debug-trace")]
                             log::debug!("sequence_tokens: Parsing value after dash (not mapping)");
-                            let value = parse_value_with_tokens(stream, directives)?;
+                            let value = parse_value_with_tokens(stream, directives, depth + 1)?;
                             #[cfg(feature = "debug-trace")]
                             log::debug!("sequence_tokens: parsed value node = {:?}", value);
                             items.push(value);
@@ -227,7 +228,7 @@ pub fn parse_sequence_with_tokens(
                     }
                     _ => {
                         // Parse the value
-                        let value = parse_value_with_tokens(stream, directives)?;
+                        let value = parse_value_with_tokens(stream, directives, depth + 1)?;
                         items.push(value);
 
                         // Normalize and aggressively consume separators/closers
@@ -295,9 +296,9 @@ mod tests {
         let yaml = b"- a\n- b\n- c";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_sequence_with_tokens(&mut stream, 0, &directives).unwrap();
+        let result = parse_sequence_with_tokens(&mut stream, 0, &directives, 0).unwrap();
 
         if let Node::Array(items) = result {
             assert_eq!(items.len(), 3, "Expected 3 items, got: {:?}", items);
@@ -311,9 +312,9 @@ mod tests {
         let yaml = b"- a\n-\n- c";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_sequence_with_tokens(&mut stream, 0, &directives).unwrap();
+        let result = parse_sequence_with_tokens(&mut stream, 0, &directives, 0).unwrap();
 
         if let Node::Array(items) = result {
             assert_eq!(items.len(), 3);
@@ -328,9 +329,9 @@ mod tests {
         let yaml = b"- !!str\n- &a\n- c";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_sequence_with_tokens(&mut stream, 0, &directives).unwrap();
+        let result = parse_sequence_with_tokens(&mut stream, 0, &directives, 0).unwrap();
 
         if let Node::Array(items) = result {
             assert_eq!(items.len(), 3);
@@ -347,9 +348,9 @@ mod tests {
         let yaml = b"- !!str\n";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_sequence_with_tokens(&mut stream, 0, &directives).unwrap();
+        let result = parse_sequence_with_tokens(&mut stream, 0, &directives, 0).unwrap();
 
         if let Node::Array(items) = result {
             assert_eq!(items.len(), 1);

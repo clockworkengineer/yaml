@@ -19,6 +19,8 @@ pub struct Decorators {
 pub struct TokenStream<'a> {
     lexer: Lexer<'a>,
     directives: &'a DirectiveContext,
+    // Track a simple position counter for progress checks
+    position_counter: usize,
 }
 
 // Env-controlled logging for token stream internals
@@ -48,11 +50,12 @@ impl<'a> TokenStream<'a> {
     pub fn new(
         source: &'a mut dyn ISource,
         directives: &'a DirectiveContext,
+        in_flow: bool,
     ) -> Result<Self, String> {
-        let mut lexer = Lexer::new(source);
+        let mut lexer = Lexer::new(source, in_flow);
         // Load the first token - propagate errors
         lexer.next()?;
-        let ts = TokenStream { lexer, directives };
+        let ts = TokenStream { lexer, directives, position_counter: 0 };
         #[cfg(feature = "debug-trace")]
         ts_log(format!("token_stream: new -> current = {:?}", ts.current()));
         Ok(ts)
@@ -69,6 +72,9 @@ impl<'a> TokenStream<'a> {
     pub fn next(&mut self) -> Result<Option<Token>, String> {
         let _prev = self.lexer.current().cloned();
         let out = self.lexer.next();
+        if out.is_ok() {
+            self.position_counter = self.position_counter.wrapping_add(1);
+        }
         #[cfg(feature = "debug-trace")]
         if let Ok(ref _t) = out {
             ts_log(format!(
@@ -78,6 +84,11 @@ impl<'a> TokenStream<'a> {
             ));
         }
         out
+    }
+
+    /// Returns a simple position counter for progress checks
+    pub fn stream_position(&self) -> usize {
+        self.position_counter
     }
 
     /// Peek at the next token without consuming it
@@ -330,7 +341,7 @@ mod tests {
     fn test_consume_decorators_tag_only() {
         let mut source = Buffer::new(b"!!str value");
         let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
         let decorators = stream.consume_decorators().unwrap();
 
@@ -343,7 +354,7 @@ mod tests {
     fn test_consume_decorators_anchor_only() {
         let mut source = Buffer::new(b"&myanchor value");
         let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
         let decorators = stream.consume_decorators().unwrap();
 
@@ -356,7 +367,7 @@ mod tests {
     fn test_consume_decorators_both() {
         let mut source = Buffer::new(b"!!str &myanchor value");
         let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
         let decorators = stream.consume_decorators().unwrap();
 
@@ -370,7 +381,7 @@ mod tests {
     fn test_consume_decorators_reversed() {
         let mut source = Buffer::new(b"&myanchor !!str value");
         let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
         let decorators = stream.consume_decorators().unwrap();
 
@@ -384,7 +395,7 @@ mod tests {
     fn test_skip_whitespace() {
         let mut source = Buffer::new(b"\n  \n  value");
         let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
         stream.next().unwrap(); // Initialize
         stream.skip_whitespace().unwrap();

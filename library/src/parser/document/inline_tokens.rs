@@ -22,6 +22,7 @@ use crate::parser::token_stream::TokenStream;
 pub fn parse_inline_sequence_with_tokens(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
+    depth: usize,
 ) -> Result<Node, String> {
     #[cfg(feature = "debug-trace")]
     log::debug!(
@@ -66,7 +67,7 @@ pub fn parse_inline_sequence_with_tokens(
                 }
 
                 // Parse the value
-                let value = parse_value_with_tokens(stream, directives)?;
+                let value = parse_value_with_tokens(stream, directives, depth + 1)?;
                 #[cfg(feature = "debug-trace")]
                 log::debug!("inline_tokens: seq item -> {:?}", value);
                 items.push(value);
@@ -94,22 +95,26 @@ pub fn parse_inline_sequence_with_tokens(
 pub fn parse_inline_mapping_with_tokens(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
+    depth: usize,
 ) -> Result<Node, String> {
-    #[cfg(feature = "debug-trace")]
-    log::debug!(
-        "inline_tokens: start flow mapping at token = {:?}",
-        stream.current()
-    );
+    println!("DEBUG: ENTER parse_inline_mapping_with_tokens, current token: {:?}", stream.current());
     // Expect opening brace
     stream.expect(Token::FlowMappingStart)?;
 
     let mut pairs = Vec::new();
     let mut expect_entry = true; // After { or comma, we expect a key
 
+    let mut iteration = 0;
     loop {
+        iteration += 1;
+        if iteration > 1000 {
+            println!("DEBUG: Exceeded 1000 iterations in parse_inline_mapping_with_tokens, possible infinite loop");
+            return Err("Exceeded 1000 iterations in flow mapping parser (possible infinite loop)".to_string());
+        }
         // Skip whitespace/comments
         stream.skip_whitespace_and_comments()?;
 
+        println!("DEBUG: Iteration {}, current token: {:?}", iteration, stream.current());
         match stream.current() {
             Some(Token::FlowMappingEnd) => {
                 // Closing brace - done
@@ -137,8 +142,18 @@ pub fn parse_inline_mapping_with_tokens(
                     ));
                 }
 
-                // Parse the key
-                let key = parse_value_with_tokens(stream, directives)?;
+                // Progress check: record position before parsing key
+                let before_key = stream.stream_position();
+                println!("DEBUG: before_key position = {}", before_key);
+                let key = parse_value_with_tokens(stream, directives, depth + 1)?;
+                let after_key = stream.stream_position();
+                println!("DEBUG: after_key position = {}", after_key);
+                if before_key == after_key {
+                    return Err(syntax_error(
+                        stream.source_mut(),
+                        "Parser did not advance when parsing key in flow mapping (possible malformed input)",
+                    ));
+                }
 
                 // Skip whitespace
                 stream.skip_whitespace_and_comments()?;
@@ -148,11 +163,20 @@ pub fn parse_inline_mapping_with_tokens(
                 if matches!(stream.current(), Some(Token::Colon)) {
                     stream.next()?;
 
+                    // Progress check: record position before parsing value
+                    let before_value = stream.stream_position();
+                    println!("DEBUG: before_value position = {}", before_value);
                     // Skip whitespace
                     stream.skip_whitespace_and_comments()?;
-
-                    // Parse the value
-                    let value = parse_value_with_tokens(stream, directives)?;
+                    let value = parse_value_with_tokens(stream, directives, depth + 1)?;
+                    let after_value = stream.stream_position();
+                    println!("DEBUG: after_value position = {}", after_value);
+                    if before_value == after_value {
+                        return Err(syntax_error(
+                            stream.source_mut(),
+                            "Parser did not advance when parsing value in flow mapping (possible malformed input)",
+                        ));
+                    }
                     #[cfg(feature = "debug-trace")]
                     log::debug!("inline_tokens: map entry -> ({:?}, {:?})", key, value);
 
@@ -186,9 +210,9 @@ mod tests {
         let yaml = b"[]";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_inline_sequence_with_tokens(&mut stream, &directives).unwrap();
+        let result = parse_inline_sequence_with_tokens(&mut stream, &directives, 0).unwrap();
 
         if let Node::Array(items) = result {
             assert_eq!(items.len(), 0);
@@ -202,9 +226,9 @@ mod tests {
         let yaml = b"[1, 2, 3]";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_inline_sequence_with_tokens(&mut stream, &directives).unwrap();
+        let result = parse_inline_sequence_with_tokens(&mut stream, &directives, 0).unwrap();
 
         if let Node::Array(items) = result {
             assert_eq!(items.len(), 3);
@@ -218,9 +242,9 @@ mod tests {
         let yaml = b"[1, 2, ]";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_inline_sequence_with_tokens(&mut stream, &directives).unwrap();
+        let result = parse_inline_sequence_with_tokens(&mut stream, &directives, 0).unwrap();
 
         if let Node::Array(items) = result {
             assert_eq!(items.len(), 2);
@@ -234,9 +258,9 @@ mod tests {
         let yaml = b"{}";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_inline_mapping_with_tokens(&mut stream, &directives).unwrap();
+        let result = parse_inline_mapping_with_tokens(&mut stream, &directives, 0).unwrap();
 
         if let Node::Mapping(pairs) = result {
             assert_eq!(pairs.len(), 0);
@@ -250,9 +274,9 @@ mod tests {
         let yaml = b"{a: 1, b: 2}";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_inline_mapping_with_tokens(&mut stream, &directives).unwrap();
+        let result = parse_inline_mapping_with_tokens(&mut stream, &directives, 0).unwrap();
 
         if let Node::Mapping(pairs) = result {
             assert_eq!(pairs.len(), 2);
@@ -266,9 +290,9 @@ mod tests {
         let yaml = b"{a: 1, b: 2, }";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_inline_mapping_with_tokens(&mut stream, &directives).unwrap();
+        let result = parse_inline_mapping_with_tokens(&mut stream, &directives, 0).unwrap();
 
         if let Node::Mapping(pairs) = result {
             assert_eq!(pairs.len(), 2);
@@ -282,9 +306,9 @@ mod tests {
         let yaml = b"[[1, 2], [3, 4]]";
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_inline_sequence_with_tokens(&mut stream, &directives).unwrap();
+        let result = parse_inline_sequence_with_tokens(&mut stream, &directives, 0).unwrap();
 
         if let Node::Array(items) = result {
             assert_eq!(items.len(), 2);

@@ -17,10 +17,10 @@ pub fn parse_value_bridged(
     source: &mut dyn ISource,
     directives: &DirectiveContext,
 ) -> Result<Node, String> {
-    let mut stream = TokenStream::new(source, directives)?;
+    let mut stream = TokenStream::new(source, directives, false)?;
 
     // Parse using token-based parser (stream is auto-initialized)
-    parse_value_with_tokens(&mut stream, directives)
+    parse_value_with_tokens(&mut stream, directives, 0)
 }
 
 /// Check if we should use token-based parsing for a given construct

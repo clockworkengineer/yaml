@@ -80,16 +80,18 @@ pub struct Lexer<'a> {
     current_token: Option<Token>,
     peeked_token: Option<Token>,
     at_line_start: bool,
+    in_flow: bool, // Track if we're in flow context
 }
 
 impl<'a> Lexer<'a> {
     /// Create a new lexer wrapping a character source
-    pub fn new(source: &'a mut dyn ISource) -> Self {
+    pub fn new(source: &'a mut dyn ISource, in_flow: bool) -> Self {
         Lexer {
             source,
             current_token: None,
             peeked_token: None,
             at_line_start: true,
+            in_flow,
         }
     }
 
@@ -136,7 +138,7 @@ impl<'a> Lexer<'a> {
 
         // Handle line-start indentation
         if self.at_line_start && (ch == CHAR_SPACE || ch == CHAR_TAB) {
-            let indent = self.scan_indentation()?;
+            let indent = self.scan_indentation(self.in_flow)?;
             self.at_line_start = false;
             return Ok(Some(Token::Indent(indent)));
         }
@@ -271,14 +273,19 @@ impl<'a> Lexer<'a> {
     }
 
     /// Scan indentation at line start
-    fn scan_indentation(&mut self) -> Result<usize, String> {
+    fn scan_indentation(&mut self, in_flow: bool) -> Result<usize, String> {
         let mut count = 0;
         while let Some(ch) = self.source.current() {
             if ch == CHAR_SPACE {
                 count += 1;
                 self.source.next();
             } else if ch == CHAR_TAB {
-                return Err("Tabs cannot be used for indentation in YAML".to_string());
+                if !in_flow {
+                    return Err("Tabs cannot be used for indentation in YAML".to_string());
+                } else {
+                    // In flow context, treat tab as content, not indentation
+                    break;
+                }
             } else {
                 break;
             }
@@ -569,7 +576,7 @@ mod tests {
     #[test]
     fn test_scan_tag() {
         let mut source = Buffer::new(b"!!str hello");
-        let mut lexer = Lexer::new(&mut source);
+        let mut lexer = Lexer::new(&mut source, false);
 
         let token = lexer.next().unwrap().unwrap();
         assert_eq!(token, Token::Tag("!!str".to_string()));
@@ -581,7 +588,7 @@ mod tests {
     #[test]
     fn test_scan_anchor() {
         let mut source = Buffer::new(b"&anchor value");
-        let mut lexer = Lexer::new(&mut source);
+        let mut lexer = Lexer::new(&mut source, false);
 
         let token = lexer.next().unwrap().unwrap();
         assert_eq!(token, Token::Anchor("anchor".to_string()));
@@ -593,7 +600,7 @@ mod tests {
     #[test]
     fn test_scan_alias() {
         let mut source = Buffer::new(b"*anchor");
-        let mut lexer = Lexer::new(&mut source);
+        let mut lexer = Lexer::new(&mut source, false);
 
         let token = lexer.next().unwrap().unwrap();
         assert_eq!(token, Token::Alias("anchor".to_string()));
@@ -602,7 +609,7 @@ mod tests {
     #[test]
     fn test_flow_indicators() {
         let mut source = Buffer::new(b"{a: b}");
-        let mut lexer = Lexer::new(&mut source);
+        let mut lexer = Lexer::new(&mut source, false);
 
         assert_eq!(lexer.next().unwrap().unwrap(), Token::FlowMappingStart);
         assert_eq!(
@@ -620,7 +627,7 @@ mod tests {
     #[test]
     fn test_quoted_strings() {
         let mut source = Buffer::new(b"'single' \"double\"");
-        let mut lexer = Lexer::new(&mut source);
+        let mut lexer = Lexer::new(&mut source, false);
 
         assert_eq!(
             lexer.next().unwrap().unwrap(),

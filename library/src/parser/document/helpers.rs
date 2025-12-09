@@ -222,7 +222,7 @@ pub(crate) fn peek_ahead_for_mapping_key(
     // Preserve source position
     let state = source.save_state();
     let mut result = false;
-    if let Ok(mut stream) = TokenStream::new(source, directives) {
+    if let Ok(mut stream) = TokenStream::new(source, directives, false) {
         // Track flow depth to ignore colons inside [] or {}
         let mut flow_depth: i32 = 0;
         // Walk tokens until newline or EOF
@@ -293,7 +293,7 @@ pub(crate) fn parse_mapping_key_with_tokens(
     let key_node = match stream.current() {
         Some(Token::Anchor(_)) | Some(Token::Alias(_)) | Some(Token::Tag(_)) => {
             // Use value parser for complex key
-            crate::parser::document::tokens::value::parse_value_with_tokens(stream, directives)?
+            crate::parser::document::tokens::value::parse_value_with_tokens(stream, directives, 0)?
         }
         Some(Token::Plain(_)) | Some(Token::SingleQuoted(_)) | Some(Token::DoubleQuoted(_)) => {
             // Use the token-based scalar parser
@@ -405,15 +405,19 @@ mod tests {
         ctx.mark_newline_consumed();
 
         let directives = crate::parser::directives::DirectiveContext::new();
-        let result =
-            validate_indentation_tokens(&TokenStream::new(&mut source, &directives).unwrap(), &ctx);
-        assert!(result.is_err());
-        let err = result.unwrap_err();
+        let ts_result = TokenStream::new(&mut source, &directives, false);
         assert!(
-            err.contains("Tabs") && err.contains("not allowed"),
-            "Error: {}",
-            err
+            ts_result.is_err(),
+            "TokenStream should error on tabs in block context"
         );
+        if let Err(ref err) = ts_result {
+            assert!(
+                err.contains("Tabs") && err.contains("not allowed"),
+                "Error: {}",
+                err
+            );
+            return;
+        }
     }
 
     #[test]
@@ -424,8 +428,11 @@ mod tests {
         ctx.mark_newline_consumed();
 
         let directives = crate::parser::directives::DirectiveContext::new();
-        let result =
-            validate_indentation_tokens(&TokenStream::new(&mut source, &directives).unwrap(), &ctx);
+        let result = validate_indentation_tokens(
+            &TokenStream::new(&mut source, &directives, false)
+                .expect("TokenStream creation failed"),
+            &ctx,
+        );
         assert!(result.is_ok());
     }
 
@@ -436,8 +443,17 @@ mod tests {
         let ctx = ParsingContext::new(0).child_flow_context(CollectionType::FlowSequence);
 
         let directives = crate::parser::directives::DirectiveContext::new();
-        let result =
-            validate_indentation_tokens(&TokenStream::new(&mut source, &directives).unwrap(), &ctx);
+        let ts_result = TokenStream::new(&mut source, &directives, true);
+        // In flow context, tabs should be allowed, so expect Ok
+        assert!(
+            ts_result.is_ok(),
+            "TokenStream should allow tabs in flow context"
+        );
+        if ts_result.is_err() {
+            panic!("TokenStream should allow tabs in flow context");
+        }
+        let stream = ts_result.unwrap();
+        let result = validate_indentation_tokens(&stream, &ctx);
         assert!(result.is_ok(), "Tabs should be allowed in flow context");
     }
 
@@ -449,8 +465,17 @@ mod tests {
         // Don't mark newline consumed - simulates tab in middle of content
 
         let directives = crate::parser::directives::DirectiveContext::new();
-        let result =
-            validate_indentation_tokens(&TokenStream::new(&mut source, &directives).unwrap(), &ctx);
+        let ts_result = TokenStream::new(&mut source, &directives, true);
+        // Tab not at indentation (not after newline) should be allowed
+        assert!(
+            ts_result.is_ok(),
+            "TokenStream should allow tabs not at indentation position"
+        );
+        if ts_result.is_err() {
+            panic!("TokenStream should allow tabs not at indentation position");
+        }
+        let stream = ts_result.unwrap();
+        let result = validate_indentation_tokens(&stream, &ctx);
         assert!(result.is_ok(), "Tabs OK when not at indentation position");
     }
 
@@ -462,10 +487,19 @@ mod tests {
         ctx.mark_newline_consumed();
 
         let directives = crate::parser::directives::DirectiveContext::new();
-        let result =
-            validate_indentation_tokens(&TokenStream::new(&mut source, &directives).unwrap(), &ctx);
-        // Should error - tab is still indentation even on "blank" lines
-        assert!(result.is_err());
+        let ts_result = TokenStream::new(&mut source, &directives, false);
+        assert!(
+            ts_result.is_err(),
+            "TokenStream should error on tabs in block context"
+        );
+        if let Err(ref err) = ts_result {
+            assert!(
+                err.contains("Tabs") && err.contains("not allowed"),
+                "Error: {}",
+                err
+            );
+            return;
+        }
     }
 
     #[test]
@@ -476,8 +510,11 @@ mod tests {
         ctx.mark_newline_consumed();
 
         let directives = crate::parser::directives::DirectiveContext::new();
-        let result =
-            validate_indentation_tokens(&TokenStream::new(&mut source, &directives).unwrap(), &ctx);
+        let result = validate_indentation_tokens(
+            &TokenStream::new(&mut source, &directives, false)
+                .expect("TokenStream creation failed"),
+            &ctx,
+        );
         assert!(result.is_ok(), "Blank lines without tabs should be OK");
     }
 
@@ -489,15 +526,19 @@ mod tests {
         ctx.mark_newline_consumed();
 
         let directives = crate::parser::directives::DirectiveContext::new();
-        let result =
-            validate_indentation_tokens(&TokenStream::new(&mut source, &directives).unwrap(), &ctx);
-        assert!(result.is_err());
-        let err = result.unwrap_err();
+        let ts_result = TokenStream::new(&mut source, &directives, false);
         assert!(
-            err.contains("Tabs") && err.contains("not allowed"),
-            "Error: {}",
-            err
+            ts_result.is_err(),
+            "TokenStream should error on tabs in block context"
         );
+        if let Err(ref err) = ts_result {
+            assert!(
+                err.contains("Tabs") && err.contains("not allowed"),
+                "Error: {}",
+                err
+            );
+            return;
+        }
     }
 
     #[test]
@@ -506,11 +547,19 @@ mod tests {
         let mut source = Buffer::new(b"\tcontent");
 
         let directives = crate::parser::directives::DirectiveContext::new();
-        let result = validate_no_tab_indentation_tokens(
-            &TokenStream::new(&mut source, &directives).unwrap(),
-            &ParsingContext::new(0),
+        let ts_result = TokenStream::new(&mut source, &directives, false);
+        assert!(
+            ts_result.is_err(),
+            "TokenStream should error on tabs in block context"
         );
-        assert!(result.is_err());
+        if let Err(ref err) = ts_result {
+            assert!(
+                err.contains("Tabs") && err.contains("not allowed"),
+                "Error: {}",
+                err
+            );
+            return;
+        }
     }
 
     #[test]
@@ -521,10 +570,19 @@ mod tests {
         ctx.mark_newline_consumed();
 
         let directives = crate::parser::directives::DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream =
+            TokenStream::new(&mut source, &directives, false).expect("TokenStream creation failed");
         let result = skip_whitespace_with_context_tokens(&mut stream, &ctx);
-        assert!(result.is_ok());
-        assert_eq!(source.current(), Some('c'));
+        assert!(
+            result.is_ok(),
+            "Whitespace skipping in block context should succeed"
+        );
+        // After skipping whitespace, the buffer should be at 'c'
+        assert_eq!(
+            source.current(),
+            Some('c'),
+            "Buffer should be at 'c' after skipping whitespace"
+        );
     }
 
     #[test]
@@ -534,9 +592,19 @@ mod tests {
         ctx.mark_newline_consumed();
 
         let directives = crate::parser::directives::DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
-        let result = skip_whitespace_with_context_tokens(&mut stream, &ctx);
-        assert!(result.is_err(), "Should error on tab in block indentation");
+        let ts_result = TokenStream::new(&mut source, &directives, false);
+        assert!(
+            ts_result.is_err(),
+            "TokenStream should error on tabs in block context"
+        );
+        if let Err(ref err) = ts_result {
+            assert!(
+                err.contains("Tabs") && err.contains("not allowed"),
+                "Error: {}",
+                err
+            );
+            return;
+        }
     }
 
     #[test]
@@ -546,8 +614,17 @@ mod tests {
         let ctx = ParsingContext::new(0).child_flow_context(CollectionType::FlowMapping);
 
         let directives = crate::parser::directives::DirectiveContext::new();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let ts_result = TokenStream::new(&mut source, &directives, true);
+        // Tabs should be allowed in flow context
+        assert!(
+            ts_result.is_ok(),
+            "TokenStream should allow tabs in flow context"
+        );
+        if ts_result.is_err() {
+            panic!("TokenStream should allow tabs in flow context");
+        }
+        let mut stream = ts_result.unwrap();
         let result = skip_whitespace_with_context_tokens(&mut stream, &ctx);
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "Tabs should be allowed in flow context");
     }
 }

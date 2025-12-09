@@ -21,11 +21,12 @@ pub(crate) fn parse_sequence(
     indent_level: usize,
     directives: &crate::parser::directives::DirectiveContext,
 ) -> Result<crate::nodes::node::Node, String> {
-    let mut stream = TokenStream::new(source, directives)?;
+    let mut stream = TokenStream::new(source, directives, false)?;
     crate::parser::document::sequence_tokens::parse_sequence_with_tokens(
         &mut stream,
         indent_level,
         directives,
+        0,
     )
 }
 
@@ -62,13 +63,13 @@ fn parse_sequence_inner(
                     Some(crate::parser::lexer::Token::FlowSequenceStart)
                     | Some(crate::parser::lexer::Token::FlowMappingStart) => {
                         use crate::parser::document::tokens::value::parse_value_with_tokens;
-                        let value = parse_value_with_tokens(stream, directives)?;
+                        let value = parse_value_with_tokens(stream, directives, 0)?;
                         items.push(value);
                         continue;
                     }
                     _ => {
                         use crate::parser::document::tokens::value::parse_value_with_tokens;
-                        let value = parse_value_with_tokens(stream, directives)?;
+                        let value = parse_value_with_tokens(stream, directives, 0)?;
                         items.push(value);
                         continue;
                     }

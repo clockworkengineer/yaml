@@ -6,7 +6,7 @@
 use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
 use crate::parser::directives::DirectiveContext;
 use crate::parser::document::error_builder::{structure_error, syntax_error};
-// ...existing code...
+const MAX_NESTING_DEPTH: usize = 128;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
 
@@ -155,7 +155,12 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
 pub fn parse_value_with_tokens(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
+    depth: usize,
 ) -> Result<Node, String> {
+    if depth > MAX_NESTING_DEPTH {
+        return Err("Nesting too deep: possible malicious or malformed YAML".to_string());
+    }
+    println!("DEBUG: ENTER parse_value_with_tokens (depth {}), current token: {:?}", depth, stream.current());
     #[cfg(feature = "debug-trace")]
     log::debug!(
         "value_tokens: start parse_value_with_tokens at token = {:?}",
@@ -228,7 +233,7 @@ pub fn parse_value_with_tokens(
         }
 
         // Parse the actual value content
-        let inner = parse_value_content(stream, directives)?;
+        let inner = parse_value_content(stream, directives, depth + 1)?;
 
         // Apply tag coercion first, then wrap with anchor
         let mut result = inner;
@@ -273,10 +278,10 @@ pub fn parse_value_with_tokens(
     }
 
     // No decorators - parse plain value
-    let node = parse_value_content(stream, directives);
+    let node = parse_value_content(stream, directives, depth + 1);
     #[cfg(feature = "debug-trace")]
     if let Ok(ref n) = node {
-        log::debug!("value_tokens: plain value -> {:?}", n);
+           log::debug!("value_tokens: plain value -> {:?}", n);
     }
     node
 }
@@ -285,6 +290,7 @@ pub fn parse_value_with_tokens(
 fn parse_value_content(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
+    depth: usize,
 ) -> Result<Node, String> {
     #[cfg(feature = "debug-trace")]
     log::debug!(
@@ -298,23 +304,23 @@ fn parse_value_content(
     match stream.current() {
         Some(Token::FlowMappingStart) => {
             use crate::parser::document::inline_tokens::parse_inline_mapping_with_tokens;
-            parse_inline_mapping_with_tokens(stream, directives)
+            parse_inline_mapping_with_tokens(stream, directives, depth + 1)
         }
         Some(Token::FlowSequenceStart) => {
             use crate::parser::document::inline_tokens::parse_inline_sequence_with_tokens;
-            parse_inline_sequence_with_tokens(stream, directives)
+            parse_inline_sequence_with_tokens(stream, directives, depth + 1)
         }
         Some(Token::SingleQuoted(_)) | Some(Token::DoubleQuoted(_)) | Some(Token::Plain(_)) => {
             crate::parser::document::scalar::parse_scalar_with_tokens(stream, directives, 0)
         }
         Some(Token::Dash) => {
             use crate::parser::document::sequence_tokens::parse_sequence_with_tokens;
-            parse_sequence_with_tokens(stream, 0, directives)
+            parse_sequence_with_tokens(stream, 0, directives, depth + 1)
         }
         Some(Token::Indent(level)) => {
             // Indented value: parse nested mapping
             use crate::parser::document::mapping_tokens::parse_mapping_with_tokens;
-            parse_mapping_with_tokens(stream, *level, directives)
+            parse_mapping_with_tokens(stream, *level, directives, depth + 1)
         }
         Some(Token::Newline) => Ok(Node::Str(
             String::new(),
@@ -353,12 +359,12 @@ mod tests {
     #[test]
     fn test_tag_on_empty_value() {
         // This is the FH7J pattern that caused infinite loops!
-        let mut source = Buffer::new(b"!!str");
+            let mut source = Buffer::new(b"!!str");
         let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
         stream.next().unwrap(); // Initialize
-        let result = parse_value_with_tokens(&mut stream, &directives).unwrap();
+        let result = parse_value_with_tokens(&mut stream, &directives, 0).unwrap();
 
         // Should parse as empty string
         assert!(matches!(result, Node::Str(s, _, _) if s.is_empty()));
@@ -367,11 +373,11 @@ mod tests {
     #[test]
     fn test_anchor_on_empty_value() {
         // This is the PW8X pattern that caused infinite loops!
-        let mut source = Buffer::new(b"&anchor");
+            let mut source = Buffer::new(b"&anchor");
         let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_value_with_tokens(&mut stream, &directives).unwrap();
+        let result = parse_value_with_tokens(&mut stream, &directives, 0).unwrap();
 
         // Should parse as anchored empty string
         match result {
@@ -386,10 +392,10 @@ mod tests {
     #[test]
     fn test_both_decorators_on_empty() {
         let mut source = Buffer::new(b"!!str &anchor");
-        let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+            let directives = DirectiveContext::default();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_value_with_tokens(&mut stream, &directives).unwrap();
+        let result = parse_value_with_tokens(&mut stream, &directives, 0).unwrap();
 
         // Should parse as anchored empty string
         match result {
@@ -404,11 +410,11 @@ mod tests {
     #[test]
     fn test_tag_with_plain_value() {
         let mut source = Buffer::new(b"!!str hello");
-        let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+            let directives = DirectiveContext::default();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
         stream.next().unwrap(); // Initialize
-        let result = parse_value_with_tokens(&mut stream, &directives).unwrap();
+        let result = parse_value_with_tokens(&mut stream, &directives, 0).unwrap();
 
         // Should parse as string "hello"
         assert!(matches!(result, Node::Str(s, _, _) if s == "hello"));
@@ -417,10 +423,10 @@ mod tests {
     #[test]
     fn test_anchor_with_quoted_value() {
         let mut source = Buffer::new(b"&anchor 'hello'");
-        let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+            let directives = DirectiveContext::default();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_value_with_tokens(&mut stream, &directives).unwrap();
+        let result = parse_value_with_tokens(&mut stream, &directives, 0).unwrap();
 
         // Should parse as anchored string
         match result {
@@ -435,10 +441,10 @@ mod tests {
     #[test]
     fn test_alias() {
         let mut source = Buffer::new(b"*myalias");
-        let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+            let directives = DirectiveContext::default();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_value_with_tokens(&mut stream, &directives).unwrap();
+        let result = parse_value_with_tokens(&mut stream, &directives, 0).unwrap();
 
         // Should parse as alias
         assert!(matches!(result, Node::Alias(name) if name == "myalias"));
@@ -447,11 +453,11 @@ mod tests {
     #[test]
     fn test_error_on_multiple_anchors_for_single_node() {
         // Two anchors adjacent should error (single-anchor per node)
-        let mut source = Buffer::new(b"&a &b 123");
+            let mut source = Buffer::new(b"&a &b 123");
         let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let err = parse_value_with_tokens(&mut stream, &directives).unwrap_err();
+        let err = parse_value_with_tokens(&mut stream, &directives, 0).unwrap_err();
         assert!(
             err.to_ascii_lowercase().contains("duplicate anchor")
                 || err.to_ascii_lowercase().contains("multiple anchors")
@@ -461,11 +467,11 @@ mod tests {
     #[test]
     fn test_tag_followed_by_indented_mapping() {
         // Decorator then indented block value should parse nested mapping
-        let mut source = Buffer::new(b"!!set\n  a: null\n  b: null\n");
+            let mut source = Buffer::new(b"!!set\n  a: null\n  b: null\n");
         let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_value_with_tokens(&mut stream, &directives).unwrap();
+        let result = parse_value_with_tokens(&mut stream, &directives, 0).unwrap();
 
         // !!set should coerce mapping/nulls into a Set
         match result {
@@ -479,11 +485,11 @@ mod tests {
     #[test]
     fn test_anchor_followed_by_indented_mapping() {
         // Anchor then indented block value should wrap nested mapping in Anchored
-        let mut source = Buffer::new(b"&root\n  key: value\n");
+            let mut source = Buffer::new(b"&root\n  key: value\n");
         let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_value_with_tokens(&mut stream, &directives).unwrap();
+        let result = parse_value_with_tokens(&mut stream, &directives, 0).unwrap();
 
         match result {
             Node::Anchored(inner, name) => {
