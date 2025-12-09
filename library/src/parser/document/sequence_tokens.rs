@@ -114,6 +114,38 @@ pub fn parse_sequence_with_tokens(
                             }
                         }
                     }
+                    // Standard-compliant: handle flow collections (empty or not) after dash at any nesting
+                    Some(Token::FlowSequenceStart) | Some(Token::FlowMappingStart) => {
+                        let value = parse_value_with_tokens(stream, directives)?;
+                        items.push(value);
+                        // Normalize and aggressively consume separators/closers
+                        loop {
+                            stream.skip_whitespace_and_comments()?;
+                            match stream.current() {
+                                Some(Token::Comma) => {
+                                    stream.next()?;
+                                    continue;
+                                }
+                                Some(Token::FlowMappingEnd) | Some(Token::FlowSequenceEnd) => {
+                                    stream.next()?;
+                                    continue;
+                                }
+                                _ => break,
+                            }
+                        }
+                        // Skip trailing whitespace/newlines until we see next dash or end
+                        loop {
+                            match stream.current() {
+                                Some(Token::Newline) => {
+                                    stream.next()?;
+                                }
+                                Some(Token::Indent(_)) | Some(Token::Dash) | None => {
+                                    break;
+                                }
+                                _ => break,
+                            }
+                        }
+                    }
                     Some(Token::Plain(_)) => {
                         // Check for mapping pattern: plain token followed by colon
                         // Skip whitespace/comments after dash

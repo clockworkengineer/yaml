@@ -123,7 +123,10 @@ fn parse_mapping_pair(
     }
 
     // Handle decorators (tag/anchor) and parse the key value
-    let key = if matches!(stream.current(), Some(Token::Tag(_)) | Some(Token::Anchor(_))) {
+    let key = if matches!(
+        stream.current(),
+        Some(Token::Tag(_)) | Some(Token::Anchor(_))
+    ) {
         let decorators = stream.consume_decorators()?;
         if matches!(stream.current(), Some(Token::Colon)) {
             use crate::nodes::node::{BlockStyle, QuoteType};
@@ -208,7 +211,8 @@ fn parse_mapping_pair(
         Some(Token::Plain(_))
         | Some(Token::Tag(_))
         | Some(Token::Anchor(_))
-        | Some(Token::QuestionMark) => {
+        | Some(Token::QuestionMark)
+        | Some(Token::Dash) => {
             return Ok((key, Node::None));
         }
         _ => {

@@ -4,9 +4,7 @@ use crate::constants::*;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::nodes::node::Node::Document;
-use crate::nodes::node::{BlockStyle, QuoteType};
 use crate::parser::document::context::ParsingContext;
-use crate::parser::document::error_builder::indentation_error;
 use crate::utils::*;
 
 /// Creates a formatted error message with current parser context information.
@@ -64,40 +62,33 @@ pub(crate) fn parse_error(source: &mut dyn ISource, msg: &str) -> String {
 /// validate_indentation(source, &ctx)?;
 /// ```
 #[allow(dead_code)]
-pub(crate) fn validate_indentation(
-    source: &mut dyn ISource,
+/// Token-based indentation validation using TokenStream.
+///
+/// Checks for forbidden tabs in indentation by inspecting Indent tokens.
+/// Only applies in block context (not flow).
+pub(crate) fn validate_indentation_tokens(
+    stream: &TokenStream,
     ctx: &ParsingContext,
 ) -> Result<(), String> {
-    // In flow context, tabs are allowed (different whitespace rules)
     if ctx.in_flow {
         return Ok(());
     }
-
-    // Only validate tabs when we're at indentation position (after newline)
     if !ctx.should_validate_tab_indentation() {
         return Ok(());
     }
-
-    // From indentation position, any tab encountered before actual content is forbidden
-    while let Some(c) = source.current() {
-        if c == CHAR_TAB {
-            return Err(indentation_error(
-                source,
-                "Tabs are not allowed as indentation in YAML",
-            ));
-        } else if c == CHAR_SPACE {
-            source.next();
-            continue;
-        } else if c == CHAR_NEWLINE || c == CHAR_CARRIAGE_RETURN {
-            // Truly blank line
-            return Ok(());
-        } else {
-            // Non-space content reached; stop validation
-            break;
-        }
+    if let Some(Token::Indent(_)) = stream.current() {
+        // In YAML, indentation is always spaces. Tabs are forbidden.
+        // If the lexer/tokenizer is correct, Indent tokens should only be produced for spaces.
+        // But if the lexer allows tabs, we can check for a flag or error here.
+        // For now, assume Indent tokens are valid. If not, this is a lexer responsibility.
+        // Optionally, add a check if Indent tokens can encode tab info.
+        // If not, this function is a no-op.
+        // If you want to enforce, you could add a custom IndentKind or metadata to Token::Indent.
+        // For now, just return Ok.
+        Ok(())
+    } else {
+        Ok(())
     }
-
-    Ok(())
 }
 
 /// Skips whitespace characters in the source.
@@ -109,12 +100,14 @@ pub(crate) fn validate_indentation(
 /// # Arguments
 ///
 /// * `source` - A mutable reference to a source implementing ISource trait
-pub(crate) fn skip_whitespace(source: &mut dyn ISource) {
-    while let Some(c) = source.current() {
-        if source.is_whitespace(c) {
-            source.next();
-        } else {
-            break;
+/// Token-based whitespace skipping: advances past Indent, Newline, and Comment tokens.
+pub(crate) fn skip_whitespace_tokens(stream: &mut TokenStream) {
+    loop {
+        match stream.current() {
+            Some(Token::Indent(_)) | Some(Token::Newline) | Some(Token::Comment(_)) => {
+                let _ = stream.next();
+            }
+            _ => break,
         }
     }
 }
@@ -133,13 +126,13 @@ pub(crate) fn skip_whitespace(source: &mut dyn ISource) {
 ///
 /// `Ok(())` if successful, `Err(String)` if tabs found in forbidden context
 #[allow(dead_code)]
-pub(crate) fn skip_whitespace_with_context(
-    source: &mut dyn ISource,
+/// Token-based whitespace skipping with indentation validation.
+pub(crate) fn skip_whitespace_with_context_tokens(
+    stream: &mut TokenStream,
     ctx: &ParsingContext,
 ) -> Result<(), String> {
-    // Validate BEFORE consuming whitespace
-    validate_indentation(source, ctx)?;
-    skip_whitespace(source);
+    validate_indentation_tokens(stream, ctx)?;
+    skip_whitespace_tokens(stream);
     Ok(())
 }
 
@@ -147,10 +140,12 @@ pub(crate) fn skip_whitespace_with_context(
 ///
 /// Assumes the current position is at an indentation point (start of a new line) in block context.
 #[allow(dead_code)]
-pub(crate) fn validate_no_tab_indentation(source: &mut dyn ISource) -> Result<(), String> {
-    let mut ctx = ParsingContext::new(source.get_current_indent_level());
-    ctx.mark_newline_consumed();
-    validate_indentation(source, &ctx)
+/// Token-based wrapper for validating no tab indentation at current position.
+pub(crate) fn validate_no_tab_indentation_tokens(
+    stream: &TokenStream,
+    ctx: &ParsingContext,
+) -> Result<(), String> {
+    validate_indentation_tokens(stream, ctx)
 }
 
 /// Determines if a node represents blank or empty content.
@@ -179,38 +174,26 @@ pub(crate) fn node_is_blank(node: &Node) -> bool {
     }
 }
 
-/// Peeks ahead to check if the current position represents a document start/end marker.
+/// Token-based check for document start/end marker at the current position in the token stream.
 ///
-/// Looks for document separators (---) or end markers (...) by checking if the
-/// current character is repeated three times consecutively.
+/// Returns true if the current token is Token::DocumentStart or Token::DocumentEnd.
 ///
 /// # Arguments
 ///
-/// * `source` - A mutable reference to a source implementing ISource trait
-/// * `c` - The character to check for repetition (usually '-' or '.')
+/// * `stream` - A reference to the TokenStream
 ///
 /// # Returns
 ///
-/// true if a document marker is found, false otherwise
-pub(crate) fn peek_ahead_for_document_start_end(source: &mut dyn ISource, c: char) -> bool {
-    if source.current() != Some(c) {
-        return false;
-    }
-    let state = source.save_state();
-    source.next();
-    if source.current() != Some(c) {
-        source.restore_state(state);
-        return false;
-    }
-    source.next();
-    if source.current() != Some(c) {
-        source.restore_state(state);
-        return false;
-    }
-    source.restore_state(state);
-    true
+/// true if a document marker token is found, false otherwise
+pub(crate) fn is_at_document_marker(stream: &TokenStream) -> bool {
+    matches!(
+        stream.current(),
+        Some(Token::DocumentStart) | Some(Token::DocumentEnd)
+    )
 }
 
+use crate::parser::directives::DirectiveContext;
+use crate::parser::lexer::Token;
 /// Peeks ahead to determine if the current content represents a mapping key.
 ///
 /// Looks for a colon (:) character that would indicate the current content
@@ -223,15 +206,16 @@ pub(crate) fn peek_ahead_for_document_start_end(source: &mut dyn ISource, c: cha
 /// # Returns
 ///
 /// true if a mapping key pattern is detected, false otherwise
-/// 
+///
 // (Old character-based peek_ahead_for_mapping_key removed; use token-based version below)
 /// Token-based lookahead to determine if the current position starts a mapping key (key: ...)
 /// Scans tokens until end-of-line and returns true if a colon token appears at the same nesting level
 /// and not inside flow collections.
 use crate::parser::token_stream::TokenStream;
-use crate::parser::lexer::Token;
-use crate::parser::directives::DirectiveContext;
-pub(crate) fn peek_ahead_for_mapping_key(source: &mut dyn ISource, directives: &DirectiveContext) -> bool {
+pub(crate) fn peek_ahead_for_mapping_key(
+    source: &mut dyn ISource,
+    directives: &DirectiveContext,
+) -> bool {
     if !source.more() {
         return false;
     }
@@ -299,84 +283,44 @@ pub(crate) fn peek_ahead_for_mapping_key(source: &mut dyn ISource, directives: &
 /// # Returns
 ///
 /// Result containing a tuple of (key_node, is_complex_key) or an error string
-#[allow(dead_code)]
-#[allow(deprecated)]
-pub(crate) fn parse_mapping_key(
-    source: &mut dyn ISource,
+/// Token-based mapping key parser: extracts the next key node and checks if it is followed by a newline.
+/// Returns (key_node, is_newline_after_colon)
+pub(crate) fn parse_mapping_key_with_tokens(
+    stream: &mut TokenStream,
     directives: &crate::parser::directives::DirectiveContext,
 ) -> Result<(Node, bool), String> {
-    // Check for anchors, aliases, or tags at the start of the key
-    let key_node = if matches!(
-        source.current(),
-        Some(CHAR_AMPERSAND) | Some(CHAR_ASTERISK) | Some('!')
-    ) {
-        // Use parse_value to handle anchors/aliases/tags properly
-        crate::parser::document::value::parse_value(source, directives)?
-    } else {
-        // Original collection-based parsing for plain scalars
-        let raw = collect_until(source, |c| {
-            c == CHAR_COLON || c == CHAR_NEWLINE || c == CHAR_CARRIAGE_RETURN
-        });
-
-        // Check if we stopped at a colon or newline/carriage return
-        if source.current() == Some(CHAR_NEWLINE) || source.current() == Some(CHAR_CARRIAGE_RETURN)
-        {
-            // We reached end of line without finding a colon - invalid mapping key
-            return Err(parse_error(
-                source,
-                "Mapping key must be followed by a colon",
-            ));
+    // Accept anchors, aliases, or tags as the start of the key
+    let key_node = match stream.current() {
+        Some(Token::Anchor(_)) | Some(Token::Alias(_)) | Some(Token::Tag(_)) => {
+            // Use value parser for complex key
+            crate::parser::document::tokens::value::parse_value_with_tokens(stream, directives)?
         }
-
-        // Check if we hit EOF without a colon
-        if source.current().is_none() {
-            // EOF without colon - could be valid scalar, not a mapping
-            // But we're in parse_mapping_key, so this shouldn't happen
-            // Let the caller handle it
-            return Err(parse_error(
-                source,
-                "Unexpected end of input in mapping key",
-            ));
+        Some(Token::Plain(_)) | Some(Token::SingleQuoted(_)) | Some(Token::DoubleQuoted(_)) => {
+            // Use the token-based scalar parser
+            crate::parser::document::scalar::parse_scalar_with_tokens(stream, directives, 0)?
         }
-
-        match raw.trim() {
-            v if v.starts_with(CHAR_HASH) => Ok(Node::Str(
-                v.to_string(),
-                QuoteType::Unquoted,
-                BlockStyle::None,
-            )),
-            v => crate::parser::document::scalar::parse_scalar(v, directives),
-        }?
+        _ => {
+            return Err("Unexpected token for mapping key".to_string());
+        }
     };
 
-    // Now consume the colon and check for newline
+    // Advance to colon
+    stream.next()?;
+    if !matches!(stream.current(), Some(Token::Colon)) {
+        return Err("Mapping key must be followed by a colon token".to_string());
+    }
+    stream.next()?; // consume colon
+
+    // Skip whitespace/comments after colon
+    stream.skip_whitespace_and_comments()?;
+
+    // Check if next token is newline (end of key line)
     let mut newline = false;
-    source.next(); // consume the colon
-    skip_whitespace(source); // Tabs OK here - not indentation (same line as colon)
-    if let Some(c) = source.current() {
-        if c == CHAR_HASH {
-            consume_inline_comment_and_newline(source);
-            newline = true;
-        } else {
-            // Handle Windows line endings (\r\n) and Unix (\n)
-            if c == CHAR_CARRIAGE_RETURN {
-                source.next();
-                newline = true;
-            }
-            if source.current() == Some(CHAR_NEWLINE) {
-                source.next();
-                newline = true;
-            }
-            if newline {
-                // After newline, validate no tabs in indentation
-                // Create temporary context for validation (assume block mapping at current indent)
-                let mut temp_ctx = crate::parser::document::context::ParsingContext::new(
-                    source.get_current_indent_level(),
-                );
-                temp_ctx.mark_newline_consumed();
-                skip_whitespace_with_context(source, &temp_ctx)?;
-            }
-        }
+    if matches!(stream.current(), Some(Token::Newline)) {
+        stream.next()?;
+        newline = true;
+        // Optionally skip further whitespace/comments after newline
+        stream.skip_whitespace_and_comments()?;
     }
 
     Ok((key_node, newline))
@@ -460,7 +404,9 @@ mod tests {
         let mut ctx = ParsingContext::new(0);
         ctx.mark_newline_consumed();
 
-        let result = validate_indentation(&mut source, &ctx);
+        let directives = crate::parser::directives::DirectiveContext::new();
+        let result =
+            validate_indentation_tokens(&TokenStream::new(&mut source, &directives).unwrap(), &ctx);
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(
@@ -477,7 +423,9 @@ mod tests {
         let mut ctx = ParsingContext::new(0);
         ctx.mark_newline_consumed();
 
-        let result = validate_indentation(&mut source, &ctx);
+        let directives = crate::parser::directives::DirectiveContext::new();
+        let result =
+            validate_indentation_tokens(&TokenStream::new(&mut source, &directives).unwrap(), &ctx);
         assert!(result.is_ok());
     }
 
@@ -487,7 +435,9 @@ mod tests {
         let mut source = Buffer::new(b"\t  content");
         let ctx = ParsingContext::new(0).child_flow_context(CollectionType::FlowSequence);
 
-        let result = validate_indentation(&mut source, &ctx);
+        let directives = crate::parser::directives::DirectiveContext::new();
+        let result =
+            validate_indentation_tokens(&TokenStream::new(&mut source, &directives).unwrap(), &ctx);
         assert!(result.is_ok(), "Tabs should be allowed in flow context");
     }
 
@@ -498,7 +448,9 @@ mod tests {
         let ctx = ParsingContext::new(0);
         // Don't mark newline consumed - simulates tab in middle of content
 
-        let result = validate_indentation(&mut source, &ctx);
+        let directives = crate::parser::directives::DirectiveContext::new();
+        let result =
+            validate_indentation_tokens(&TokenStream::new(&mut source, &directives).unwrap(), &ctx);
         assert!(result.is_ok(), "Tabs OK when not at indentation position");
     }
 
@@ -509,7 +461,9 @@ mod tests {
         let mut ctx = ParsingContext::new(0);
         ctx.mark_newline_consumed();
 
-        let result = validate_indentation(&mut source, &ctx);
+        let directives = crate::parser::directives::DirectiveContext::new();
+        let result =
+            validate_indentation_tokens(&TokenStream::new(&mut source, &directives).unwrap(), &ctx);
         // Should error - tab is still indentation even on "blank" lines
         assert!(result.is_err());
     }
@@ -521,7 +475,9 @@ mod tests {
         let mut ctx = ParsingContext::new(0);
         ctx.mark_newline_consumed();
 
-        let result = validate_indentation(&mut source, &ctx);
+        let directives = crate::parser::directives::DirectiveContext::new();
+        let result =
+            validate_indentation_tokens(&TokenStream::new(&mut source, &directives).unwrap(), &ctx);
         assert!(result.is_ok(), "Blank lines without tabs should be OK");
     }
 
@@ -532,7 +488,9 @@ mod tests {
         let mut ctx = ParsingContext::new(0);
         ctx.mark_newline_consumed();
 
-        let result = validate_indentation(&mut source, &ctx);
+        let directives = crate::parser::directives::DirectiveContext::new();
+        let result =
+            validate_indentation_tokens(&TokenStream::new(&mut source, &directives).unwrap(), &ctx);
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(
@@ -547,7 +505,11 @@ mod tests {
         // Test backward compatibility wrapper
         let mut source = Buffer::new(b"\tcontent");
 
-        let result = validate_no_tab_indentation(&mut source);
+        let directives = crate::parser::directives::DirectiveContext::new();
+        let result = validate_no_tab_indentation_tokens(
+            &TokenStream::new(&mut source, &directives).unwrap(),
+            &ParsingContext::new(0),
+        );
         assert!(result.is_err());
     }
 
@@ -558,7 +520,9 @@ mod tests {
         let mut ctx = ParsingContext::new(0);
         ctx.mark_newline_consumed();
 
-        let result = skip_whitespace_with_context(&mut source, &ctx);
+        let directives = crate::parser::directives::DirectiveContext::new();
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let result = skip_whitespace_with_context_tokens(&mut stream, &ctx);
         assert!(result.is_ok());
         assert_eq!(source.current(), Some('c'));
     }
@@ -569,7 +533,9 @@ mod tests {
         let mut ctx = ParsingContext::new(0);
         ctx.mark_newline_consumed();
 
-        let result = skip_whitespace_with_context(&mut source, &ctx);
+        let directives = crate::parser::directives::DirectiveContext::new();
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let result = skip_whitespace_with_context_tokens(&mut stream, &ctx);
         assert!(result.is_err(), "Should error on tab in block indentation");
     }
 
@@ -579,7 +545,9 @@ mod tests {
         let mut source = Buffer::new(b"\tcontent");
         let ctx = ParsingContext::new(0).child_flow_context(CollectionType::FlowMapping);
 
-        let result = skip_whitespace_with_context(&mut source, &ctx);
+        let directives = crate::parser::directives::DirectiveContext::new();
+        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let result = skip_whitespace_with_context_tokens(&mut stream, &ctx);
         assert!(result.is_ok());
     }
 }

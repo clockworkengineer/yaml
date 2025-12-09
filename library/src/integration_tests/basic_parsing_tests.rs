@@ -313,6 +313,9 @@ mod tests {
         let yaml = b"---\nnested sequences:\n- - - []\n- - - {}\nkey1: []\nkey2: {}";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
+        if let Err(e) = &result {
+            println!("7ZZ5 Error: {}", e);
+        }
         assert!(
             result.is_ok(),
             "Should parse nested sequences with empty flow collections"

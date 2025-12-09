@@ -43,7 +43,6 @@ use crate::parser::directives::{DirectiveContext, parse_directives};
 // use std::collections::HashMap;
 
 use helpers::node_is_blank;
-use helpers::skip_whitespace;
 
 /// Token-based lookahead to determine if the current position starts a mapping key (key: ...)
 /// Scans tokens until end-of-line and returns true if a colon token appears at the same nesting level
@@ -131,7 +130,7 @@ fn parse_multiple_explicit_keys(
         pairs.push((key_node, Node::None));
 
         // Skip whitespace and check if we're still at the same indentation level
-        skip_whitespace(source);
+        crate::utils::skip_whitespace_and_comments(source);
         let current_indent = source.get_current_indent_level();
 
         // If we're at a different indentation level or don't see another '?', stop
@@ -166,7 +165,7 @@ pub fn parse_document_contents(
     // Fast token-dispatch for block constructs to prefer tokenized paths
     {
         let st = source.save_state();
-        if let Ok(mut ts) = crate::parser::token_stream::TokenStream::new(source, directives) {
+        if let Ok(ts) = crate::parser::token_stream::TokenStream::new(source, directives) {
             match ts.current() {
                 Some(crate::parser::lexer::Token::Indent(lvl)) => {
                     let level_val = *lvl;
@@ -259,7 +258,7 @@ pub fn parse_document_contents(
             let map_indent = source.get_current_indent_level();
             let is_doc_end = {
                 let st = source.save_state();
-                let mut ts = crate::parser::token_stream::TokenStream::new(source, directives)?;
+                let ts = crate::parser::token_stream::TokenStream::new(source, directives)?;
                 let res = matches!(ts.current(), Some(crate::parser::lexer::Token::DocumentEnd));
                 source.restore_state(st);
                 res
@@ -381,7 +380,7 @@ pub fn parse_document_contents(
                         "Tabs cannot be used as separation after explicit value indicator",
                     ));
                 }
-                skip_whitespace(source);
+                crate::utils::skip_whitespace_and_comments(source);
 
                 let mut stream = crate::parser::token_stream::TokenStream::new(source, directives)?;
                 let value_node = match stream.current() {
@@ -398,7 +397,7 @@ pub fn parse_document_contents(
                 if source.current() == Some('\n') {
                     source.next();
                 }
-                skip_whitespace(source);
+                crate::utils::skip_whitespace_and_comments(source);
             }
             Ok(Node::Mapping(pairs))
         }
@@ -414,7 +413,7 @@ pub fn parse_document_contents(
             if source.current() == Some('\n') {
                 source.next();
             }
-            skip_whitespace(source);
+            crate::utils::skip_whitespace_and_comments(source);
 
             if source.get_current_indent_level() == current_indent && source.current() == Some('?')
             {
@@ -671,7 +670,7 @@ pub fn parse_document(
 ) -> Result<Node, String> {
     #[cfg(feature = "debug-trace")]
     log::debug!("parse_document: start at indent {}", indent_level);
-    skip_whitespace(source);
+    crate::utils::skip_whitespace_and_comments(source);
 
     let mut document_nodes = Vec::new();
 
@@ -781,7 +780,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
 
     while source.more() {
         // Ensure we're positioned at meaningful content before checks
-        skip_whitespace(source);
+        crate::utils::skip_whitespace_and_comments(source);
         // Parse directives before this document
         let directives = parse_directives(source)?;
 
@@ -835,7 +834,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
 
             // After ---, only whitespace/comments allowed until end of line
             // Exception: block scalar indicators (>, |) and tags (!) are allowed
-            skip_whitespace(source);
+            crate::utils::skip_whitespace_and_comments(source);
             if let Some(c) = source.current() {
                 // Allow: newline, carriage return, comment, block scalar indicators, tags
                 // Tags can appear after --- to apply to the document (e.g., --- !<tag>)
@@ -889,7 +888,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
         }
 
         // Check for document end marker (...)
-        skip_whitespace(source);
+        crate::utils::skip_whitespace_and_comments(source);
         let has_document_end = {
             let st = source.save_state();
             let ts = crate::parser::token_stream::TokenStream::new(source, &directives)?;
@@ -903,7 +902,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
             source.next();
 
             // Check for invalid content after document end marker
-            skip_whitespace(source);
+            crate::utils::skip_whitespace_and_comments(source);
             if let Some(c) = source.current() {
                 // Allow newline, carriage return, comments, and directives (%)
                 if c != '\n' && c != '\r' && c != '#' && c != '%' {
@@ -941,9 +940,9 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::document::helpers::parse_comment;
     use super::*;
     use crate::io::sources::buffer::Buffer;
+    use crate::parser::document::helpers::parse_comment;
 
     #[test]
     fn test_parse_scalar_with_tokens() {
@@ -996,7 +995,9 @@ mod tests {
         let mut source = Buffer::new(b"key: value");
         assert_eq!(source.get_current_indent_level(), 0);
         let directives = crate::parser::directives::DirectiveContext::new();
-        assert!(crate::parser::document::helpers::peek_ahead_for_mapping_key(&mut source, &directives));
+        assert!(
+            crate::parser::document::helpers::peek_ahead_for_mapping_key(&mut source, &directives)
+        );
         assert_eq!(source.get_current_indent_level(), 0);
     }
 
@@ -1004,7 +1005,9 @@ mod tests {
     fn test_peek_ahead_for_mapping_key_no_colon() {
         let mut source = Buffer::new(b"key value");
         let directives = crate::parser::directives::DirectiveContext::new();
-        assert!(!crate::parser::document::helpers::peek_ahead_for_mapping_key(&mut source, &directives));
+        assert!(
+            !crate::parser::document::helpers::peek_ahead_for_mapping_key(&mut source, &directives)
+        );
         assert_eq!(source.get_current_indent_level(), 0);
     }
 
@@ -1012,21 +1015,27 @@ mod tests {
     fn test_peek_ahead_for_mapping_key_colon_after_newline() {
         let mut source = Buffer::new(b"key\n: value");
         let directives = crate::parser::directives::DirectiveContext::new();
-        assert!(!crate::parser::document::helpers::peek_ahead_for_mapping_key(&mut source, &directives));
+        assert!(
+            !crate::parser::document::helpers::peek_ahead_for_mapping_key(&mut source, &directives)
+        );
     }
 
     #[test]
     fn test_peek_ahead_for_mapping_key_spaces_before_colon() {
         let mut source = Buffer::new(b"key   : value");
         let directives = crate::parser::directives::DirectiveContext::new();
-        assert!(crate::parser::document::helpers::peek_ahead_for_mapping_key(&mut source, &directives));
+        assert!(
+            crate::parser::document::helpers::peek_ahead_for_mapping_key(&mut source, &directives)
+        );
     }
 
     #[test]
     fn test_peek_ahead_for_mapping_key_empty() {
         let mut source = Buffer::new(b"");
         let directives = crate::parser::directives::DirectiveContext::new();
-        assert!(!crate::parser::document::helpers::peek_ahead_for_mapping_key(&mut source, &directives));
+        assert!(
+            !crate::parser::document::helpers::peek_ahead_for_mapping_key(&mut source, &directives)
+        );
     }
 
     #[test]
