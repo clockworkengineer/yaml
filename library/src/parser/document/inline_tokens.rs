@@ -46,6 +46,13 @@ pub fn parse_inline_sequence_with_tokens(
                 break;
             }
             Some(Token::Comma) => {
+                if expect_item {
+                    // Comma found when expecting an item: leading or double comma
+                    return Err(syntax_error(
+                        stream.source_mut(),
+                        "Leading or double comma in flow sequence is not allowed",
+                    ));
+                }
                 // Allow trailing comma: set to expect next item, but do not error
                 // If immediately followed by ']', the loop will close cleanly
                 stream.next()?;
@@ -97,7 +104,10 @@ pub fn parse_inline_mapping_with_tokens(
     directives: &DirectiveContext,
     depth: usize,
 ) -> Result<Node, String> {
-    println!("DEBUG: ENTER parse_inline_mapping_with_tokens, current token: {:?}", stream.current());
+    println!(
+        "DEBUG: ENTER parse_inline_mapping_with_tokens, current token: {:?}",
+        stream.current()
+    );
     // Expect opening brace
     stream.expect(Token::FlowMappingStart)?;
 
@@ -108,13 +118,22 @@ pub fn parse_inline_mapping_with_tokens(
     loop {
         iteration += 1;
         if iteration > 1000 {
-            println!("DEBUG: Exceeded 1000 iterations in parse_inline_mapping_with_tokens, possible infinite loop");
-            return Err("Exceeded 1000 iterations in flow mapping parser (possible infinite loop)".to_string());
+            println!(
+                "DEBUG: Exceeded 1000 iterations in parse_inline_mapping_with_tokens, possible infinite loop"
+            );
+            return Err(
+                "Exceeded 1000 iterations in flow mapping parser (possible infinite loop)"
+                    .to_string(),
+            );
         }
         // Skip whitespace/comments
         stream.skip_whitespace_and_comments()?;
 
-        println!("DEBUG: Iteration {}, current token: {:?}", iteration, stream.current());
+        println!(
+            "DEBUG: Iteration {}, current token: {:?}",
+            iteration,
+            stream.current()
+        );
         match stream.current() {
             Some(Token::FlowMappingEnd) => {
                 // Closing brace - done

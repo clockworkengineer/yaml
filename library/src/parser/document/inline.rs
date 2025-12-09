@@ -381,7 +381,13 @@ pub(crate) fn parse_inline_sequence(
     let mut iterations = 0;
     const MAX_ITEMS: usize = 10_000;
 
+
     stream.next()?; // Skip the opening '['
+
+    // Reject leading comma after [
+    if let Some(Token::Comma) = stream.current() {
+        return Err("Leading comma in flow sequence is not allowed".to_string());
+    }
 
     if let Some(Token::FlowSequenceEnd) = stream.current() {
         stream.next()?;
