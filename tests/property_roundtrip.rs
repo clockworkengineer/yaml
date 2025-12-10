@@ -1,8 +1,8 @@
 //! Test for roundtrip property
 
+use yaml_lib::testing::property::properties;
 use yaml_lib::Node;
 use yaml_lib::PropertyResult;
-use yaml_lib::testing::property::properties;
 
 #[test]
 fn test_roundtrip_simple() {

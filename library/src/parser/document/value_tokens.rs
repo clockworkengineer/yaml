@@ -165,6 +165,7 @@ pub fn parse_value_with_tokens(
         depth,
         stream.current()
     );
+    println!("DEBUG: parse_value_with_tokens (depth {}), current token: {:?}", depth, stream.current());
     #[cfg(feature = "debug-trace")]
     log::debug!(
         "value_tokens: start parse_value_with_tokens at token = {:?}",

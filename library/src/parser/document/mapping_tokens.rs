@@ -137,6 +137,7 @@ fn parse_mapping_pair(
     cur_indent: usize,
     depth: usize,
 ) -> Result<(Node, Node), String> {
+    println!("DEBUG: parse_mapping_pair: start, token = {:?}", stream.current());
     #[cfg(feature = "debug-trace")]
     log::debug!("mapping_pair: start at token = {:?}", stream.current());
     // Unify explicit and implicit key handling: always use token stream for key detection
@@ -144,7 +145,6 @@ fn parse_mapping_pair(
     let mut explicit_key = false;
     if matches!(stream.current(), Some(Token::QuestionMark)) {
         stream.next()?;
-        stream.skip_whitespace()?;
         explicit_key = true;
     }
 
@@ -155,6 +155,7 @@ fn parse_mapping_pair(
             Some(Token::Tag(_)) | Some(Token::Anchor(_))
         ) {
             let decorators = stream.consume_decorators()?;
+            println!("DEBUG: parse_mapping_pair: after decorators, token = {:?}", stream.current());
             if matches!(stream.current(), Some(Token::Colon)) {
                 use crate::nodes::node::{BlockStyle, QuoteType};
                 let mut node = Node::Str("".to_string(), QuoteType::Unquoted, BlockStyle::None);
@@ -189,6 +190,17 @@ fn parse_mapping_pair(
         }
         parsed_key
     };
+    println!("DEBUG: parse_mapping_pair: after key, token = {:?}", stream.current());
+    // Allow newlines and whitespace after key before colon
+    loop {
+        match stream.current() {
+            Some(Token::Newline) | Some(Token::Comment(_)) => {
+                stream.next()?;
+                continue;
+            }
+            _ => break,
+        }
+    }
     match stream.current() {
         Some(Token::Colon) => {
             stream.next()?;
@@ -198,32 +210,22 @@ fn parse_mapping_pair(
             // YAML allows explicit keys without a following colon to indicate an
             // empty value. If the colon isn't found on the next non-trivia token,
             // treat the value as empty rather than error.
-            if matches!(stream.current(), Some(Token::Newline)) {
-                stream.next()?;
-                // Skip indentation and comments
-                loop {
-                    stream.skip_whitespace()?;
-                    match stream.current() {
-                        Some(Token::Comment(_)) => {
-                            stream.next()?;
-                            continue;
-                        }
-                        _ => break,
-                    }
-                }
-                if matches!(stream.current(), Some(Token::Colon)) {
-                    stream.next()?;
-                } else {
-                    // No colon: treat as empty value for explicit key
+            // If the next token is a new key, document boundary, or EOF, treat as empty value
+            println!("DEBUG: parse_mapping_pair: after explicit key newline/whitespace, token = {:?}", stream.current());
+            match stream.current() {
+                Some(Token::Plain(_)) | Some(Token::Tag(_)) | Some(Token::Anchor(_)) | Some(Token::QuestionMark)
+                | Some(Token::DocumentEnd) | Some(Token::DocumentStart) | Some(Token::Eof) | None => {
                     return Ok((key, Node::None));
                 }
+                _ => {
+                    // Otherwise, always attempt to parse a value (let value parser handle)
+                }
+            }
+            // If colon is not present, treat as empty value
+            if !matches!(stream.current(), Some(Token::Colon)) {
+                return Ok((key, Node::None));
             } else {
-                // No newline after explicit key: if colon absent, treat as empty
-                if !matches!(stream.current(), Some(Token::Colon)) {
-                    return Ok((key, Node::None));
-                } else {
-                    stream.next()?;
-                }
+                stream.next()?;
             }
         }
         Some(Token::Eof) | None => {
@@ -234,8 +236,11 @@ fn parse_mapping_pair(
         Some(Token::Plain(_))
         | Some(Token::Tag(_))
         | Some(Token::Anchor(_))
-        | Some(Token::QuestionMark)
-        | Some(Token::Dash) => {
+        | Some(Token::QuestionMark) => {
+            return Ok((key, Node::None));
+        }
+        Some(Token::Dash) => {
+            // Allow dash as value only if it follows a newline (handled above)
             return Ok((key, Node::None));
         }
         _ => {
@@ -279,6 +284,7 @@ fn parse_mapping_pair(
                         _ => break,
                     }
                 }
+                println!("DEBUG: parse_mapping_pair: after value indent/newline, token = {:?}", stream.current());
                 if matches!(stream.current(), Some(Token::Dash)) {
                     // Parse block sequence as value
                     use crate::parser::document::sequence_tokens::parse_sequence_with_tokens;
