@@ -3,7 +3,7 @@ use crate::nodes::node::Node;
 use crate::nodes::node::Node::Document;
 use crate::parser::directives::DirectiveContext;
 use crate::parser::document::helpers::node_is_blank;
-use crate::parser::document::parse_document_contents;
+use crate::parser::document::document_contents::parse_document_contents;
 
 /// Parses a single YAML document from the source.
 ///
