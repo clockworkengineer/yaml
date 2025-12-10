@@ -27,7 +27,7 @@ pub use parse::parse;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
     use crate::Node;
     use crate::io::sources::buffer::Buffer;
     use crate::io::traits::ISource;
