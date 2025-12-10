@@ -47,19 +47,44 @@ pub fn parse_mapping_with_tokens(
 
     // Track current indentation level
     let mut current_indent: Option<usize> = None;
+    let mut first_key = true;
 
-    while let Some(token) = stream.current() {
+    loop {
+        // Skip whitespace/comments before each mapping entry
+        while matches!(stream.current(), Some(Token::Newline) | Some(Token::Comment(_))) {
+            stream.next()?;
+        }
+        let token = match stream.current() {
+            Some(t) => t,
+            None => break,
+        };
+        // If this is the first key, set indent appropriately
+        if first_key {
+            match token {
+                Token::Indent(level) => {
+                    current_indent = Some(*level);
+                }
+                _ => {
+                    current_indent = Some(0);
+                }
+            }
+            first_key = false;
+        }
+        // If the next token is a Plain token and current_indent > 0, break out
+        if let Some(cur) = current_indent {
+            if cur > 0 {
+                if let Token::Plain(_) = token {
+                    break;
+                }
+            }
+        }
         match token {
             Token::Newline | Token::Comment(_) => {
                 stream.next()?;
                 continue;
             }
             Token::Indent(level) => {
-                if current_indent.is_none() {
-                    current_indent = Some(*level);
-                    stream.next()?;
-                    continue;
-                } else if let Some(cur) = current_indent {
+                if let Some(cur) = current_indent {
                     if *level < cur {
                         // Indent decreased: end current mapping
                         break;
@@ -86,6 +111,12 @@ pub fn parse_mapping_with_tokens(
                 let (key, value) = parse_mapping_pair(stream, directives, cur_indent, depth)?;
                 stream.skip_whitespace()?;
                 pairs.push((key, value));
+                // After adding a pair, if the next token is a plain key and current_indent > 0, break out
+                if cur_indent > 0 {
+                    if let Some(Token::Plain(_)) = stream.current() {
+                        break;
+                    }
+                }
             }
         }
     }
@@ -118,49 +149,46 @@ fn parse_mapping_pair(
     }
 
     // Handle decorators (tag/anchor) and parse the key value
-    let key = if matches!(
-        stream.current(),
-        Some(Token::Tag(_)) | Some(Token::Anchor(_))
-    ) {
-        let decorators = stream.consume_decorators()?;
-        if matches!(stream.current(), Some(Token::Colon)) {
-            use crate::nodes::node::{BlockStyle, QuoteType};
-            let mut node = Node::Str("".to_string(), QuoteType::Unquoted, BlockStyle::None);
-            if let Some(tag) = decorators.tag {
-                node = Node::Tagged(Box::new(node), tag);
+    let key = {
+        let mut parsed_key = if matches!(
+            stream.current(),
+            Some(Token::Tag(_)) | Some(Token::Anchor(_))
+        ) {
+            let decorators = stream.consume_decorators()?;
+            if matches!(stream.current(), Some(Token::Colon)) {
+                use crate::nodes::node::{BlockStyle, QuoteType};
+                let mut node = Node::Str("".to_string(), QuoteType::Unquoted, BlockStyle::None);
+                if let Some(tag) = decorators.tag {
+                    node = Node::Tagged(Box::new(node), tag);
+                }
+                if let Some(anchor) = decorators.anchor {
+                    node = Node::Anchored(Box::new(node), anchor);
+                }
+                node
+            } else {
+                parse_value_with_tokens(stream, directives, depth + 1)?
             }
-            if let Some(anchor) = decorators.anchor {
-                node = Node::Anchored(Box::new(node), anchor);
-            }
-            node
         } else {
-            let parsed_key = parse_value_with_tokens(stream, directives, depth + 1)?;
-            #[cfg(feature = "debug-trace")]
-            log::debug!("mapping_pair: parsed decorated key = {:?}", parsed_key);
-            parsed_key
+            parse_value_with_tokens(stream, directives, depth + 1)?
+        };
+        // If the key is an array, convert to string representation for mapping key
+        if let Node::Array(items) = &parsed_key {
+            let mut s = String::from("[");
+            for (i, item) in items.iter().enumerate() {
+                if i > 0 { s.push_str(", "); }
+                match item {
+                    Node::Str(val, _, _) => s.push_str(val),
+                    Node::Number(n) => s.push_str(&format!("{:?}", n)),
+                    Node::Boolean(b) => s.push_str(&format!("{}", b)),
+                    _ => s.push_str(&format!("{:?}", item)),
+                }
+            }
+            s.push(']');
+            use crate::nodes::node::{BlockStyle, QuoteType};
+            parsed_key = Node::Str(s, QuoteType::Unquoted, BlockStyle::None);
         }
-    } else {
-        let parsed_key = parse_value_with_tokens(stream, directives, depth + 1)?;
-        #[cfg(feature = "debug-trace")]
-        log::debug!("mapping_pair: parsed key = {:?}", parsed_key);
         parsed_key
     };
-
-    // Skip whitespace and comments after key
-    loop {
-        stream.skip_whitespace()?;
-        match stream.current() {
-            Some(Token::Comment(_)) => {
-                stream.next()?;
-                continue;
-            }
-            _ => break,
-        }
-    }
-
-    #[cfg(feature = "debug-trace")]
-    log::debug!("mapping_pair: after key, token = {:?}", stream.current());
-    // Expect colon, or treat as empty value if next token is a valid key
     match stream.current() {
         Some(Token::Colon) => {
             stream.next()?;

@@ -1,7 +1,6 @@
 //! Integration tests for embedded system features
 
 #[cfg(test)]
-#[cfg(feature = "embedded")]
 mod tests {
     use crate::embedded::limits::{LimitError, NodeValidator};
     use crate::io::sources::buffer::Buffer as BufferSource;
@@ -223,6 +222,7 @@ empty_mapping: {}
         match parse(&mut source) {
             Ok(doc) => {
                 let mut node = &doc;
+                println!("DEBUG: Root node type: {:?}", node);
                 loop {
                     match node {
                         Node::Document(nodes) | Node::Documents(nodes) => {
@@ -235,32 +235,39 @@ empty_mapping: {}
                         _ => break,
                     }
                 }
-
+                println!("DEBUG: Unwrapped node type: {:?}", node);
+                // Print keys and their types/lengths
+                if let Node::Mapping(pairs) = node {
+                    for (k, v) in pairs {
+                        println!("DEBUG: Key: {:?}, Value: {:?}, Value len: {:?}", k, v, v.len());
+                    }
+                }
                 // Check array
                 if let Some(arr) = node.get_key("array") {
+                    println!("DEBUG: array: {:?}, len: {:?}", arr, arr.len());
                     assert!(arr.is_sequence());
                     assert!(!arr.is_mapping());
                     assert_eq!(arr.len(), Some(3));
                     assert!(!arr.is_empty());
                 }
-
                 // Check mapping
                 if let Some(map) = node.get_key("mapping") {
+                    println!("DEBUG: mapping: {:?}, len: {:?}", map, map.len());
                     assert!(!map.is_sequence());
                     assert!(map.is_mapping());
                     assert_eq!(map.len(), Some(2));
                     assert!(!map.is_empty());
                 }
-
                 // Check empty array
                 if let Some(empty_arr) = node.get_key("empty_array") {
+                    println!("DEBUG: empty_array: {:?}, len: {:?}", empty_arr, empty_arr.len());
                     assert!(empty_arr.is_sequence());
                     assert_eq!(empty_arr.len(), Some(0));
                     assert!(empty_arr.is_empty());
                 }
-
                 // Check empty mapping
                 if let Some(empty_map) = node.get_key("empty_mapping") {
+                    println!("DEBUG: empty_mapping: {:?}, len: {:?}", empty_map, empty_map.len());
                     assert!(empty_map.is_mapping());
                     assert_eq!(empty_map.len(), Some(0));
                     assert!(empty_map.is_empty());

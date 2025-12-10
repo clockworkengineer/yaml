@@ -355,16 +355,5 @@ mod tests {
         assert!(suite.all_pass(&node));
     }
 
-    #[test]
-    fn test_roundtrip_simple() {
-        let node = Node::from("test");
-        let result = properties::roundtrip_preserves_structure(&node);
-        if !matches!(result, PropertyResult::Pass | PropertyResult::Skip(_)) {
-            eprintln!("Roundtrip failed: {:?}", result);
-        }
-        assert!(matches!(
-            result,
-            PropertyResult::Pass | PropertyResult::Skip(_)
-        ));
-    }
+    // test_roundtrip_simple moved to tests/property_roundtrip.rs
 }
