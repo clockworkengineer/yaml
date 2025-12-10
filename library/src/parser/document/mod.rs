@@ -859,10 +859,17 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
             source.next();
 
             // After ---, only whitespace/comments, block scalar indicators (|, >), or tags (!) are allowed until end of line
-            crate::utils::skip_whitespace_and_comments(source);
+            // crate::utils::skip_whitespace_and_comments(source);
             if let Some(c) = source.current() {
                 // Allow: newline, carriage return, comment, block scalar indicators, tags
-                if c != '\n' && c != '\r' && c != '#' && c != '>' && c != '|' && c != '!' {
+                if c != '\n'
+                    && c != '\r'
+                    && c != '#'
+                    && c != '>'
+                    && c != '|'
+                    && c != '!'
+                    && c != '-'
+                {
                     // Any other content (including mapping keys/values) is invalid on the marker line
                     return Err(helpers::parse_error(
                         source,
@@ -911,7 +918,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
             crate::utils::skip_whitespace_and_comments(source);
             if let Some(c) = source.current() {
                 // Allow newline, carriage return, comments, and directives (%)
-                if c != '\n' && c != '\r' && c != '#' && c != '%' {
+                if c != '\n' && c != '\r' && c != '#' && c != '%' && c != '-' {
                     // There's non-whitespace, non-comment, non-directive content after ...
                     return Err(parse_error(
                         source,

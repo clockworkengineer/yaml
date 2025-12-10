@@ -205,12 +205,12 @@ impl<'a> Lexer<'a> {
                 let state = self.source.save_state();
                 self.source.next();
 
-                match (self.source.current(), self.peek_ahead(2)) {
+                match (self.source.current(), self.peek_ahead(1)) {
                     (Some('-'), Some('-')) => {
                         // Document start: ---
-                        // Only emit at indent 0
+                        // Only emit at indent 1
                         let indent = self.indent_level();
-                        if indent == 0 {
+                        if indent == 1 {
                             self.source.next();
                             self.source.next();
                             Ok(Some(Token::DocumentStart))
@@ -236,12 +236,12 @@ impl<'a> Lexer<'a> {
                 let state = self.source.save_state();
                 self.source.next();
 
-                match (self.source.current(), self.peek_ahead(2)) {
+                match (self.source.current(), self.peek_ahead(1)) {
                     (Some('.'), Some('.')) => {
                         // Document end: ...
                         // Only emit at indent 0
                         let indent = self.indent_level();
-                        if indent == 0 {
+                        if indent == 1 {
                             self.source.next();
                             self.source.next();
                             Ok(Some(Token::DocumentEnd))
@@ -645,5 +645,101 @@ mod tests {
             lexer.next().unwrap().unwrap(),
             Token::DoubleQuoted("double".to_string())
         );
+    }
+    #[test]
+    fn test_document_markers_empty() {
+        use crate::io::sources::buffer::Buffer;
+        let mut source = Buffer::new(b"---\n...\n");
+        let mut lexer = Lexer::new(&mut source, false);
+
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::DocumentStart);
+
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::Newline);
+
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::DocumentEnd);
+
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::Newline);
+    }
+    #[test]
+    fn test_document_markers_with_content() {
+        use crate::io::sources::buffer::Buffer;
+        let mut source = Buffer::new(b"---\nkey: value\n...");
+        let mut lexer = Lexer::new(&mut source, false);
+
+        // Document start
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::DocumentStart);
+
+        // Newline
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::Newline);
+
+        // Plain key 'God'
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::Plain("key".to_string()));
+
+        // Colon
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::Colon);
+
+        // Plain value '42'
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::Plain("value".to_string()));
+
+        // Newline
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::Newline);
+
+        // Document end
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::DocumentEnd);
+
+        // Newline
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::Newline);
+    }
+    #[test]
+    fn test_document_markers_three() {
+        use crate::io::sources::buffer::Buffer;
+        let mut source = Buffer::new(b"---\n...\n---\n...\n---\n...\n");
+        let mut lexer = Lexer::new(&mut source, false);
+
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::DocumentStart);
+
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::Newline);
+
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::DocumentEnd);
+
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::Newline);
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::DocumentStart);
+
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::Newline);
+
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::DocumentEnd);
+
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::Newline);
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::DocumentStart);
+
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::Newline);
+
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::DocumentEnd);
+
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::Newline);
     }
 }

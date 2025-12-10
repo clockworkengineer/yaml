@@ -55,7 +55,11 @@ impl<'a> TokenStream<'a> {
         let mut lexer = Lexer::new(source, in_flow);
         // Load the first token - propagate errors
         lexer.next()?;
-        let ts = TokenStream { lexer, directives, position_counter: 0 };
+        let ts = TokenStream {
+            lexer,
+            directives,
+            position_counter: 0,
+        };
         #[cfg(feature = "debug-trace")]
         ts_log(format!("token_stream: new -> current = {:?}", ts.current()));
         Ok(ts)
@@ -401,5 +405,24 @@ mod tests {
         stream.skip_whitespace().unwrap();
 
         assert!(matches!(stream.current(), Some(Token::Plain(_))));
+    }
+
+    #[test]
+    fn test_document_markers() {
+        use crate::io::sources::buffer::Buffer;
+        let mut source = Buffer::new(b"---\n...\n");
+        let mut lexer = Lexer::new(&mut source, false);
+
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::DocumentStart);
+
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::Newline);
+
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::DocumentEnd);
+
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::Newline);
     }
 }
