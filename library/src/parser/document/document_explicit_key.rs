@@ -1,6 +1,70 @@
 use crate::io::traits::ISource;
-use crate::nodes::node::{BlockStyle, Node};
-use crate::parser::document::helpers;
+use crate::nodes::node::{ Node};
+
+/// Parses a single explicit key from the source and normalizes it to a string node.
+fn parse_and_normalize_explicit_key(source: &mut dyn ISource) -> Result<Node, String> {
+    let directives_local = crate::parser::directives::DirectiveContext::new();
+    {
+        let mut stream =
+            crate::parser::token_stream::TokenStream::new(source, &directives_local, false)?;
+        stream.skip_whitespace_and_comments()?;
+    }
+    let mut stream =
+        crate::parser::token_stream::TokenStream::new(source, &directives_local, false)?;
+    let mut key_node = match stream.current() {
+        Some(crate::parser::lexer::Token::Newline) | None => {
+            if source.current() == Some('\n') {
+                source.next();
+            }
+            return Ok(Node::None);
+        }
+        _ => crate::parser::document::tokens::value::parse_value_with_tokens(
+            &mut stream,
+            &directives_local,
+            0,
+        )?,
+    };
+    use crate::nodes::node::BlockStyle;
+    use crate::parser::document::helpers::node_to_inline_string;
+    match key_node {
+        Node::Array(_) | Node::Mapping(_) => {
+            let inline = node_to_inline_string(&key_node);
+            key_node = Node::Str(
+                inline,
+                crate::nodes::node::QuoteType::Double,
+                BlockStyle::None,
+            );
+        }
+        Node::Str(s, _qt, style) => {
+            let key_string = if matches!(style, BlockStyle::Literal) {
+                format!("{}\n", s)
+            } else {
+                s
+            };
+            key_node = Node::Str(
+                key_string,
+                crate::nodes::node::QuoteType::Double,
+                BlockStyle::None,
+            );
+        }
+        other => {
+            let inline = node_to_inline_string(&other);
+            key_node = Node::Str(
+                inline,
+                crate::nodes::node::QuoteType::Double,
+                BlockStyle::None,
+            );
+        }
+    }
+    Ok(key_node)
+}
+
+/// Determines if the loop should continue for explicit keys.
+fn should_continue_explicit_key_loop(source: &mut dyn ISource, indent_level: usize) -> bool {
+    crate::utils::skip_whitespace_and_comments(source);
+    let current_indent = source.get_current_indent_level();
+    current_indent == indent_level && source.current() == Some('?')
+}
 
 /// Parses multiple explicit keys for sets or mappings.
 ///
@@ -20,81 +84,17 @@ pub fn parse_multiple_explicit_keys(
     indent_level: usize,
 ) -> Result<Node, String> {
     let mut pairs: Vec<(Node, Node)> = Vec::new();
-
     while source.current() == Some('?') {
-        // Skip the '?' character
         source.next();
-        let directives_local = crate::parser::directives::DirectiveContext::new();
-        {
-            let mut stream =
-                crate::parser::token_stream::TokenStream::new(source, &directives_local, false)?;
-            // Note: use local stream only for skipping; actual parsing below uses provided directives
-            stream.skip_whitespace_and_comments()?;
+        let key_node = parse_and_normalize_explicit_key(source)?;
+        if let Node::None = key_node {
+            continue;
         }
-
-        // Parse the key via tokens; normalize to string for set semantics
-        let mut stream =
-            crate::parser::token_stream::TokenStream::new(source, &directives_local, false)?;
-        let mut key_node = match stream.current() {
-            Some(crate::parser::lexer::Token::Newline) | None => {
-                // Empty key, skip this entry
-                if source.current() == Some('\n') {
-                    source.next();
-                }
-                // Continue to next explicit key
-                continue;
-            }
-            _ => crate::parser::document::tokens::value::parse_value_with_tokens(
-                &mut stream,
-                &directives_local,
-                0,
-            )?,
-        };
-
-        match key_node {
-            Node::Array(_) | Node::Mapping(_) => {
-                let inline = helpers::node_to_inline_string(&key_node);
-                key_node = Node::Str(
-                    inline,
-                    crate::nodes::node::QuoteType::Double,
-                    crate::nodes::node::BlockStyle::None,
-                );
-            }
-            Node::Str(s, _qt, style) => {
-                let key_string = if matches!(style, BlockStyle::Literal) {
-                    format!("{}\n", s)
-                } else {
-                    s
-                };
-                key_node = Node::Str(
-                    key_string,
-                    crate::nodes::node::QuoteType::Double,
-                    crate::nodes::node::BlockStyle::None,
-                );
-            }
-            other => {
-                let inline = helpers::node_to_inline_string(&other);
-                key_node = Node::Str(
-                    inline,
-                    crate::nodes::node::QuoteType::Double,
-                    crate::nodes::node::BlockStyle::None,
-                );
-            }
-        }
-
-        // For explicit keys without explicit values, the value is implicitly null
         pairs.push((key_node, Node::None));
-
-        // Skip whitespace and check if we're still at the same indentation level
-        crate::utils::skip_whitespace_and_comments(source);
-        let current_indent = source.get_current_indent_level();
-
-        // If we're at a different indentation level or don't see another '?', stop
-        if current_indent != indent_level || source.current() != Some('?') {
+        if !should_continue_explicit_key_loop(source, indent_level) {
             break;
         }
     }
-
     Ok(Node::Mapping(pairs))
 }
 // Helper functions for parsing explicit mapping keys (? indicator)
