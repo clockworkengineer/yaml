@@ -174,23 +174,6 @@ pub(crate) fn node_is_blank(node: &Node) -> bool {
     }
 }
 
-/// Token-based check for document start/end marker at the current position in the token stream.
-///
-/// Returns true if the current token is Token::DocumentStart or Token::DocumentEnd.
-///
-/// # Arguments
-///
-/// * `stream` - A reference to the TokenStream
-///
-/// # Returns
-///
-/// true if a document marker token is found, false otherwise
-pub(crate) fn is_at_document_marker(stream: &TokenStream) -> bool {
-    matches!(
-        stream.current(),
-        Some(Token::DocumentStart) | Some(Token::DocumentEnd)
-    )
-}
 
 use crate::parser::directives::DirectiveContext;
 use crate::parser::lexer::Token;
@@ -270,61 +253,6 @@ pub(crate) fn peek_ahead_for_mapping_key(
     result
 }
 
-/// Parses a mapping key and determines if it has an explicit complex structure.
-///
-/// Handles both simple keys and complex keys (like sequences or mappings used as keys).
-/// Returns the parsed key node and a boolean indicating if it's a complex key.
-///
-/// # Arguments
-///
-/// * `source` - A mutable reference to a source implementing ISource trait
-/// * `directives` - Directive context for version-aware parsing
-///
-/// # Returns
-///
-/// Result containing a tuple of (key_node, is_complex_key) or an error string
-/// Token-based mapping key parser: extracts the next key node and checks if it is followed by a newline.
-/// Returns (key_node, is_newline_after_colon)
-pub(crate) fn parse_mapping_key_with_tokens(
-    stream: &mut TokenStream,
-    directives: &crate::parser::directives::DirectiveContext,
-) -> Result<(Node, bool), String> {
-    // Accept anchors, aliases, or tags as the start of the key
-    let key_node = match stream.current() {
-        Some(Token::Anchor(_)) | Some(Token::Alias(_)) | Some(Token::Tag(_)) => {
-            // Use value parser for complex key
-            crate::parser::document::tokens::value::parse_value_with_tokens(stream, directives, 0)?
-        }
-        Some(Token::Plain(_)) | Some(Token::SingleQuoted(_)) | Some(Token::DoubleQuoted(_)) => {
-            // Use the token-based scalar parser
-            crate::parser::document::scalar::parse_scalar_with_tokens(stream, directives, 0)?
-        }
-        _ => {
-            return Err("Unexpected token for mapping key".to_string());
-        }
-    };
-
-    // Advance to colon
-    stream.next()?;
-    if !matches!(stream.current(), Some(Token::Colon)) {
-        return Err("Mapping key must be followed by a colon token".to_string());
-    }
-    stream.next()?; // consume colon
-
-    // Skip whitespace/comments after colon
-    stream.skip_whitespace_and_comments()?;
-
-    // Check if next token is newline (end of key line)
-    let mut newline = false;
-    if matches!(stream.current(), Some(Token::Newline)) {
-        stream.next()?;
-        newline = true;
-        // Optionally skip further whitespace/comments after newline
-        stream.skip_whitespace_and_comments()?;
-    }
-
-    Ok((key_node, newline))
-}
 
 /// Parses a comment line from the source.
 ///

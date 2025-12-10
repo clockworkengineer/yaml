@@ -375,7 +375,9 @@ mod tests {
         // Using string-based parser path to verify chomping behavior
         let directives = DirectiveContext::new();
         let value = "| -\n  a\n  b\n\n";
-        let node = parse_scalar(value, &directives).unwrap();
+        let mut source = Buffer::new(value.as_bytes());
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+        let node = parse_scalar_with_tokens(&mut stream, &directives, 0).unwrap();
         assert!(
             matches!(node, Node::Str(ref s, QuoteType::Unquoted, BlockStyle::Literal) if !s.ends_with('\n'))
         );
@@ -385,7 +387,9 @@ mod tests {
     fn test_block_scalar_chomping_keep_plus() {
         let directives = DirectiveContext::new();
         let value = "| +\n  a\n  b\n\n\n";
-        let node = parse_scalar(value, &directives).unwrap();
+        let mut source = Buffer::new(value.as_bytes());
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+        let node = parse_scalar_with_tokens(&mut stream, &directives, 0).unwrap();
         assert!(
             matches!(node, Node::Str(ref s, QuoteType::Unquoted, BlockStyle::Literal) if s.ends_with("\n\n"))
         );
@@ -395,7 +399,9 @@ mod tests {
     fn test_block_scalar_indent_indicator() {
         let directives = DirectiveContext::new();
         let value = "| 2\n    a\n    b\n";
-        let node = parse_scalar(value, &directives).unwrap();
+        let mut source = Buffer::new(value.as_bytes());
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+        let node = parse_scalar_with_tokens(&mut stream, &directives, 0).unwrap();
         assert!(
             matches!(node, Node::Str(ref s, QuoteType::Unquoted, BlockStyle::Literal) if s.contains("a") && s.contains("b"))
         );

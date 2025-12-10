@@ -1,7 +1,6 @@
 //! Module: constants/mod.rs
 
 pub const CHAR_DASH: char = '-';
-pub const CHAR_DOT: char = '.';
 pub const CHAR_HASH: char = '#';
 pub const CHAR_LBRACE: char = '{';
 pub const CHAR_RBRACE: char = '}';

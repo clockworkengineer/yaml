@@ -18,7 +18,7 @@ pub struct Decorators {
 /// Token stream for high-level parser operations
 pub struct TokenStream<'a> {
     lexer: Lexer<'a>,
-    directives: &'a DirectiveContext,
+    _directives: &'a DirectiveContext,
     // Track a simple position counter for progress checks
     position_counter: usize,
 }
@@ -57,7 +57,7 @@ impl<'a> TokenStream<'a> {
         lexer.next()?;
         let ts = TokenStream {
             lexer,
-            directives,
+            _directives: directives,
             position_counter: 0,
         };
         #[cfg(feature = "debug-trace")]
