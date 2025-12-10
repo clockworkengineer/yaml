@@ -195,6 +195,24 @@ pub fn parse_value_with_tokens(
         // Only skip comments; structural whitespace must be preserved.
         stream.skip_comments()?;
 
+        // Special handling: if tag is !!seq and next token is Indent, parse a sequence, not a mapping
+        let tag_is_seq = decorators.tag.as_ref().map(|t| {
+            let resolved = directives.resolve_tag(t);
+            resolved == "!!seq" || resolved == "tag:yaml.org,2002:seq"
+        }).unwrap_or(false);
+
+        if tag_is_seq {
+            if let Some(Token::Indent(level)) = stream.current() {
+                use crate::parser::document::sequence_tokens::parse_sequence_with_tokens;
+                let seq = parse_sequence_with_tokens(stream, *level, directives, depth + 1)?;
+                let mut result = Node::Tagged(Box::new(seq), "tag:yaml.org,2002:seq".to_string());
+                if let Some(anchor_name) = decorators.anchor {
+                    result = Node::Anchored(Box::new(result), anchor_name);
+                }
+                return Ok(result);
+            }
+        }
+
         // NOW check if we're at EOF or end of structure (empty decorated value)
         // This includes:
         // - EOF/None: end of document

@@ -243,11 +243,9 @@ fn parse_mapping_pair(
             // Allow dash as value only if it follows a newline (handled above)
             return Ok((key, Node::None));
         }
+        // Do not error on Indent or other tokens; let the value parser handle it
         _ => {
-            return Err(format!(
-                "Expected colon after key, got: {:?}",
-                stream.current()
-            ));
+            // No error: let the value parser handle the next token
         }
     }
 
