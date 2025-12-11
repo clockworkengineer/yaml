@@ -129,15 +129,33 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
     #[cfg(feature = "debug-trace")]
     log::debug!("parse: begin stream");
     let mut docs: Vec<Node> = Vec::new();
-
+    let mut saw_marker = false;
+    let mut any_content = false;
     while source.more() {
         crate::utils::skip_whitespace_and_comments(source);
-        let directives = parse_directives(source)?;
+        // Always create a fresh DirectiveContext for each document
+        let mut directives = crate::parser::directives::DirectiveContext::new();
+        // Parse and apply any directives for this document
+        let parsed_directives = parse_directives(source)?;
+        // Merge parsed directives into the new context
+        directives.yaml_version = parsed_directives.yaml_version;
+        directives.tag_prefixes.extend(parsed_directives.tag_prefixes);
         check_explicit_directives(source, &directives)?;
-        parse_document_markers(source, &directives)?;
+        let marker_res = parse_document_markers(source, &directives);
+        let marker_ok = marker_res.is_ok();
+        if marker_ok {
+            if saw_marker && !any_content {
+                docs.push(Document(Vec::new()));
+            }
+            saw_marker = true;
+            any_content = false;
+        }
         let document = parse_document(source, 0, &directives);
         match document {
-            Ok(doc) => docs.push(doc),
+            Ok(doc) => {
+                docs.push(doc);
+                any_content = true;
+            },
             Err(err) => return Err(err),
         }
         parse_document_end_marker(source, &directives)?;
@@ -146,7 +164,10 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
         }
     }
     if docs.is_empty() {
-        docs.push(Document(Vec::new()))
+        docs.push(Document(Vec::new()));
+    }
+    if saw_marker && !any_content {
+        docs.push(Document(Vec::new()));
     }
     #[cfg(feature = "debug-trace")]
     log::debug!("parse: end stream with {} document(s)", docs.len());
