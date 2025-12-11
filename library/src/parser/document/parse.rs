@@ -27,17 +27,36 @@ fn parse_document_markers(
         source.next();
         source.next();
         source.next();
-        if let Some(c) = source.current() {
-            if c != '\n' && c != '\r' && c != '#' && c != '>' && c != '|' && c != '!' && c != '-' {
-                return Err(helpers::parse_error(
-                    source,
-                    "YAML 1.2: Document start marker (---) must be on its own line, except for comments, block scalar indicators (|, >), or tags (!). No mapping keys or values allowed on the same line as ---.",
-                ));
+        // After --- marker, only allow whitespace, comments, block scalar indicators, or tags until end of line
+        // Use token stream to check for forbidden tokens before newline
+        let st = source.save_state();
+        if let Ok(mut ts) = crate::parser::token_stream::TokenStream::new(source, directives, false) {
+            loop {
+                match ts.current() {
+                    Some(crate::parser::lexer::Token::Newline) | Some(crate::parser::lexer::Token::Eof) => { break; },
+                    Some(crate::parser::lexer::Token::Comment(_)) => { ts.next().ok(); break; },
+                    Some(crate::parser::lexer::Token::Tag(_)) => { ts.next().ok(); break; },
+                    // Allow block scalar indicators as single characters after ---
+                    Some(crate::parser::lexer::Token::Plain(s)) if s == "|" || s == ">" => { ts.next().ok(); break; },
+                    // Forbidden: mapping key, colon, or any plain value
+                    Some(crate::parser::lexer::Token::Plain(_)) | Some(crate::parser::lexer::Token::Colon) => {
+                        return Err(helpers::parse_error(
+                            source,
+                            "YAML 1.2: Document start marker (---) must be on its own line. No mapping keys or values allowed on the same line as ---.",
+                        ));
+                    }
+                    Some(_) => {
+                        return Err(helpers::parse_error(
+                            source,
+                            "YAML 1.2: Document start marker (---) must be on its own line. No mapping keys or values allowed on the same line as ---.",
+                        ));
+                    }
+                    None => { break; }
+                }
             }
         }
-        if source.current() == Some('#') {
-            helpers::parse_comment(source);
-        }
+        source.restore_state(st);
+        // Move to next line if needed
         if source.current() == Some('\n') || source.current() == Some('\r') {
             source.next();
         }
@@ -139,11 +158,16 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
         let parsed_directives = parse_directives(source)?;
         // Merge parsed directives into the new context
         directives.yaml_version = parsed_directives.yaml_version;
-        directives.tag_prefixes.extend(parsed_directives.tag_prefixes);
+        directives
+            .tag_prefixes
+            .extend(parsed_directives.tag_prefixes);
         check_explicit_directives(source, &directives)?;
         let marker_res = parse_document_markers(source, &directives);
-        let marker_ok = marker_res.is_ok();
-        if marker_ok {
+        eprintln!("DEBUG: parse_document_markers result: {:?}", marker_res);
+        if let Err(err) = marker_res {
+            return Err(err);
+        }
+        if marker_res.is_ok() {
             if saw_marker && !any_content {
                 docs.push(Document(Vec::new()));
             }
@@ -155,7 +179,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
             Ok(doc) => {
                 docs.push(doc);
                 any_content = true;
-            },
+            }
             Err(err) => return Err(err),
         }
         parse_document_end_marker(source, &directives)?;
