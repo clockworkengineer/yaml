@@ -31,28 +31,32 @@ fn parse_document_markers(
         // Use token stream to check for forbidden tokens before newline
         let st = source.save_state();
         if let Ok(mut ts) = crate::parser::token_stream::TokenStream::new(source, directives, false) {
+            // Skip whitespace tokens after ---
             loop {
                 match ts.current() {
-                    Some(crate::parser::lexer::Token::Newline) | Some(crate::parser::lexer::Token::Eof) => { break; },
-                    Some(crate::parser::lexer::Token::Comment(_)) => { ts.next().ok(); break; },
-                    Some(crate::parser::lexer::Token::Tag(_)) => { ts.next().ok(); break; },
-                    // Allow block scalar indicators as single characters after ---
-                    Some(crate::parser::lexer::Token::Plain(s)) if s == "|" || s == ">" => { ts.next().ok(); break; },
-                    // Forbidden: mapping key, colon, or any plain value
-                    Some(crate::parser::lexer::Token::Plain(_)) | Some(crate::parser::lexer::Token::Colon) => {
-                        return Err(helpers::parse_error(
-                            source,
-                            "YAML 1.2: Document start marker (---) must be on its own line. No mapping keys or values allowed on the same line as ---.",
-                        ));
-                    }
-                    Some(_) => {
-                        return Err(helpers::parse_error(
-                            source,
-                            "YAML 1.2: Document start marker (---) must be on its own line. No mapping keys or values allowed on the same line as ---.",
-                        ));
-                    }
-                    None => { break; }
+                    Some(crate::parser::lexer::Token::Indent(_)) => { ts.next().ok(); },
+                    _ => break,
                 }
+            }
+            // Now check for comment or other allowed/forbidden tokens
+            match ts.current() {
+                Some(crate::parser::lexer::Token::Newline) | Some(crate::parser::lexer::Token::Eof) => {},
+                Some(crate::parser::lexer::Token::Comment(_)) => {}, // allow comment after ---
+                Some(crate::parser::lexer::Token::Tag(_)) => { ts.next().ok(); },
+                Some(crate::parser::lexer::Token::Plain(s)) if s == "|" || s == ">" => { ts.next().ok(); },
+                Some(crate::parser::lexer::Token::Plain(_)) | Some(crate::parser::lexer::Token::Colon) => {
+                    return Err(helpers::parse_error(
+                        source,
+                        "YAML 1.2: Document start marker (---) must be on its own line. No mapping keys or values allowed on the same line as ---.",
+                    ));
+                }
+                Some(_) => {
+                    return Err(helpers::parse_error(
+                        source,
+                        "YAML 1.2: Document start marker (---) must be on its own line. No mapping keys or values allowed on the same line as ---.",
+                    ));
+                }
+                None => {}
             }
         }
         source.restore_state(st);

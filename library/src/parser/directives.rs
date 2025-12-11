@@ -169,7 +169,13 @@ impl DirectiveContext {
         // Apply the best match if found
         if let Some((handle, prefix)) = best_match {
             let suffix = &tag[handle.len()..];
-            return alloc::format!("{}{}", prefix, suffix);
+            // If the prefix looks like a URI (starts with "tag:"), join as URI, else join as local tag
+            if prefix.starts_with("tag:") {
+                return alloc::format!("{}{}", prefix, suffix);
+            } else {
+                // Local tag prefix, join with no separator
+                return alloc::format!("{}{}", prefix, suffix);
+            }
         }
 
         // If no handle matches, return as-is
