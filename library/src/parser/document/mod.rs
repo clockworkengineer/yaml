@@ -1,5 +1,10 @@
-
-
+///
+/// Modules for parsing YAML documents.
+/// 
+/// Handles parsing of various YAML constructs including sequences, mappings,
+/// scalars, anchors, aliases, and directives. Provides utilities for 
+/// managing document boundaries and normalization of parsed nodes.
+///
 mod anchors;
 mod block_scalar;
 mod bridge;
@@ -231,4 +236,5 @@ mod tests {
         let n = parse_document_contents(&mut src, 0, &directives).unwrap();
         assert!(matches!(n, Node::Mapping(_)));
     }
+    
 }

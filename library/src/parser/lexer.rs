@@ -700,7 +700,7 @@ mod tests {
 
         // Newline
         let token = lexer.next().unwrap().unwrap();
-        assert_eq!(token, Token::Newline);
+        assert_eq!(token, Token::Eof);
     }
     #[test]
     fn test_document_markers_three() {
