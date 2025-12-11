@@ -233,16 +233,8 @@ pub fn parse_document_contents(
         Some(c) if c == '-' => {
             let seq_indent = source.get_current_indent_level();
             if is_doc_start(source, directives)? {
-                if seq_indent == 0 {
-                    return Ok(Node::None);
-                } else {
-                    let s = crate::utils::read_line_trimmed_into_string(source);
-                    return Ok(Node::Str(
-                        s,
-                        crate::nodes::node::QuoteType::Unquoted,
-                        crate::nodes::node::BlockStyle::None,
-                    ));
-                }
+                // Always break to main document loop, even if deeply nested
+                return Ok(Node::None);
             }
             let mut stream = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
             match stream.current() {
@@ -253,12 +245,16 @@ pub fn parse_document_contents(
                             indent_level, seq_indent
                         ));
                     }
-                    Ok(crate::parser::document::sequence_tokens::parse_sequence_with_tokens(
+                    let seq = crate::parser::document::sequence_tokens::parse_sequence_with_tokens(
                         &mut stream,
                         seq_indent,
                         directives,
                         0,
-                    )?)
+                    )?;
+                    if let Node::None = seq {
+                        return Ok(Node::None);
+                    }
+                    Ok(seq)
                 }
                 _ => Ok(parse_value(source, directives)?),
             }
@@ -266,16 +262,8 @@ pub fn parse_document_contents(
         Some(c) if c == '.' => {
             let map_indent = source.get_current_indent_level();
             if is_doc_end(source, directives)? {
-                if map_indent == 0 {
-                    return Ok(Node::None);
-                } else {
-                    let s = crate::utils::read_line_trimmed_into_string(source);
-                    return Ok(Node::Str(
-                        s,
-                        crate::nodes::node::QuoteType::Unquoted,
-                        crate::nodes::node::BlockStyle::None,
-                    ));
-                }
+                // Always break to main document loop, even if deeply nested
+                return Ok(Node::None);
             }
             if map_indent < indent_level {
                 return Err(format!(

@@ -62,6 +62,14 @@ pub fn parse_sequence_with_tokens(
             // Normalize whitespace/comments after consuming
             stream.skip_whitespace_and_comments()?;
         }
+        // Check for document start/end marker at any depth
+        match stream.current() {
+            Some(Token::DocumentStart) | Some(Token::DocumentEnd) => {
+                // Always break to main document loop, even if deeply nested
+                return Ok(Node::None);
+            }
+            _ => {}
+        }
         // Check for indentation change that would end the sequence
         if let Some(Token::Indent(level)) = stream.current() {
             if *level < base_indent {
