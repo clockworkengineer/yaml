@@ -35,7 +35,11 @@ pub fn parse_sequence_with_tokens(
         base_indent
     );
     #[cfg(feature = "debug-trace")]
-    log::debug!("sequence_tokens: ENTER parse_sequence_with_tokens, indent={}, depth={}", base_indent, depth);
+    log::debug!(
+        "sequence_tokens: ENTER parse_sequence_with_tokens, indent={}, depth={}",
+        base_indent,
+        depth
+    );
     let mut items = Vec::new();
 
     // Skip initial whitespace/newlines but track where we start
@@ -110,12 +114,14 @@ pub fn parse_sequence_with_tokens(
                         // Peek for dash after indent
                         if matches!(stream.current(), Some(Token::Dash)) {
                             // Parse as sequence
-                            let seq = parse_sequence_with_tokens(stream, indent, directives, depth + 1)?;
+                            let seq =
+                                parse_sequence_with_tokens(stream, indent, directives, depth + 1)?;
                             items.push(seq);
                         } else {
                             // Parse as mapping
                             use crate::parser::document::mapping_tokens::parse_mapping_with_tokens;
-                            let mapping = parse_mapping_with_tokens(stream, indent, directives, depth + 1)?;
+                            let mapping =
+                                parse_mapping_with_tokens(stream, indent, directives, depth + 1)?;
                             items.push(mapping);
                         }
                         // Skip trailing whitespace/comments/newlines until next dash or end
@@ -178,7 +184,8 @@ pub fn parse_sequence_with_tokens(
                         if is_colon {
                             use crate::parser::document::mapping_tokens::parse_mapping_with_tokens;
                             let indent = base_indent;
-                            let mapping = parse_mapping_with_tokens(stream, indent, directives, depth + 1)?;
+                            let mapping =
+                                parse_mapping_with_tokens(stream, indent, directives, depth + 1)?;
                             items.push(mapping);
                             // Normalize whitespace/comments after item
                             stream.skip_whitespace_and_comments()?;
@@ -299,7 +306,10 @@ pub fn parse_sequence_with_tokens(
         items.len()
     );
     #[cfg(feature = "debug-trace")]
-    log::debug!("sequence_tokens: EXIT parse_sequence_with_tokens, items={:?}", items);
+    log::debug!(
+        "sequence_tokens: EXIT parse_sequence_with_tokens, items={:?}",
+        items
+    );
     Ok(Node::Array(items))
 }
 

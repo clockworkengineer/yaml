@@ -109,7 +109,44 @@ pub fn parse_mapping_with_tokens(
             _ => {
                 let cur_indent = current_indent.unwrap_or(0);
                 let (key, value) = parse_mapping_pair(stream, directives, cur_indent, depth)?;
+                println!("DEBUG: mapping_tokens: parsed pair: key={:?}, value={:?}", key, value);
                 stream.skip_whitespace()?;
+
+                // Patch: If the value is a Set with a single empty string, and the next token is an explicit key (?),
+                // treat the following block as the value for this key (for !!set explicit block format)
+                if let Node::Set(items) = &value {
+                    let is_empty_str = items.len() == 1 && matches!(items[0], Node::Str(ref s, _, _) if s.is_empty());
+                    let is_mapping_set = if let Some(Token::Plain(_)) = stream.current() {
+                        // If the next token is a plain key and we just parsed a Set with an empty string, treat as mapping set
+                        true
+                    } else {
+                        false
+                    };
+                    if (is_empty_str && is_mapping_set) || (is_empty_str && matches!(stream.current(), Some(Token::QuestionMark))) {
+                        // Parse the following block as a mapping
+                        let mapping_value = parse_mapping_with_tokens(stream, cur_indent, directives, depth + 1)?;
+                        println!("DEBUG: mapping_tokens: reparsed set block as value: {:?}", mapping_value);
+                        // If the original value was a Set (from !!set tag), convert mapping to Set
+                        let set_value = if let Node::Mapping(ref pairs) = mapping_value {
+                            let mut set_items = Vec::new();
+                            for (k, v) in pairs {
+                                if matches!(v, Node::None) {
+                                    set_items.push(k.clone());
+                                } else {
+                                    // If any value is not None, keep as tagged mapping (invalid set)
+                                    return Ok(Node::Mapping(pairs.clone()));
+                                }
+                            }
+                            Node::Set(set_items)
+                        } else {
+                            mapping_value
+                        };
+                        pairs.push((key, set_value));
+                        // Skip the pairs for the top-level mapping/explicit keys (already consumed)
+                        return Ok(Node::Mapping(pairs));
+                    }
+                }
+
                 pairs.push((key, value));
                 // After adding a pair, if the next token is a plain key and current_indent > 0, break out
                 if cur_indent > 0 {
@@ -211,10 +248,17 @@ fn parse_mapping_pair(
             // empty value. If the colon isn't found on the next non-trivia token,
             // treat the value as empty rather than error.
             // If the next token is a new key, document boundary, or EOF, treat as empty value
+            // This is critical for !!set block format: ? item1\n? item2\n? item3
+            // Always treat as Node::None if not followed by colon/value.
             println!("DEBUG: parse_mapping_pair: after explicit key newline/whitespace, token = {:?}", stream.current());
             match stream.current() {
                 Some(Token::Plain(_)) | Some(Token::Tag(_)) | Some(Token::Anchor(_)) | Some(Token::QuestionMark)
                 | Some(Token::DocumentEnd) | Some(Token::DocumentStart) | Some(Token::Eof) | None => {
+                    // Explicit key with no value: treat as Node::None
+                    return Ok((key, Node::None));
+                }
+                // Also treat Indent as start of new mapping entry (Node::None)
+                Some(Token::Indent(_)) => {
                     return Ok((key, Node::None));
                 }
                 _ => {

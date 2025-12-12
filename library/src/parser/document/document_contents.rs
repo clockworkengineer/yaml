@@ -1,5 +1,5 @@
 use crate::io::traits::ISource;
-use crate::nodes::node::{ Node};
+use crate::nodes::node::Node;
 use crate::parser::directives::DirectiveContext;
 use crate::parser::document::document_explicit_key::parse_multiple_explicit_keys;
 use crate::parser::document::helpers;
@@ -9,31 +9,42 @@ use crate::parser::document::sequence::parse_sequence;
 use crate::parser::document::value::parse_value;
 
 /// Fast token-dispatch for block constructs to prefer tokenized paths.
-fn token_dispatch(source: &mut dyn ISource, directives: &DirectiveContext) -> Option<Result<Node, String>> {
+fn token_dispatch(
+    source: &mut dyn ISource,
+    directives: &DirectiveContext,
+) -> Option<Result<Node, String>> {
     let st = source.save_state();
     if let Ok(ts) = crate::parser::token_stream::TokenStream::new(source, directives, false) {
         match ts.current() {
             Some(crate::parser::lexer::Token::Indent(lvl)) => {
                 let level_val = *lvl;
                 source.restore_state(st);
-                let mut stream = crate::parser::token_stream::TokenStream::new(source, directives, false).ok()?;
-                return Some(crate::parser::document::mapping_tokens::parse_mapping_with_tokens(
-                    &mut stream,
-                    level_val,
-                    directives,
-                    0,
-                ));
+                let mut stream =
+                    crate::parser::token_stream::TokenStream::new(source, directives, false)
+                        .ok()?;
+                return Some(
+                    crate::parser::document::mapping_tokens::parse_mapping_with_tokens(
+                        &mut stream,
+                        level_val,
+                        directives,
+                        0,
+                    ),
+                );
             }
             Some(crate::parser::lexer::Token::Dash) => {
                 source.restore_state(st);
                 let seq_indent = source.get_current_indent_level();
-                let mut stream = crate::parser::token_stream::TokenStream::new(source, directives, false).ok()?;
-                return Some(crate::parser::document::sequence_tokens::parse_sequence_with_tokens(
-                    &mut stream,
-                    seq_indent,
-                    directives,
-                    0,
-                ));
+                let mut stream =
+                    crate::parser::token_stream::TokenStream::new(source, directives, false)
+                        .ok()?;
+                return Some(
+                    crate::parser::document::sequence_tokens::parse_sequence_with_tokens(
+                        &mut stream,
+                        seq_indent,
+                        directives,
+                        0,
+                    ),
+                );
             }
             _ => {
                 source.restore_state(st);
@@ -49,7 +60,10 @@ fn token_dispatch(source: &mut dyn ISource, directives: &DirectiveContext) -> Op
 fn is_doc_start(source: &mut dyn ISource, directives: &DirectiveContext) -> Result<bool, String> {
     let st = source.save_state();
     let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-    let res = matches!(ts.current(), Some(crate::parser::lexer::Token::DocumentStart));
+    let res = matches!(
+        ts.current(),
+        Some(crate::parser::lexer::Token::DocumentStart)
+    );
     source.restore_state(st);
     Ok(res)
 }
@@ -64,12 +78,18 @@ fn is_doc_end(source: &mut dyn ISource, directives: &DirectiveContext) -> Result
 }
 
 /// Handles multiple explicit keys at the same indentation level.
-fn handle_multiple_explicit_keys(source: &mut dyn ISource, current_indent: usize) -> Result<Node, String> {
+fn handle_multiple_explicit_keys(
+    source: &mut dyn ISource,
+    current_indent: usize,
+) -> Result<Node, String> {
     Ok(parse_multiple_explicit_keys(source, current_indent)?)
 }
 
 /// Handles single explicit key logic using TokenStream-based parsing.
-fn handle_single_explicit_key(source: &mut dyn ISource, directives: &DirectiveContext) -> Result<Node, String> {
+fn handle_single_explicit_key(
+    source: &mut dyn ISource,
+    directives: &DirectiveContext,
+) -> Result<Node, String> {
     source.next();
     if source.current() == Some('\t') {
         return Err(helpers::parse_error(
@@ -121,9 +141,8 @@ fn handle_single_explicit_key(source: &mut dyn ISource, directives: &DirectiveCo
     let mut found_colon = false;
     loop {
         {
-            let mut stream = crate::parser::token_stream::TokenStream::new(
-                source, directives, false,
-            )?;
+            let mut stream =
+                crate::parser::token_stream::TokenStream::new(source, directives, false)?;
             stream.skip_whitespace_and_comments()?;
         }
         match source.current() {
@@ -146,9 +165,8 @@ fn handle_single_explicit_key(source: &mut dyn ISource, directives: &DirectiveCo
         }
         loop {
             {
-                let mut stream = crate::parser::token_stream::TokenStream::new(
-                    source, directives, false,
-                )?;
+                let mut stream =
+                    crate::parser::token_stream::TokenStream::new(source, directives, false)?;
                 stream.skip_whitespace_and_comments()?;
             }
             if source.current() == Some(':') {
@@ -172,15 +190,13 @@ fn handle_single_explicit_key(source: &mut dyn ISource, directives: &DirectiveCo
     }
     let mut value_node = match source.current() {
         Some('[') => {
-            let mut stream = crate::parser::token_stream::TokenStream::new(
-                source, directives, false,
-            )?;
+            let mut stream =
+                crate::parser::token_stream::TokenStream::new(source, directives, false)?;
             parse_inline_sequence(&mut stream, directives)?
         }
         Some('{') => {
-            let mut stream = crate::parser::token_stream::TokenStream::new(
-                source, directives, false,
-            )?;
+            let mut stream =
+                crate::parser::token_stream::TokenStream::new(source, directives, false)?;
             parse_inline_mapping(&mut stream, directives)?
         }
         Some('-') => {
@@ -204,7 +220,6 @@ fn handle_single_explicit_key(source: &mut dyn ISource, directives: &DirectiveCo
     pairs.push((key_node, value_node));
     Ok(Node::Mapping(pairs))
 }
-
 
 /// Parses the contents of a YAML document based on the current character and context.
 ///
@@ -236,7 +251,8 @@ pub fn parse_document_contents(
                 // Always break to main document loop, even if deeply nested
                 return Ok(Node::None);
             }
-            let mut stream = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+            let mut stream =
+                crate::parser::token_stream::TokenStream::new(source, directives, false)?;
             match stream.current() {
                 Some(crate::parser::lexer::Token::Dash) => {
                     if seq_indent < indent_level {
@@ -410,7 +426,8 @@ pub fn parse_document_contents(
                 source.next();
             }
             crate::utils::skip_whitespace_and_comments(source);
-            let has_multiple_explicit_keys = source.get_current_indent_level() == current_indent && source.current() == Some('?');
+            let has_multiple_explicit_keys = source.get_current_indent_level() == current_indent
+                && source.current() == Some('?');
             source.restore_state(state);
             if has_multiple_explicit_keys {
                 return handle_multiple_explicit_keys(source, current_indent);
