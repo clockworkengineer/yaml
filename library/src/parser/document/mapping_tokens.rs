@@ -51,7 +51,10 @@ pub fn parse_mapping_with_tokens(
 
     loop {
         // Skip whitespace/comments before each mapping entry
-        while matches!(stream.current(), Some(Token::Newline) | Some(Token::Comment(_))) {
+        while matches!(
+            stream.current(),
+            Some(Token::Newline) | Some(Token::Comment(_))
+        ) {
             stream.next()?;
         }
         let token = match stream.current() {
@@ -109,23 +112,33 @@ pub fn parse_mapping_with_tokens(
             _ => {
                 let cur_indent = current_indent.unwrap_or(0);
                 let (key, value) = parse_mapping_pair(stream, directives, cur_indent, depth)?;
-                println!("DEBUG: mapping_tokens: parsed pair: key={:?}, value={:?}", key, value);
+                println!(
+                    "DEBUG: mapping_tokens: parsed pair: key={:?}, value={:?}",
+                    key, value
+                );
                 stream.skip_whitespace()?;
 
                 // Patch: If the value is a Set with a single empty string, and the next token is an explicit key (?),
                 // treat the following block as the value for this key (for !!set explicit block format)
                 if let Node::Set(items) = &value {
-                    let is_empty_str = items.len() == 1 && matches!(items[0], Node::Str(ref s, _, _) if s.is_empty());
+                    let is_empty_str = items.len() == 1
+                        && matches!(items[0], Node::Str(ref s, _, _) if s.is_empty());
                     let is_mapping_set = if let Some(Token::Plain(_)) = stream.current() {
                         // If the next token is a plain key and we just parsed a Set with an empty string, treat as mapping set
                         true
                     } else {
                         false
                     };
-                    if (is_empty_str && is_mapping_set) || (is_empty_str && matches!(stream.current(), Some(Token::QuestionMark))) {
+                    if (is_empty_str && is_mapping_set)
+                        || (is_empty_str && matches!(stream.current(), Some(Token::QuestionMark)))
+                    {
                         // Parse the following block as a mapping
-                        let mapping_value = parse_mapping_with_tokens(stream, cur_indent, directives, depth + 1)?;
-                        println!("DEBUG: mapping_tokens: reparsed set block as value: {:?}", mapping_value);
+                        let mapping_value =
+                            parse_mapping_with_tokens(stream, cur_indent, directives, depth + 1)?;
+                        println!(
+                            "DEBUG: mapping_tokens: reparsed set block as value: {:?}",
+                            mapping_value
+                        );
                         // If the original value was a Set (from !!set tag), convert mapping to Set
                         let set_value = if let Node::Mapping(ref pairs) = mapping_value {
                             let mut set_items = Vec::new();
@@ -174,7 +187,10 @@ fn parse_mapping_pair(
     cur_indent: usize,
     depth: usize,
 ) -> Result<(Node, Node), String> {
-    println!("DEBUG: parse_mapping_pair: start, token = {:?}", stream.current());
+    println!(
+        "DEBUG: parse_mapping_pair: start, token = {:?}",
+        stream.current()
+    );
     #[cfg(feature = "debug-trace")]
     log::debug!("mapping_pair: start at token = {:?}", stream.current());
     // Unify explicit and implicit key handling: always use token stream for key detection
@@ -192,7 +208,10 @@ fn parse_mapping_pair(
             Some(Token::Tag(_)) | Some(Token::Anchor(_))
         ) {
             let decorators = stream.consume_decorators()?;
-            println!("DEBUG: parse_mapping_pair: after decorators, token = {:?}", stream.current());
+            println!(
+                "DEBUG: parse_mapping_pair: after decorators, token = {:?}",
+                stream.current()
+            );
             if matches!(stream.current(), Some(Token::Colon)) {
                 use crate::nodes::node::{BlockStyle, QuoteType};
                 let mut node = Node::Str("".to_string(), QuoteType::Unquoted, BlockStyle::None);
@@ -213,7 +232,9 @@ fn parse_mapping_pair(
         if let Node::Array(items) = &parsed_key {
             let mut s = String::from("[");
             for (i, item) in items.iter().enumerate() {
-                if i > 0 { s.push_str(", "); }
+                if i > 0 {
+                    s.push_str(", ");
+                }
                 match item {
                     Node::Str(val, _, _) => s.push_str(val),
                     Node::Number(n) => s.push_str(&format!("{:?}", n)),
@@ -227,7 +248,10 @@ fn parse_mapping_pair(
         }
         parsed_key
     };
-    println!("DEBUG: parse_mapping_pair: after key, token = {:?}", stream.current());
+    println!(
+        "DEBUG: parse_mapping_pair: after key, token = {:?}",
+        stream.current()
+    );
     // Allow newlines and whitespace after key before colon
     loop {
         match stream.current() {
@@ -250,10 +274,19 @@ fn parse_mapping_pair(
             // If the next token is a new key, document boundary, or EOF, treat as empty value
             // This is critical for !!set block format: ? item1\n? item2\n? item3
             // Always treat as Node::None if not followed by colon/value.
-            println!("DEBUG: parse_mapping_pair: after explicit key newline/whitespace, token = {:?}", stream.current());
+            println!(
+                "DEBUG: parse_mapping_pair: after explicit key newline/whitespace, token = {:?}",
+                stream.current()
+            );
             match stream.current() {
-                Some(Token::Plain(_)) | Some(Token::Tag(_)) | Some(Token::Anchor(_)) | Some(Token::QuestionMark)
-                | Some(Token::DocumentEnd) | Some(Token::DocumentStart) | Some(Token::Eof) | None => {
+                Some(Token::Plain(_))
+                | Some(Token::Tag(_))
+                | Some(Token::Anchor(_))
+                | Some(Token::QuestionMark)
+                | Some(Token::DocumentEnd)
+                | Some(Token::DocumentStart)
+                | Some(Token::Eof)
+                | None => {
                     // Explicit key with no value: treat as Node::None
                     return Ok((key, Node::None));
                 }
@@ -298,7 +331,10 @@ fn parse_mapping_pair(
     // Parse the value - check for empty value BEFORE skipping whitespace
     let cur_token = stream.current().cloned();
     #[cfg(feature = "debug-trace")]
-    log::debug!("mapping_pair: value parse branch, cur_token = {:?}", cur_token);
+    log::debug!(
+        "mapping_pair: value parse branch, cur_token = {:?}",
+        cur_token
+    );
     let value = match cur_token {
         Some(Token::Newline) | None | Some(Token::Eof) => {
             // After colon and newline, check for indent and dash for block sequence value
@@ -322,11 +358,16 @@ fn parse_mapping_pair(
                 // After indent, skip newlines/comments before checking for dash
                 loop {
                     match stream.current() {
-                        Some(Token::Newline) | Some(Token::Comment(_)) => { stream.next()?; }
+                        Some(Token::Newline) | Some(Token::Comment(_)) => {
+                            stream.next()?;
+                        }
                         _ => break,
                     }
                 }
-                println!("DEBUG: parse_mapping_pair: after value indent/newline, token = {:?}", stream.current());
+                println!(
+                    "DEBUG: parse_mapping_pair: after value indent/newline, token = {:?}",
+                    stream.current()
+                );
                 if matches!(stream.current(), Some(Token::Dash)) {
                     // Parse block sequence as value
                     use crate::parser::document::sequence_tokens::parse_sequence_with_tokens;

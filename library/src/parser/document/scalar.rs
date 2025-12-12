@@ -23,47 +23,35 @@ pub(crate) fn parse_scalar_with_tokens(
             Ok(Node::Str(unescaped, QuoteType::Double, BlockStyle::None))
         }
         Some(Token::Plain(s)) => {
-            // Block scalar detection: if plain token starts with | or >, collect indented lines
-            if s.starts_with('|') || s.starts_with('>') {
-                let indicator = s.chars().next().unwrap();
-                stream.next()?;
-                let mut block_content = String::new();
-                block_content.push_str(s.as_str());
-                // Iteratively collect all subsequent indented lines and plain tokens
-                loop {
-                    stream.skip_whitespace_and_comments()?;
-                    match stream.current() {
-                        Some(Token::Indent(_)) => {
-                            stream.next()?;
-                            if let Some(Token::Plain(line)) = stream.current() {
-                                block_content.push('\n');
-                                block_content.push_str(line.as_str());
-                                stream.next()?;
-                            } else if let Some(Token::Newline) = stream.current() {
-                                block_content.push('\n');
-                                stream.next()?;
-                            } else {
-                                break;
+            // All logic for plain tokens should be handled here, not in parse_scalar
+            stream.next()?;
+            match s.as_str() {
+                "null" | "~" => Ok(Node::None),
+                "true" => Ok(Node::Boolean(true)),
+                "false" => Ok(Node::Boolean(false)),
+                v if directives.is_yaml_11() && matches!(v, "yes"|"Yes"|"YES"|"on"|"On"|"ON") => Ok(Node::Boolean(true)),
+                v if directives.is_yaml_11() && matches!(v, "no"|"No"|"NO"|"off"|"Off"|"OFF") => Ok(Node::Boolean(false)),
+                v => {
+                    // Try integer and float parsing
+                    if v.starts_with('0') && v.len() > 1 {
+                        if v.starts_with("0o") || v.starts_with("0O") {
+                            if let Ok(i) = i64::from_str_radix(&v[2..], 8) {
+                                return Ok(Node::Number(Numeric::Integer(i)));
+                            }
+                        } else if directives.is_yaml_11() && v.chars().skip(1).all(|c| c >= '0' && c <= '7') {
+                            if let Ok(i) = i64::from_str_radix(&v[1..], 8) {
+                                return Ok(Node::Number(Numeric::Integer(i)));
                             }
                         }
-                        Some(Token::Plain(line)) => {
-                            block_content.push('\n');
-                            block_content.push_str(line.as_str());
-                            stream.next()?;
-                        }
-                        _ => break,
+                    }
+                    if let Ok(i) = v.parse::<i64>() {
+                        Ok(Node::Number(Numeric::Integer(i)))
+                    } else if let Ok(f) = v.parse::<f64>() {
+                        Ok(Node::Number(Numeric::Float(f)))
+                    } else {
+                        Ok(Node::Str(v.to_string(), QuoteType::Unquoted, BlockStyle::None))
                     }
                 }
-                // Directly construct the Node for block scalar (no recursion)
-                let style = if indicator == '|' {
-                    BlockStyle::Literal
-                } else {
-                    BlockStyle::Folded
-                };
-                Ok(Node::Str(block_content, QuoteType::Unquoted, style))
-            } else {
-                stream.next()?;
-                parse_scalar(&s, directives)
             }
         }
         _ => Err("Expected a scalar token".to_string()),
