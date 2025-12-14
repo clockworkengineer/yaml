@@ -22,14 +22,13 @@ fn token_dispatch(
                 let mut stream =
                     crate::parser::token_stream::TokenStream::new(source, directives, false)
                         .ok()?;
-                return Some(
-                    crate::parser::document::mapping_tokens::parse_mapping_with_tokens(
-                        &mut stream,
-                        level_val,
-                        directives,
-                        0,
-                    ),
+                let result = crate::parser::document::mapping_tokens::parse_mapping_with_tokens(
+                    &mut stream,
+                    level_val,
+                    directives,
+                    0,
                 );
+                return Some(result);
             }
             Some(crate::parser::lexer::Token::Dash) => {
                 source.restore_state(st);
@@ -37,14 +36,13 @@ fn token_dispatch(
                 let mut stream =
                     crate::parser::token_stream::TokenStream::new(source, directives, false)
                         .ok()?;
-                return Some(
-                    crate::parser::document::sequence_tokens::parse_sequence_with_tokens(
-                        &mut stream,
-                        seq_indent,
-                        directives,
-                        0,
-                    ),
+                let result = crate::parser::document::sequence_tokens::parse_sequence_with_tokens(
+                    &mut stream,
+                    seq_indent,
+                    directives,
+                    0,
                 );
+                return Some(result);
             }
             _ => {
                 source.restore_state(st);
@@ -247,10 +245,7 @@ pub fn parse_document_contents(
     match source.current() {
         Some(c) if c == '-' => {
             let seq_indent = source.get_current_indent_level();
-            if is_doc_start(source, directives)? {
-                // Always break to main document loop, even if deeply nested
-                return Ok(Node::None);
-            }
+            // Removed is_doc_start check: do not skip top-level sequence after document marker
             let mut stream =
                 crate::parser::token_stream::TokenStream::new(source, directives, false)?;
             match stream.current() {

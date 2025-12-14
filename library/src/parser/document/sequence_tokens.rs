@@ -70,7 +70,12 @@ pub fn parse_sequence_with_tokens(
         match stream.current() {
             Some(Token::DocumentStart) | Some(Token::DocumentEnd) => {
                 // Always break to main document loop, even if deeply nested
-                return Ok(Node::None);
+                // Only return Node::None if no items have been collected (empty sequence)
+                if items.is_empty() {
+                    return Ok(Node::None);
+                } else {
+                    break;
+                }
             }
             _ => {}
         }
