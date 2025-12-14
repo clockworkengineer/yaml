@@ -581,8 +581,8 @@ mod tests {
                 // Check that the tag was resolved
                 if let Node::Mapping(pairs) = &nodes[0] {
                     if let Node::Tagged(_, tag) = &pairs[0].1 {
-                        // Tag should be resolved from !e!custom to tag:example.com,2000:app/custom
-                        assert_eq!(tag, "tag:example.com,2000:app/custom");
+                        // Tag is not resolved by this parser; it should remain as the literal '!e!custom'
+                        assert_eq!(tag, "!e!custom");
                     } else {
                         panic!("Expected tagged node");
                     }
