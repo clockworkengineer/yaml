@@ -461,7 +461,11 @@ impl<'a> Lexer<'a> {
                     content.push(ch);
                     self.source.next();
                 }
-                None => return Err("Unclosed single-quoted string".to_string()),
+                None => {
+                    #[cfg(debug_assertions)]
+                    eprintln!("DEBUG: Unterminated single-quoted string: reached EOF");
+                    return Err("YAML compliance error: Unterminated single-quoted string (unexpected EOF)".to_string());
+                }
             }
         }
 
