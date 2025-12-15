@@ -177,6 +177,10 @@ pub fn parse_inline_mapping_with_tokens(
                 // Skip whitespace
                 stream.skip_whitespace_and_comments()?;
 
+                // Debug: print current token before colon check
+                println!("DEBUG: Before colon check, current token: {:?}", stream.current());
+                // Ensure all comments and newlines are skipped before colon check
+                stream.skip_whitespace_and_comments()?;
                 // Expect colon for regular mappings; if absent, treat as
                 // an empty value entry (useful for !!set like {a, b, c}).
                 if matches!(stream.current(), Some(Token::Colon)) {
@@ -201,6 +205,8 @@ pub fn parse_inline_mapping_with_tokens(
 
                     pairs.push((key, value));
                 } else {
+                    // Debug: print error if not colon
+                    println!("DEBUG: Expected colon, got: {:?}", stream.current());
                     // No colon: record as key with empty value
                     #[cfg(feature = "debug-trace")]
                     log::debug!("inline_tokens: map entry (empty) -> ({:?}, None)", key);

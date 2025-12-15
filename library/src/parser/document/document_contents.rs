@@ -297,13 +297,13 @@ pub fn parse_document_contents(
         }
         Some(c) if c == '{' => {
             let mut stream =
-                crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-            Ok(parse_inline_mapping(&mut stream, directives)?)
+                crate::parser::token_stream::TokenStream::new(source, directives, true)?;
+            Ok(crate::parser::document::inline_tokens::parse_inline_mapping_with_tokens(&mut stream, directives, 0)?)
         }
         Some(c) if c == '[' => {
             let mut stream =
-                crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-            Ok(parse_inline_sequence(&mut stream, directives)?)
+                crate::parser::token_stream::TokenStream::new(source, directives, true)?;
+            Ok(crate::parser::document::inline_tokens::parse_inline_sequence_with_tokens(&mut stream, directives, 0)?)
         }
         // Support tagged values or tagged keys using TokenStream
         Some(c) if c == '!' => {

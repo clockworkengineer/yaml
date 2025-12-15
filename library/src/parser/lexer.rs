@@ -148,16 +148,28 @@ impl<'a> Lexer<'a> {
         // Match token types
         match ch {
             CHAR_NEWLINE => {
+                #[cfg(debug_assertions)]
+                println!("DEBUG: Emitting Token::Newline (in_flow={})", self.in_flow);
                 self.source.next();
                 self.at_line_start = true;
+                if self.in_flow {
+                    // Suppress Token::Newline in flow context
+                    return self.scan_token();
+                }
                 Ok(Some(Token::Newline))
             }
             CHAR_CARRIAGE_RETURN => {
+                #[cfg(debug_assertions)]
+                println!("DEBUG: Emitting Token::Newline (CR) (in_flow={})", self.in_flow);
                 self.source.next();
                 if self.source.current() == Some(CHAR_NEWLINE) {
                     self.source.next();
                 }
                 self.at_line_start = true;
+                if self.in_flow {
+                    // Suppress Token::Newline in flow context
+                    return self.scan_token();
+                }
                 Ok(Some(Token::Newline))
             }
             CHAR_HASH => {
