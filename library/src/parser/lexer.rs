@@ -206,6 +206,12 @@ impl<'a> Lexer<'a> {
             }
             CHAR_COMMA => {
                 self.source.next();
+                // Check for comment immediately after comma with no whitespace (YAML compliance)
+                if let Some('#') = self.source.current() {
+                    #[cfg(debug_assertions)]
+                    eprintln!("DEBUG: Comment after comma with no whitespace at {:?}", self.source.current());
+                    return Err("YAML syntax error: comment must be preceded by whitespace after ',' in flow collection".to_string());
+                }
                 Ok(Some(Token::Comma))
             }
             CHAR_COLON => {

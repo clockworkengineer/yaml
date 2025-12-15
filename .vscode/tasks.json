@@ -178,6 +178,33 @@
 				"parser::document::tests",
 				"--nocapture"
 			]
+		},
+		{
+			"label": "cargo test cvw2 only",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"--package",
+				"yaml_lib",
+				"--lib",
+				"test_cvw2_comment_without_space_after_comma",
+				"--nocapture"
+			]
+		},
+		{
+			"label": "cargo test cvw2 only fixed",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"--package",
+				"yaml_lib",
+				"--lib",
+				"test_cvw2_comment_without_space_after_comma",
+				"--",
+				"--nocapture"
+			]
 		}
 	]
 }
