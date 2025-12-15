@@ -354,20 +354,22 @@ pub fn unescape_double_quoted(s: &str) -> String {
                             }
                         }
                     }
-                    if hex.len() == 4 {
-                        if let Ok(code) = u16::from_str_radix(&hex, 16) {
-                            if let Some(ch) = char::from_u32(code as u32) {
-                                result.push(ch);
-                                continue;
-                            }
+                    if hex.len() < 4 {
+                        // Incomplete unicode escape: emit debug trace and return error marker
+                        eprintln!("DEBUG: Incomplete unicode escape: \\u{}", hex);
+                        result.push_str("[ERROR:INCOMPLETE_UNICODE_ESCAPE]");
+                        break;
+                    }
+                    if let Ok(code) = u16::from_str_radix(&hex, 16) {
+                        if let Some(ch) = char::from_u32(code as u32) {
+                            result.push(ch);
+                            continue;
                         }
                     }
-
                     result.push('\\');
                     result.push('u');
                     result.push_str(&hex);
                 }
-
                 Some('U') => {
                     let mut hex = String::new();
                     for _ in 0..8 {
@@ -380,24 +382,24 @@ pub fn unescape_double_quoted(s: &str) -> String {
                             }
                         }
                     }
-                    if hex.len() == 8 {
-                        if let Ok(code) = u32::from_str_radix(&hex, 16) {
-                            if let Some(ch) = char::from_u32(code) {
-                                result.push(ch);
-                                continue;
-                            }
+                    if hex.len() < 8 {
+                        eprintln!("DEBUG: Incomplete unicode escape: \\U{}", hex);
+                        result.push_str("[ERROR:INCOMPLETE_UNICODE_ESCAPE]");
+                        break;
+                    }
+                    if let Ok(code) = u32::from_str_radix(&hex, 16) {
+                        if let Some(ch) = char::from_u32(code) {
+                            result.push(ch);
+                            continue;
                         }
                     }
-
                     result.push('\\');
                     result.push('U');
                     result.push_str(&hex);
                 }
-
                 Some('x') => {
                     result.push('\\');
                     result.push('x');
-
                     for _ in 0..2 {
                         if let Some(h) = chars.peek().copied() {
                             if h.is_ascii_hexdigit() {
@@ -409,7 +411,6 @@ pub fn unescape_double_quoted(s: &str) -> String {
                         }
                     }
                 }
-
                 Some('n') => {
                     result.push('\n');
                 }
@@ -422,7 +423,6 @@ pub fn unescape_double_quoted(s: &str) -> String {
                 Some('b') => {
                     result.push('\x08'); // backspace
                 }
-
                 Some('"') => result.push('"'),
                 Some('\\') => result.push('\\'),
                 Some('/') => result.push('/'),
@@ -436,10 +436,7 @@ pub fn unescape_double_quoted(s: &str) -> String {
                 Some('_') => result.push('\u{00A0}'),
                 Some('L') => result.push('\u{2028}'),
                 Some('P') => result.push('\u{2029}'),
-
                 Some('\n') => {
-                    // Line continuation: \<newline> removes the newline and any leading whitespace on next line
-                    // Skip any following whitespace
                     while let Some(&c) = chars.peek() {
                         if c == ' ' || c == '\t' {
                             chars.next();
@@ -449,11 +446,9 @@ pub fn unescape_double_quoted(s: &str) -> String {
                     }
                 }
                 Some('\r') => {
-                    // Handle Windows line endings: \<CR><LF>
                     if chars.peek() == Some(&'\n') {
-                        chars.next(); // consume the \n
+                        chars.next();
                     }
-                    // Skip any following whitespace
                     while let Some(&c) = chars.peek() {
                         if c == ' ' || c == '\t' {
                             chars.next();
@@ -463,8 +458,6 @@ pub fn unescape_double_quoted(s: &str) -> String {
                     }
                 }
                 Some('\t') => {
-                    // \<tab> is whitespace folding: the tab and following whitespace are consumed
-                    // This is similar to line continuation but with a tab
                     while let Some(&c) = chars.peek() {
                         if c == ' ' || c == '\t' {
                             chars.next();
@@ -473,14 +466,13 @@ pub fn unescape_double_quoted(s: &str) -> String {
                         }
                     }
                 }
-
                 Some(other) => {
-                    // Invalid escape sequence - this should cause an error
-                    // For now, we'll preserve it literally, but parsers should reject this
+                    eprintln!("DEBUG: Invalid escape sequence: \\{}", other);
                     result.push('\\');
                     result.push(other);
                 }
                 None => {
+                    eprintln!("DEBUG: Trailing backslash in string");
                     result.push('\\');
                 }
             }
@@ -488,7 +480,6 @@ pub fn unescape_double_quoted(s: &str) -> String {
             result.push(c);
         }
     }
-
     result
 }
 

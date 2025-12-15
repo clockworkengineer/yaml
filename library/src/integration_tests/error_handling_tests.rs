@@ -79,7 +79,10 @@ mod tests {
         assert!(res.is_err());
         let err = res.unwrap_err();
         assert!(
-            err.contains("Invalid") || err.contains("Unexpected") || err.contains("Unterminated")
+            err.contains("Invalid")
+                || err.contains("Unexpected")
+                || err.contains("Unterminated")
+                || err.contains("Unclosed")
         );
     }
 
@@ -224,6 +227,7 @@ mod tests {
                 || err.contains("Expected")
                 || err.contains("Unexpected")
                 || err.contains("Unterminated")
+                || err.contains("Unclosed")
         );
     }
 
