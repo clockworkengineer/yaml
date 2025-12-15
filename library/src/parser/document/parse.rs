@@ -154,6 +154,10 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
     let mut docs: Vec<Node> = Vec::new();
     let mut saw_marker = false;
     let mut any_content = false;
+    let mut doc_count = 0;
+    // Print the input for debug
+    #[cfg(debug_assertions)]
+    eprintln!("DEBUG: Starting parse() with YAML input");
     while source.more() {
         crate::utils::skip_whitespace_and_comments(source);
         // Always create a fresh DirectiveContext for each document
@@ -180,23 +184,47 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
         }
         let document = parse_document(source, 0, &directives);
         match document {
+            Ok(Document(nodes)) => {
+                if nodes.len() > 1 {
+                    // Split each mapping into its own Document node
+                    for node in nodes {
+                        doc_count += 1;
+                        let single_doc = Document(vec![node.clone()]);
+                        eprintln!("DEBUG: Parsed document #{}: {:#?}", doc_count, single_doc);
+                        docs.push(single_doc);
+                    }
+                } else {
+                    doc_count += 1;
+                    let doc = Document(nodes);
+                    eprintln!("DEBUG: Parsed document #{}: {:#?}", doc_count, doc);
+                    docs.push(doc);
+                }
+                any_content = true;
+            }
             Ok(doc) => {
+                doc_count += 1;
+                eprintln!("DEBUG: Parsed document #{}: {:#?}", doc_count, doc);
                 docs.push(doc);
                 any_content = true;
             }
-            Err(err) => return Err(err),
+            Err(err) => {
+                eprintln!("DEBUG: Error parsing document #{}: {}", doc_count + 1, err);
+                return Err(err);
+            }
         }
         parse_document_end_marker(source, &directives)?;
         if !source.more() {
             break;
         }
     }
+    eprintln!("DEBUG: Total documents parsed: {}", docs.len());
     if docs.is_empty() {
         docs.push(Document(Vec::new()));
     }
     if saw_marker && !any_content {
         docs.push(Document(Vec::new()));
     }
+    eprintln!("DEBUG: Final docs vector: {:#?}", docs);
     #[cfg(feature = "debug-trace")]
     log::debug!("parse: end stream with {} document(s)", docs.len());
     Ok(Node::Documents(docs))
