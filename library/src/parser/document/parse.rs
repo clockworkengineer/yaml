@@ -43,8 +43,19 @@ fn parse_document_markers(
                 Some(crate::parser::lexer::Token::Newline) | Some(crate::parser::lexer::Token::Eof) => {},
                 Some(crate::parser::lexer::Token::Comment(_)) => {}, // allow comment after ---
                 Some(crate::parser::lexer::Token::Tag(_)) => { ts.next().ok(); },
-                Some(crate::parser::lexer::Token::Plain(s)) if s == "|" || s == ">" => { ts.next().ok(); },
-                Some(crate::parser::lexer::Token::Plain(_)) | Some(crate::parser::lexer::Token::Colon) => {
+                Some(crate::parser::lexer::Token::Plain(s)) => {
+                    // Accept block scalar indicator (| or >) with optional indentation/chomping (e.g., |0, |1, >2, |+)
+                    let trimmed = s.trim();
+                    if trimmed.starts_with('|') || trimmed.starts_with('>') {
+                        // Accept, let downstream handle block scalar validation
+                    } else {
+                        return Err(helpers::parse_error(
+                            source,
+                            "YAML 1.2: Document start marker (---) must be on its own line. No mapping keys or values allowed on the same line as ---.",
+                        ));
+                    }
+                }
+                Some(crate::parser::lexer::Token::Colon) => {
                     return Err(helpers::parse_error(
                         source,
                         "YAML 1.2: Document start marker (---) must be on its own line. No mapping keys or values allowed on the same line as ---.",
