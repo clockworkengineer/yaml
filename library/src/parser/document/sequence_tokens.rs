@@ -46,6 +46,7 @@ pub fn parse_sequence_with_tokens(
     stream.skip_whitespace()?;
 
     loop {
+        println!("DEBUG: [seq] depth={}, base_indent={}, current token={:?}", depth, base_indent, stream.current());
         // Skip comments and newlines between sequence items
         while matches!(
             stream.current(),
@@ -81,6 +82,7 @@ pub fn parse_sequence_with_tokens(
         }
         // Check for indentation change that would end the sequence
         if let Some(Token::Indent(level)) = stream.current() {
+            println!("DEBUG: [seq] Indent token: level={}, base_indent={}", level, base_indent);
             if *level < base_indent {
                 // Dedent - sequence is done
                 break;
@@ -92,6 +94,7 @@ pub fn parse_sequence_with_tokens(
         // Check if we're at a dash (sequence indicator)
         match stream.current() {
             Some(Token::Dash) => {
+                println!("DEBUG: [seq] Got dash at depth={}, base_indent={}", depth, base_indent);
                 // Consume the dash
                 stream.next()?;
 
@@ -102,32 +105,39 @@ pub fn parse_sequence_with_tokens(
                 match stream.current() {
                     Some(Token::Newline) | None => {
                         // Empty item (dash followed by newline or EOF)
+                        println!("DEBUG: [seq] Dash followed by newline/EOF, push None");
                         items.push(Node::None);
                         if let Some(Token::Newline) = stream.current() {
                             stream.next()?;
                         }
                     }
                     Some(Token::Dash) => {
-                        // Next item starts immediately (dash followed by dash)
-                        items.push(Node::None);
-                        // Don't consume - let next iteration handle it
+                        // Dash followed by dash at same indent: recurse as nested sequence
+                        println!("DEBUG: [seq] Dash followed by dash, recurse as nested sequence");
+                        let seq = parse_sequence_with_tokens(stream, base_indent, directives, depth + 1)?;
+                        items.push(seq);
                     }
                     Some(Token::Indent(level)) => {
                         // Indented block after dash: check if it's a sequence or mapping
                         let indent = *level;
+                        println!("DEBUG: [seq] Dash followed by indent: {} > {}?", indent, base_indent);
                         stream.next()?; // consume Indent
-                        // Peek for dash after indent
-                        if matches!(stream.current(), Some(Token::Dash)) {
-                            // Parse as sequence
+                        // If indent is greater than base_indent and next token is dash, recurse as nested sequence
+                        if indent > base_indent && matches!(stream.current(), Some(Token::Dash)) {
+                            println!("DEBUG: [seq] Recursing into nested sequence at indent {}", indent);
                             let seq =
                                 parse_sequence_with_tokens(stream, indent, directives, depth + 1)?;
                             items.push(seq);
-                        } else {
-                            // Parse as mapping
+                        } else if indent >= base_indent {
+                            // Parse as mapping (or possibly flat sequence)
                             use crate::parser::document::mapping_tokens::parse_mapping_with_tokens;
                             let mapping =
                                 parse_mapping_with_tokens(stream, indent, directives, depth + 1)?;
                             items.push(mapping);
+                        } else {
+                            // Dedent - sequence is done
+                            println!("DEBUG: [seq] Dedent after dash+indent, breaking");
+                            break;
                         }
                         // Skip trailing whitespace/comments/newlines until next dash or end
                         loop {
