@@ -50,11 +50,12 @@ fn test_5t43_double_colon() {
 
     match parse(&mut source) {
         Ok(_) => {
-            println!("Parsed successfully");
+            panic!("Test should fail: double colon in flow mapping is not allowed by YAML 1.2");
         }
         Err(e) => {
             println!("Parse error: {}", e);
-            panic!("Failed to parse: {}", e);
+            assert!(e.contains("YAML 1.2 compliance error: Double colon (::) is not allowed"),
+                "Error message should indicate YAML 1.2 compliance error for double colon, got: {}", e);
         }
     }
 }
