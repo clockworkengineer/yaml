@@ -485,7 +485,11 @@ impl<'a> Lexer<'a> {
                         Some('\\') => content.push('\\'),
                         Some('"') => content.push('"'),
                         Some(c) => content.push(c),
-                        None => return Err("Unclosed double-quoted string".to_string()),
+                        None => {
+                            #[cfg(debug_assertions)]
+                            eprintln!("DEBUG: Unterminated double-quoted string: reached EOF after escape");
+                            return Err("YAML compliance error: Unterminated double-quoted string (unexpected EOF after escape)".to_string());
+                        }
                     }
                     self.source.next();
                 }
@@ -497,7 +501,11 @@ impl<'a> Lexer<'a> {
                     content.push(ch);
                     self.source.next();
                 }
-                None => return Err("Unclosed double-quoted string".to_string()),
+                None => {
+                    #[cfg(debug_assertions)]
+                    eprintln!("DEBUG: Unterminated double-quoted string: reached EOF");
+                    return Err("YAML compliance error: Unterminated double-quoted string (unexpected EOF)".to_string());
+                }
             }
         }
 
