@@ -54,7 +54,10 @@ pub fn parse_directives(
             }
             "%TAG" => {
                 if parts.len() < 3 {
-                    return Err("Missing handle or prefix in %TAG directive".to_string());
+                    // Debug trace for malformed %TAG directive
+                    #[cfg(debug_assertions)]
+                    eprintln!("DEBUG: Malformed %TAG directive: parts = {:?}", parts);
+                    return Err("YAML compliance error: Malformed %TAG directive. Expected format: %TAG <handle> <prefix>".to_string());
                 }
                 let handle = parts[1].to_string();
                 let prefix = parts[2].to_string();

@@ -513,7 +513,7 @@ mod tests {
         let res = parse(&mut source);
         assert!(res.is_err());
         let err = res.unwrap_err();
-        assert!(err.contains("Unexpected") || err.contains("Invalid"));
+        assert!(err.contains("Malformed %TAG directive") || err.contains("YAML compliance error"));
     }
 
     #[test]
