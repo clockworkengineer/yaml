@@ -569,6 +569,7 @@ mod tests {
             &mut stream,
             &directives,
             0,
+            false,
         )
         .unwrap();
         assert!(matches!(node, Node::Mapping(ref v) if v.is_empty()));

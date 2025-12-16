@@ -103,6 +103,7 @@ pub fn parse_inline_mapping_with_tokens(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
     depth: usize,
+    is_set: bool,
 ) -> Result<Node, String> {
     println!(
         "DEBUG: ENTER parse_inline_mapping_with_tokens, current token: {:?}",
@@ -212,12 +213,19 @@ pub fn parse_inline_mapping_with_tokens(
 
                     pairs.push((key, value));
                 } else {
-                    // Debug: print error if not colon
-                    println!("DEBUG: Expected colon, got: {:?}", stream.current());
-                    // No colon: record as key with empty value
-                    #[cfg(feature = "debug-trace")]
-                    log::debug!("inline_tokens: map entry (empty) -> ({:?}, None)", key);
-                    pairs.push((key, Node::None));
+                    if is_set {
+                        // For sets, allow key with no colon (value is None)
+                        #[cfg(feature = "debug-trace")]
+                        log::debug!("inline_tokens: set entry -> ({:?}, None)", key);
+                        pairs.push((key, Node::None));
+                    } else {
+                        // If not a colon, this is invalid in a flow mapping (YAML 1.2)
+                        println!("DEBUG: Expected colon, got: {:?}", stream.current());
+                        return Err(syntax_error(
+                            stream.source_mut(),
+                            "Expected colon after key in flow mapping",
+                        ));
+                    }
                 }
                 expect_entry = false;
             }
@@ -292,7 +300,7 @@ mod tests {
         let directives = DirectiveContext::new();
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_inline_mapping_with_tokens(&mut stream, &directives, 0).unwrap();
+        let result = parse_inline_mapping_with_tokens(&mut stream, &directives, 0, false).unwrap();
 
         if let Node::Mapping(pairs) = result {
             assert_eq!(pairs.len(), 0);
@@ -308,7 +316,7 @@ mod tests {
         let directives = DirectiveContext::new();
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_inline_mapping_with_tokens(&mut stream, &directives, 0).unwrap();
+        let result = parse_inline_mapping_with_tokens(&mut stream, &directives, 0, false).unwrap();
 
         if let Node::Mapping(pairs) = result {
             assert_eq!(pairs.len(), 2);
@@ -324,7 +332,7 @@ mod tests {
         let directives = DirectiveContext::new();
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_inline_mapping_with_tokens(&mut stream, &directives, 0).unwrap();
+        let result = parse_inline_mapping_with_tokens(&mut stream, &directives, 0, false).unwrap();
 
         if let Node::Mapping(pairs) = result {
             assert_eq!(pairs.len(), 2);

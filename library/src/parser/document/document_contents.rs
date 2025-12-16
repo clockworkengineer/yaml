@@ -287,7 +287,7 @@ pub fn parse_document_contents(
         Some(c) if c == '{' => {
             let mut stream =
                 crate::parser::token_stream::TokenStream::new(source, directives, true)?;
-            Ok(crate::parser::document::inline_tokens::parse_inline_mapping_with_tokens(&mut stream, directives, 0)?)
+            Ok(crate::parser::document::inline_tokens::parse_inline_mapping_with_tokens(&mut stream, directives, 0, false)?)
         }
         Some(c) if c == '[' => {
             let mut stream =

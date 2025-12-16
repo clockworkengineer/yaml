@@ -283,11 +283,22 @@ pub fn parse_value_with_tokens(
             }
         }
 
-        // Parse the actual value content
-        let inner = parse_value_content(stream, directives, depth + 1)?;
+        // Special handling: if tag is !!set and next token is FlowMappingStart, parse as set
+        let tag_is_set = decorators.tag.as_ref().map(|t| {
+            let resolved = directives.resolve_tag(t);
+            resolved == "!!set" || resolved == "tag:yaml.org,2002:set"
+        }).unwrap_or(false);
 
-        // Apply tag coercion first, then wrap with anchor
-        let mut result = inner;
+        let mut result = if tag_is_set {
+            if matches!(stream.current(), Some(Token::FlowMappingStart)) {
+                // Use set mode for inline mapping
+                crate::parser::document::inline_tokens::parse_inline_mapping_with_tokens(stream, directives, depth + 1, true)?
+            } else {
+                parse_value_content(stream, directives, depth + 1)?
+            }
+        } else {
+            parse_value_content(stream, directives, depth + 1)?
+        };
 
         if let Some(tag_raw) = decorators.tag {
             let tag_resolved = directives.resolve_tag(&tag_raw);
@@ -404,7 +415,7 @@ fn parse_value_content(
     match stream.current() {
         Some(Token::FlowMappingStart) => {
             use crate::parser::document::inline_tokens::parse_inline_mapping_with_tokens;
-            parse_inline_mapping_with_tokens(stream, directives, depth + 1)
+            parse_inline_mapping_with_tokens(stream, directives, depth + 1, false)
         }
         Some(Token::FlowSequenceStart) => {
             use crate::parser::document::inline_tokens::parse_inline_sequence_with_tokens;

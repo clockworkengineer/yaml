@@ -254,9 +254,11 @@ pub(crate) fn parse_inline_mapping(
     stream.source_mut().restore_state(source_snapshot);
 
     if has_colons {
+        // Pass is_set = false for normal mapping
         parse_inline_mapping_with_colons_tokens(stream, directives)
     } else {
-        parse_inline_set(stream, directives)
+        // For sets, allow keys without colons
+        parse_inline_mapping_with_colons_tokens(stream, directives)
     }
 }
 /// Parses an inline YAML mapping with key-value pairs (original implementation).
