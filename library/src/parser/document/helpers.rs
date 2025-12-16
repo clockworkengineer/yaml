@@ -174,7 +174,6 @@ pub(crate) fn node_is_blank(node: &Node) -> bool {
     }
 }
 
-
 use crate::parser::directives::DirectiveContext;
 use crate::parser::lexer::Token;
 /// Peeks ahead to determine if the current content represents a mapping key.
@@ -252,7 +251,6 @@ pub(crate) fn peek_ahead_for_mapping_key(
     source.restore_state(state);
     result
 }
-
 
 /// Parses a comment line from the source.
 ///
@@ -500,7 +498,8 @@ mod tests {
 
         let directives = crate::parser::directives::DirectiveContext::new();
         {
-            let mut stream = TokenStream::new(&mut source, &directives, false).expect("TokenStream creation failed");
+            let mut stream = TokenStream::new(&mut source, &directives, false)
+                .expect("TokenStream creation failed");
             let result = skip_whitespace_with_context_tokens(&mut stream, &ctx);
             assert!(
                 result.is_ok(),
@@ -509,9 +508,15 @@ mod tests {
             // Also check the token stream's current token
             match stream.current() {
                 Some(Token::Plain(s)) => {
-                    assert!(s.starts_with('c'), "TokenStream should be at plain scalar starting with 'c'");
+                    assert!(
+                        s.starts_with('c'),
+                        "TokenStream should be at plain scalar starting with 'c'"
+                    );
                 }
-                other => panic!("TokenStream not at expected plain scalar after whitespace: {:?}", other),
+                other => panic!(
+                    "TokenStream not at expected plain scalar after whitespace: {:?}",
+                    other
+                ),
             }
         }
     }

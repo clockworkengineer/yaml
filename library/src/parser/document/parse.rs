@@ -30,19 +30,25 @@ fn parse_document_markers(
         // After --- marker, only allow whitespace, comments, block scalar indicators, or tags until end of line
         // Use token stream to check for forbidden tokens before newline
         let st = source.save_state();
-        if let Ok(mut ts) = crate::parser::token_stream::TokenStream::new(source, directives, false) {
+        if let Ok(mut ts) = crate::parser::token_stream::TokenStream::new(source, directives, false)
+        {
             // Skip whitespace tokens after ---
             loop {
                 match ts.current() {
-                    Some(crate::parser::lexer::Token::Indent(_)) => { ts.next().ok(); },
+                    Some(crate::parser::lexer::Token::Indent(_)) => {
+                        ts.next().ok();
+                    }
                     _ => break,
                 }
             }
             // Now check for comment or other allowed/forbidden tokens
             match ts.current() {
-                Some(crate::parser::lexer::Token::Newline) | Some(crate::parser::lexer::Token::Eof) => {},
-                Some(crate::parser::lexer::Token::Comment(_)) => {}, // allow comment after ---
-                Some(crate::parser::lexer::Token::Tag(_)) => { ts.next().ok(); },
+                Some(crate::parser::lexer::Token::Newline)
+                | Some(crate::parser::lexer::Token::Eof) => {}
+                Some(crate::parser::lexer::Token::Comment(_)) => {} // allow comment after ---
+                Some(crate::parser::lexer::Token::Tag(_)) => {
+                    ts.next().ok();
+                }
                 Some(crate::parser::lexer::Token::Plain(s)) => {
                     // Accept block scalar indicator (| or >) with optional indentation/chomping (e.g., |0, |1, >2, |+)
                     let trimmed = s.trim();
