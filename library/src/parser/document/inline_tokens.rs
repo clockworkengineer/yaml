@@ -184,7 +184,6 @@ pub fn parse_inline_mapping_with_tokens(
                 // Check for double colon (YAML compliance: not allowed)
                 if matches!(stream.current(), Some(Token::Colon)) {
                     // Peek ahead for another colon (without whitespace/comments)
-                    let pos_before = stream.stream_position();
                     stream.next()?;
                     stream.skip_whitespace_and_comments()?;
                     if matches!(stream.current(), Some(Token::Colon)) {

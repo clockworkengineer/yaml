@@ -54,17 +54,6 @@ fn token_dispatch(
     None
 }
 
-/// Checks if the current position is at a document start marker (---).
-fn is_doc_start(source: &mut dyn ISource, directives: &DirectiveContext) -> Result<bool, String> {
-    let st = source.save_state();
-    let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-    let res = matches!(
-        ts.current(),
-        Some(crate::parser::lexer::Token::DocumentStart)
-    );
-    source.restore_state(st);
-    Ok(res)
-}
 
 /// Checks if the current position is at a document end marker (...).
 fn is_doc_end(source: &mut dyn ISource, directives: &DirectiveContext) -> Result<bool, String> {

@@ -191,7 +191,6 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
                 docs.push(Document(Vec::new()));
             }
             saw_marker = true;
-            any_content = false;
         }
         let document = parse_document(source, 0, &directives);
         match document {

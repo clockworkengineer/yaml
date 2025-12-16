@@ -266,6 +266,7 @@ pub(crate) fn peek_ahead_for_mapping_key(
 /// # Returns
 ///
 /// The comment text as a String
+#[allow(dead_code)]
 pub(crate) fn parse_comment(source: &mut dyn ISource) -> String {
     source.next();
     read_line_trimmed_into_string(source)
