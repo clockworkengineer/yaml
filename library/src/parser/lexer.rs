@@ -358,6 +358,17 @@ impl<'a> Lexer<'a> {
 
         let mut tag_name = String::new();
         while let Some(ch) = self.source.current() {
+            // Allow colon in tag name unless it is followed by whitespace (mapping key separator)
+            if ch == CHAR_COLON {
+                // Peek ahead: if next char is whitespace or end, stop tag
+                let state = self.source.save_state();
+                self.source.next();
+                let next_ch = self.source.current();
+                self.source.restore_state(state);
+                if next_ch.map_or(true, |c| c.is_whitespace() || c == CHAR_NEWLINE) {
+                    break;
+                }
+            }
             if ch.is_whitespace()
                 || ch == CHAR_NEWLINE
                 || ch == CHAR_HASH
@@ -366,7 +377,6 @@ impl<'a> Lexer<'a> {
                 || ch == CHAR_RBRACKET
                 || ch == CHAR_LBRACE
                 || ch == CHAR_RBRACE
-                || ch == CHAR_COLON
             {
                 break;
             }

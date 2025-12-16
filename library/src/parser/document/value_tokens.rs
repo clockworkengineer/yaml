@@ -13,6 +13,34 @@ use crate::parser::token_stream::TokenStream;
 /// Try to coerce a value based on a tag
 fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
     match tag {
+        "!!int:hex" => match node {
+            Node::Str(s, _, _) => {
+                if let Some(stripped) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
+                    if let Ok(i) = i64::from_str_radix(stripped, 16) {
+                        Some(Node::Number(Numeric::Integer(i)))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        },
+        "!!int:oct" => match node {
+            Node::Str(s, _, _) => {
+                if let Some(stripped) = s.strip_prefix("0o").or_else(|| s.strip_prefix("0O")) {
+                    if let Ok(i) = i64::from_str_radix(stripped, 8) {
+                        Some(Node::Number(Numeric::Integer(i)))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        },
         "!!str" | "!str" | "tag:yaml.org,2002:str" => {
             let s = match node {
                 Node::Str(s, _, _) => s,
