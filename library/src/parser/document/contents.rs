@@ -1,7 +1,7 @@
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::parser::directives::DirectiveContext;
-use crate::parser::document::document_explicit_key::parse_multiple_explicit_keys;
+use crate::parser::document::explicit_key::parse_multiple_explicit_keys;
 use crate::parser::document::helpers;
 use crate::parser::document::inline::{parse_inline_mapping, parse_inline_sequence};
 use crate::parser::document::mapping::parse_mapping;

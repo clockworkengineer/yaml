@@ -2,7 +2,7 @@ use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::nodes::node::Node::Document;
 use crate::parser::directives::DirectiveContext;
-use crate::parser::document::document_contents::parse_document_contents;
+use crate::parser::document::contents::parse_document_contents;
 use crate::parser::document::helpers::node_is_blank;
 
 /// Checks if the current position is at a document marker (--- or ...).

@@ -3,7 +3,7 @@ use crate::nodes::node::Node;
 use crate::nodes::node::Node::Document;
 use crate::parser::directives::parse_directives;
 
-use crate::parser::document::document_parser::parse_document;
+use crate::parser::document::main_loop::parse_document;
 use crate::parser::document::helpers;
 
 /// Checks for and processes the document start marker (---).

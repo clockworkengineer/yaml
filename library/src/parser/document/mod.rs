@@ -9,9 +9,9 @@ mod anchors;
 mod block_scalar;
 mod bridge;
 mod context;
-mod document_contents;
-mod document_explicit_key;
-mod document_parser;
+mod contents;
+mod explicit_key;
+mod main_loop;
 mod error_builder;
 mod helpers;
 mod inline;
@@ -37,7 +37,7 @@ mod tests {
     use crate::io::sources::buffer::Buffer;
     use crate::io::traits::ISource;
     use crate::parser::directives::DirectiveContext;
-    use crate::parser::document::document_contents::parse_document_contents;
+    use crate::parser::document::contents::parse_document_contents;
     use crate::parser::document::helpers::parse_comment;
     use crate::parser::document::scalar::parse_scalar_with_tokens;
 
