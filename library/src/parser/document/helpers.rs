@@ -32,19 +32,6 @@ pub(crate) fn parse_error_token(stream: &crate::parser::token_stream::TokenStrea
     )
 }
 
-/// [DEPRECATED] Char-based error context. Remove when all usages are migrated.
-pub(crate) fn parse_error(source: &mut dyn ISource, msg: &str) -> String {
-    let current = match source.current() {
-        Some(c) => c.to_string(),
-        None => STR_EOF.to_string(),
-    };
-    format!(
-        "{} (current: '{}', indent: {})",
-        msg,
-        current,
-        source.get_current_indent_level()
-    )
-}
 
 /// Unified indentation validation using parsing context.
 ///

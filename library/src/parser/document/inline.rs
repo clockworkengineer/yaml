@@ -86,7 +86,6 @@ use crate::constants::*;
 use crate::error::messages::{ERR_EOF_INLINE_MAPPING, ERR_UNEXPECTED_CHAR_INLINE_MAPPING_PREFIX};
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
-use crate::parser::document::helpers::parse_error;
 // ...existing code...
 use crate::parser::document::value::parse_value;
 // ...existing code...
@@ -291,8 +290,9 @@ fn parse_inline_mapping_with_colons(
         // Prevent infinite loop
         iterations += 1;
         if iterations >= MAX_PAIRS {
-            return Err(parse_error(
-                source,
+            let mut stream = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+            return Err(crate::parser::document::helpers::parse_error_token(
+                &stream,
                 "Flow mapping too large or malformed - possible infinite loop",
             ));
         }
@@ -307,7 +307,8 @@ fn parse_inline_mapping_with_colons(
 
         // If we're at None (EOF) inside a flow mapping, that's an error
         if source.current().is_none() {
-            return Err(parse_error(source, ERR_EOF_INLINE_MAPPING));
+            let mut stream = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+            return Err(crate::parser::document::helpers::parse_error_token(&stream, ERR_EOF_INLINE_MAPPING));
         }
 
         let key_node = parse_value(source, directives)?;
@@ -331,7 +332,8 @@ fn parse_inline_mapping_with_colons(
                 }
                 // Check for double comma
                 if source.current() == Some(CHAR_COMMA) {
-                    return Err(parse_error(source, "Flow mapping has consecutive commas"));
+                    let mut stream = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+                    return Err(crate::parser::document::helpers::parse_error_token(&stream, "Flow mapping has consecutive commas"));
                 }
                 continue;
             }
@@ -352,8 +354,9 @@ fn parse_inline_mapping_with_colons(
                     {
                         // Check if it's an alphanumeric character which would be clearly invalid
                         if c.is_alphanumeric() {
-                            return Err(parse_error(
-                                source,
+                            let mut stream = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+                            return Err(crate::parser::document::helpers::parse_error_token(
+                                &stream,
                                 "Invalid character after flow mapping - expected whitespace or newline",
                             ));
                         }
@@ -363,12 +366,16 @@ fn parse_inline_mapping_with_colons(
                 break;
             }
             Some(c) => {
-                return Err(parse_error(
-                    source,
+                let mut stream = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+                return Err(crate::parser::document::helpers::parse_error_token(
+                    &stream,
                     &format!("{ERR_UNEXPECTED_CHAR_INLINE_MAPPING_PREFIX}{c}"),
                 ));
             }
-            None => return Err(parse_error(source, ERR_EOF_INLINE_MAPPING)),
+            None => {
+                let mut stream = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+                return Err(crate::parser::document::helpers::parse_error_token(&stream, ERR_EOF_INLINE_MAPPING));
+            }
         }
     }
     // After the loop, construct and return the mapping node

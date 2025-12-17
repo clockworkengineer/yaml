@@ -54,7 +54,6 @@ fn token_dispatch(
     None
 }
 
-
 /// Checks if the current position is at a document end marker (...).
 fn is_doc_end(source: &mut dyn ISource, directives: &DirectiveContext) -> Result<bool, String> {
     let st = source.save_state();
@@ -79,8 +78,9 @@ fn handle_single_explicit_key(
 ) -> Result<Node, String> {
     source.next();
     if source.current() == Some('\t') {
-        return Err(helpers::parse_error(
-            source,
+        let mut stream = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+        return Err(helpers::parse_error_token(
+            &stream,
             "Tabs cannot be used as separation after explicit key indicator",
         ));
     }
@@ -245,12 +245,13 @@ pub fn parse_document_contents(
                             indent_level, seq_indent
                         ));
                     }
-                    let seq = crate::parser::document::tokens::sequence::parse_sequence_with_tokens(
-                        &mut stream,
-                        seq_indent,
-                        directives,
-                        0,
-                    )?;
+                    let seq =
+                        crate::parser::document::tokens::sequence::parse_sequence_with_tokens(
+                            &mut stream,
+                            seq_indent,
+                            directives,
+                            0,
+                        )?;
                     if let Node::None = seq {
                         return Ok(Node::None);
                     }
@@ -287,12 +288,25 @@ pub fn parse_document_contents(
         Some(c) if c == '{' => {
             let mut stream =
                 crate::parser::token_stream::TokenStream::new(source, directives, true)?;
-            Ok(crate::parser::document::inline_tokens::parse_inline_mapping_with_tokens(&mut stream, directives, 0, false)?)
+            Ok(
+                crate::parser::document::inline_tokens::parse_inline_mapping_with_tokens(
+                    &mut stream,
+                    directives,
+                    0,
+                    false,
+                )?,
+            )
         }
         Some(c) if c == '[' => {
             let mut stream =
                 crate::parser::token_stream::TokenStream::new(source, directives, true)?;
-            Ok(crate::parser::document::inline_tokens::parse_inline_sequence_with_tokens(&mut stream, directives, 0)?)
+            Ok(
+                crate::parser::document::inline_tokens::parse_inline_sequence_with_tokens(
+                    &mut stream,
+                    directives,
+                    0,
+                )?,
+            )
         }
         // Support tagged values or tagged keys using TokenStream
         Some(c) if c == '!' => {
@@ -373,8 +387,9 @@ pub fn parse_document_contents(
                 }
                 source.next();
                 if source.current() == Some('\t') {
-                    return Err(helpers::parse_error(
-                        source,
+                    let mut stream = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+                    return Err(helpers::parse_error_token(
+                        &stream,
                         "Tabs cannot be used as separation after explicit value indicator",
                     ));
                 }
@@ -461,7 +476,8 @@ pub fn parse_document_contents(
                         next_char,
                         Some('-') | Some('?') | Some('[') | Some('{') | Some('#')
                     ) {
-                        return Err(helpers::parse_error(source, "Mapping key without colon"));
+                        let mut stream = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+                        return Err(helpers::parse_error_token(&stream, "Mapping key without colon"));
                     }
                 }
 
@@ -493,14 +509,17 @@ pub fn parse_document_contents(
                 Ok(parse_value(source, directives)?)
             }
         }
-        Some(c) => Err(helpers::parse_error(
-            source,
-            &format!(
-                "{}{}",
-                crate::error::messages::ERR_UNEXPECTED_CHAR_PREFIX,
-                c
-            ),
-        )),
+        Some(c) => {
+            let mut stream = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+            Err(helpers::parse_error_token(
+                &stream,
+                &format!(
+                    "{}{}",
+                    crate::error::messages::ERR_UNEXPECTED_CHAR_PREFIX,
+                    c
+                ),
+            ))
+        },
         None => Ok(Node::None),
     }
 }

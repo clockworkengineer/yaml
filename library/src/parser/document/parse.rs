@@ -106,8 +106,9 @@ fn parse_document_end_marker(
         crate::utils::skip_whitespace_and_comments(source);
         if let Some(c) = source.current() {
             if c != '\n' && c != '\r' && c != '#' && c != '%' && c != '-' {
-                return Err(helpers::parse_error(
-                    source,
+                let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+                return Err(helpers::parse_error_token(
+                    &ts,
                     "Invalid content after document end marker (...)",
                 ));
             }
@@ -137,8 +138,9 @@ fn check_explicit_directives(
             | Some(crate::parser::lexer::Token::Eof)
             | None => {
                 source.restore_state(st);
-                return Err(helpers::parse_error(
-                    source,
+                let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+                return Err(helpers::parse_error_token(
+                    &ts,
                     "Directive must be followed by a document",
                 ));
             }
