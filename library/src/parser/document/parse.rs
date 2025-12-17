@@ -308,6 +308,21 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
         if !source.more() {
             break;
         }
+        // If we didn't see a document start marker for this document and there isn't one ahead,
+        // avoid implicitly splitting into multiple documents from remaining top-level nodes.
+        // Continue only when an explicit '---' marker is present.
+        if !saw_marker {
+            let st_ahead = source.save_state();
+            let dir = crate::parser::directives::DirectiveContext::new();
+            let mut ts_ahead = crate::parser::token_stream::TokenStream::new(source, &dir, false)?;
+            // Skip trivia
+            ts_ahead.skip_whitespace_and_comments()?;
+            let has_next_doc = matches!(ts_ahead.current(), Some(crate::parser::lexer::Token::DocumentStart));
+            source.restore_state(st_ahead);
+            if !has_next_doc {
+                break;
+            }
+        }
     }
     eprintln!("DEBUG: Total documents parsed: {}", docs.len());
     if docs.is_empty() {

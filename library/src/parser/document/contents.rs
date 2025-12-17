@@ -508,6 +508,11 @@ pub fn parse_document_contents(
                 Ok(parse_value(source, directives)?)
             }
         }
+        Some('%') => {
+            // A directive start encountered within content parsing: signal no node here.
+            // The main document loop will handle breaking at directives.
+            Ok(Node::None)
+        }
         Some(c) => {
             let mut stream = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
             Err(helpers::parse_error_token(
