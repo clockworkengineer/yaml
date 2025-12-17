@@ -1,22 +1,22 @@
 ///
 /// Modules for parsing YAML documents.
-/// 
+///
 /// Handles parsing of various YAML constructs including sequences, mappings,
-/// scalars, anchors, aliases, and directives. Provides utilities for 
+/// scalars, anchors, aliases, and directives. Provides utilities for
 /// managing document boundaries and normalization of parsed nodes.
 ///
 mod anchors;
 mod block_scalar;
 mod bridge;
-mod context;
 mod contents;
-mod explicit_key;
-mod main_loop;
+mod context;
 mod error_builder;
+mod explicit_key;
 mod helpers;
 mod inline;
 mod inline_tokens;
 mod loop_guards;
+mod main_loop;
 mod mapping;
 mod parse;
 mod scalar;
@@ -24,18 +24,17 @@ mod sequence;
 mod tokens;
 mod value;
 
-
 pub use parse::parse;
 
 #[cfg(test)]
 mod tests {
-    
+
     use crate::Node;
     use crate::io::sources::buffer::Buffer;
     use crate::io::traits::ISource;
     use crate::parser::directives::DirectiveContext;
     use crate::parser::document::contents::parse_document_contents;
-    use crate::parser::document::helpers::parse_comment;
+
     use crate::parser::document::scalar::parse_scalar_with_tokens;
 
     use crate::parser::document::inline::{parse_inline_mapping, parse_inline_sequence};
@@ -200,13 +199,6 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_comment_trims_hash_and_newline() {
-        let mut src = Buffer::new(b"# Hello world  \n");
-        let text = parse_comment(&mut src);
-        assert_eq!(text, "Hello world");
-    }
-
-    #[test]
     fn test_parse_value_alias_and_anchor() {
         let directives = DirectiveContext::new();
         let mut a = Buffer::new(b"*myalias");
@@ -233,5 +225,4 @@ mod tests {
         let n = parse_document_contents(&mut src, 0, &directives).unwrap();
         assert!(matches!(n, Node::Mapping(_)));
     }
-    
 }

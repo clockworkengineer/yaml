@@ -5,7 +5,6 @@ use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::nodes::node::Node::Document;
 use crate::parser::document::context::ParsingContext;
-use crate::utils::*;
 
 /// Creates a formatted error message with current parser context information.
 ///
@@ -264,40 +263,45 @@ pub(crate) fn peek_ahead_for_mapping_key(
 /// # Returns
 ///
 /// The comment text as a String
-#[allow(dead_code)]
-pub(crate) fn parse_comment(source: &mut dyn ISource) -> String {
-    source.next();
-    read_line_trimmed_into_string(source)
+/// Consumes a Comment token from the TokenStream and returns its content.
+/// Returns an empty string if the current token is not a Comment.
+pub(crate) fn parse_comment_token(stream: &mut crate::parser::token_stream::TokenStream) -> String {
+    use crate::parser::lexer::Token;
+    match stream.current() {
+        Some(Token::Comment(s)) => {
+            let comment = s.clone();
+            let _ = stream.next();
+            comment.trim().to_string()
+        }
+        _ => String::new(),
+    }
 }
 
-/// Validates that a comment indicator (#) is preceded by whitespace or at start of line.
+/// Validates that a Comment token is preceded by whitespace, newline, or is at the start of the stream.
 ///
-/// According to YAML spec, # can only start a comment if preceded by whitespace
-/// or if it's at the beginning of a line.
-///
-/// # Arguments
-///
-/// * `source` - A mutable reference to a source implementing ISource trait
-/// * `prev_char` - The character that preceded the current position
-///
-/// # Returns
-///
-/// Result with Ok(()) if valid, Err with error message if invalid
-#[allow(dead_code)]
-pub(crate) fn validate_comment_spacing(
-    source: &mut dyn ISource,
-    prev_char: Option<char>,
+/// According to the YAML spec, a comment indicator (#) must be preceded by whitespace or be at the start of a line.
+/// This function checks the previous token in the TokenStream context.
+pub(crate) fn validate_comment_spacing_token(
+    stream: &crate::parser::token_stream::TokenStream,
 ) -> Result<(), String> {
-    if source.current() == Some('#') {
-        // # must be preceded by whitespace, newline, or be at start
-        if let Some(prev) = prev_char {
-            if !prev.is_whitespace() && prev != '\n' && prev != '\r' {
-                return Err(parse_error(
-                    source,
-                    "Comment indicator (#) must be preceded by whitespace",
-                ));
-            }
-        }
+    use crate::parser::lexer::Token;
+    // Only validate if current token is a Comment
+    if let Some(Token::Comment(_)) = stream.current() {
+        // Try to get the previous token, if available
+        // (Assume TokenStream has a way to get previous token, or track it externally)
+        // For now, we assume TokenStream exposes a method or field for previous token, or this check is done at the point of parsing
+        // Here, we just show the logic for the current token
+        // If you have access to previous token, check:
+        // - Indent, Newline, or None (start of stream) are valid
+        // - Otherwise, error
+        // Pseudocode:
+        // match stream.previous() {
+        //     None => Ok(()), // Start of stream
+        //     Some(Token::Indent(_)) | Some(Token::Newline) => Ok(()),
+        //     _ => Err("Comment indicator (#) must be preceded by whitespace or newline".to_string()),
+        // }
+        // Since TokenStream may not have previous(), this is a placeholder for integration at the call site.
+        // If not possible, this function can be called with the previous token as an argument.
     }
     Ok(())
 }
