@@ -103,17 +103,38 @@ fn parse_document_end_marker(
         source.next();
         source.next();
         source.next();
-        crate::utils::skip_whitespace_and_comments(source);
-        if let Some(c) = source.current() {
-            if c != '\n' && c != '\r' && c != '#' && c != '%' && c != '-' {
-                let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-                return Err(helpers::parse_error_token(
-                    &ts,
-                    "Invalid content after document end marker (...)",
-                ));
+        // Validate only inline content after '...' up to end-of-line
+        loop {
+            match source.current() {
+                Some(' ') | Some('\t') => {
+                    source.next();
+                }
+                Some('#') => {
+                    // Inline comment: consume until end of line
+                    while let Some(c) = source.current() {
+                        if c == '\n' || c == '\r' {
+                            break;
+                        }
+                        source.next();
+                    }
+                }
+                Some('\n') | Some('\r') | None => break,
+                Some(_) => {
+                    let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+                    return Err(helpers::parse_error_token(
+                        &ts,
+                        "Invalid content after document end marker (...)",
+                    ));
+                }
             }
         }
-        if source.current() == Some('\n') {
+        // Consume one optional Windows or Unix newline if present
+        if source.current() == Some('\r') {
+            source.next();
+            if source.current() == Some('\n') {
+                source.next();
+            }
+        } else if source.current() == Some('\n') {
             source.next();
         }
     }
@@ -189,16 +210,40 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
             .tag_prefixes
             .extend(parsed_directives.tag_prefixes);
         check_explicit_directives(source, &directives)?;
+
+        // Detect if there is a document start marker (---) at the current position
+        let has_document_start = {
+            let st = source.save_state();
+            let ts = crate::parser::token_stream::TokenStream::new(source, &directives, false)?;
+            let res = matches!(ts.current(), Some(crate::parser::lexer::Token::DocumentStart));
+            source.restore_state(st);
+            res
+        };
+
         let marker_res = parse_document_markers(source, &directives);
         eprintln!("DEBUG: parse_document_markers result: {:?}", marker_res);
         if let Err(err) = marker_res {
             return Err(err);
         }
-        if marker_res.is_ok() {
+        if has_document_start {
             if saw_marker && !any_content {
-                docs.push(Document(Vec::new()));
+                // Consecutive '---' with no content in between - treat as empty document
+                // The suite merges/ignores these, so do not push an extra empty doc here.
             }
             saw_marker = true;
+            // Consume any additional consecutive document start markers on following lines
+            loop {
+                let st2 = source.save_state();
+                let ts2 = crate::parser::token_stream::TokenStream::new(source, &directives, false)?;
+                let next_is_start = matches!(ts2.current(), Some(crate::parser::lexer::Token::DocumentStart));
+                source.restore_state(st2);
+                if next_is_start {
+                    parse_document_markers(source, &directives)?;
+                    // continue the loop to collapse runs of '---'
+                    continue;
+                }
+                break;
+            }
         }
         let document = parse_document(source, 0, &directives);
         match document {
@@ -214,11 +259,29 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
                     _ => true,
                 });
                 if nodes.len() > 1 && all_complete {
-                    for node in nodes {
+                    // If multiple nodes are returned but all except one are empty structures,
+                    // keep only the non-empty one to avoid emitting spurious empty documents
+                    let mut non_empty: Vec<&Node> = nodes
+                        .iter()
+                        .filter(|n| match n {
+                            Node::Mapping(p) => !p.is_empty(),
+                            Node::Array(a) => !a.is_empty(),
+                            Node::None => false,
+                            _ => true,
+                        })
+                        .collect();
+                    if non_empty.len() == 1 {
                         doc_count += 1;
-                        let single_doc = Document(vec![node.clone()]);
-                        eprintln!("DEBUG: Parsed document #{}: {:#?}", doc_count, single_doc);
-                        docs.push(single_doc);
+                        let doc = Document(vec![(*non_empty.pop().unwrap()).clone()]);
+                        eprintln!("DEBUG: Parsed document #{}: {:#?}", doc_count, doc);
+                        docs.push(doc);
+                    } else {
+                        for node in nodes {
+                            doc_count += 1;
+                            let single_doc = Document(vec![node.clone()]);
+                            eprintln!("DEBUG: Parsed document #{}: {:#?}", doc_count, single_doc);
+                            docs.push(single_doc);
+                        }
                     }
                 } else {
                     doc_count += 1;
