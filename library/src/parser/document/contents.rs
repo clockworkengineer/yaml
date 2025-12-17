@@ -476,7 +476,7 @@ pub fn parse_document_contents(
                         Some('-') | Some('?') | Some('[') | Some('{') | Some('#')
                     ) {
                         let mut stream = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-                        return Err(helpers::parse_error_token(&stream, "Mapping key without colon"));
+                        return Err(helpers::parse_error_token(&stream, "Expected ':' after mapping key"));
                     }
                 }
 
