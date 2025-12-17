@@ -450,11 +450,36 @@ fn parse_value_content(
             use crate::parser::document::tokens::mapping::parse_mapping_with_tokens;
             parse_mapping_with_tokens(stream, *level, directives, depth + 1)
         }
-        Some(Token::Newline) => Ok(Node::Str(
-            String::new(),
-            QuoteType::Unquoted,
-            BlockStyle::None,
-        )),
+        Some(Token::Newline) => {
+            // Handle newline before an indented block value. If there's an increased indent
+            // after the newline, parse a nested mapping or sequence as the value.
+            stream.next()?; // consume Newline
+            // Check for indentation increase
+            if let Some(Token::Indent(level)) = stream.current() {
+                if *level > 0 {
+                    let lvl = *level;
+                    stream.next()?; // consume Indent
+                    // Skip subsequent newlines/comments
+                    while matches!(stream.current(), Some(Token::Newline) | Some(Token::Comment(_))) {
+                        stream.next()?;
+                    }
+                    // Decide between sequence or mapping based on next token
+                    if matches!(stream.current(), Some(Token::Dash)) {
+                        use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
+                        return parse_sequence_with_tokens(stream, lvl, directives, depth + 1);
+                    } else {
+                        use crate::parser::document::tokens::mapping::parse_mapping_with_tokens;
+                        return parse_mapping_with_tokens(stream, lvl, directives, depth + 1);
+                    }
+                }
+            }
+            // No indentation increase; treat as empty string value
+            Ok(Node::Str(
+                String::new(),
+                QuoteType::Unquoted,
+                BlockStyle::None,
+            ))
+        }
         Some(Token::Eof) | None => Ok(Node::Str(
             String::new(),
             QuoteType::Unquoted,

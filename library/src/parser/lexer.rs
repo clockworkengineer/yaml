@@ -160,7 +160,10 @@ impl<'a> Lexer<'a> {
             }
             CHAR_CARRIAGE_RETURN => {
                 #[cfg(debug_assertions)]
-                println!("DEBUG: Emitting Token::Newline (CR) (in_flow={})", self.in_flow);
+                println!(
+                    "DEBUG: Emitting Token::Newline (CR) (in_flow={})",
+                    self.in_flow
+                );
                 self.source.next();
                 if self.source.current() == Some(CHAR_NEWLINE) {
                     self.source.next();
@@ -209,7 +212,10 @@ impl<'a> Lexer<'a> {
                 // Check for comment immediately after comma with no whitespace (YAML compliance)
                 if let Some('#') = self.source.current() {
                     #[cfg(debug_assertions)]
-                    eprintln!("DEBUG: Comment after comma with no whitespace at {:?}", self.source.current());
+                    eprintln!(
+                        "DEBUG: Comment after comma with no whitespace at {:?}",
+                        self.source.current()
+                    );
                     return Err("YAML syntax error: comment must be preceded by whitespace after ',' in flow collection".to_string());
                 }
                 Ok(Some(Token::Comma))
@@ -306,12 +312,8 @@ impl<'a> Lexer<'a> {
                 count += 1;
                 self.source.next();
             } else if ch == CHAR_TAB {
-                if !in_flow {
+                    // YAML forbids tabs for indentation in all contexts (block and flow)
                     return Err("Tabs are not allowed as indentation in YAML".to_string());
-                } else {
-                    // In flow context, treat tab as content, not indentation
-                    break;
-                }
             } else {
                 break;
             }
@@ -492,7 +494,10 @@ impl<'a> Lexer<'a> {
                 None => {
                     #[cfg(debug_assertions)]
                     eprintln!("DEBUG: Unterminated single-quoted string: reached EOF");
-                    return Err("YAML compliance error: Unterminated single-quoted string (unexpected EOF)".to_string());
+                    return Err(
+                        "YAML compliance error: Unterminated single-quoted string (unexpected EOF)"
+                            .to_string(),
+                    );
                 }
             }
         }
@@ -519,7 +524,9 @@ impl<'a> Lexer<'a> {
                         Some(c) => content.push(c),
                         None => {
                             #[cfg(debug_assertions)]
-                            eprintln!("DEBUG: Unterminated double-quoted string: reached EOF after escape");
+                            eprintln!(
+                                "DEBUG: Unterminated double-quoted string: reached EOF after escape"
+                            );
                             return Err("YAML compliance error: Unterminated double-quoted string (unexpected EOF after escape)".to_string());
                         }
                     }
@@ -536,7 +543,10 @@ impl<'a> Lexer<'a> {
                 None => {
                     #[cfg(debug_assertions)]
                     eprintln!("DEBUG: Unterminated double-quoted string: reached EOF");
-                    return Err("YAML compliance error: Unterminated double-quoted string (unexpected EOF)".to_string());
+                    return Err(
+                        "YAML compliance error: Unterminated double-quoted string (unexpected EOF)"
+                            .to_string(),
+                    );
                 }
             }
         }
