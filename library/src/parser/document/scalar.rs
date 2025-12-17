@@ -42,6 +42,17 @@ pub(crate) fn parse_scalar_with_tokens(
             };
             if is_block_header {
                 let _indicator = s.chars().next().unwrap();
+                // Validate indentation indicator range if present: must be a single digit 1-9
+                let header_meta = s[1..].trim();
+                let digits: String = header_meta
+                    .chars()
+                    .filter(|c| c.is_ascii_digit())
+                    .collect();
+                if !digits.is_empty() {
+                    if digits.len() != 1 || digits.chars().next().unwrap() == '0' {
+                        return Err("Invalid block scalar indentation indicator: must be a single digit from 1-9".to_string());
+                    }
+                }
                 let block_header = s.clone();
                 stream.next()?;
                 let mut block_lines: Vec<String> = Vec::new();
