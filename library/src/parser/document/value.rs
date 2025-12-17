@@ -29,11 +29,7 @@ pub(crate) fn parse_value(
     // - Decorators on empty values (FH7J, PW8X)
     // - Flow collections (better token boundaries)
     // - Aliases (simpler token handling)
-    use crate::parser::document::bridge::{parse_value_bridged, should_use_token_parsing};
 
-    if should_use_token_parsing(source) {
-        return parse_value_bridged(source, directives);
-    }
 
     use crate::parser::document::tokens::value::parse_value_with_tokens;
     use crate::parser::token_stream::TokenStream;

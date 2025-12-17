@@ -105,12 +105,12 @@ Migrate as much of the YAML parser as possible from character-based (ISource) pa
 ---
 
 ## Progress Checklist
-- [ ] Inventory complete
-- [ ] Scalar parsing migrated
-- [ ] Block/flow parsing migrated
-- [ ] Comment handling migrated
-- [ ] Error reporting migrated
-- [ ] Node construction migrated
+- [x] Inventory complete
+- [x] Scalar parsing migrated
+- [x] Block/flow parsing migrated
+- [x] Comment handling migrated
+- [x] Error reporting migrated
+- [x] Node construction migrated
 - [ ] Test coverage updated
 - [ ] Cleanup complete
 
