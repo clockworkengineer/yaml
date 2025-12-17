@@ -312,8 +312,14 @@ impl<'a> Lexer<'a> {
                 count += 1;
                 self.source.next();
             } else if ch == CHAR_TAB {
-                    // YAML forbids tabs for indentation in all contexts (block and flow)
-                    return Err("Tabs are not allowed as indentation in YAML".to_string());
+                    // Tabs as indentation are forbidden in block context, but allowed in flow context per tests.
+                    if in_flow {
+                        // Consume the tab but do not count it towards indentation width
+                        self.source.next();
+                        continue;
+                    } else {
+                        return Err("Tabs are not allowed as indentation in YAML".to_string());
+                    }
             } else {
                 break;
             }
