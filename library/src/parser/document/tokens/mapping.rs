@@ -32,7 +32,7 @@ pub fn parse_single_mapping_pair_with_tokens(
 #[allow(dead_code)]
 pub fn parse_mapping_with_tokens(
     stream: &mut TokenStream,
-    _base_indent: usize,
+    base_indent: usize,
     directives: &DirectiveContext,
     depth: usize,
 ) -> Result<Node, String> {
@@ -43,60 +43,60 @@ pub fn parse_mapping_with_tokens(
     // Skip initial whitespace/newlines
     stream.skip_whitespace()?;
 
-    // Track current indentation level
-    let mut current_indent: Option<usize> = None;
-    let mut first_key = true;
+    // Track current indentation level relative to caller-provided base
+    let mut current_indent: usize = base_indent;
+    let mut saw_any_pair: bool = false;
 
     loop {
         // Skip whitespace/comments before each mapping entry
+        // Track if we just crossed a newline without seeing an Indent yet
+        let mut after_newline_no_indent = false;
         while matches!(
             stream.current(),
             Some(Token::Newline) | Some(Token::Comment(_))
         ) {
+            if matches!(stream.current(), Some(Token::Newline)) {
+                after_newline_no_indent = true;
+            }
             stream.next()?;
         }
-        let token = match stream.current() {
-            Some(t) => t,
-            None => break,
-        };
-        // If this is the first key, set indent appropriately
-        if first_key {
-            match token {
-                Token::Indent(level) => {
-                    current_indent = Some(*level);
+        // If we've already parsed at least one pair within this mapping and we're in an indented
+        // block (current_indent > 0), then every subsequent pair must begin with an Indent token
+        // at least at the same level. If there's no Indent token, we've dedented to column 0; end mapping.
+        if saw_any_pair && current_indent > 0 {
+            match stream.current() {
+                Some(Token::Indent(_)) => {
+                    // consume the indent for the next entry and proceed
+                    stream.next()?;
                 }
                 _ => {
-                    current_indent = Some(0);
-                }
-            }
-            first_key = false;
-        }
-        // If the next token is a Plain token and current_indent > 0, break out
-        if let Some(cur) = current_indent {
-            if cur > 0 {
-                if let Token::Plain(_) = token {
                     break;
                 }
             }
         }
+
+        let token = match stream.current() {
+            Some(t) => t,
+            None => break,
+        };
+        // Note: after_newline_no_indent check is no longer necessary due to explicit indent check above
         match token {
             Token::Newline | Token::Comment(_) => {
                 stream.next()?;
                 continue;
             }
             Token::Indent(level) => {
-                if let Some(cur) = current_indent {
-                    if *level < cur {
-                        // Indent decreased: end current mapping
-                        break;
-                    } else if *level > cur {
-                        // Indent increased: skip, let parse_mapping_pair handle as value
-                        stream.next()?;
-                        continue;
-                    } else {
-                        stream.next()?;
-                        continue;
-                    }
+                if *level < current_indent {
+                    // Indent decreased: end current mapping
+                    break;
+                } else if *level > current_indent {
+                    // Indent increased: skip, let parse_mapping_pair handle nested value
+                    stream.next()?;
+                    continue;
+                } else {
+                    // Same indent: consume and continue
+                    stream.next()?;
+                    continue;
                 }
             }
             Token::Eof
@@ -108,13 +108,20 @@ pub fn parse_mapping_with_tokens(
                 break;
             }
             _ => {
-                let cur_indent = current_indent.unwrap_or(0);
+                let cur_indent = current_indent;
                 let (key, value) = parse_mapping_pair(stream, directives, cur_indent, depth)?;
                 println!(
                     "DEBUG: mapping_tokens: parsed pair: key={:?}, value={:?}",
                     key, value
                 );
-                stream.skip_whitespace()?;
+                // Do not consume Indent tokens here; they signal dedent/end-of-mapping.
+                // Only skip newlines and comments between pairs.
+                while matches!(
+                    stream.current(),
+                    Some(Token::Newline) | Some(Token::Comment(_))
+                ) {
+                    stream.next()?;
+                }
 
                 // Patch: If the value is a Set with a single empty string, and the next token is an explicit key (?),
                 // treat the following block as the value for this key (for !!set explicit block format)
@@ -159,12 +166,7 @@ pub fn parse_mapping_with_tokens(
                 }
 
                 pairs.push((key, value));
-                // After adding a pair, if the next token is a plain key and current_indent > 0, break out
-                if cur_indent > 0 {
-                    if let Some(Token::Plain(_)) = stream.current() {
-                        break;
-                    }
-                }
+                saw_any_pair = true;
             }
         }
     }
