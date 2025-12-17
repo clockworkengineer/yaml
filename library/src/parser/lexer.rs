@@ -81,6 +81,9 @@ pub struct Lexer<'a> {
     peeked_token: Option<Token>,
     at_line_start: bool,
     in_flow: bool, // Track if we're in flow context
+    // Track whether the last processed character was a line break
+    // Used to distinguish indentation after newline vs. leading tabs at stream start in flow
+    last_was_linebreak: bool,
 }
 
 impl<'a> Lexer<'a> {
@@ -92,6 +95,7 @@ impl<'a> Lexer<'a> {
             peeked_token: None,
             at_line_start: true,
             in_flow,
+            last_was_linebreak: false,
         }
     }
 
@@ -152,6 +156,7 @@ impl<'a> Lexer<'a> {
                 println!("DEBUG: Emitting Token::Newline (in_flow={})", self.in_flow);
                 self.source.next();
                 self.at_line_start = true;
+                self.last_was_linebreak = true;
                 if self.in_flow {
                     // Suppress Token::Newline in flow context
                     return self.scan_token();
@@ -169,6 +174,7 @@ impl<'a> Lexer<'a> {
                     self.source.next();
                 }
                 self.at_line_start = true;
+                self.last_was_linebreak = true;
                 if self.in_flow {
                     // Suppress Token::Newline in flow context
                     return self.scan_token();
@@ -185,6 +191,7 @@ impl<'a> Lexer<'a> {
             CHAR_ASTERISK => Ok(Some(self.scan_alias()?)),
             CHAR_LBRACE => {
                 self.source.next();
+                self.last_was_linebreak = false;
                 Ok(Some(Token::FlowMappingStart))
             }
             CHAR_RBRACE => {
@@ -193,10 +200,12 @@ impl<'a> Lexer<'a> {
                 if let Some('#') = self.source.current() {
                     return Err("YAML syntax error: comment must be preceded by whitespace after '}' in flow collection".to_string());
                 }
+                self.last_was_linebreak = false;
                 Ok(Some(Token::FlowMappingEnd))
             }
             CHAR_LBRACKET => {
                 self.source.next();
+                self.last_was_linebreak = false;
                 Ok(Some(Token::FlowSequenceStart))
             }
             CHAR_RBRACKET => {
@@ -205,6 +214,7 @@ impl<'a> Lexer<'a> {
                 if let Some('#') = self.source.current() {
                     return Err("YAML syntax error: comment must be preceded by whitespace after ']' in flow collection".to_string());
                 }
+                self.last_was_linebreak = false;
                 Ok(Some(Token::FlowSequenceEnd))
             }
             CHAR_COMMA => {
@@ -218,10 +228,12 @@ impl<'a> Lexer<'a> {
                     );
                     return Err("YAML syntax error: comment must be preceded by whitespace after ',' in flow collection".to_string());
                 }
+                self.last_was_linebreak = false;
                 Ok(Some(Token::Comma))
             }
             CHAR_COLON => {
                 self.source.next();
+                self.last_was_linebreak = false;
                 Ok(Some(Token::Colon))
             }
             '-' => {
@@ -241,16 +253,19 @@ impl<'a> Lexer<'a> {
                         } else {
                             // Not at indent 0, treat as plain scalar
                             self.source.restore_state(state);
+                            self.last_was_linebreak = false;
                             Ok(Some(self.scan_plain_scalar()?))
                         }
                     }
                     (Some(c), _) if c.is_whitespace() || c == CHAR_NEWLINE => {
                         // Dash (sequence indicator)
+                        self.last_was_linebreak = false;
                         Ok(Some(Token::Dash))
                     }
                     _ => {
                         // Plain scalar starting with dash
                         self.source.restore_state(state);
+                        self.last_was_linebreak = false;
                         Ok(Some(self.scan_plain_scalar()?))
                     }
                 }
@@ -272,18 +287,21 @@ impl<'a> Lexer<'a> {
                         } else {
                             // Not at indent 0, treat as plain scalar
                             self.source.restore_state(state);
+                            self.last_was_linebreak = false;
                             Ok(Some(self.scan_plain_scalar()?))
                         }
                     }
                     _ => {
                         // Plain scalar starting with dot
                         self.source.restore_state(state);
+                        self.last_was_linebreak = false;
                         Ok(Some(self.scan_plain_scalar()?))
                     }
                 }
             }
             '?' => {
                 self.source.next();
+                self.last_was_linebreak = false;
                 Ok(Some(Token::QuestionMark))
             }
             '%' => Ok(Some(self.scan_directive()?)),
@@ -312,18 +330,20 @@ impl<'a> Lexer<'a> {
                 count += 1;
                 self.source.next();
             } else if ch == CHAR_TAB {
-                    // Tabs as indentation are forbidden in block context, but allowed in flow context per tests.
-                    if in_flow {
+                    // Tabs are forbidden for indentation in YAML.
+                    // Allow a leading tab at the very start of a flow context line only if not after a newline.
+                    if in_flow && !self.last_was_linebreak {
                         // Consume the tab but do not count it towards indentation width
                         self.source.next();
                         continue;
-                    } else {
-                        return Err("Tabs are not allowed as indentation in YAML".to_string());
                     }
+                    return Err("Tabs are not allowed as indentation in YAML".to_string());
             } else {
                 break;
             }
         }
+        // Indentation consumed; reset linebreak flag
+        self.last_was_linebreak = false;
         Ok(count)
     }
 

@@ -60,18 +60,38 @@ pub fn parse_mapping_with_tokens(
             }
             stream.next()?;
         }
+        // Normalize: if a stray comma remains after an inline flow item, consume it
+        // and optionally a closing flow token, then re-skip trivia.
+        if matches!(stream.current(), Some(Token::Comma)) {
+            stream.next()?;
+            if matches!(
+                stream.current(),
+                Some(Token::FlowMappingEnd) | Some(Token::FlowSequenceEnd)
+            ) {
+                stream.next()?;
+            }
+            stream.skip_whitespace_and_comments()?;
+        }
         // If we've already parsed at least one pair within this mapping and we're in an indented
-        // block (current_indent > 0), then every subsequent pair must begin with an Indent token
-        // at least at the same level. If there's no Indent token, we've dedented to column 0; end mapping.
+        // block (current_indent > 0), inspect the next indentation. If it dedents, end this mapping.
+        // Do NOT consume the Indent here; let the main match handle it so relative changes are respected.
         if saw_any_pair && current_indent > 0 {
-            match stream.current() {
-                Some(Token::Indent(_)) => {
-                    // consume the indent for the next entry and proceed
-                    stream.next()?;
-                }
-                _ => {
+            if let Some(Token::Indent(level)) = stream.current() {
+                if *level < current_indent {
                     break;
                 }
+                // equal/greater indent will be handled below
+            } else if matches!(
+                stream.current(),
+                Some(Token::Eof)
+                    | Some(Token::DocumentStart)
+                    | Some(Token::DocumentEnd)
+                    | Some(Token::Dash)
+                    | Some(Token::FlowMappingEnd)
+                    | Some(Token::FlowSequenceEnd)
+            ) {
+                // Structural token without an indent indicates end of this mapping
+                break;
             }
         }
 
@@ -337,12 +357,22 @@ fn parse_mapping_pair(
     );
     let value = match cur_token {
         Some(Token::Newline) | None | Some(Token::Eof) => {
-            // After colon and newline, check for indent and dash for block sequence value
-            // Consume newline
+            // After colon and newline, skip any intervening comments/newlines,
+            // then check for indent and dash for block sequence/mapping value.
             if matches!(stream.current(), Some(Token::Newline)) {
                 stream.next()?;
             }
-            // Check for indent
+            // Allow comments and blank lines immediately after the colon
+            loop {
+                match stream.current() {
+                    Some(Token::Newline) | Some(Token::Comment(_)) => {
+                        stream.next()?;
+                        continue;
+                    }
+                    _ => break,
+                }
+            }
+            // Check for indent starting the nested value
             let indent_level = if let Some(Token::Indent(level)) = stream.current() {
                 if *level > cur_indent {
                     let lvl = *level;

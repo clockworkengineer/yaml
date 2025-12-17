@@ -430,6 +430,12 @@ fn parse_value_content(
         stream.next()?;
     }
     match stream.current() {
+        // Tolerate stray commas in block contexts: consume and treat as empty value
+        Some(Token::Comma) => {
+            stream.next()?;
+            stream.skip_whitespace_and_comments()?;
+            return Ok(Node::Str(String::new(), QuoteType::Unquoted, BlockStyle::None));
+        }
         Some(Token::FlowMappingStart) => {
             use crate::parser::document::inline_tokens::parse_inline_mapping_with_tokens;
             parse_inline_mapping_with_tokens(stream, directives, depth + 1, false)

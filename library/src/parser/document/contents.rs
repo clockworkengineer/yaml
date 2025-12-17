@@ -76,136 +76,98 @@ fn handle_single_explicit_key(
     source: &mut dyn ISource,
     directives: &DirectiveContext,
 ) -> Result<Node, String> {
-    source.next();
-    if source.current() == Some('\t') {
-        let mut stream = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-        return Err(helpers::parse_error_token(
-            &stream,
-            "Tabs cannot be used as separation after explicit key indicator",
-        ));
+    // Token-based explicit key/value parsing to avoid char/token desync
+    let mut ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+    // Current token should be QuestionMark; if not, try to proceed for robustness
+    if matches!(ts.current(), Some(crate::parser::lexer::Token::QuestionMark)) {
+        ts.next()?; // consume '?'
     }
-    let mut stream = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-    stream.skip_whitespace_and_comments()?;
-    let mut key_node = crate::parser::document::tokens::value::parse_value_with_tokens(
-        &mut stream,
-        directives,
-        0,
-    )?;
+    ts.skip_whitespace_and_comments()?;
+    // Parse the key as a tokenized value
+    let mut key_node = crate::parser::document::tokens::value::parse_value_with_tokens(&mut ts, directives, 0)?;
     use crate::nodes::node::BlockStyle;
     use crate::parser::document::helpers::node_to_inline_string;
     match key_node {
         Node::Array(_) | Node::Mapping(_) => {
             let inline = node_to_inline_string(&key_node);
-            key_node = Node::Str(
-                inline,
-                crate::nodes::node::QuoteType::Double,
-                BlockStyle::None,
-            );
+            key_node = Node::Str(inline, crate::nodes::node::QuoteType::Double, BlockStyle::None);
         }
         Node::Str(s, _qt, style) => {
-            let key_string = if matches!(style, BlockStyle::Literal) {
-                format!("{}\n", s)
-            } else {
-                s
-            };
-            key_node = Node::Str(
-                key_string,
-                crate::nodes::node::QuoteType::Double,
-                BlockStyle::None,
-            );
+            let key_string = if matches!(style, BlockStyle::Literal) { format!("{}\n", s) } else { s };
+            key_node = Node::Str(key_string, crate::nodes::node::QuoteType::Double, BlockStyle::None);
         }
         other => {
             let inline = node_to_inline_string(&other);
-            key_node = Node::Str(
-                inline,
-                crate::nodes::node::QuoteType::Double,
-                BlockStyle::None,
-            );
+            key_node = Node::Str(inline, crate::nodes::node::QuoteType::Double, BlockStyle::None);
         }
     }
-    // ...existing code for colon and value parsing...
-    let st_colon = source.save_state();
-    let mut found_colon = false;
+
+    // Find colon following the key
     loop {
-        {
-            let mut stream =
-                crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-            stream.skip_whitespace_and_comments()?;
-        }
-        match source.current() {
-            Some(':') => {
-                source.next();
-                found_colon = true;
-                break;
-            }
-            Some('\n') => {
-                source.next();
+        match ts.current() {
+            Some(crate::parser::lexer::Token::Newline) | Some(crate::parser::lexer::Token::Comment(_)) => {
+                ts.next()?;
                 continue;
             }
-            Some(_) | None => break,
-        }
-    }
-    if !found_colon {
-        source.restore_state(st_colon);
-        if source.current() == Some('\n') {
-            source.next();
-        }
-        loop {
-            {
-                let mut stream =
-                    crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-                stream.skip_whitespace_and_comments()?;
-            }
-            if source.current() == Some(':') {
+            Some(crate::parser::lexer::Token::Colon) => {
+                ts.next()?; // consume ':'
                 break;
             }
-            if source.current().is_none() {
-                break;
+            Some(crate::parser::lexer::Token::Eof)
+            | Some(crate::parser::lexer::Token::DocumentStart)
+            | Some(crate::parser::lexer::Token::DocumentEnd)
+            | None => {
+                let pairs = vec![(key_node, Node::None)];
+                return Ok(Node::Mapping(pairs));
             }
-            crate::utils::skip_until_newline(source);
-            if source.current().is_none() {
+            _ => {
+                // If next token starts a new key or structure, treat as empty value
                 break;
             }
         }
     }
-    if source.current() == Some(':') {
-        source.next();
-    }
-    {
-        let mut stream = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-        stream.skip_whitespace_and_comments()?;
-    }
-    let mut value_node = match source.current() {
-        Some('[') => {
-            let mut stream =
-                crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-            parse_inline_sequence(&mut stream, directives)?
+
+    // After colon, parse value possibly on the next indented line
+    ts.skip_whitespace_and_comments()?;
+    let mut value_node = match ts.current() {
+        Some(crate::parser::lexer::Token::Newline) => {
+            ts.next()?;
+            // If an increased indent follows, parse nested mapping/sequence
+            if let Some(crate::parser::lexer::Token::Indent(level)) = ts.current() {
+                let lvl = *level;
+                ts.next()?;
+                // Skip comments/newlines after indent
+                ts.skip_whitespace_and_comments()?;
+                if matches!(ts.current(), Some(crate::parser::lexer::Token::Dash)) {
+                    use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
+                    parse_sequence_with_tokens(&mut ts, lvl, directives, 0)?
+                } else {
+                    use crate::parser::document::tokens::mapping::parse_mapping_with_tokens;
+                    parse_mapping_with_tokens(&mut ts, lvl, directives, 0)?
+                }
+            } else {
+                Node::None
+            }
         }
-        Some('{') => {
-            let mut stream =
-                crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-            parse_inline_mapping(&mut stream, directives)?
+        Some(crate::parser::lexer::Token::Indent(level)) => {
+            let lvl = *level;
+            ts.next()?;
+            ts.skip_whitespace_and_comments()?;
+            if matches!(ts.current(), Some(crate::parser::lexer::Token::Dash)) {
+                use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
+                parse_sequence_with_tokens(&mut ts, lvl, directives, 0)?
+            } else {
+                use crate::parser::document::tokens::mapping::parse_mapping_with_tokens;
+                parse_mapping_with_tokens(&mut ts, lvl, directives, 0)?
+            }
         }
-        Some('-') => {
-            let nested_indent = source.get_current_indent_level();
-            parse_sequence(source, nested_indent, directives)?
+        _ => {
+            // Inline or same-line value
+            crate::parser::document::tokens::value::parse_value_with_tokens(&mut ts, directives, 0)?
         }
-        Some(_) => parse_value(source, directives)?,
-        None => Node::None,
     };
-    if matches!(value_node, Node::None) {
-        let st_peek = source.save_state();
-        crate::utils::skip_whitespace_and_comments(source);
-        if source.current() == Some('-') {
-            let nested_indent = source.get_current_indent_level();
-            value_node = parse_sequence(source, nested_indent, directives)?;
-        } else {
-            source.restore_state(st_peek);
-        }
-    }
-    let mut pairs: Vec<(Node, Node)> = Vec::new();
-    pairs.push((key_node, value_node));
-    Ok(Node::Mapping(pairs))
+
+    Ok(Node::Mapping(vec![(key_node, value_node)]))
 }
 
 /// Parses the contents of a YAML document based on the current character and context.
@@ -230,6 +192,25 @@ pub fn parse_document_contents(
 ) -> Result<Node, String> {
     // Normalize position to the next significant token
     crate::utils::skip_whitespace_and_comments(source);
+    // Handle explicit keys first so token-dispatch doesn't overshadow '?'
+    if matches!(source.current(), Some('?')) {
+        let current_indent = source.get_current_indent_level();
+        let state = source.save_state();
+        source.next();
+        crate::utils::skip_until_newline(source);
+        if source.current() == Some('\n') {
+            source.next();
+        }
+        crate::utils::skip_whitespace_and_comments(source);
+        let has_multiple_explicit_keys = source.get_current_indent_level() == current_indent
+            && source.current() == Some('?');
+        source.restore_state(state);
+        if has_multiple_explicit_keys {
+            return handle_multiple_explicit_keys(source, current_indent);
+        } else {
+            return handle_single_explicit_key(source, directives);
+        }
+    }
     // (debug removed)
     if let Some(result) = token_dispatch(source, directives) {
         return result;
@@ -424,24 +405,7 @@ pub fn parse_document_contents(
             }
             Ok(Node::Mapping(pairs))
         }
-        Some(c) if c == '?' => {
-            let current_indent = source.get_current_indent_level();
-            let state = source.save_state();
-            source.next();
-            crate::utils::skip_until_newline(source);
-            if source.current() == Some('\n') {
-                source.next();
-            }
-            crate::utils::skip_whitespace_and_comments(source);
-            let has_multiple_explicit_keys = source.get_current_indent_level() == current_indent
-                && source.current() == Some('?');
-            source.restore_state(state);
-            if has_multiple_explicit_keys {
-                return handle_multiple_explicit_keys(source, current_indent);
-            } else {
-                return handle_single_explicit_key(source, directives);
-            }
-        }
+        Some(c) if c == '?' => unreachable!(),
         Some(c) if c.is_alphanumeric() => {
             if helpers::peek_ahead_for_mapping_key(source, directives) {
                 // Prefer token-based mapping parsing for reliability
