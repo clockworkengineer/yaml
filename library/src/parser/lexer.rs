@@ -330,14 +330,14 @@ impl<'a> Lexer<'a> {
                 count += 1;
                 self.source.next();
             } else if ch == CHAR_TAB {
-                    // Tabs are forbidden for indentation in YAML.
-                    // Allow a leading tab at the very start of a flow context line only if not after a newline.
-                    if in_flow && !self.last_was_linebreak {
-                        // Consume the tab but do not count it towards indentation width
-                        self.source.next();
-                        continue;
-                    }
-                    return Err("Tabs are not allowed as indentation in YAML".to_string());
+                // Tabs are forbidden for indentation in YAML.
+                // Allow a leading tab at the very start of a flow context line only if not after a newline.
+                if in_flow && !self.last_was_linebreak {
+                    // Consume the tab but do not count it towards indentation width
+                    self.source.next();
+                    continue;
+                }
+                return Err("Tabs are not allowed as indentation in YAML".to_string());
             } else {
                 break;
             }

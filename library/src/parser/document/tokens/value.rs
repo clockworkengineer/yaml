@@ -434,7 +434,11 @@ fn parse_value_content(
         Some(Token::Comma) => {
             stream.next()?;
             stream.skip_whitespace_and_comments()?;
-            return Ok(Node::Str(String::new(), QuoteType::Unquoted, BlockStyle::None));
+            return Ok(Node::Str(
+                String::new(),
+                QuoteType::Unquoted,
+                BlockStyle::None,
+            ));
         }
         Some(Token::FlowMappingStart) => {
             use crate::parser::document::inline_tokens::parse_inline_mapping_with_tokens;
@@ -466,7 +470,10 @@ fn parse_value_content(
                     let lvl = *level;
                     stream.next()?; // consume Indent
                     // Skip subsequent newlines/comments
-                    while matches!(stream.current(), Some(Token::Newline) | Some(Token::Comment(_))) {
+                    while matches!(
+                        stream.current(),
+                        Some(Token::Newline) | Some(Token::Comment(_))
+                    ) {
                         stream.next()?;
                     }
                     // Decide between sequence or mapping based on next token
