@@ -23,136 +23,69 @@ pub(crate) fn parse_scalar_with_tokens(
             Ok(Node::Str(unescaped, QuoteType::Double, BlockStyle::None))
         }
         Some(Token::Plain(s)) => {
-            // Block scalar detection: if plain token starts with | or >, collect all indented/plain lines as content
-            if s.starts_with('|') || s.starts_with('>') {
+            // Block scalar detection: treat as block scalar ONLY when the plain token is a valid block header line
+            // i.e., first char '|' or '>' and the remainder contains only spaces, '+', '-', or digits (indent hints).
+            // This avoids misinterpreting plain tokens like ">folded" inside flow collections.
+            let is_block_header = {
+                let mut chars = s.chars();
+                if let Some(ind) = chars.next() {
+                    if ind == '|' || ind == '>' {
+                        let rest = chars.as_str();
+                        rest.chars()
+                            .all(|c| c == ' ' || c == '+' || c == '-' || c.is_ascii_digit())
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            };
+            if is_block_header {
                 let _indicator = s.chars().next().unwrap();
                 let block_header = s.clone();
                 stream.next()?;
                 let mut block_lines: Vec<String> = Vec::new();
-                // Collect all subsequent indented/plain lines as block scalar content
+                let mut trailing_newlines: usize = 0;
+                // Collect subsequent lines: consume indentation tokens, capture plain content lines,
+                // and ignore standalone newline tokens (they serve as separators).
                 loop {
-                    // Accept Indent, Plain, and Newline tokens as part of the block scalar
                     match stream.current() {
                         Some(Token::Indent(_)) => {
                             stream.next()?;
                         }
                         Some(Token::Plain(line)) => {
                             block_lines.push(line.clone());
+                            trailing_newlines = 0; // reset when we see content
                             stream.next()?;
                         }
                         Some(Token::Newline) => {
-                            block_lines.push(String::new());
+                            // Treat as separator; count for trailing chomping semantics
+                            trailing_newlines += 1;
                             stream.next()?;
                         }
                         _ => break,
                     }
                 }
-                // Reconstruct the block scalar string as if it was a single string after the indicator
-                let mut v = block_header;
-                if !block_lines.is_empty() {
-                    v.push('\n');
-                    v.push_str(&block_lines.join("\n"));
-                }
-                // Now use the old block scalar logic to process v
-                let mut chars = v.chars();
-                let indicator = chars.next().unwrap();
-                let mut chomping = None;
-                let mut indent_str = String::new();
-                let mut rest = String::new();
-                while let Some(c) = chars.next() {
-                    match c {
-                        '+' | '-' if chomping.is_none() => chomping = Some(c),
-                        d if d.is_ascii_digit() => {
-                            indent_str.push(d);
-                        }
-                        ' ' => continue,
-                        _ => {
-                            rest.push(c);
-                            rest.push_str(chars.as_str());
-                            break;
-                        }
-                    }
-                }
-                if !indent_str.is_empty() {
-                    if indent_str == "0" {
-                        return Err("Invalid block scalar indentation indicator: 0. Only 1-9 allowed. See YAML spec. Error: indentation indicator must be 1-9".to_string());
-                    }
-                    if indent_str.len() > 1 {
-                        return Err(format!(
-                            "Invalid block scalar indentation indicator: {}. Only single digit 1-9 allowed. Error: indentation indicator must be 1-9, single digit",
-                            indent_str
-                        ));
-                    }
-                }
-                let indent = if indent_str.is_empty() {
-                    None
-                } else {
-                    indent_str.parse::<usize>().ok()
-                };
-                let content = if rest.is_empty() {
-                    v[1..].trim_start()
-                } else {
-                    rest.trim_start()
-                };
-                let lines: Vec<&str> = content.lines().collect();
-                let min_indent = indent.unwrap_or_else(|| {
-                    lines
-                        .iter()
-                        .filter(|l| !l.trim().is_empty())
-                        .map(|l| l.chars().take_while(|c| *c == ' ').count())
-                        .min()
-                        .unwrap_or(0)
-                });
-                let stripped: Vec<&str> = lines
-                    .iter()
-                    .map(|l| {
-                        if l.len() >= min_indent {
-                            &l[min_indent..]
-                        } else {
-                            l.trim_end()
-                        }
-                    })
-                    .collect();
+                // Build result as header + newline + joined lines; no folding here.
+                let indicator = block_header.chars().next().unwrap();
                 let style = if indicator == '|' {
                     BlockStyle::Literal
                 } else {
                     BlockStyle::Folded
                 };
-                let mut result = String::new();
-                if style == BlockStyle::Literal {
-                    result = stripped.join("\n");
-                } else {
-                    let mut prev_blank = false;
-                    for line in &stripped {
-                        if line.trim().is_empty() {
-                            result.push('\n');
-                            prev_blank = true;
-                        } else {
-                            if !result.is_empty() && !prev_blank {
-                                result.push(' ');
-                            }
-                            result.push_str(line);
-                            prev_blank = false;
-                        }
+                let mut full = block_header.trim_end().to_string();
+                if !block_lines.is_empty() {
+                    full.push('\n');
+                    full.push_str(&block_lines.join("\n"));
+                }
+                // Apply simplified chomping: keep '+' preserves trailing newlines, '-' strips (default already stripped)
+                let header_meta = block_header[1..].trim_start();
+                if header_meta.contains('+') && trailing_newlines > 0 {
+                    for _ in 0..trailing_newlines {
+                        full.push('\n');
                     }
                 }
-                let trailing_newlines = content.chars().rev().take_while(|c| *c == '\n').count();
-                match chomping {
-                    Some('+') => {
-                        for _ in 0..trailing_newlines {
-                            result.push('\n');
-                        }
-                    }
-                    Some('-') => {
-                        result = result.trim_end_matches('\n').to_string();
-                    }
-                    _ => {
-                        if trailing_newlines > 0 {
-                            result.push('\n');
-                        }
-                    }
-                }
-                return Ok(Node::Str(result, QuoteType::Unquoted, style));
+                return Ok(Node::Str(full, QuoteType::Unquoted, style));
             }
             // Otherwise, treat as plain scalar
             stream.next()?;
