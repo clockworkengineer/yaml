@@ -203,8 +203,17 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
         let document = parse_document(source, 0, &directives);
         match document {
             Ok(Document(nodes)) => {
-                if nodes.len() > 1 {
-                    // Split each mapping into its own Document node
+                // If parse_document returned multiple top-level nodes, it may indicate
+                // multiple documents without proper loop splitting (e.g., stray markers).
+                // However, sometimes incomplete nodes (e.g., a mapping with None value)
+                // can be emitted transiently for a single logical document (e.g., block scalars).
+                // Only split into multiple documents when ALL nodes are complete top-level values.
+                let all_complete = nodes.iter().all(|n| match n {
+                    Node::Mapping(pairs) => pairs.iter().all(|(_, v)| !matches!(v, Node::None)),
+                    Node::None => false,
+                    _ => true,
+                });
+                if nodes.len() > 1 && all_complete {
                     for node in nodes {
                         doc_count += 1;
                         let single_doc = Document(vec![node.clone()]);
