@@ -55,21 +55,21 @@ fn parse_document_markers(
                     if trimmed.starts_with('|') || trimmed.starts_with('>') {
                         // Accept, let downstream handle block scalar validation
                     } else {
-                        return Err(helpers::parse_error(
-                            source,
+                        return Err(helpers::parse_error_token(
+                            &ts,
                             "YAML 1.2: Document start marker (---) must be on its own line. No mapping keys or values allowed on the same line as ---.",
                         ));
                     }
                 }
                 Some(crate::parser::lexer::Token::Colon) => {
-                    return Err(helpers::parse_error(
-                        source,
+                    return Err(helpers::parse_error_token(
+                        &ts,
                         "YAML 1.2: Document start marker (---) must be on its own line. No mapping keys or values allowed on the same line as ---.",
                     ));
                 }
                 Some(_) => {
-                    return Err(helpers::parse_error(
-                        source,
+                    return Err(helpers::parse_error_token(
+                        &ts,
                         "YAML 1.2: Document start marker (---) must be on its own line. No mapping keys or values allowed on the same line as ---.",
                     ));
                 }

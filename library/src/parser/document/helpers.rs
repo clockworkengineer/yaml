@@ -6,19 +6,33 @@ use crate::nodes::node::Node;
 use crate::nodes::node::Node::Document;
 use crate::parser::document::context::ParsingContext;
 
-/// Creates a formatted error message with current parser context information.
+/// Creates a formatted error message with current token context information (TokenStream-based).
 ///
-/// Generates an error message that includes the current character being parsed
-/// and the current indentation level to help with debugging parsing issues.
+/// Generates an error message that includes the current token and stream position for debugging.
 ///
 /// # Arguments
 ///
-/// * `source` - A mutable reference to a source implementing ISource trait
+/// * `stream` - Reference to the TokenStream
 /// * `msg` - The base error message to include
 ///
 /// # Returns
 ///
-/// A formatted error string with context information
+/// A formatted error string with token context information
+pub(crate) fn parse_error_token(stream: &crate::parser::token_stream::TokenStream, msg: &str) -> String {
+    let current = match stream.current() {
+        Some(tok) => format!("{:?}", tok),
+        None => "<EOF>".to_string(),
+    };
+    let pos = stream.stream_position();
+    format!(
+        "{} (token: {}, pos: {})",
+        msg,
+        current,
+        pos
+    )
+}
+
+/// [DEPRECATED] Char-based error context. Remove when all usages are migrated.
 pub(crate) fn parse_error(source: &mut dyn ISource, msg: &str) -> String {
     let current = match source.current() {
         Some(c) => c.to_string(),

@@ -10,7 +10,10 @@ fn parse_inline_mapping_with_colons_tokens(
     loop {
         iterations += 1;
         if iterations >= MAX_PAIRS {
-            return Err("Flow mapping too large or malformed - possible infinite loop".to_string());
+            return Err(crate::parser::document::helpers::parse_error_token(
+                stream,
+                "Flow mapping too large or malformed - possible infinite loop",
+            ));
         }
 
         // Check for closing brace after whitespace (handles trailing comma case)
@@ -21,7 +24,10 @@ fn parse_inline_mapping_with_colons_tokens(
 
         // If we're at None (EOF) inside a flow mapping, that's an error
         if stream.current().is_none() {
-            return Err("Unexpected EOF in inline mapping".to_string());
+            return Err(crate::parser::document::helpers::parse_error_token(
+                stream,
+                "Unexpected EOF in inline mapping",
+            ));
         }
 
         // Parse key
@@ -33,8 +39,18 @@ fn parse_inline_mapping_with_colons_tokens(
             Some(Token::Colon) => {
                 stream.next()?;
             }
-            Some(tok) => return Err(format!("Expected colon in inline mapping, got: {:?}", tok)),
-            None => return Err("Unexpected EOF in inline mapping (expected colon)".to_string()),
+            Some(_) => {
+                return Err(crate::parser::document::helpers::parse_error_token(
+                    stream,
+                    "Expected colon in inline mapping",
+                ));
+            }
+            None => {
+                return Err(crate::parser::document::helpers::parse_error_token(
+                    stream,
+                    "Unexpected EOF in inline mapping (expected colon)",
+                ));
+            }
         }
 
         // Parse value
