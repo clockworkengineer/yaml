@@ -228,16 +228,23 @@ pub fn parse_document_contents(
     indent_level: usize,
     directives: &DirectiveContext,
 ) -> Result<Node, String> {
+    // Normalize position to the next significant token
+    crate::utils::skip_whitespace_and_comments(source);
+    // (debug removed)
     if let Some(result) = token_dispatch(source, directives) {
         return result;
     }
     match source.current() {
         Some(c) if c == '-' => {
             let seq_indent = source.get_current_indent_level();
-            // Removed is_doc_start check: do not skip top-level sequence after document marker
             let mut stream =
                 crate::parser::token_stream::TokenStream::new(source, directives, false)?;
             match stream.current() {
+                // If this is actually a document start marker (---), do not parse as a sequence.
+                // Leave the marker for the main loop to handle by returning Node::None without consuming.
+                Some(crate::parser::lexer::Token::DocumentStart) => {
+                    return Ok(Node::None);
+                }
                 Some(crate::parser::lexer::Token::Dash) => {
                     if seq_indent < indent_level {
                         return Err(format!(
@@ -377,6 +384,7 @@ pub fn parse_document_contents(
         )?),
         // Handle explicit value indicator (: value) with missing/null key using tokens
         Some(c) if c == ':' => {
+            
             let current_indent = source.get_current_indent_level();
             let mut pairs: Vec<(Node, Node)> = Vec::new();
             loop {
@@ -436,8 +444,31 @@ pub fn parse_document_contents(
         }
         Some(c) if c.is_alphanumeric() => {
             if helpers::peek_ahead_for_mapping_key(source, directives) {
-                Ok(parse_mapping(source, indent_level, directives)?)
+                // Prefer token-based mapping parsing for reliability
+                let base_indent = source.get_current_indent_level();
+                let mut stream =
+                    crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+                Ok(
+                    crate::parser::document::tokens::mapping::parse_mapping_with_tokens(
+                        &mut stream,
+                        base_indent,
+                        directives,
+                        0,
+                    )?,
+                )
             } else {
+                // Fallback: quick token check for Plain followed by Colon on same line
+                let st_map_check = source.save_state();
+                if let Ok(mut ts) = crate::parser::token_stream::TokenStream::new(source, directives, false) {
+                    if matches!(ts.current(), Some(crate::parser::lexer::Token::Plain(_))) {
+                        let _ = ts.next();
+                        if matches!(ts.current(), Some(crate::parser::lexer::Token::Colon)) {
+                            source.restore_state(st_map_check);
+                            return Ok(parse_mapping(source, indent_level, directives)?);
+                        }
+                    }
+                }
+                source.restore_state(st_map_check);
                 // If a plain word is followed by a newline and greater indentation
                 // without a colon, this is likely a missing colon error.
                 let state = source.save_state();
@@ -454,20 +485,24 @@ pub fn parse_document_contents(
                 // After consuming the current plain scalar, check newline + indent
                 // Note: ts has advanced; reflect in source by restoring then consuming characters
                 source.restore_state(state);
-                // Read until end of line
+                // Look ahead to next line without consuming current position
+                let st_line_lookahead = source.save_state();
+                // Read until end of current line
                 crate::utils::skip_until_newline(source);
-                // If newline present, move to next char
+                // Move to start of next line if present
                 if source.current() == Some('\n') {
                     source.next();
                 }
                 let next_indent = source.get_current_indent_level();
                 let st_after_nl = source.save_state();
-                // Skip horizontal spaces
+                // Skip horizontal spaces on the next line to find first significant char
                 while matches!(source.current(), Some(' ')) {
                     source.next();
                 }
                 let next_char = source.current();
+                // Restore to beginning of lookahead so we don't consume input
                 source.restore_state(st_after_nl);
+                source.restore_state(st_line_lookahead);
 
                 if next_indent > indent_level {
                     // If next significant char doesn't start a valid nested construct,
@@ -481,7 +516,7 @@ pub fn parse_document_contents(
                     }
                 }
 
-                // Otherwise, treat as plain scalar
+                // Otherwise, treat as plain scalar at the original position
                 let mut stream =
                     crate::parser::token_stream::TokenStream::new(source, directives, false)?;
                 let s = stream.consume_plain_scalar()?;

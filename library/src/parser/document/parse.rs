@@ -245,6 +245,8 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
                 break;
             }
         }
+        // Ensure we start the document after any trailing blank lines/comments following markers
+        crate::utils::skip_whitespace_and_comments(source);
         let document = parse_document(source, 0, &directives);
         match document {
             Ok(Document(nodes)) => {
