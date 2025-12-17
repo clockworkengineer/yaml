@@ -18,14 +18,11 @@ mod inline;
 mod inline_tokens;
 mod loop_guards;
 mod mapping;
-mod mapping_tokens;
 mod parse;
 mod scalar;
 mod sequence;
-mod sequence_tokens;
 mod tokens;
 mod value;
-mod value_tokens;
 
 
 pub use parse::parse;

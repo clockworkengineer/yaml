@@ -22,7 +22,7 @@ fn token_dispatch(
                 let mut stream =
                     crate::parser::token_stream::TokenStream::new(source, directives, false)
                         .ok()?;
-                let result = crate::parser::document::mapping_tokens::parse_mapping_with_tokens(
+                let result = crate::parser::document::tokens::mapping::parse_mapping_with_tokens(
                     &mut stream,
                     level_val,
                     directives,
@@ -36,7 +36,7 @@ fn token_dispatch(
                 let mut stream =
                     crate::parser::token_stream::TokenStream::new(source, directives, false)
                         .ok()?;
-                let result = crate::parser::document::sequence_tokens::parse_sequence_with_tokens(
+                let result = crate::parser::document::tokens::sequence::parse_sequence_with_tokens(
                     &mut stream,
                     seq_indent,
                     directives,
@@ -245,7 +245,7 @@ pub fn parse_document_contents(
                             indent_level, seq_indent
                         ));
                     }
-                    let seq = crate::parser::document::sequence_tokens::parse_sequence_with_tokens(
+                    let seq = crate::parser::document::tokens::sequence::parse_sequence_with_tokens(
                         &mut stream,
                         seq_indent,
                         directives,

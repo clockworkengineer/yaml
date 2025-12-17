@@ -22,7 +22,7 @@ pub(crate) fn parse_sequence(
     directives: &crate::parser::directives::DirectiveContext,
 ) -> Result<crate::nodes::node::Node, String> {
     let mut stream = TokenStream::new(source, directives, false)?;
-    crate::parser::document::sequence_tokens::parse_sequence_with_tokens(
+    crate::parser::document::tokens::sequence::parse_sequence_with_tokens(
         &mut stream,
         indent_level,
         directives,

@@ -1,7 +1,7 @@
 /// Module: parser/document/mapping.rs
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
-use crate::parser::document::mapping_tokens::parse_mapping_with_tokens;
+use crate::parser::document::tokens::mapping::parse_mapping_with_tokens;
 // ...existing code...
 
 /// Parses a YAML mapping (dictionary) with the specified indentation level.
