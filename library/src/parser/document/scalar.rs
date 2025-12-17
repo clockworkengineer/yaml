@@ -98,9 +98,48 @@ pub(crate) fn parse_scalar_with_tokens(
                 }
                 return Ok(Node::Str(full, QuoteType::Unquoted, style));
             }
-            // Otherwise, treat as plain scalar
+            // Otherwise, treat as plain scalar with possible indented continuation lines
             stream.next()?;
-            match s.as_str() {
+            let mut accumulated = s.clone();
+            // Handle multiline plain scalars: if a newline is followed by an indented plain line,
+            // treat it as a continuation separated by a space. We advance tokens in a
+            // forward-only manner; consuming a newline/indent without a following plain
+            // is acceptable since callers generally skip trivia.
+            loop {
+                match stream.current() {
+                    Some(Token::Newline) => {
+                        // Consume the newline to inspect the next line
+                        stream.next()?;
+                        // If the next token is indentation > 0, consume it
+                        match stream.current() {
+                            Some(Token::Indent(level)) if *level > 0 => {
+                                stream.next()?; // consume indent
+                                // If this plain token is followed by a colon, it's a mapping key,
+                                // not a continuation of the previous scalar. Do not consume it.
+                                if matches!(stream.peek()?, Some(Token::Colon)) {
+                                    break;
+                                }
+                                if let Some(Token::Plain(seg)) = stream.current() {
+                                    // Continuation line
+                                    accumulated.push(' ');
+                                    accumulated.push_str(seg);
+                                    stream.next()?; // consume plain segment
+                                    continue; // attempt to gather further continuation lines
+                                } else {
+                                    // Not a plain segment; stop accumulating
+                                    break;
+                                }
+                            }
+                            _ => {
+                                // No indentation after newline -> not a continuation
+                                break;
+                            }
+                        }
+                    }
+                    _ => break,
+                }
+            }
+            match accumulated.as_str() {
                 "null" | "~" => Ok(Node::None),
                 "true" => Ok(Node::Boolean(true)),
                 "false" => Ok(Node::Boolean(false)),

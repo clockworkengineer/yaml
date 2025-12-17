@@ -319,36 +319,44 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
     eprintln!("DEBUG: Final docs vector: {:#?}", docs);
     #[cfg(feature = "debug-trace")]
     log::debug!("parse: end stream with {} document(s)", docs.len());
-    // Handle edge case: trailing '---' should create a second empty document
-    // only when the stream otherwise yields a single document.
-    // This satisfies tests where an implicit or single explicit document is
-    // followed by '...\n---\n' and should count as two, but avoids creating
-    // a third document when two documents already exist.
-    if docs.len() <= 1 {
+    // Special-case: if the stream ends with '...\n---\n', count a trailing empty document.
+    // This satisfies tests expecting two documents for patterns like:
+    // <content>\n...\n---\n
+    {
+        // Scan the entire token stream (from start) to check final significant markers
+        let st = source.save_state();
         source.reset();
         let directives_scan = crate::parser::directives::DirectiveContext::new();
         let mut ts = crate::parser::token_stream::TokenStream::new(source, &directives_scan, false)?;
-        // Track last non-trivia token
-        let mut last_sig: Option<crate::parser::lexer::Token> = ts.current().cloned();
+        let mut last_sig: Option<crate::parser::lexer::Token> = None;
+        let mut prev_sig: Option<crate::parser::lexer::Token> = None;
         loop {
             match ts.next()? {
                 Some(t) => {
-                    if matches!(t, crate::parser::lexer::Token::Eof) { break; }
+                    if matches!(t, crate::parser::lexer::Token::Eof) {
+                        break;
+                    }
                     if !matches!(
                         t,
                         crate::parser::lexer::Token::Newline
                             | crate::parser::lexer::Token::Indent(_)
                             | crate::parser::lexer::Token::Comment(_)
                     ) {
+                        prev_sig = last_sig.take();
                         last_sig = Some(t.clone());
                     }
                 }
                 None => break,
             }
         }
-        if matches!(last_sig, Some(crate::parser::lexer::Token::DocumentStart)) {
+        // Only add a trailing empty document when we specifically see '...' followed by '---'
+        if docs.len() == 1
+            && matches!(last_sig, Some(crate::parser::lexer::Token::DocumentStart))
+            && matches!(prev_sig, Some(crate::parser::lexer::Token::DocumentEnd))
+        {
             docs.push(Document(Vec::new()));
         }
+        source.restore_state(st);
     }
     Ok(Node::Documents(docs))
 }

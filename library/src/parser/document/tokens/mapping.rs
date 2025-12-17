@@ -92,6 +92,11 @@ pub fn parse_mapping_with_tokens(
             ) {
                 // Structural token without an indent indicates end of this mapping
                 break;
+            } else if after_newline_no_indent {
+                // We saw a newline and no following Indent token; in an indented mapping this
+                // indicates a dedent to parent scope. End this mapping so the caller can parse
+                // the next sibling entry (e.g., top-level key like 'inline_set').
+                break;
             }
         }
 
@@ -135,12 +140,23 @@ pub fn parse_mapping_with_tokens(
                     key, value
                 );
                 // Do not consume Indent tokens here; they signal dedent/end-of-mapping.
-                // Only skip newlines and comments between pairs.
+                // Only skip newlines and comments between pairs. If we are in a nested mapping
+                // (current_indent > 0) and we see a newline not followed by an Indent token,
+                // that indicates a dedent to the parent scope; end this mapping.
+                let mut saw_newline_between_pairs = false;
                 while matches!(
                     stream.current(),
                     Some(Token::Newline) | Some(Token::Comment(_))
                 ) {
+                    if matches!(stream.current(), Some(Token::Newline)) {
+                        saw_newline_between_pairs = true;
+                    }
                     stream.next()?;
+                }
+                if saw_newline_between_pairs && current_indent > 0 {
+                    if !matches!(stream.current(), Some(Token::Indent(_))) {
+                        return Ok(Node::Mapping(pairs));
+                    }
                 }
 
                 // Patch: If the value is a Set with a single empty string, and the next token is an explicit key (?),
