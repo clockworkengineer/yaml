@@ -330,35 +330,13 @@ impl<'a> Lexer<'a> {
                 count += 1;
                 self.source.next();
             } else if ch == CHAR_TAB {
-                // Tabs are forbidden for indentation in YAML.
-                // Allow a leading tab at the very start of a flow context line only if not after a newline.
+                // Tabs are forbidden for indentation in YAML (block context), even on blank lines.
+                // Only allowed in flow context at line start if not after a newline.
                 if in_flow && !self.last_was_linebreak {
-                    // Consume the tab but do not count it towards indentation width
                     self.source.next();
                     continue;
                 }
-                // Leniency: if the remainder of the line contains only horizontal whitespace
-                // and a newline/CR (i.e., a whitespace-only line), allow tabs by consuming
-                // them and not counting towards indentation, rather than erroring.
-                let st = self.source.save_state();
-                // Consume this tab and any subsequent spaces/tabs to inspect the next char
-                self.source.next();
-                while let Some(ch2) = self.source.current() {
-                    if ch2 == CHAR_SPACE || ch2 == CHAR_TAB {
-                        self.source.next();
-                    } else {
-                        break;
-                    }
-                }
-                let next_ch = self.source.current();
-                self.source.restore_state(st);
-                if next_ch.is_none()
-                    || matches!(next_ch, Some(CHAR_NEWLINE) | Some(CHAR_CARRIAGE_RETURN))
-                {
-                    // Whitespace-only line: consume one tab and continue without error
-                    self.source.next();
-                    continue;
-                }
+                // Always error in block context (YAML 1.2 compliant)
                 return Err("Tabs are not allowed as indentation in YAML".to_string());
             } else {
                 break;
