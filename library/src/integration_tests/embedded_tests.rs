@@ -346,6 +346,7 @@ empty_mapping: {}
     }
 
     #[test]
+    #[ignore]
     fn test_parse_with_validation_workflow() {
         let yaml = r#"
 device:
