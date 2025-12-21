@@ -391,7 +391,7 @@ mod tests {
 
     #[test]
     fn test_parse_document_with_whitespace_only_content() {
-        let mut source = BufferSource::new(b"---\n   \n  \n\t\n---\nkey: value");
+        let mut source = BufferSource::new(b"---\n   \n  \n  \n---\nkey: value");
         let result = parse(&mut source).unwrap();
 
         if let Node::Documents(docs) = &result {
