@@ -111,6 +111,17 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
                 }
                 Some(Node::Set(unique_items))
             }
+            // FLATTEN: If already a set, flatten its items
+            Node::Set(items) => {
+                let mut flat = Vec::new();
+                for item in items {
+                    match item {
+                        Node::Set(nested) => flat.extend(nested),
+                        other => flat.push(other),
+                    }
+                }
+                Some(Node::Set(flat))
+            }
             // Single value becomes a set with one element
             _ => Some(Node::Set(vec![node])),
         },
@@ -240,7 +251,8 @@ pub fn parse_value_with_tokens(
         if tag_is_seq {
             if let Some(Token::Indent(level)) = stream.current() {
                 use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
-                let seq = parse_sequence_with_tokens(stream, *level, directives, depth + 1)?;
+                let ctx_seq = crate::parser::document::context::ParsingContext::new(*level).child_block_context(*level, crate::parser::document::context::CollectionType::BlockSequence);
+                let seq = parse_sequence_with_tokens(stream, *level, directives, &ctx_seq, depth + 1)?;
                 let mut result = Node::Tagged(Box::new(seq), "tag:yaml.org,2002:seq".to_string());
                 if let Some(anchor_name) = decorators.anchor {
                     result = Node::Anchored(Box::new(result), anchor_name);
@@ -453,7 +465,8 @@ fn parse_value_content(
         }
         Some(Token::Dash) => {
             use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
-            parse_sequence_with_tokens(stream, 0, directives, depth + 1)
+            let ctx_seq = crate::parser::document::context::ParsingContext::new(0).child_block_context(0, crate::parser::document::context::CollectionType::BlockSequence);
+            parse_sequence_with_tokens(stream, 0, directives, &ctx_seq, depth + 1)
         }
         Some(Token::Indent(level)) => {
             // Indented value: parse nested mapping
@@ -479,7 +492,8 @@ fn parse_value_content(
                     // Decide between sequence or mapping based on next token
                     if matches!(stream.current(), Some(Token::Dash)) {
                         use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
-                        return parse_sequence_with_tokens(stream, lvl, directives, depth + 1);
+                        let ctx_seq = crate::parser::document::context::ParsingContext::new(lvl).child_block_context(lvl, crate::parser::document::context::CollectionType::BlockSequence);
+                        return parse_sequence_with_tokens(stream, lvl, directives, &ctx_seq, depth + 1);
                     } else {
                         use crate::parser::document::tokens::mapping::parse_mapping_with_tokens;
                         return parse_mapping_with_tokens(stream, lvl, directives, depth + 1);

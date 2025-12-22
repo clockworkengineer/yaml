@@ -222,7 +222,8 @@ mod tests {
     fn test_parse_document_contents_empty_line() {
         let directives = DirectiveContext::new();
         let mut src = Buffer::new(b"key: value\n\n");
-        let n = parse_document_contents(&mut src, 0, &directives).unwrap();
+        let ctx = crate::parser::document::context::ParsingContext::new(0);
+        let n = parse_document_contents(&mut src, 0, &directives, &ctx).unwrap();
         assert!(matches!(n, Node::Mapping(_)));
     }
 }

@@ -43,68 +43,29 @@ pub fn parse_mapping_with_tokens(
     // Skip initial whitespace/newlines
     stream.skip_whitespace()?;
 
-    // Track current indentation level relative to caller-provided base
     let mut current_indent: usize = base_indent;
     let mut saw_any_pair: bool = false;
-
     loop {
-        // Skip whitespace/comments before each mapping entry
-        // Track if we just crossed a newline without seeing an Indent yet
-        let mut after_newline_no_indent = false;
-        while matches!(
-            stream.current(),
-            Some(Token::Newline) | Some(Token::Comment(_))
-        ) {
-            if matches!(stream.current(), Some(Token::Newline)) {
-                after_newline_no_indent = true;
-            }
+        while matches!(stream.current(), Some(Token::Newline) | Some(Token::Comment(_))) {
             stream.next()?;
         }
-        // Normalize: if a stray comma remains after an inline flow item, consume it
-        // and optionally a closing flow token, then re-skip trivia.
         if matches!(stream.current(), Some(Token::Comma)) {
             stream.next()?;
-            if matches!(
-                stream.current(),
-                Some(Token::FlowMappingEnd) | Some(Token::FlowSequenceEnd)
-            ) {
+            if matches!(stream.current(), Some(Token::FlowMappingEnd) | Some(Token::FlowSequenceEnd)) {
                 stream.next()?;
             }
             stream.skip_whitespace_and_comments()?;
         }
-        // If we've already parsed at least one pair within this mapping and we're in an indented
-        // block (current_indent > 0), inspect the next indentation. If it dedents, end this mapping.
-        // Do NOT consume the Indent here; let the main match handle it so relative changes are respected.
-        if saw_any_pair && current_indent > 0 {
-            if let Some(Token::Indent(level)) = stream.current() {
-                if *level < current_indent {
-                    break;
-                }
-                // equal/greater indent will be handled below
-            } else if matches!(
-                stream.current(),
-                Some(Token::Eof)
-                    | Some(Token::DocumentStart)
-                    | Some(Token::DocumentEnd)
-                    | Some(Token::Dash)
-                    | Some(Token::FlowMappingEnd)
-                    | Some(Token::FlowSequenceEnd)
-            ) {
-                // Structural token without an indent indicates end of this mapping
-                break;
-            } else if after_newline_no_indent {
-                // We saw a newline and no following Indent token; in an indented mapping this
-                // indicates a dedent to parent scope. End this mapping so the caller can parse
-                // the next sibling entry (e.g., top-level key like 'inline_set').
-                break;
-            }
+        // End mapping if dedent or document marker
+        match stream.current() {
+            Some(Token::Indent(level)) if *level < current_indent => break,
+            Some(Token::DocumentStart) | Some(Token::DocumentEnd) | Some(Token::Eof) | Some(Token::Dash) | Some(Token::FlowMappingEnd) | Some(Token::FlowSequenceEnd) => break,
+            _ => {}
         }
-
         let token = match stream.current() {
             Some(t) => t,
             None => break,
         };
-        // Note: after_newline_no_indent check is no longer necessary due to explicit indent check above
         match token {
             Token::Newline | Token::Comment(_) => {
                 stream.next()?;
@@ -112,95 +73,51 @@ pub fn parse_mapping_with_tokens(
             }
             Token::Indent(level) => {
                 if *level < current_indent {
-                    // Indent decreased: end current mapping
                     break;
                 } else if *level > current_indent {
-                    // Indent increased: skip, let parse_mapping_pair handle nested value
                     stream.next()?;
                     continue;
                 } else {
-                    // Same indent: consume and continue
                     stream.next()?;
                     continue;
                 }
             }
-            Token::Eof
-            | Token::DocumentEnd
-            | Token::DocumentStart
-            | Token::Dash
-            | Token::FlowMappingEnd
-            | Token::FlowSequenceEnd => {
-                break;
-            }
+            Token::Eof | Token::DocumentEnd | Token::DocumentStart | Token::Dash | Token::FlowMappingEnd | Token::FlowSequenceEnd => break,
             _ => {
                 let cur_indent = current_indent;
                 let (key, value) = parse_mapping_pair(stream, directives, cur_indent, depth)?;
-                println!(
-                    "DEBUG: mapping_tokens: parsed pair: key={:?}, value={:?}",
-                    key, value
-                );
-                // Do not consume Indent tokens here; they signal dedent/end-of-mapping.
-                // Only skip newlines and comments between pairs. If we are in a nested mapping
-                // (current_indent > 0) and we see a newline not followed by an Indent token,
-                // that indicates a dedent to the parent scope; end this mapping.
-                let mut saw_newline_between_pairs = false;
-                while matches!(
-                    stream.current(),
-                    Some(Token::Newline) | Some(Token::Comment(_))
-                ) {
-                    if matches!(stream.current(), Some(Token::Newline)) {
-                        saw_newline_between_pairs = true;
-                    }
-                    stream.next()?;
-                }
-                if saw_newline_between_pairs && current_indent > 0 {
-                    if !matches!(stream.current(), Some(Token::Indent(_))) {
-                        return Ok(Node::Mapping(pairs));
-                    }
-                }
-
                 // Patch: If the value is a Set with a single empty string, and the next token is an explicit key (?),
                 // treat the following block as the value for this key (for !!set explicit block format)
                 if let Node::Set(items) = &value {
-                    let is_empty_str = items.len() == 1
-                        && matches!(items[0], Node::Str(ref s, _, _) if s.is_empty());
-                    let is_mapping_set = if let Some(Token::Plain(_)) = stream.current() {
-                        // If the next token is a plain key and we just parsed a Set with an empty string, treat as mapping set
-                        true
-                    } else {
-                        false
-                    };
-                    if (is_empty_str && is_mapping_set)
-                        || (is_empty_str && matches!(stream.current(), Some(Token::QuestionMark)))
-                    {
-                        // Parse the following block as a mapping
-                        let mapping_value =
-                            parse_mapping_with_tokens(stream, cur_indent, directives, depth + 1)?;
-                        println!(
-                            "DEBUG: mapping_tokens: reparsed set block as value: {:?}",
-                            mapping_value
-                        );
-                        // If the original value was a Set (from !!set tag), convert mapping to Set
-                        let set_value = if let Node::Mapping(ref pairs) = mapping_value {
+                    let is_empty_str = items.len() == 1 && matches!(items[0], Node::Str(ref s, _, _) if s.is_empty());
+                    let is_mapping_set = if let Some(Token::Plain(_)) = stream.current() { true } else { false };
+                    if (is_empty_str && is_mapping_set) || (is_empty_str && matches!(stream.current(), Some(Token::QuestionMark))) {
+                        let mapping_value = parse_mapping_with_tokens(stream, cur_indent, directives, depth + 1)?;
+                        if let Node::Mapping(ref pairs) = mapping_value {
                             let mut set_items = Vec::new();
                             for (k, v) in pairs {
                                 if matches!(v, Node::None) {
                                     set_items.push(k.clone());
                                 } else {
-                                    // If any value is not None, keep as tagged mapping (invalid set)
+                                    // Not a valid set, return as mapping
                                     return Ok(Node::Mapping(pairs.clone()));
                                 }
                             }
-                            Node::Set(set_items)
+                            // FLATTEN: If the current value is a Set, merge its items
+                            let mut all_items = Vec::new();
+                            for item in items.iter() {
+                                if !matches!(item, Node::Str(s, _, _) if s.is_empty()) {
+                                    all_items.push(item.clone());
+                                }
+                            }
+                            all_items.extend(set_items);
+                            return Ok(Node::Set(all_items));
                         } else {
-                            mapping_value
-                        };
-                        pairs.push((key, set_value));
-                        // Skip the pairs for the top-level mapping/explicit keys (already consumed)
-                        return Ok(Node::Mapping(pairs));
+                            // Not a mapping, just return as-is
+                            return Ok(mapping_value);
+                        }
                     }
                 }
-
                 pairs.push((key, value));
                 saw_any_pair = true;
             }
@@ -419,7 +336,8 @@ fn parse_mapping_pair(
                     use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
                     #[cfg(feature = "debug-trace")]
                     log::debug!("mapping_pair: parsing sequence as value for key {:?}", key);
-                    let seq = parse_sequence_with_tokens(stream, level, directives, depth + 1)?;
+                    let ctx_seq = crate::parser::document::context::ParsingContext::new(level).child_block_context(level, crate::parser::document::context::CollectionType::BlockSequence);
+                    let seq = parse_sequence_with_tokens(stream, level, directives, &ctx_seq, depth + 1)?;
                     #[cfg(feature = "debug-trace")]
                     log::debug!("mapping_pair: sequence node for key {:?}: {:?}", key, seq);
                     return Ok((key, seq));
@@ -440,7 +358,8 @@ fn parse_mapping_pair(
             stream.next()?; // consume Indent
             if matches!(stream.current(), Some(Token::Dash)) {
                 use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
-                parse_sequence_with_tokens(stream, level, directives, depth + 1)?
+                let ctx_seq = crate::parser::document::context::ParsingContext::new(level).child_block_context(level, crate::parser::document::context::CollectionType::BlockSequence);
+                parse_sequence_with_tokens(stream, level, directives, &ctx_seq, depth + 1)?
             } else {
                 parse_mapping_with_tokens(stream, level, directives, depth + 1)?
             }

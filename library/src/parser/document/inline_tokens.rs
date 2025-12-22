@@ -236,7 +236,21 @@ pub fn parse_inline_mapping_with_tokens(
         "inline_tokens: end flow mapping with {} pair(s)",
         pairs.len()
     );
-    Ok(Node::Mapping(pairs))
+    if is_set {
+        // For !!set, convert mapping pairs with Node::None values to Node::Set
+        let mut set_items = Vec::new();
+        for (key, value) in &pairs {
+            if let Node::None = value {
+                set_items.push(key.clone());
+            } else {
+                // If any value is not None, fallback to mapping for compatibility
+                return Ok(Node::Mapping(pairs));
+            }
+        }
+        Ok(Node::Set(set_items))
+    } else {
+        Ok(Node::Mapping(pairs))
+    }
 }
 
 #[cfg(test)]
