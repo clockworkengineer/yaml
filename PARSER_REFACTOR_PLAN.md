@@ -1,8 +1,8 @@
 # YAML Parser Refactor Plan (for test failures)
 
 ## 1. Explicit Sequence Keys Splitting Documents
-- Refactor sequence parsing logic to avoid splitting documents on dashes when inside explicit key or flow context.
-- Add logic to check parser context before treating a dash as a new document start.
+- Refactor sequence parsing logic to avoid splitting documents on dashes when inside explicit key or flow context. **DONE**
+- Add logic to check parser context before treating a dash as a new document start. **DONE**
 - Add/expand unit tests for explicit sequence key edge cases.
 
 ## 2. Nested Mapping Key Placement
