@@ -4,9 +4,7 @@ use crate::parser::directives::DirectiveContext;
 use crate::parser::document::explicit_key::parse_multiple_explicit_keys;
 use crate::parser::document::context::{ParsingContext, CollectionType};
 use crate::parser::document::helpers;
-use crate::parser::document::inline::{parse_inline_mapping, parse_inline_sequence};
 use crate::parser::document::mapping::parse_mapping;
-use crate::parser::document::sequence::parse_sequence;
 use crate::parser::document::value::parse_value;
 
 /// Fast token-dispatch for block constructs to prefer tokenized paths.
@@ -160,7 +158,7 @@ fn handle_single_explicit_key(
 
     // After colon, parse value possibly on the next indented line
     ts.skip_whitespace_and_comments()?;
-    let mut value_node = {
+    let value_node = {
         match ts.current() {
             Some(crate::parser::lexer::Token::Newline) => {
                 ts.next()?;
@@ -244,7 +242,6 @@ pub fn parse_document_contents(
         if has_multiple_explicit_keys {
             return handle_multiple_explicit_keys(source, current_indent);
         } else {
-            return handle_single_explicit_key(source, directives, ctx);
             return handle_single_explicit_key(source, directives, ctx);
         }
     }
@@ -418,7 +415,7 @@ pub fn parse_document_contents(
                 }
                 source.next();
                 if source.current() == Some('\t') {
-                    let mut stream =
+                    let stream =
                         crate::parser::token_stream::TokenStream::new(source, directives, false)?;
                     return Err(helpers::parse_error_token(
                         &stream,
@@ -480,7 +477,7 @@ pub fn parse_document_contents(
                 source.restore_state(st_map_check);
                 // If a plain word is followed by a newline and greater indentation
                 // without a colon, this is likely a missing colon error.
-                let state = source.save_state();
+                let _state = source.save_state();
                 // Create token stream to align with lexer boundaries (no assignment needed)
                 let seq_indent = source.get_current_indent_level();
                 let mut stream =
@@ -527,7 +524,7 @@ pub fn parse_document_contents(
             Ok(Node::None)
         }
         Some(c) => {
-            let mut stream =
+            let stream =
                 crate::parser::token_stream::TokenStream::new(source, directives, false)?;
             Err(helpers::parse_error_token(
                 &stream,

@@ -43,8 +43,8 @@ pub fn parse_mapping_with_tokens(
     // Skip initial whitespace/newlines
     stream.skip_whitespace()?;
 
-    let mut current_indent: usize = base_indent;
-    let mut saw_any_pair: bool = false;
+    let current_indent: usize = base_indent;
+    // let mut _saw_any_pair: bool = false;
     loop {
         while matches!(
             stream.current(),
@@ -143,7 +143,6 @@ pub fn parse_mapping_with_tokens(
                     }
                 }
                 pairs.push((key, value));
-                saw_any_pair = true;
             }
         }
     }

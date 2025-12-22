@@ -33,6 +33,7 @@ use crate::{Node, Numeric};
 /// # Safety
 ///
 /// Has a maximum iteration limit of 100,000 characters to prevent infinite loops
+#[allow(dead_code)]
 pub fn collect_until<F>(source: &mut dyn ISource, mut stop_pred: F) -> String
 where
     F: FnMut(char) -> bool,
@@ -235,6 +236,7 @@ pub fn consume_inline_comment_and_newline(source: &mut dyn ISource) {
 /// # Returns
 ///
 /// A trimmed String containing the line content without comments
+#[allow(dead_code)]
 pub fn read_line_trimmed_into_string(source: &mut dyn ISource) -> String {
     let s = collect_until(source, |c| c == CHAR_NEWLINE);
 

@@ -1,4 +1,5 @@
 /// Parses an inline YAML mapping with key-value pairs using tokens.
+#[allow(dead_code)]
 fn parse_inline_mapping_with_colons_tokens(
     stream: &mut TokenStream,
     directives: &crate::parser::directives::DirectiveContext,
@@ -138,6 +139,7 @@ pub(crate) fn collect_flow_scalar(
 
 // ...existing code...
 /// Parses an inline YAML set using tokens.
+#[allow(dead_code)]
 pub(crate) fn parse_inline_set(
     stream: &mut TokenStream,
     directives: &crate::parser::directives::DirectiveContext,
@@ -226,6 +228,7 @@ use crate::parser::lexer::Token;
 /// Result containing a Mapping Node or an error string
 use crate::parser::token_stream::TokenStream;
 /// Parses an inline YAML mapping or set using tokens.
+#[allow(dead_code)]
 pub(crate) fn parse_inline_mapping(
     stream: &mut TokenStream,
     directives: &crate::parser::directives::DirectiveContext,
@@ -290,7 +293,7 @@ fn parse_inline_mapping_with_colons(
         // Prevent infinite loop
         iterations += 1;
         if iterations >= MAX_PAIRS {
-            let mut stream = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+            let stream = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
             return Err(crate::parser::document::helpers::parse_error_token(
                 &stream,
                 "Flow mapping too large or malformed - possible infinite loop",
@@ -307,8 +310,11 @@ fn parse_inline_mapping_with_colons(
 
         // If we're at None (EOF) inside a flow mapping, that's an error
         if source.current().is_none() {
-            let mut stream = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-            return Err(crate::parser::document::helpers::parse_error_token(&stream, ERR_EOF_INLINE_MAPPING));
+            let stream = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+            return Err(crate::parser::document::helpers::parse_error_token(
+                &stream,
+                ERR_EOF_INLINE_MAPPING,
+            ));
         }
 
         let key_node = parse_value(source, directives)?;
@@ -332,8 +338,12 @@ fn parse_inline_mapping_with_colons(
                 }
                 // Check for double comma
                 if source.current() == Some(CHAR_COMMA) {
-                    let mut stream = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-                    return Err(crate::parser::document::helpers::parse_error_token(&stream, "Flow mapping has consecutive commas"));
+                    let stream =
+                        crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+                    return Err(crate::parser::document::helpers::parse_error_token(
+                        &stream,
+                        "Flow mapping has consecutive commas",
+                    ));
                 }
                 continue;
             }
@@ -354,7 +364,9 @@ fn parse_inline_mapping_with_colons(
                     {
                         // Check if it's an alphanumeric character which would be clearly invalid
                         if c.is_alphanumeric() {
-                            let mut stream = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+                            let stream = crate::parser::token_stream::TokenStream::new(
+                                source, directives, false,
+                            )?;
                             return Err(crate::parser::document::helpers::parse_error_token(
                                 &stream,
                                 "Invalid character after flow mapping - expected whitespace or newline",
@@ -366,15 +378,20 @@ fn parse_inline_mapping_with_colons(
                 break;
             }
             Some(c) => {
-                let mut stream = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+                let stream =
+                    crate::parser::token_stream::TokenStream::new(source, directives, false)?;
                 return Err(crate::parser::document::helpers::parse_error_token(
                     &stream,
                     &format!("{ERR_UNEXPECTED_CHAR_INLINE_MAPPING_PREFIX}{c}"),
                 ));
             }
             None => {
-                let mut stream = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-                return Err(crate::parser::document::helpers::parse_error_token(&stream, ERR_EOF_INLINE_MAPPING));
+                let stream =
+                    crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+                return Err(crate::parser::document::helpers::parse_error_token(
+                    &stream,
+                    ERR_EOF_INLINE_MAPPING,
+                ));
             }
         }
     }
@@ -398,6 +415,7 @@ fn parse_inline_mapping_with_colons(
 /// Result containing an Array Node or an error string
 
 /// Parses an inline YAML sequence using tokens (token-based refactor).
+#[allow(dead_code)]
 pub(crate) fn parse_inline_sequence(
     stream: &mut TokenStream,
     directives: &crate::parser::directives::DirectiveContext,

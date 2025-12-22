@@ -49,7 +49,7 @@ fn parse_document_main_loop(
     indent_level: usize,
     directives: &DirectiveContext,
 ) -> Result<Vec<Node>, String> {
-    use crate::parser::document::context::{ParsingContext, CollectionType};
+    use crate::parser::document::context::ParsingContext;
     let mut document_nodes = Vec::new();
     let root_ctx = ParsingContext::new(indent_level);
     while let Some(c) = source.current() {

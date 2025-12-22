@@ -1,6 +1,5 @@
 //! Module: parser/document/helpers.rs
 
-use crate::constants::*;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::nodes::node::Node::Document;
@@ -18,20 +17,17 @@ use crate::parser::document::context::ParsingContext;
 /// # Returns
 ///
 /// A formatted error string with token context information
-pub(crate) fn parse_error_token(stream: &crate::parser::token_stream::TokenStream, msg: &str) -> String {
+pub(crate) fn parse_error_token(
+    stream: &crate::parser::token_stream::TokenStream,
+    msg: &str,
+) -> String {
     let current = match stream.current() {
         Some(tok) => format!("{:?}", tok),
         None => "<EOF>".to_string(),
     };
     let pos = stream.stream_position();
-    format!(
-        "{} (token: {}, pos: {})",
-        msg,
-        current,
-        pos
-    )
+    format!("{} (token: {}, pos: {})", msg, current, pos)
 }
-
 
 /// Unified indentation validation using parsing context.
 ///
@@ -266,6 +262,7 @@ pub(crate) fn peek_ahead_for_mapping_key(
 /// The comment text as a String
 /// Consumes a Comment token from the TokenStream and returns its content.
 /// Returns an empty string if the current token is not a Comment.
+#[allow(dead_code)]
 pub(crate) fn parse_comment_token(stream: &mut crate::parser::token_stream::TokenStream) -> String {
     use crate::parser::lexer::Token;
     match stream.current() {
@@ -282,6 +279,7 @@ pub(crate) fn parse_comment_token(stream: &mut crate::parser::token_stream::Toke
 ///
 /// According to the YAML spec, a comment indicator (#) must be preceded by whitespace or be at the start of a line.
 /// This function checks the previous token in the TokenStream context.
+#[allow(dead_code)]
 pub(crate) fn validate_comment_spacing_token(
     stream: &crate::parser::token_stream::TokenStream,
 ) -> Result<(), String> {

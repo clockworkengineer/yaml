@@ -16,6 +16,7 @@ use crate::parser::token_stream::TokenStream;
 use crate::io::traits::ISource;
 
 /// Parses a YAML sequence (array) with the specified indentation level.
+#[allow(dead_code)]
 pub(crate) fn parse_sequence(
     source: &mut dyn ISource,
     indent_level: usize,
