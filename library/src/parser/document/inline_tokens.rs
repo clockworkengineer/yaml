@@ -179,7 +179,10 @@ pub fn parse_inline_mapping_with_tokens(
                 stream.skip_whitespace_and_comments()?;
 
                 // Debug: print current token before colon check
-                println!("DEBUG: Before colon check, current token: {:?}", stream.current());
+                println!(
+                    "DEBUG: Before colon check, current token: {:?}",
+                    stream.current()
+                );
                 // Ensure all comments and newlines are skipped before colon check
                 stream.skip_whitespace_and_comments()?;
                 // Check for double colon (YAML compliance: not allowed)
@@ -191,7 +194,7 @@ pub fn parse_inline_mapping_with_tokens(
                         // Found double colon, which is not allowed in YAML 1.2 flow mappings
                         return Err(syntax_error(
                             stream.source_mut(),
-                            "YAML 1.2 compliance error: Double colon (::) is not allowed as a key-value separator in flow mappings. Use a single colon only."
+                            "YAML 1.2 compliance error: Double colon (::) is not allowed as a key-value separator in flow mappings. Use a single colon only.",
                         ));
                     }
                     // Progress check: record position before parsing value

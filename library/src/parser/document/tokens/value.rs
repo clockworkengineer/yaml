@@ -55,8 +55,22 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
         "!!int" | "!int" | "tag:yaml.org,2002:int" => match node {
             Node::Number(Numeric::Integer(i)) => Some(Node::Number(Numeric::Integer(i))),
             Node::Str(s, _, _) => {
+                // Accept both quoted and unquoted numbers, and also coerce floats that are integers
                 if let Ok(i) = s.parse::<i64>() {
                     Some(Node::Number(Numeric::Integer(i)))
+                } else if let Ok(f) = s.parse::<f64>() {
+                    if f.fract() == 0.0 {
+                        Some(Node::Number(Numeric::Integer(f as i64)))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
+            Node::Number(Numeric::Float(f)) => {
+                if f.fract() == 0.0 {
+                    Some(Node::Number(Numeric::Integer(f as i64)))
                 } else {
                     None
                 }
@@ -78,13 +92,15 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
         "!!bool" | "!bool" | "tag:yaml.org,2002:bool" => match node {
             Node::Boolean(b) => Some(Node::Boolean(b)),
             Node::Str(s, _, _) => {
-                let sl = s.to_ascii_lowercase();
+                let sl = s.trim().to_ascii_lowercase();
                 match sl.as_str() {
                     "true" | "yes" | "on" => Some(Node::Boolean(true)),
                     "false" | "no" | "off" => Some(Node::Boolean(false)),
                     _ => None,
                 }
             }
+            Node::Number(Numeric::Integer(i)) => Some(Node::Boolean(i != 0)),
+            Node::Number(Numeric::Float(f)) => Some(Node::Boolean(f != 0.0)),
             _ => None,
         },
         "!!set" | "!set" | "tag:yaml.org,2002:set" => match node {
@@ -251,8 +267,13 @@ pub fn parse_value_with_tokens(
         if tag_is_seq {
             if let Some(Token::Indent(level)) = stream.current() {
                 use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
-                let ctx_seq = crate::parser::document::context::ParsingContext::new(*level).child_block_context(*level, crate::parser::document::context::CollectionType::BlockSequence);
-                let seq = parse_sequence_with_tokens(stream, *level, directives, &ctx_seq, depth + 1)?;
+                let ctx_seq = crate::parser::document::context::ParsingContext::new(*level)
+                    .child_block_context(
+                        *level,
+                        crate::parser::document::context::CollectionType::BlockSequence,
+                    );
+                let seq =
+                    parse_sequence_with_tokens(stream, *level, directives, &ctx_seq, depth + 1)?;
                 let mut result = Node::Tagged(Box::new(seq), "tag:yaml.org,2002:seq".to_string());
                 if let Some(anchor_name) = decorators.anchor {
                     result = Node::Anchored(Box::new(result), anchor_name);
@@ -465,7 +486,11 @@ fn parse_value_content(
         }
         Some(Token::Dash) => {
             use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
-            let ctx_seq = crate::parser::document::context::ParsingContext::new(0).child_block_context(0, crate::parser::document::context::CollectionType::BlockSequence);
+            let ctx_seq = crate::parser::document::context::ParsingContext::new(0)
+                .child_block_context(
+                    0,
+                    crate::parser::document::context::CollectionType::BlockSequence,
+                );
             parse_sequence_with_tokens(stream, 0, directives, &ctx_seq, depth + 1)
         }
         Some(Token::Indent(level)) => {
@@ -492,8 +517,18 @@ fn parse_value_content(
                     // Decide between sequence or mapping based on next token
                     if matches!(stream.current(), Some(Token::Dash)) {
                         use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
-                        let ctx_seq = crate::parser::document::context::ParsingContext::new(lvl).child_block_context(lvl, crate::parser::document::context::CollectionType::BlockSequence);
-                        return parse_sequence_with_tokens(stream, lvl, directives, &ctx_seq, depth + 1);
+                        let ctx_seq = crate::parser::document::context::ParsingContext::new(lvl)
+                            .child_block_context(
+                                lvl,
+                                crate::parser::document::context::CollectionType::BlockSequence,
+                            );
+                        return parse_sequence_with_tokens(
+                            stream,
+                            lvl,
+                            directives,
+                            &ctx_seq,
+                            depth + 1,
+                        );
                     } else {
                         use crate::parser::document::tokens::mapping::parse_mapping_with_tokens;
                         return parse_mapping_with_tokens(stream, lvl, directives, depth + 1);
