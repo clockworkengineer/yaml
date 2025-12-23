@@ -43,7 +43,8 @@ pub fn parse_sequence_with_tokens(
         base_indent,
         depth
     );
-    let mut items = Vec::new();
+    let mut stack: Vec<(usize, Vec<Node>)> = Vec::new();
+    stack.push((base_indent, Vec::new()));
 
     // Skip initial whitespace/newlines but track where we start
     stream.skip_whitespace()?;
@@ -68,6 +69,7 @@ pub fn parse_sequence_with_tokens(
             stream.skip_whitespace_and_comments()?;
         }
         // End sequence if dedent or document marker, but only if not in explicit key or flow context
+        let current_indent = stack.last().map(|(lvl, _)| *lvl).unwrap_or(base_indent);
         if !ctx.in_flow
             && !matches!(
                 ctx.collection_type,
@@ -76,14 +78,16 @@ pub fn parse_sequence_with_tokens(
         {
             match stream.current() {
                 Some(Token::DocumentStart) | Some(Token::DocumentEnd) => {
+                    let (_, items) = stack.pop().unwrap();
                     if items.is_empty() {
                         return Ok(Node::None);
                     } else {
-                        break;
+                        return Ok(Node::Array(items));
                     }
                 }
-                Some(Token::Indent(level)) if *level < base_indent => {
-                    break;
+                Some(Token::Indent(level)) if *level < current_indent => {
+                    let (_, items) = stack.pop().unwrap();
+                    return Ok(Node::Array(items));
                 }
                 _ => {}
             }
@@ -96,48 +100,52 @@ pub fn parse_sequence_with_tokens(
             stream.skip_whitespace_and_comments()?;
             match stream.current() {
                 Some(Token::Newline) | None => {
-                    items.push(Node::None);
+                    if let Some((_, items)) = stack.last_mut() {
+                        items.push(Node::None);
+                    }
                     if let Some(Token::Newline) = stream.current() {
                         stream.next()?;
                     }
                 }
                 Some(Token::Dash) => {
                     let ctx_seq = ctx.child_block_context(
-                        base_indent,
+                        current_indent,
                         crate::parser::document::context::CollectionType::BlockSequence,
                     );
                     let seq = parse_sequence_with_tokens(
                         stream,
-                        base_indent,
+                        current_indent,
                         directives,
                         &ctx_seq,
                         depth + 1,
                     )?;
-                    items.push(seq);
+                    if let Some((_, items)) = stack.last_mut() {
+                        items.push(seq);
+                    }
                 }
                 Some(Token::Indent(level)) => {
                     let indent = *level;
                     stream.next()?;
-                    if indent > base_indent && matches!(stream.current(), Some(Token::Dash)) {
-                        let ctx_seq = ctx.child_block_context(
-                            indent,
-                            crate::parser::document::context::CollectionType::BlockSequence,
-                        );
-                        let seq = parse_sequence_with_tokens(
-                            stream,
-                            indent,
-                            directives,
-                            &ctx_seq,
-                            depth + 1,
-                        )?;
-                        items.push(seq);
-                    } else if indent >= base_indent {
+                    if indent > current_indent && matches!(stream.current(), Some(Token::Dash)) {
+                        // New nested sequence: push to stack
+                        stack.push((indent, Vec::new()));
+                        continue;
+                    } else if indent >= current_indent {
                         use crate::parser::document::tokens::mapping::parse_mapping_with_tokens;
                         let mapping =
                             parse_mapping_with_tokens(stream, indent, directives, depth + 1)?;
-                        items.push(mapping);
+                        if let Some((_, items)) = stack.last_mut() {
+                            items.push(mapping);
+                        }
                     } else {
-                        break;
+                        // Dedent: close current sequence
+                        let (_, items) = stack.pop().unwrap();
+                        if let Some((_, parent_items)) = stack.last_mut() {
+                            parent_items.push(Node::Array(items));
+                        } else {
+                            return Ok(Node::Array(items));
+                        }
+                        continue;
                     }
                     while matches!(
                         stream.current(),
@@ -148,7 +156,9 @@ pub fn parse_sequence_with_tokens(
                 }
                 Some(Token::FlowSequenceStart) | Some(Token::FlowMappingStart) => {
                     let value = parse_value_with_tokens(stream, directives, depth + 1)?;
-                    items.push(value);
+                    if let Some((_, items)) = stack.last_mut() {
+                        items.push(value);
+                    }
                     loop {
                         stream.skip_whitespace_and_comments()?;
                         match stream.current() {
@@ -177,10 +187,12 @@ pub fn parse_sequence_with_tokens(
                     }
                     if is_colon {
                         use crate::parser::document::tokens::mapping::parse_mapping_with_tokens;
-                        let indent = base_indent;
+                        let indent = current_indent;
                         let mapping =
                             parse_mapping_with_tokens(stream, indent, directives, depth + 1)?;
-                        items.push(mapping);
+                        if let Some((_, items)) = stack.last_mut() {
+                            items.push(mapping);
+                        }
                         stream.skip_whitespace_and_comments()?;
                         if matches!(stream.current(), Some(Token::Comma)) {
                             stream.next()?;
@@ -200,12 +212,16 @@ pub fn parse_sequence_with_tokens(
                         }
                     } else {
                         let value = parse_value_with_tokens(stream, directives, depth + 1)?;
-                        items.push(value);
+                        if let Some((_, items)) = stack.last_mut() {
+                            items.push(value);
+                        }
                     }
                 }
                 _ => {
                     let value = parse_value_with_tokens(stream, directives, depth + 1)?;
-                    items.push(value);
+                    if let Some((_, items)) = stack.last_mut() {
+                        items.push(value);
+                    }
                 }
             }
 
@@ -221,5 +237,8 @@ pub fn parse_sequence_with_tokens(
             break;
         }
     }
+
+    // Should not reach here, but return top-level sequence if stack not empty
+    let (_, items) = stack.pop().unwrap_or((base_indent, Vec::new()));
     Ok(Node::Array(items))
 }

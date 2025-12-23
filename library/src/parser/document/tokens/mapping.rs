@@ -38,13 +38,12 @@ pub fn parse_mapping_with_tokens(
 ) -> Result<Node, String> {
     #[cfg(feature = "debug-trace")]
     log::debug!("mapping_tokens: start parse_mapping_with_tokens");
-    let mut pairs = Vec::new();
+    let mut stack: Vec<(usize, Vec<(Node, Node)>)> = Vec::new();
+    stack.push((base_indent, Vec::new()));
 
     // Skip initial whitespace/newlines
     stream.skip_whitespace()?;
 
-    let current_indent: usize = base_indent;
-    // let mut _saw_any_pair: bool = false;
     loop {
         while matches!(
             stream.current(),
@@ -62,20 +61,40 @@ pub fn parse_mapping_with_tokens(
             }
             stream.skip_whitespace_and_comments()?;
         }
+
         // End mapping if dedent or document marker
+        let current_indent = stack.last().map(|(lvl, _)| *lvl).unwrap_or(base_indent);
         match stream.current() {
-            Some(Token::Indent(level)) if *level < current_indent => break,
+            Some(Token::Indent(level)) if *level < current_indent => {
+                // Dedent: close current mapping and return to parent
+                let (_, closed_pairs) = stack.pop().unwrap();
+                if let Some((_, parent_pairs)) = stack.last_mut() {
+                    parent_pairs.push((Node::None, Node::Mapping(closed_pairs)));
+                    continue;
+                } else {
+                    // Top-level dedent: return mapping
+                    return Ok(Node::Mapping(closed_pairs));
+                }
+            }
             Some(Token::DocumentStart)
             | Some(Token::DocumentEnd)
             | Some(Token::Eof)
             | Some(Token::Dash)
             | Some(Token::FlowMappingEnd)
-            | Some(Token::FlowSequenceEnd) => break,
+            | Some(Token::FlowSequenceEnd) => {
+                // End of mapping
+                let (_, pairs) = stack.pop().unwrap();
+                return Ok(Node::Mapping(pairs));
+            }
             _ => {}
         }
+
         let token = match stream.current() {
             Some(t) => t,
-            None => break,
+            None => {
+                let (_, pairs) = stack.pop().unwrap();
+                return Ok(Node::Mapping(pairs));
+            }
         };
         match token {
             Token::Newline | Token::Comment(_) => {
@@ -83,10 +102,14 @@ pub fn parse_mapping_with_tokens(
                 continue;
             }
             Token::Indent(level) => {
-                if *level < current_indent {
-                    break;
-                } else if *level > current_indent {
+                let current_indent = stack.last().map(|(lvl, _)| *lvl).unwrap_or(base_indent);
+                if *level > current_indent {
+                    // New nested mapping: push to stack
+                    stack.push((*level, Vec::new()));
                     stream.next()?;
+                    continue;
+                } else if *level < current_indent {
+                    // Dedent: handled above
                     continue;
                 } else {
                     stream.next()?;
@@ -98,9 +121,12 @@ pub fn parse_mapping_with_tokens(
             | Token::DocumentStart
             | Token::Dash
             | Token::FlowMappingEnd
-            | Token::FlowSequenceEnd => break,
+            | Token::FlowSequenceEnd => {
+                let (_, pairs) = stack.pop().unwrap();
+                return Ok(Node::Mapping(pairs));
+            }
             _ => {
-                let cur_indent = current_indent;
+                let cur_indent = stack.last().map(|(lvl, _)| *lvl).unwrap_or(base_indent);
                 let (key, value) = parse_mapping_pair(stream, directives, cur_indent, depth)?;
                 // Patch: If the value is a Set with a single empty string, and the next token is an explicit key (?),
                 // treat the following block as the value for this key (for !!set explicit block format)
@@ -142,17 +168,16 @@ pub fn parse_mapping_with_tokens(
                         }
                     }
                 }
-                pairs.push((key, value));
+                if let Some((_, pairs)) = stack.last_mut() {
+                    pairs.push((key, value));
+                }
             }
         }
     }
 
-    #[cfg(feature = "debug-trace")]
-    log::debug!(
-        "mapping_tokens: end parse_mapping_with_tokens with {} pair(s)",
-        pairs.len()
-    );
-    Ok(Node::Mapping(pairs))
+    // Should not reach here, but return top-level mapping if stack not empty
+    // unreachable: loop always returns on end condition
+    unreachable!("parse_mapping_with_tokens: fell through without returning")
 }
 
 /// Parse a single key-value pair
