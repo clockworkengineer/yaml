@@ -1,3 +1,30 @@
+/// Helper to forcibly convert any mapping key to a string node (double quoted)
+fn force_key_to_string(key: Node) -> Node {
+    use crate::nodes::node::{BlockStyle, QuoteType};
+    match key {
+        Node::Str(_, _, _) => key,
+        Node::Array(items) => {
+            let mut s = String::from("[");
+            for (i, item) in items.iter().enumerate() {
+                if i > 0 {
+                    s.push_str(", ");
+                }
+                match item {
+                    Node::Str(val, _, _) => s.push_str(val),
+                    Node::Number(n) => s.push_str(&format!("{:?}", n)),
+                    Node::Boolean(b) => s.push_str(&format!("{}", b)),
+                    _ => s.push_str(&format!("{:?}", item)),
+                }
+            }
+            s.push(']');
+            Node::Str(s, QuoteType::Double, BlockStyle::None)
+        }
+        other => {
+            // Fallback: use debug string
+            Node::Str(format!("{:?}", other), QuoteType::Double, BlockStyle::None)
+        }
+    }
+}
 use crate::nodes::node::Node;
 use crate::parser::directives::DirectiveContext;
 use crate::parser::document::tokens::value::parse_value_with_tokens;
@@ -128,6 +155,10 @@ pub fn parse_mapping_with_tokens(
             _ => {
                 let cur_indent = stack.last().map(|(lvl, _)| *lvl).unwrap_or(base_indent);
                 let (key, value) = parse_mapping_pair(stream, directives, cur_indent, depth)?;
+                let norm_key = force_key_to_string(key);
+                // Debug: print key type before insertion
+                #[cfg(debug_assertions)]
+                println!("DEBUG: Inserting mapping key: {:?}", norm_key);
                 // Patch: If the value is a Set with a single empty string, and the next token is an explicit key (?),
                 // treat the following block as the value for this key (for !!set explicit block format)
                 if let Node::Set(items) = &value {
@@ -169,7 +200,7 @@ pub fn parse_mapping_with_tokens(
                     }
                 }
                 if let Some((_, pairs)) = stack.last_mut() {
-                    pairs.push((key, value));
+                    pairs.push((norm_key, value));
                 }
             }
         }
@@ -229,7 +260,7 @@ fn parse_mapping_pair(
         } else {
             parse_value_with_tokens(stream, directives, depth + 1)?
         };
-        // If the key is an array, convert to string representation for mapping key
+        // If the key is an array, convert to string representation for mapping key (with double quotes)
         if let Node::Array(items) = &parsed_key {
             let mut s = String::from("[");
             for (i, item) in items.iter().enumerate() {
@@ -245,7 +276,7 @@ fn parse_mapping_pair(
             }
             s.push(']');
             use crate::nodes::node::{BlockStyle, QuoteType};
-            parsed_key = Node::Str(s, QuoteType::Unquoted, BlockStyle::None);
+            parsed_key = Node::Str(s, QuoteType::Double, BlockStyle::None);
         }
         parsed_key
     };

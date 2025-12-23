@@ -75,6 +75,7 @@ fn handle_multiple_explicit_keys(
     source: &mut dyn ISource,
     current_indent: usize,
 ) -> Result<Node, String> {
+    // Now collects (key, value) pairs for all explicit keys at this indent
     Ok(parse_multiple_explicit_keys(source, current_indent)?)
 }
 
@@ -230,22 +231,9 @@ pub fn parse_document_contents(
     crate::utils::skip_whitespace_and_comments(source);
     // Handle explicit keys first so token-dispatch doesn't overshadow '?'
     if matches!(source.current(), Some('?')) {
+        // Always collect all consecutive explicit keys at this indent into a single mapping node
         let current_indent = source.get_current_indent_level();
-        let state = source.save_state();
-        source.next();
-        crate::utils::skip_until_newline(source);
-        if source.current() == Some('\n') {
-            source.next();
-        }
-        crate::utils::skip_whitespace_and_comments(source);
-        let has_multiple_explicit_keys =
-            source.get_current_indent_level() == current_indent && source.current() == Some('?');
-        source.restore_state(state);
-        if has_multiple_explicit_keys {
-            return handle_multiple_explicit_keys(source, current_indent);
-        } else {
-            return handle_single_explicit_key(source, directives, ctx);
-        }
+        return handle_multiple_explicit_keys(source, current_indent);
     }
     // (debug removed)
     if let Some(result) = token_dispatch(source, directives, ctx) {

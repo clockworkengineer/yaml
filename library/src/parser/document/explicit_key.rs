@@ -66,32 +66,26 @@ fn should_continue_explicit_key_loop(source: &mut dyn ISource, indent_level: usi
     current_indent == indent_level && source.current() == Some('?')
 }
 
-/// Parses multiple explicit keys for sets or mappings.
+/// Parses multiple explicit keys and their values for mappings.
 ///
-/// Handles the case where we have multiple consecutive lines starting with '?'
-/// which typically represents a set with explicit key syntax.
-///
-/// # Arguments
-///
-/// * `source` - A mutable reference to a source implementing ISource trait
-/// * `indent_level` - The current indentation level for proper nesting
-///
-/// # Returns
-///
-/// Result containing a Mapping Node with null values, suitable for set conversion
+/// Handles the case where we have multiple consecutive lines starting with '?',
+/// each followed by a value, and collects (key, value) pairs into a mapping node.
 pub fn parse_multiple_explicit_keys(
     source: &mut dyn ISource,
     indent_level: usize,
 ) -> Result<Node, String> {
+    use crate::parser::token_stream::TokenStream;
+    use crate::parser::directives::DirectiveContext;
     let mut pairs: Vec<(Node, Node)> = Vec::new();
-    while source.current() == Some('?') {
-        source.next();
-        let key_node = parse_and_normalize_explicit_key(source)?;
-        if let Node::None = key_node {
-            continue;
-        }
-        pairs.push((key_node, Node::None));
-        if !should_continue_explicit_key_loop(source, indent_level) {
+    let directives_local = DirectiveContext::new();
+    let mut stream = TokenStream::new(source, &directives_local, false)?;
+    while matches!(stream.current(), Some(crate::parser::lexer::Token::QuestionMark)) {
+        // Parse explicit mapping entry (? key : value)
+        let (key, value) = crate::parser::document::explicit_key::parse_explicit_mapping_entry(&mut stream, &directives_local)?;
+        pairs.push((key, value));
+        stream.skip_whitespace_and_comments()?;
+        // Only continue if next token is another explicit key at the same indent
+        if !matches!(stream.current(), Some(crate::parser::lexer::Token::QuestionMark)) {
             break;
         }
     }
@@ -122,8 +116,9 @@ pub(crate) fn parse_explicit_mapping_entry(
     stream.next()?;
     stream.skip_whitespace()?;
 
-    // Parse the key (may be empty)
-    let key_node = match stream.current() {
+
+    // Parse the key (may be empty), then normalize to string
+    let mut key_node = match stream.current() {
         Some(Token::Newline) => {
             stream.next()?;
             stream.skip_whitespace()?;
@@ -132,6 +127,39 @@ pub(crate) fn parse_explicit_mapping_entry(
         }
         _ => {
             crate::parser::document::tokens::value::parse_value_with_tokens(stream, directives, 0)?
+        }
+    };
+    // Normalize key_node to Node::Str if not already
+    use crate::nodes::node::BlockStyle;
+    use crate::parser::document::helpers::node_to_inline_string;
+    key_node = match key_node {
+        Node::Array(_) | Node::Mapping(_) => {
+            let inline = node_to_inline_string(&key_node);
+            Node::Str(
+                inline,
+                crate::nodes::node::QuoteType::Double,
+                BlockStyle::None,
+            )
+        }
+        Node::Str(s, _qt, style) => {
+            let key_string = if matches!(style, BlockStyle::Literal) {
+                format!("{}\n", s)
+            } else {
+                s
+            };
+            Node::Str(
+                key_string,
+                crate::nodes::node::QuoteType::Double,
+                BlockStyle::None,
+            )
+        }
+        other => {
+            let inline = node_to_inline_string(&other);
+            Node::Str(
+                inline,
+                crate::nodes::node::QuoteType::Double,
+                BlockStyle::None,
+            )
         }
     };
 
