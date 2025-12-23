@@ -19,6 +19,27 @@ fn force_key_to_string(key: Node) -> Node {
             s.push(']');
             Node::Str(s, QuoteType::Double, BlockStyle::None)
         }
+        Node::Mapping(_) => {
+            // Stringify mapping keys (rare, but for completeness)
+            Node::Str(format!("{:?}", key), QuoteType::Double, BlockStyle::None)
+        }
+        Node::Tagged(inner, tag) => {
+            // If the inner is an empty string, preserve as Tagged(empty string)
+            if matches!(*inner, Node::Str(ref s, _, _) if s.is_empty()) {
+                Node::Tagged(inner, tag)
+            } else {
+                // Otherwise, normalize the inner
+                Node::Tagged(Box::new(force_key_to_string(*inner)), tag)
+            }
+        }
+        Node::Anchored(inner, name) => {
+            // If the inner is an empty string, preserve as Anchored(empty string)
+            if matches!(*inner, Node::Str(ref s, _, _) if s.is_empty()) {
+                Node::Anchored(inner, name)
+            } else {
+                Node::Anchored(Box::new(force_key_to_string(*inner)), name)
+            }
+        }
         other => {
             // Fallback: use debug string
             Node::Str(format!("{:?}", other), QuoteType::Double, BlockStyle::None)
