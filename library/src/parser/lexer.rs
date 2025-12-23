@@ -84,6 +84,7 @@ pub struct Lexer<'a> {
     // Track whether the last processed character was a line break
     // Used to distinguish indentation after newline vs. leading tabs at stream start in flow
     last_was_linebreak: bool,
+    last_indent: usize, // Track last emitted indent
 }
 
 impl<'a> Lexer<'a> {
@@ -96,6 +97,7 @@ impl<'a> Lexer<'a> {
             at_line_start: true,
             in_flow,
             last_was_linebreak: false,
+            last_indent: 0,
         }
     }
 
@@ -137,14 +139,27 @@ impl<'a> Lexer<'a> {
 
         let ch = match self.source.current() {
             Some(c) => c,
-            None => return Ok(Some(Token::Eof)),
+            None => {
+                println!("LEXER TRACE: Emitting Token::Eof");
+                return Ok(Some(Token::Eof));
+            }
         };
 
         // Handle line-start indentation
-        if self.at_line_start && (ch == CHAR_SPACE || ch == CHAR_TAB) {
-            let indent = self.scan_indentation(self.in_flow)?;
-            self.at_line_start = false;
-            return Ok(Some(Token::Indent(indent)));
+        if self.at_line_start {
+            if ch == CHAR_SPACE || ch == CHAR_TAB {
+                let indent = self.scan_indentation(self.in_flow)?;
+                self.at_line_start = false;
+                self.last_indent = indent;
+                println!("LEXER TRACE: Emitting Token::Indent({})", indent);
+                return Ok(Some(Token::Indent(indent)));
+            } else if self.last_indent > 0 {
+                // No leading space/tab, but previous indent was > 0: emit Indent(0) to signal dedent
+                self.at_line_start = false;
+                self.last_indent = 0;
+                println!("LEXER TRACE: Emitting Token::Indent(0) (dedent to top level)");
+                return Ok(Some(Token::Indent(0)));
+            }
         }
 
         self.at_line_start = false;
@@ -152,8 +167,7 @@ impl<'a> Lexer<'a> {
         // Match token types
         match ch {
             CHAR_NEWLINE => {
-                #[cfg(debug_assertions)]
-                println!("DEBUG: Emitting Token::Newline (in_flow={})", self.in_flow);
+                println!("LEXER TRACE: Emitting Token::Newline (in_flow={})", self.in_flow);
                 self.source.next();
                 self.at_line_start = true;
                 self.last_was_linebreak = true;
@@ -164,11 +178,7 @@ impl<'a> Lexer<'a> {
                 Ok(Some(Token::Newline))
             }
             CHAR_CARRIAGE_RETURN => {
-                #[cfg(debug_assertions)]
-                println!(
-                    "DEBUG: Emitting Token::Newline (CR) (in_flow={})",
-                    self.in_flow
-                );
+                println!("LEXER TRACE: Emitting Token::Newline (CR) (in_flow={})", self.in_flow);
                 self.source.next();
                 if self.source.current() == Some(CHAR_NEWLINE) {
                     self.source.next();
@@ -186,15 +196,26 @@ impl<'a> Lexer<'a> {
                 let comment = self.scan_until_newline();
                 Ok(Some(Token::Comment(comment)))
             }
-            '!' => Ok(Some(self.scan_tag()?)),
-            '&' => Ok(Some(self.scan_anchor()?)),
-            CHAR_ASTERISK => Ok(Some(self.scan_alias()?)),
+            '!' => {
+                println!("LEXER TRACE: Emitting Token::Tag");
+                Ok(Some(self.scan_tag()?))
+            },
+            '&' => {
+                println!("LEXER TRACE: Emitting Token::Anchor");
+                Ok(Some(self.scan_anchor()?))
+            },
+            CHAR_ASTERISK => {
+                println!("LEXER TRACE: Emitting Token::Alias");
+                Ok(Some(self.scan_alias()?))
+            },
             CHAR_LBRACE => {
                 self.source.next();
                 self.last_was_linebreak = false;
+                println!("LEXER TRACE: Emitting Token::FlowMappingStart");
                 Ok(Some(Token::FlowMappingStart))
             }
             CHAR_RBRACE => {
+                println!("LEXER TRACE: Emitting Token::FlowMappingEnd");
                 // Check for comment immediately after } with no whitespace
                 self.source.next();
                 if let Some('#') = self.source.current() {

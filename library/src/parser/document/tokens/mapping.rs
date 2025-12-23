@@ -1,3 +1,4 @@
+use crate::nodes::node::{QuoteType, BlockStyle};
 /// Helper to forcibly convert any mapping key to a string node (double quoted)
 fn force_key_to_string(key: Node) -> Node {
     use crate::nodes::node::{BlockStyle, QuoteType};
@@ -93,40 +94,76 @@ pub fn parse_mapping_with_tokens(
     stream.skip_whitespace()?;
 
     loop {
-        while matches!(
-            stream.current(),
-            Some(Token::Newline) | Some(Token::Comment(_))
-        ) {
+        while matches!(stream.current(), Some(Token::Newline) | Some(Token::Comment(_))) {
             stream.next()?;
-        }
-        if matches!(stream.current(), Some(Token::Comma)) {
-            stream.next()?;
-            if matches!(
-                stream.current(),
-                Some(Token::FlowMappingEnd) | Some(Token::FlowSequenceEnd)
-            ) {
-                stream.next()?;
-            }
-            stream.skip_whitespace_and_comments()?;
         }
 
-        // End mapping if dedent or document marker
-        let current_indent = stack.last().map(|(lvl, _)| *lvl).unwrap_or(base_indent);
-        match stream.current() {
-            Some(Token::Indent(level)) if *level < current_indent => {
-                // Dedent: close current mapping and return to parent
+        // Before parsing a new key, check for dedent and unwind stack if needed
+        let mut dedented = false;
+        loop {
+            let current_indent = stack.last().map(|(lvl, _)| *lvl).unwrap_or(base_indent);
+            let token_indent = match stream.current() {
+                Some(Token::Indent(level)) => *level,
+                _ => current_indent,
+            };
+            if token_indent < current_indent && stack.len() > 1 {
+                // Pop stack frames until the current indent matches the token's indent
                 let (_, closed_pairs) = stack.pop().unwrap();
                 if let Some((_, parent_pairs)) = stack.last_mut() {
                     parent_pairs.push((Node::None, Node::Mapping(closed_pairs)));
-                    continue;
-                } else {
-                    // Top-level dedent: return mapping
-                    return Ok(Node::Mapping(closed_pairs));
                 }
+                dedented = true;
+            } else {
+                break;
+            }
+        }
+
+        let current_indent = stack.last().map(|(lvl, _)| *lvl).unwrap_or(base_indent);
+        let token = stream.current().cloned();
+        match token {
+            Some(Token::Indent(level)) if level < current_indent => {
+                println!("DEBUG: Dedent (level: {}, current_indent: {}, stack_len: {}) - closing current mapping", level, current_indent, stack.len());
+                // Pop stack frames until the current indent matches the token's indent
+                while stack.len() > 1 && stack.last().map(|(i, _)| *i).unwrap_or(0) > level {
+                    let (_, closed_pairs) = stack.pop().unwrap();
+                    println!("DEBUG: Dedent pop: stack now {:?}", stack.iter().map(|(i, v)| (*i, v.len())).collect::<Vec<_>>());
+                    if let Some((_, parent_pairs)) = stack.last_mut() {
+                        println!("DEBUG: Inserting dedented mapping into parent. Parent pairs before: {}", parent_pairs.len());
+                        parent_pairs.push((Node::None, Node::Mapping(closed_pairs)));
+                        println!("DEBUG: Parent pairs after: {}", parent_pairs.len());
+                    }
+                }
+                // After dedent, return to parent so the next key is parsed at the correct level
+                let (_, pairs) = stack.last().unwrap();
+                return Ok(Node::Mapping(pairs.clone()));
+            }
+            Some(Token::Eof) => {
+                // At EOF: unwind the stack, closing all open mappings
+                println!("DEBUG: EOF encountered, unwinding stack. stack_len={}", stack.len());
+                while stack.len() > 1 {
+                    let (top_indent, top_pairs) = stack.pop().unwrap();
+                    println!("DEBUG: EOF unwind: closing mapping at indent {} with {} pairs", top_indent, top_pairs.len());
+                    if let Some((_, parent_pairs)) = stack.last_mut() {
+                        let mapping_node = Node::Mapping(top_pairs);
+                        // Insert as value for last key in parent if possible
+                        if let Some((_, last_value)) = parent_pairs.last_mut() {
+                            println!("DEBUG: EOF unwind: inserting mapping_node as last_value in parent");
+                            *last_value = mapping_node;
+                        } else {
+                            // If no key, push as orphan (should not happen in valid YAML)
+                            println!("DEBUG: EOF unwind: pushing orphan mapping_node to parent");
+                            parent_pairs.push((Node::Str("<unwound>".to_string(), QuoteType::Unquoted, BlockStyle::None), mapping_node));
+                        }
+                        println!("DEBUG: Parent pairs after EOF unwind: {}", parent_pairs.len());
+                    }
+                    println!("DEBUG: Stack after EOF unwind pop: {:?}", stack.iter().map(|(i, v)| (*i, v.len())).collect::<Vec<_>>());
+                }
+                let (_, pairs) = stack.pop().unwrap();
+                println!("DEBUG: Final mapping pairs at EOF: {:?}", pairs.iter().map(|(k, v)| (k, v)).collect::<Vec<_>>());
+                return Ok(Node::Mapping(pairs));
             }
             Some(Token::DocumentStart)
             | Some(Token::DocumentEnd)
-            | Some(Token::Eof)
             | Some(Token::Dash)
             | Some(Token::FlowMappingEnd)
             | Some(Token::FlowSequenceEnd) => {
@@ -134,42 +171,101 @@ pub fn parse_mapping_with_tokens(
                 let (_, pairs) = stack.pop().unwrap();
                 return Ok(Node::Mapping(pairs));
             }
-            _ => {}
-        }
-
-        let token = match stream.current() {
-            Some(t) => t,
-            None => {
-                let (_, pairs) = stack.pop().unwrap();
-                return Ok(Node::Mapping(pairs));
-            }
-        };
-        match token {
-            Token::Newline | Token::Comment(_) => {
+            Some(Token::Newline) => {
                 stream.next()?;
                 continue;
             }
-            Token::Indent(level) => {
+            Some(Token::Comment(_)) => {
+                stream.next()?;
+                continue;
+            }
+            Some(Token::Indent(level)) => {
+                println!("TRACE: Token::Indent encountered: level={}, stack_len={}, stack={:?}", level, stack.len(), stack.iter().map(|(i, v)| (*i, v.len())).collect::<Vec<_>>());
                 let current_indent = stack.last().map(|(lvl, _)| *lvl).unwrap_or(base_indent);
-                if *level > current_indent {
+                println!("DEBUG: INDENT token encountered: level={}, current_indent={}, stack_len={}", level, current_indent, stack.len());
+                if level > current_indent {
                     // New nested mapping: push to stack
-                    stack.push((*level, Vec::new()));
+                    println!("DEBUG: Pushing new stack frame for nested mapping at indent {} (current_indent={}, stack_len={})", level, current_indent, stack.len());
+                    stack.push((level, Vec::new()));
+                    println!("DEBUG: Stack after push: {:?}", stack.iter().map(|(i, v)| (*i, v.len())).collect::<Vec<_>>());
                     stream.next()?;
                     continue;
-                } else if *level < current_indent {
-                    // Dedent: handled above
+                } else if level < current_indent {
+                    // Dedent: pop stack and insert completed mapping into parent
+                    println!("DEBUG: Dedent detected: popping stack. level={}, current_indent={}, stack_len={}", level, current_indent, stack.len());
+                    // ...existing code for dedent...
+                    stream.next()?;
                     continue;
                 } else {
                     stream.next()?;
                     continue;
                 }
             }
-            Token::Eof
-            | Token::DocumentEnd
-            | Token::DocumentStart
-            | Token::Dash
-            | Token::FlowMappingEnd
-            | Token::FlowSequenceEnd => {
+            _ => {}
+        }
+        println!("TRACE: At top of loop, token={:?}, stack_len={}, stack={:?}", token, stack.len(), stack.iter().map(|(i, v)| (*i, v.len())).collect::<Vec<_>>());
+        match token {
+            Some(Token::Newline) | Some(Token::Comment(_)) => {
+                stream.next()?;
+                continue;
+            }
+            Some(Token::Indent(level)) => {
+                println!("TRACE: Token::Indent encountered: level={}, stack_len={}, stack={:?}", level, stack.len(), stack.iter().map(|(i, v)| (*i, v.len())).collect::<Vec<_>>());
+                let current_indent = stack.last().map(|(lvl, _)| *lvl).unwrap_or(base_indent);
+                println!("DEBUG: INDENT token encountered: level={}, current_indent={}, stack_len={}", level, current_indent, stack.len());
+                if level > current_indent {
+                    // New nested mapping: push to stack
+                    println!("DEBUG: Pushing new stack frame for nested mapping at indent {} (current_indent={}, stack_len={})", level, current_indent, stack.len());
+                    stack.push((level, Vec::new()));
+                    println!("DEBUG: Stack after push: {:?}", stack.iter().map(|(i, v)| (*i, v.len())).collect::<Vec<_>>());
+                    stream.next()?;
+                    continue;
+                } else if level < current_indent {
+                    // Dedent: pop stack and insert completed mapping into parent
+                    println!("DEBUG: Dedent detected: popping stack. level={}, current_indent={}, stack_len={}", level, current_indent, stack.len());
+                    let mut pop_count = 0;
+                    while let Some((top_indent, top_pairs)) = stack.pop() {
+                        println!("DEBUG: Popped stack frame: indent={}, pairs_len={}", top_indent, top_pairs.len());
+                        pop_count += 1;
+                        if top_indent == level {
+                            println!("DEBUG: Reached matching indent, pushing frame back: indent={}, pairs_len={}", top_indent, top_pairs.len());
+                            stack.push((top_indent, top_pairs));
+                            break;
+                        }
+                        if let Some((parent_indent, parent_pairs)) = stack.last_mut() {
+                            println!("DEBUG: Inserting completed mapping into parent (parent_indent={}, parent_pairs_len={})", parent_indent, parent_pairs.len());
+                            let mapping_node = Node::Mapping(top_pairs);
+                            parent_pairs.push((Node::Str("<nested>".to_string(), QuoteType::Unquoted, BlockStyle::None), mapping_node));
+                            println!("DEBUG: Parent pairs after insert: {}", parent_pairs.len());
+                        } else {
+                            println!("DEBUG: No parent found, pushing frame back as root");
+                            stack.push((top_indent, top_pairs));
+                            break;
+                        }
+                        if let Some((new_top_indent, _)) = stack.last() {
+                            println!("DEBUG: Top of stack after pop: indent={}", new_top_indent);
+                            if *new_top_indent <= level {
+                                break;
+                            }
+                        } else {
+                            println!("DEBUG: Stack is empty after pop");
+                            break;
+                        }
+                    }
+                    println!("DEBUG: Dedent pop loop exited after {} pops. Stack now: {:?}", pop_count, stack.iter().map(|(i, v)| (*i, v.len())).collect::<Vec<_>>());
+                    stream.next()?;
+                    continue;
+                } else {
+                    stream.next()?;
+                    continue;
+                }
+            }
+            Some(Token::Eof)
+            | Some(Token::DocumentEnd)
+            | Some(Token::DocumentStart)
+            | Some(Token::Dash)
+            | Some(Token::FlowMappingEnd)
+            | Some(Token::FlowSequenceEnd) => {
                 let (_, pairs) = stack.pop().unwrap();
                 return Ok(Node::Mapping(pairs));
             }
@@ -221,7 +317,19 @@ pub fn parse_mapping_with_tokens(
                     }
                 }
                 if let Some((_, pairs)) = stack.last_mut() {
-                    pairs.push((norm_key, value));
+                    // Get stack info before mutable borrow
+                    let stack_idx = stack.len().saturating_sub(1);
+                    let (stack_indent, pairs_len) = if let Some((lvl, pairs)) = stack.get(stack_idx) {
+                        (*lvl, pairs.len())
+                    } else {
+                        (base_indent, 0)
+                    };
+                    println!("DEBUG: Inserting pair: key={:?}, value={:?} into stack at indent {} (pairs before: {})", norm_key, value, stack_indent, pairs_len);
+                    if let Some((_, pairs)) = stack.last_mut() {
+                        pairs.push((norm_key, value));
+                        // After push, print only the new pairs length for this stack frame
+                        println!("DEBUG: Stack at indent {} now has {} pairs", stack_indent, pairs.len());
+                    }
                 }
             }
         }
