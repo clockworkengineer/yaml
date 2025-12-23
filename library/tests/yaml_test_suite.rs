@@ -147,8 +147,8 @@ fn run_yaml_test_suite() {
         print!("  Result: ");
         std::io::Write::flush(&mut std::io::stdout()).unwrap();
 
-        // Check for timeout (likely infinite loop if > 20ms per test)
-        if elapsed > Duration::from_millis(20) {
+        // Check for timeout (likely infinite loop if > 200ms per test)
+        if elapsed > Duration::from_millis(200) {
             skipped += 1;
             println!("TIMEOUT (took {:?})", elapsed);
             continue;
