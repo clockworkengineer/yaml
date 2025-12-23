@@ -1,8 +1,8 @@
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::parser::directives::DirectiveContext;
+use crate::parser::document::context::{CollectionType, ParsingContext};
 use crate::parser::document::explicit_key::parse_multiple_explicit_keys;
-use crate::parser::document::context::{ParsingContext, CollectionType};
 use crate::parser::document::helpers;
 use crate::parser::document::mapping::parse_mapping;
 use crate::parser::document::value::parse_value;
@@ -195,7 +195,9 @@ fn handle_single_explicit_key(
             }
             _ => {
                 // Inline or same-line value
-                crate::parser::document::tokens::value::parse_value_with_tokens(&mut ts, directives, 0)?
+                crate::parser::document::tokens::value::parse_value_with_tokens(
+                    &mut ts, directives, 0,
+                )?
             }
         }
     };
@@ -272,14 +274,16 @@ pub fn parse_document_contents(
                             indent_level, seq_indent
                         ));
                     }
-                    let ctx_seq = ctx.child_block_context(seq_indent, CollectionType::BlockSequence);
-                    let seq = crate::parser::document::tokens::sequence::parse_sequence_with_tokens(
-                        &mut stream,
-                        seq_indent,
-                        directives,
-                        &ctx_seq,
-                        0,
-                    )?;
+                    let ctx_seq =
+                        ctx.child_block_context(seq_indent, CollectionType::BlockSequence);
+                    let seq =
+                        crate::parser::document::tokens::sequence::parse_sequence_with_tokens(
+                            &mut stream,
+                            seq_indent,
+                            directives,
+                            &ctx_seq,
+                            0,
+                        )?;
                     if let Node::None = seq {
                         return Ok(Node::None);
                     }
@@ -503,11 +507,21 @@ pub fn parse_document_contents(
         }
         Some(c) if c.is_whitespace() => {
             source.next();
-            Ok(parse_document_contents(source, indent_level, directives, ctx)?)
+            Ok(parse_document_contents(
+                source,
+                indent_level,
+                directives,
+                ctx,
+            )?)
         }
         Some('\0') => {
             source.next();
-            Ok(parse_document_contents(source, indent_level, directives, ctx)?)
+            Ok(parse_document_contents(
+                source,
+                indent_level,
+                directives,
+                ctx,
+            )?)
         }
         Some(c) if matches!(c, '<' | '>' | '"' | '\'' | '|') => {
             if matches!(source.current(), Some('"') | Some('\''))
@@ -524,8 +538,7 @@ pub fn parse_document_contents(
             Ok(Node::None)
         }
         Some(c) => {
-            let stream =
-                crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+            let stream = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
             Err(helpers::parse_error_token(
                 &stream,
                 &format!(
