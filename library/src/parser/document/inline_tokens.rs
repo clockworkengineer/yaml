@@ -216,19 +216,11 @@ pub fn parse_inline_mapping_with_tokens(
 
                     pairs.push((key, value));
                 } else {
-                    if is_set {
-                        // For sets, allow key with no colon (value is None)
-                        #[cfg(feature = "debug-trace")]
-                        log::debug!("inline_tokens: set entry -> ({:?}, None)", key);
-                        pairs.push((key, Node::None));
-                    } else {
-                        // If not a colon, this is invalid in a flow mapping (YAML 1.2)
-                        println!("DEBUG: Expected colon, got: {:?}", stream.current());
-                        return Err(syntax_error(
-                            stream.source_mut(),
-                            "Expected colon after key in flow mapping",
-                        ));
-                    }
+                    // In flow mappings, a key without a colon has an implicit null value
+                    // This is valid in YAML 1.2: {key} is equivalent to {key: null}
+                    #[cfg(feature = "debug-trace")]
+                    log::debug!("inline_tokens: map entry with implicit null -> ({:?}, None)", key);
+                    pairs.push((key, Node::None));
                 }
                 expect_entry = false;
             }

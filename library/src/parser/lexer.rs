@@ -439,9 +439,9 @@ impl<'a> Lexer<'a> {
             format!("!{}", tag_name)
         };
 
-        if tag == "!" || tag == "!!" {
-            return Err("Empty tag".to_string());
-        }
+        // Note: "!" is a valid non-specific tag in YAML 1.2
+        // It means the application should auto-detect the type
+        // Similarly "!!" without a name is also technically valid (though unusual)
 
         Ok(Token::Tag(tag))
     }

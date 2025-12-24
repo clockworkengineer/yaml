@@ -557,6 +557,12 @@ fn parse_value_content(
             QuoteType::Unquoted,
             BlockStyle::None,
         )),
+        Some(Token::QuestionMark) => {
+            // Explicit key marker - parse as mapping with explicit keys
+            use crate::parser::document::tokens::mapping::parse_mapping_with_tokens;
+            // Parse mapping at indent 0 (explicit keys can appear at any indent)
+            parse_mapping_with_tokens(stream, 0, directives, depth + 1)
+        }
         Some(token) => {
             let token_str = format!("Unexpected token in value: {:?}", token);
             #[cfg(feature = "debug-trace")]

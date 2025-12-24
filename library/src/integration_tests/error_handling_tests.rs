@@ -144,11 +144,13 @@ mod tests {
 
     #[test]
     fn test_error_on_invalid_flow_mapping() {
-        let mut source = BufferSource::new(b"---\n{key: value, invalid}");
+        // Actually {key: value, invalid} is valid YAML - invalid has implicit null value
+        // Changed to test truly invalid syntax: missing closing brace
+        let mut source = BufferSource::new(b"---\n{key: value, invalid:");
         let res = parse(&mut source);
         assert!(res.is_err());
         let err = res.unwrap_err();
-        assert!(err.contains("Expected") || err.contains("Unexpected"));
+        assert!(err.contains("Expected") || err.contains("Unexpected") || err.contains("EOF"));
     }
 
     #[test]
