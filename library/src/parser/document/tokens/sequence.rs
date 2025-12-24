@@ -51,6 +51,7 @@ pub fn parse_sequence_with_tokens(
 
     loop {
         // Skip comments and newlines between sequence items
+        // DO NOT skip Indent tokens here - we need them for dedent detection
         while matches!(
             stream.current(),
             Some(Token::Comment(_)) | Some(Token::Newline)
@@ -66,7 +67,10 @@ pub fn parse_sequence_with_tokens(
             ) {
                 stream.next()?;
             }
-            stream.skip_whitespace_and_comments()?;
+            // Don't skip Indent tokens - we need them for dedent detection
+            while matches!(stream.current(), Some(Token::Newline) | Some(Token::Comment(_))) {
+                stream.next()?;
+            }
         }
         // End sequence if dedent or document marker, but only if not in explicit key or flow context
         let current_indent = stack.last().map(|(lvl, _)| *lvl).unwrap_or(base_indent);
@@ -97,7 +101,11 @@ pub fn parse_sequence_with_tokens(
         let is_dash = matches!(stream.current(), Some(Token::Dash));
         if is_dash {
             stream.next()?;
-            stream.skip_whitespace_and_comments()?;
+            // Skip whitespace after dash, but preserve Indent tokens for dedent detection
+            // Only skip newlines and comments here
+            while matches!(stream.current(), Some(Token::Newline) | Some(Token::Comment(_))) {
+                stream.next()?;
+            }
             match stream.current() {
                 Some(Token::Newline) | None => {
                     if let Some((_, items)) = stack.last_mut() {
@@ -108,13 +116,16 @@ pub fn parse_sequence_with_tokens(
                     }
                 }
                 Some(Token::Dash) => {
+                    // Nested sequence starts immediately (- - case)
+                    // Use current_indent + 1 as base to properly detect dedents back to current level
+                    let nested_base = current_indent + 1;
                     let ctx_seq = ctx.child_block_context(
-                        current_indent,
+                        nested_base,
                         crate::parser::document::context::CollectionType::BlockSequence,
                     );
                     let seq = parse_sequence_with_tokens(
                         stream,
-                        current_indent,
+                        nested_base,
                         directives,
                         &ctx_seq,
                         depth + 1,
@@ -160,7 +171,10 @@ pub fn parse_sequence_with_tokens(
                         items.push(value);
                     }
                     loop {
-                        stream.skip_whitespace_and_comments()?;
+                        // Don't skip Indent tokens - needed for dedent detection
+                        while matches!(stream.current(), Some(Token::Newline) | Some(Token::Comment(_))) {
+                            stream.next()?;
+                        }
                         match stream.current() {
                             Some(Token::Comma) => {
                                 stream.next()?;
@@ -178,7 +192,10 @@ pub fn parse_sequence_with_tokens(
                     }
                 }
                 Some(Token::Plain(_)) => {
-                    stream.skip_whitespace_and_comments()?;
+                    // Don't skip indent tokens here - we need them for dedent detection
+                    while matches!(stream.current(), Some(Token::Newline) | Some(Token::Comment(_))) {
+                        stream.next()?;
+                    }
                     let mut is_colon = false;
                     if let Some(Token::Plain(_)) = stream.current() {
                         if let Some(Token::Colon) = stream.peek()? {
@@ -193,7 +210,10 @@ pub fn parse_sequence_with_tokens(
                         if let Some((_, items)) = stack.last_mut() {
                             items.push(mapping);
                         }
-                        stream.skip_whitespace_and_comments()?;
+                        // Don't skip Indent tokens - needed for dedent detection
+                        while matches!(stream.current(), Some(Token::Newline) | Some(Token::Comment(_))) {
+                            stream.next()?;
+                        }
                         if matches!(stream.current(), Some(Token::Comma)) {
                             stream.next()?;
                             if matches!(
@@ -202,7 +222,10 @@ pub fn parse_sequence_with_tokens(
                             ) {
                                 stream.next()?;
                             }
-                            stream.skip_whitespace_and_comments()?;
+                            // Don't skip Indent tokens - needed for dedent detection
+                            while matches!(stream.current(), Some(Token::Newline) | Some(Token::Comment(_))) {
+                                stream.next()?;
+                            }
                         }
                         while matches!(
                             stream.current(),
@@ -226,11 +249,34 @@ pub fn parse_sequence_with_tokens(
             }
 
             // After parsing an item, skip whitespace/comments and check for another dash at the same indent
-            stream.skip_whitespace_and_comments()?;
-            if matches!(stream.current(), Some(Token::Dash)) {
-                continue;
-            } else {
-                break;
+            // Skip newlines and comments, but NOT indents (we need to check indent level)
+            while matches!(stream.current(), Some(Token::Newline) | Some(Token::Comment(_))) {
+                stream.next()?;
+            }
+
+            // Check if there's another dash at the current indent level
+            match stream.current() {
+                Some(Token::Dash) => {
+                    // Dash at same indent, continue parsing
+                    continue;
+                }
+                Some(Token::Indent(level)) if *level < current_indent => {
+                    // Dedent detected, break out to return
+                    break;
+                }
+                Some(Token::Indent(level)) if *level == current_indent => {
+                    // Check if there's a dash after this indent
+                    stream.next()?;
+                    if matches!(stream.current(), Some(Token::Dash)) {
+                        continue;
+                    } else {
+                        break;
+                    }
+                }
+                _ => {
+                    // No more items at this level
+                    break;
+                }
             }
         } else {
             // If not a dash, skip to next token or break if at end
