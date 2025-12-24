@@ -41,39 +41,35 @@ fn parse_document_markers(
                     _ => break,
                 }
             }
-            // Now check for comment or other allowed/forbidden tokens
+            // According to YAML 1.2 spec, scalar content after --- is allowed
+            // However, mapping keys (key: value) on the same line as --- are forbidden
+            // Check if this looks like a mapping by looking for Plain followed by Colon
             match ts.current() {
                 Some(crate::parser::lexer::Token::Newline)
                 | Some(crate::parser::lexer::Token::Eof) => {}
                 Some(crate::parser::lexer::Token::Comment(_)) => {} // allow comment after ---
                 Some(crate::parser::lexer::Token::Tag(_)) => {
-                    ts.next().ok();
+                    // Allow tags - let the content parser handle them
                 }
-                Some(crate::parser::lexer::Token::Plain(s)) => {
-                    // Accept block scalar indicator (| or >) with optional indentation/chomping (e.g., |0, |1, >2, |+)
-                    let trimmed = s.trim();
-                    if trimmed.starts_with('|') || trimmed.starts_with('>') {
-                        // Accept, let downstream handle block scalar validation
-                    } else {
+                Some(crate::parser::lexer::Token::Plain(_)) => {
+                    // Check if next token is Colon (indicating a mapping key)
+                    if let Some(crate::parser::lexer::Token::Colon) = ts.peek().ok().flatten() {
                         return Err(helpers::parse_error_token(
                             &ts,
-                            "Expected document start marker (---) to be on its own line. No mapping keys or values allowed on the same line as ---.",
+                            "Mapping keys are not allowed on the same line as document start marker (---).",
                         ));
                     }
+                    // Otherwise, it's a plain scalar which is allowed
                 }
                 Some(crate::parser::lexer::Token::Colon) => {
                     return Err(helpers::parse_error_token(
                         &ts,
-                        "Expected document start marker (---) to be on its own line. No mapping keys or values allowed on the same line as ---.",
+                        "Mapping keys are not allowed on the same line as document start marker (---).",
                     ));
                 }
-                Some(_) => {
-                    return Err(helpers::parse_error_token(
-                        &ts,
-                        "Expected document start marker (---) to be on its own line. No mapping keys or values allowed on the same line as ---.",
-                    ));
+                _ => {
+                    // Allow other content (quoted strings, anchors, etc.)
                 }
-                None => {}
             }
         }
         source.restore_state(st);
