@@ -6,7 +6,7 @@ use std::env;
 use std::fs::{self, File};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use yaml_lib::{BufferSource, parse};
 
 #[derive(Debug)]

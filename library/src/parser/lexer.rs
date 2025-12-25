@@ -167,7 +167,10 @@ impl<'a> Lexer<'a> {
         // Match token types
         match ch {
             CHAR_NEWLINE => {
-                println!("LEXER TRACE: Emitting Token::Newline (in_flow={})", self.in_flow);
+                println!(
+                    "LEXER TRACE: Emitting Token::Newline (in_flow={})",
+                    self.in_flow
+                );
                 self.source.next();
                 self.at_line_start = true;
                 self.last_was_linebreak = true;
@@ -178,7 +181,10 @@ impl<'a> Lexer<'a> {
                 Ok(Some(Token::Newline))
             }
             CHAR_CARRIAGE_RETURN => {
-                println!("LEXER TRACE: Emitting Token::Newline (CR) (in_flow={})", self.in_flow);
+                println!(
+                    "LEXER TRACE: Emitting Token::Newline (CR) (in_flow={})",
+                    self.in_flow
+                );
                 self.source.next();
                 if self.source.current() == Some(CHAR_NEWLINE) {
                     self.source.next();
@@ -199,15 +205,15 @@ impl<'a> Lexer<'a> {
             '!' => {
                 println!("LEXER TRACE: Emitting Token::Tag");
                 Ok(Some(self.scan_tag()?))
-            },
+            }
             '&' => {
                 println!("LEXER TRACE: Emitting Token::Anchor");
                 Ok(Some(self.scan_anchor()?))
-            },
+            }
             CHAR_ASTERISK => {
                 println!("LEXER TRACE: Emitting Token::Alias");
                 Ok(Some(self.scan_alias()?))
-            },
+            }
             CHAR_LBRACE => {
                 self.source.next();
                 self.last_was_linebreak = false;
