@@ -351,13 +351,14 @@ impl<'a> Lexer<'a> {
                 count += 1;
                 self.source.next();
             } else if ch == CHAR_TAB {
-                // Tabs are forbidden for indentation in YAML (block context), even on blank lines.
-                // Only allowed in flow context at line start if not after a newline.
-                if in_flow && !self.last_was_linebreak {
+                // Tabs are forbidden for indentation in YAML block context
+                // But allowed as whitespace in flow context (inside [], {})
+                if in_flow {
+                    // In flow context, tabs are just whitespace - skip them
                     self.source.next();
                     continue;
                 }
-                // Always error in block context (YAML 1.2 compliant)
+                // Error in block context (YAML 1.2 compliant)
                 return Err("Tabs are not allowed as indentation in YAML".to_string());
             } else {
                 break;

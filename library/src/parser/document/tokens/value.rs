@@ -563,6 +563,11 @@ fn parse_value_content(
             // Parse mapping at indent 0 (explicit keys can appear at any indent)
             parse_mapping_with_tokens(stream, 0, directives, depth + 1)
         }
+        Some(Token::FlowMappingEnd) | Some(Token::FlowSequenceEnd) => {
+            // Flow collection end with no value = implicit null/empty
+            // e.g., {key:} or [item,]
+            Ok(Node::None)
+        }
         Some(token) => {
             let token_str = format!("Unexpected token in value: {:?}", token);
             #[cfg(feature = "debug-trace")]
