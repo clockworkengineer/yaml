@@ -6,10 +6,14 @@ fn test_9mma_directive_without_document() {
     let yaml = b"%YAML 1.2\n";
     let mut source = BufferSource::new(yaml);
     let result = parse(&mut source);
-    if let Err(ref e) = result {
-        println!("Error (correct): {}", e);
+    match result {
+        Err(e) => {
+            println!("Error (expected): {}", e);
+        }
+        Ok(_) => {
+            panic!("Should reject directive without document");
+        }
     }
-    assert!(result.is_err(), "Should reject directive without document");
 }
 
 #[test]
@@ -18,14 +22,17 @@ fn test_b63p_directive_with_only_end_marker() {
     let yaml = b"%YAML 1.2\n...\n";
     let mut source = BufferSource::new(yaml);
     let result = parse(&mut source);
-    if let Err(e) = result {
-        println!("Error (correct): {}", e);
-        assert!(
-            e.contains("Directive must be followed by a document"),
-            "Error message should mention directive requirement"
-        );
-    } else {
-        panic!("Should reject directive with only end marker");
+    match result {
+        Err(e) => {
+            println!("Error (expected): {}", e);
+            assert!(
+                e.contains("Directive must be followed by a document"),
+                "Error message should mention directive requirement"
+            );
+        }
+        Ok(_) => {
+            panic!("Should reject directive with only end marker");
+        }
     }
 }
 
@@ -35,5 +42,12 @@ fn test_valid_directive_with_document() {
     let yaml = b"%YAML 1.2\n---\nkey: value\n";
     let mut source = BufferSource::new(yaml);
     let result = parse(&mut source);
-    assert!(result.is_ok(), "Should parse valid directive with document");
+    match result {
+        Ok(_) => {
+            // Success
+        }
+        Err(e) => {
+            panic!("Should parse valid directive with document, got error: {}", e);
+        }
+    }
 }
