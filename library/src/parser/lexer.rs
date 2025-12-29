@@ -603,12 +603,84 @@ impl<'a> Lexer<'a> {
                 Some('\\') => {
                     self.source.next();
                     match self.source.current() {
-                        Some('n') => content.push('\n'),
-                        Some('t') => content.push('\t'),
-                        Some('r') => content.push('\r'),
-                        Some('\\') => content.push('\\'),
-                        Some('"') => content.push('"'),
-                        Some(c) => content.push(c),
+                        Some('0') => { content.push('\0'); self.source.next(); }
+                        Some('a') => { content.push('\x07'); self.source.next(); }
+                        Some('b') => { content.push('\x08'); self.source.next(); }
+                        Some('t') | Some('\t') => { content.push('\t'); self.source.next(); }
+                        Some('n') => { content.push('\n'); self.source.next(); }
+                        Some('v') => { content.push('\x0B'); self.source.next(); }
+                        Some('f') => { content.push('\x0C'); self.source.next(); }
+                        Some('r') => { content.push('\r'); self.source.next(); }
+                        Some('e') => { content.push('\x1B'); self.source.next(); }
+                        Some(' ') => { content.push(' '); self.source.next(); }
+                        Some('"') => { content.push('"'); self.source.next(); }
+                        Some('/') => { content.push('/'); self.source.next(); }
+                        Some('\\') => { content.push('\\'); self.source.next(); }
+                        Some('N') => { content.push('\u{0085}'); self.source.next(); }
+                        Some('_') => { content.push('\u{00A0}'); self.source.next(); }
+                        Some('L') => { content.push('\u{2028}'); self.source.next(); }
+                        Some('P') => { content.push('\u{2029}'); self.source.next(); }
+                        Some('x') => {
+                            // \xXX - 2 hex digits
+                            self.source.next();
+                            let mut hex = String::new();
+                            for _ in 0..2 {
+                                match self.source.current() {
+                                    Some(c) if c.is_ascii_hexdigit() => {
+                                        hex.push(c);
+                                        self.source.next();
+                                    }
+                                    _ => return Err("YAML compliance error: Invalid \\x escape sequence, expected 2 hex digits".to_string()),
+                                }
+                            }
+                            let code = u8::from_str_radix(&hex, 16).unwrap();
+                            content.push(code as char);
+                        }
+                        Some('u') => {
+                            // \uXXXX - 4 hex digits
+                            self.source.next();
+                            let mut hex = String::new();
+                            for _ in 0..4 {
+                                match self.source.current() {
+                                    Some(c) if c.is_ascii_hexdigit() => {
+                                        hex.push(c);
+                                        self.source.next();
+                                    }
+                                    _ => return Err("YAML compliance error: Invalid \\u escape sequence, expected 4 hex digits".to_string()),
+                                }
+                            }
+                            let code = u32::from_str_radix(&hex, 16).unwrap();
+                            match char::from_u32(code) {
+                                Some(ch) => content.push(ch),
+                                None => return Err(format!("YAML compliance error: Invalid unicode codepoint U+{:04X}", code)),
+                            }
+                        }
+                        Some('U') => {
+                            // \UXXXXXXXX - 8 hex digits
+                            self.source.next();
+                            let mut hex = String::new();
+                            for _ in 0..8 {
+                                match self.source.current() {
+                                    Some(c) if c.is_ascii_hexdigit() => {
+                                        hex.push(c);
+                                        self.source.next();
+                                    }
+                                    _ => return Err("YAML compliance error: Invalid \\U escape sequence, expected 8 hex digits".to_string()),
+                                }
+                            }
+                            let code = u32::from_str_radix(&hex, 16).unwrap();
+                            match char::from_u32(code) {
+                                Some(ch) => content.push(ch),
+                                None => return Err(format!("YAML compliance error: Invalid unicode codepoint U+{:08X}", code)),
+                            }
+                        }
+                        // Invalid escape sequences - reject per YAML 1.2 spec
+                        Some(c) => {
+                            return Err(format!(
+                                "YAML compliance error: Invalid escape sequence '\\{}' in double-quoted string",
+                                c
+                            ));
+                        }
                         None => {
                             #[cfg(debug_assertions)]
                             eprintln!(
@@ -617,7 +689,6 @@ impl<'a> Lexer<'a> {
                             return Err("YAML compliance error: Unterminated double-quoted string (unexpected EOF after escape)".to_string());
                         }
                     }
-                    self.source.next();
                 }
                 Some(CHAR_DOUBLE_QUOTE) => {
                     self.source.next();

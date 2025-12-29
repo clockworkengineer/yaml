@@ -244,6 +244,26 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
         // Ensure we start the document after any trailing blank lines/comments following markers
         crate::utils::skip_whitespace_and_comments(source);
         let document = parse_document(source, 0, &directives);
+
+        // After parsing document, check for invalid trailing content before doc end
+        if document.is_ok() {
+            crate::utils::skip_whitespace_and_comments(source);
+            let st = source.save_state();
+            if let Ok(mut ts) = crate::parser::token_stream::TokenStream::new(source, &directives, false) {
+                ts.skip_whitespace_and_comments().ok();
+                match ts.current() {
+                    Some(crate::parser::lexer::Token::FlowSequenceEnd) => {
+                        return Err(helpers::parse_error_token(&ts, "Unexpected closing bracket ']' - no matching opening bracket"));
+                    }
+                    Some(crate::parser::lexer::Token::FlowMappingEnd) => {
+                        return Err(helpers::parse_error_token(&ts, "Unexpected closing brace '}' - no matching opening brace"));
+                    }
+                    _ => {}
+                }
+            }
+            source.restore_state(st);
+        }
+
         match document {
             Ok(Document(nodes)) => {
                 // If parse_document returned multiple top-level nodes, it may indicate
