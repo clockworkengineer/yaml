@@ -202,15 +202,23 @@ pub fn parse_inline_mapping_with_tokens(
                     println!("DEBUG: before_value position = {}", before_value);
                     // Skip whitespace
                     stream.skip_whitespace_and_comments()?;
-                    let value = parse_value_with_tokens(stream, directives, depth + 1)?;
-                    let after_value = stream.stream_position();
-                    println!("DEBUG: after_value position = {}", after_value);
-                    if before_value == after_value {
-                        return Err(syntax_error(
-                            stream.source_mut(),
-                            "Parser did not advance when parsing value in flow mapping (possible malformed input)",
-                        ));
-                    }
+
+                    // Check for empty value (key: followed by , or })
+                    let value = if matches!(stream.current(), Some(Token::Comma) | Some(Token::FlowMappingEnd)) {
+                        // Empty value - use None (null)
+                        Node::None
+                    } else {
+                        let val = parse_value_with_tokens(stream, directives, depth + 1)?;
+                        let after_value = stream.stream_position();
+                        println!("DEBUG: after_value position = {}", after_value);
+                        if before_value == after_value {
+                            return Err(syntax_error(
+                                stream.source_mut(),
+                                "Parser did not advance when parsing value in flow mapping (possible malformed input)",
+                            ));
+                        }
+                        val
+                    };
                     #[cfg(feature = "debug-trace")]
                     log::debug!("inline_tokens: map entry -> ({:?}, {:?})", key, value);
 
