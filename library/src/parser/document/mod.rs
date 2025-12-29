@@ -13,7 +13,6 @@ mod context;
 mod error_builder;
 mod explicit_key;
 mod helpers;
-mod inline;
 mod inline_tokens;
 mod loop_guards;
 mod main_loop;
@@ -37,7 +36,7 @@ mod tests {
 
     use crate::parser::document::scalar::parse_scalar_with_tokens;
 
-    use crate::parser::document::inline::{parse_inline_mapping, parse_inline_sequence};
+    use crate::parser::document::inline_tokens::{parse_inline_mapping_with_tokens, parse_inline_sequence_with_tokens};
     use crate::parser::document::value::parse_value;
 
     #[test]
@@ -141,7 +140,7 @@ mod tests {
         let mut src = Buffer::new(b"[1, 'two', 3]");
         let mut stream =
             crate::parser::token_stream::TokenStream::new(&mut src, &directives, false).unwrap();
-        let node = parse_inline_sequence(&mut stream, &directives).unwrap();
+        let node = parse_inline_sequence_with_tokens(&mut stream, &directives, 0).unwrap();
         assert!(matches!(node, Node::Array(_)));
         if let Node::Array(items) = node {
             assert_eq!(items.len(), 3);
@@ -162,7 +161,7 @@ mod tests {
         let mut empty = Buffer::new(b"[]");
         let mut stream =
             crate::parser::token_stream::TokenStream::new(&mut empty, &directives, false).unwrap();
-        let node = parse_inline_sequence(&mut stream, &directives).unwrap();
+        let node = parse_inline_sequence_with_tokens(&mut stream, &directives, 0).unwrap();
         assert!(matches!(node, Node::Array(ref v) if v.is_empty()));
     }
 
@@ -172,7 +171,7 @@ mod tests {
         let mut src = Buffer::new(b"{key1: 1, 'key2': \"two\"}");
         let mut stream =
             crate::parser::token_stream::TokenStream::new(&mut src, &directives, false).unwrap();
-        let node = parse_inline_mapping(&mut stream, &directives).unwrap();
+        let node = parse_inline_mapping_with_tokens(&mut stream, &directives, 0, false).unwrap();
         assert!(matches!(node, Node::Mapping(_)));
         if let Node::Mapping(pairs) = node {
             assert_eq!(pairs.len(), 2);
@@ -194,7 +193,7 @@ mod tests {
         let mut empty = Buffer::new(b"{}");
         let mut stream =
             crate::parser::token_stream::TokenStream::new(&mut empty, &directives, false).unwrap();
-        let node = parse_inline_mapping(&mut stream, &directives).unwrap();
+        let node = parse_inline_mapping_with_tokens(&mut stream, &directives, 0, false).unwrap();
         assert!(matches!(node, Node::Mapping(ref v) if v.is_empty()));
     }
 
