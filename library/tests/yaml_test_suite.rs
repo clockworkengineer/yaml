@@ -57,11 +57,11 @@ fn get_all_test_dirs(suite_dir: &Path) -> Vec<PathBuf> {
     test_dirs
 }
 
-/// Run all YAML test suite cases and assert pass rate >= 85%
+// /// Run all YAML test suite cases and assert pass rate >= 85%
 #[test]
 fn run_yaml_test_suite() {
     // Try multiple possible paths for the test suite
-    let possible_paths = vec![Path::new("c:/Projects/yaml/yaml-test-suite")];
+    let possible_paths = vec![Path::new("c:/Projects/yaml/yaml-test-suite"), Path::new("../yaml-test-suite")];
 
     let suite_dir = possible_paths.iter().find(|p| p.exists()).cloned();
     let suite_dir = match suite_dir {
@@ -71,53 +71,34 @@ fn run_yaml_test_suite() {
             for path in &possible_paths {
                 println!("  - {:?}", path);
             }
-            println!(
-                "Please clone https://github.com/yaml/yaml-test-suite.git to one of these locations."
-            );
+            println!("Please clone https://github.com/yaml/yaml-test-suite.git to one of these locations.");
             return;
         }
     };
 
-    // Skip list now empty - infinite loop protection added to parser
     let skip_list: Vec<&str> = vec![];
-
     let mut passed = 0;
     let mut failed = 0;
     let mut skipped = 0;
     let mut failures = Vec::new();
 
-    // Get all test directories
     let mut test_dirs = get_all_test_dirs(suite_dir);
-
     if test_dirs.is_empty() {
         println!("No test directories found. Make sure you're using the data release branch.");
         println!("Run: cd tests/yaml-test-suite && git checkout data-2022-01-17");
         return;
     }
-
-    // Sort for consistent ordering
     test_dirs.sort();
-
     let total_dirs = test_dirs.len();
-
     println!("Running all {} YAML test suite tests...", total_dirs);
-
     let mut test_num = 0;
-
-    // Run all tests
     let test_limit = 402;
-
     for (idx, test_dir) in test_dirs.iter().enumerate() {
         if idx >= test_limit {
-            println!(
-                "\n--- Stopping at {} tests (limit reached) ---\n",
-                test_limit
-            );
+            println!("\n--- Stopping at {} tests (limit reached) ---\n", test_limit);
             break;
         }
-
         let test_dir = test_dir.clone();
-        // Load test case
         let test = match load_test_case(&test_dir) {
             Some(t) => t,
             None => {
@@ -125,36 +106,26 @@ fn run_yaml_test_suite() {
                 continue;
             }
         };
-
-        // Skip if in skip list
         if skip_list.contains(&test.id.as_str()) {
             skipped += 1;
             continue;
         }
-
         test_num += 1;
-        println!("[{}/402] Testing: {}", test_num, test.id);
+        println!("[{}/{}] Testing: {}", test_num, test_limit, test.id);
         std::io::Write::flush(&mut std::io::stdout()).unwrap();
-
-        // Run the test with panic protection
         let start_time = Instant::now();
         let result = panic::catch_unwind(|| {
             let mut source = BufferSource::new(test.yaml.as_bytes());
             parse(&mut source)
         });
         let elapsed = start_time.elapsed();
-
         print!("  Result: ");
         std::io::Write::flush(&mut std::io::stdout()).unwrap();
-
-        // Check for timeout (likely infinite loop if > 200ms per test)
         if elapsed > Duration::from_millis(200) {
             skipped += 1;
             println!("TIMEOUT (took {:?})", elapsed);
             continue;
         }
-
-        // Handle panic
         let parse_result = match result {
             Ok(r) => r,
             Err(_) => {
@@ -163,62 +134,38 @@ fn run_yaml_test_suite() {
                 continue;
             }
         };
-
-        // Determine if test passed
-        // Error tests should fail to parse, non-error tests should succeed
         let test_passed = match (parse_result.is_ok(), test.has_error_file) {
-            (true, false) => true, // Should pass and did pass
-            (false, true) => true, // Should fail and did fail
-            _ => false,            // Mismatch
+            (true, false) => true,
+            (false, true) => true,
+            _ => false,
         };
-
         if test_passed {
             passed += 1;
             println!("PASS");
         } else {
             failed += 1;
-            let expected = if test.has_error_file {
-                "error"
-            } else {
-                "success"
-            };
-            let got = if parse_result.is_ok() {
-                "success"
-            } else {
-                "error"
-            };
+            let expected = if test.has_error_file { "error" } else { "success" };
+            let got = if parse_result.is_ok() { "success" } else { "error" };
             println!("FAIL (expected: {}, got: {})", expected, got);
-            failures.push(format!(
-                "{} (expected: {}, got: {})",
-                test.id, expected, got
-            ));
+            failures.push(format!("{} (expected: {}, got: {})", test.id, expected, got));
         }
     }
-
-    // Print summary
     println!("\n=== YAML Test Suite Results (All Tests) ===");
     println!("Passed:  {}", passed);
     println!("Failed:  {}", failed);
     println!("Skipped: {}", skipped);
     println!("Total:   {}", passed + failed + skipped);
-
     if !failures.is_empty() {
         println!("\n=== Failures ===");
         for (i, failure) in failures.iter().enumerate() {
             println!("{}. {}", i + 1, failure);
         }
     }
-
-    // Calculate pass rate and assert >= 85%
     let total_tests = passed + failed;
     if total_tests > 0 {
         let pass_rate = (passed as f64 / total_tests as f64) * 100.0;
         println!("\nPass Rate: {:.1}%", pass_rate);
-        assert!(
-            pass_rate >= 85.0,
-            "YAML test suite pass rate is below 85%: {:.1}%",
-            pass_rate
-        );
+        assert!(pass_rate >= 85.0, "YAML test suite pass rate is below 85%: {:.1}%", pass_rate);
     }
 }
 

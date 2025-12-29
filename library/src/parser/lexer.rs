@@ -167,7 +167,10 @@ impl<'a> Lexer<'a> {
         // Match token types
         match ch {
             CHAR_NEWLINE => {
-                println!("LEXER TRACE: Emitting Token::Newline (in_flow={})", self.in_flow);
+                println!(
+                    "LEXER TRACE: Emitting Token::Newline (in_flow={})",
+                    self.in_flow
+                );
                 self.source.next();
                 self.at_line_start = true;
                 self.last_was_linebreak = true;
@@ -178,7 +181,10 @@ impl<'a> Lexer<'a> {
                 Ok(Some(Token::Newline))
             }
             CHAR_CARRIAGE_RETURN => {
-                println!("LEXER TRACE: Emitting Token::Newline (CR) (in_flow={})", self.in_flow);
+                println!(
+                    "LEXER TRACE: Emitting Token::Newline (CR) (in_flow={})",
+                    self.in_flow
+                );
                 self.source.next();
                 if self.source.current() == Some(CHAR_NEWLINE) {
                     self.source.next();
@@ -199,15 +205,15 @@ impl<'a> Lexer<'a> {
             '!' => {
                 println!("LEXER TRACE: Emitting Token::Tag");
                 Ok(Some(self.scan_tag()?))
-            },
+            }
             '&' => {
                 println!("LEXER TRACE: Emitting Token::Anchor");
                 Ok(Some(self.scan_anchor()?))
-            },
+            }
             CHAR_ASTERISK => {
                 println!("LEXER TRACE: Emitting Token::Alias");
                 Ok(Some(self.scan_alias()?))
-            },
+            }
             CHAR_LBRACE => {
                 self.source.next();
                 self.last_was_linebreak = false;
@@ -216,10 +222,21 @@ impl<'a> Lexer<'a> {
             }
             CHAR_RBRACE => {
                 println!("LEXER TRACE: Emitting Token::FlowMappingEnd");
-                // Check for comment immediately after } with no whitespace
                 self.source.next();
+                // Allow any horizontal whitespace before comment
+                let mut seen_whitespace = false;
+                while let Some(c) = self.source.current() {
+                    if c == ' ' || c == '\t' {
+                        seen_whitespace = true;
+                        self.source.next();
+                    } else {
+                        break;
+                    }
+                }
                 if let Some('#') = self.source.current() {
-                    return Err("YAML syntax error: comment must be preceded by whitespace after '}' in flow collection".to_string());
+                    if !seen_whitespace {
+                        return Err("YAML syntax error: comment must be preceded by whitespace after '}' in flow collection".to_string());
+                    }
                 }
                 self.last_was_linebreak = false;
                 Ok(Some(Token::FlowMappingEnd))
@@ -230,24 +247,46 @@ impl<'a> Lexer<'a> {
                 Ok(Some(Token::FlowSequenceStart))
             }
             CHAR_RBRACKET => {
-                // Check for comment immediately after ] with no whitespace
                 self.source.next();
+                // Allow any horizontal whitespace before comment
+                let mut seen_whitespace = false;
+                while let Some(c) = self.source.current() {
+                    if c == ' ' || c == '\t' {
+                        seen_whitespace = true;
+                        self.source.next();
+                    } else {
+                        break;
+                    }
+                }
                 if let Some('#') = self.source.current() {
-                    return Err("YAML syntax error: comment must be preceded by whitespace after ']' in flow collection".to_string());
+                    if !seen_whitespace {
+                        return Err("YAML syntax error: comment must be preceded by whitespace after ']' in flow collection".to_string());
+                    }
                 }
                 self.last_was_linebreak = false;
                 Ok(Some(Token::FlowSequenceEnd))
             }
             CHAR_COMMA => {
                 self.source.next();
-                // Check for comment immediately after comma with no whitespace (YAML compliance)
+                // Allow any horizontal whitespace before comment
+                let mut seen_whitespace = false;
+                while let Some(c) = self.source.current() {
+                    if c == ' ' || c == '\t' {
+                        seen_whitespace = true;
+                        self.source.next();
+                    } else {
+                        break;
+                    }
+                }
                 if let Some('#') = self.source.current() {
-                    #[cfg(debug_assertions)]
-                    eprintln!(
-                        "DEBUG: Comment after comma with no whitespace at {:?}",
-                        self.source.current()
-                    );
-                    return Err("YAML syntax error: comment must be preceded by whitespace after ',' in flow collection".to_string());
+                    if !seen_whitespace {
+                        #[cfg(debug_assertions)]
+                        eprintln!(
+                            "DEBUG: Comment after comma with no whitespace at {:?}",
+                            self.source.current()
+                        );
+                        return Err("YAML syntax error: comment must be preceded by whitespace after ',' in flow collection".to_string());
+                    }
                 }
                 self.last_was_linebreak = false;
                 Ok(Some(Token::Comma))

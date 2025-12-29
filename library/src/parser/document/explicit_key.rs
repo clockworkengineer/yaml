@@ -1,7 +1,8 @@
 use crate::io::traits::ISource;
-use crate::nodes::node::{ Node};
+use crate::nodes::node::Node;
 
 /// Parses a single explicit key from the source and normalizes it to a string node.
+#[allow(dead_code)]
 fn parse_and_normalize_explicit_key(source: &mut dyn ISource) -> Result<Node, String> {
     let directives_local = crate::parser::directives::DirectiveContext::new();
     {
@@ -59,12 +60,6 @@ fn parse_and_normalize_explicit_key(source: &mut dyn ISource) -> Result<Node, St
     Ok(key_node)
 }
 
-/// Determines if the loop should continue for explicit keys.
-fn should_continue_explicit_key_loop(source: &mut dyn ISource, indent_level: usize) -> bool {
-    crate::utils::skip_whitespace_and_comments(source);
-    let current_indent = source.get_current_indent_level();
-    current_indent == indent_level && source.current() == Some('?')
-}
 
 /// Parses multiple explicit keys and their values for mappings.
 ///
@@ -72,20 +67,29 @@ fn should_continue_explicit_key_loop(source: &mut dyn ISource, indent_level: usi
 /// each followed by a value, and collects (key, value) pairs into a mapping node.
 pub fn parse_multiple_explicit_keys(
     source: &mut dyn ISource,
-    indent_level: usize,
+    _indent_level: usize,
 ) -> Result<Node, String> {
-    use crate::parser::token_stream::TokenStream;
     use crate::parser::directives::DirectiveContext;
+    use crate::parser::token_stream::TokenStream;
     let mut pairs: Vec<(Node, Node)> = Vec::new();
     let directives_local = DirectiveContext::new();
     let mut stream = TokenStream::new(source, &directives_local, false)?;
-    while matches!(stream.current(), Some(crate::parser::lexer::Token::QuestionMark)) {
+    while matches!(
+        stream.current(),
+        Some(crate::parser::lexer::Token::QuestionMark)
+    ) {
         // Parse explicit mapping entry (? key : value)
-        let (key, value) = crate::parser::document::explicit_key::parse_explicit_mapping_entry(&mut stream, &directives_local)?;
+        let (key, value) = crate::parser::document::explicit_key::parse_explicit_mapping_entry(
+            &mut stream,
+            &directives_local,
+        )?;
         pairs.push((key, value));
         stream.skip_whitespace_and_comments()?;
         // Only continue if next token is another explicit key at the same indent
-        if !matches!(stream.current(), Some(crate::parser::lexer::Token::QuestionMark)) {
+        if !matches!(
+            stream.current(),
+            Some(crate::parser::lexer::Token::QuestionMark)
+        ) {
             break;
         }
     }
@@ -115,7 +119,6 @@ pub(crate) fn parse_explicit_mapping_entry(
     }
     stream.next()?;
     stream.skip_whitespace()?;
-
 
     // Parse the key (may be empty), then normalize to string
     let mut key_node = match stream.current() {

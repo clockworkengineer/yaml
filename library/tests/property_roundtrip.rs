@@ -8,11 +8,12 @@ use yaml_lib::PropertyResult;
 fn test_roundtrip_simple() {
     let node = Node::from("test");
     let result = properties::roundtrip_preserves_structure(&node);
-    if !matches!(result, PropertyResult::Pass | PropertyResult::Skip(_)) {
-        eprintln!("Roundtrip failed: {:?}", result);
+    match result {
+        PropertyResult::Pass | PropertyResult::Skip(_) => {
+            // Success
+        }
+        other => {
+            panic!("Roundtrip property failed: {:?}", other);
+        }
     }
-    assert!(matches!(
-        result,
-        PropertyResult::Pass | PropertyResult::Skip(_)
-    ));
 }
