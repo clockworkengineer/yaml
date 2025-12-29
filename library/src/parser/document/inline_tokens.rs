@@ -185,23 +185,24 @@ pub fn parse_inline_mapping_with_tokens(
                 );
                 // Ensure all comments and newlines are skipped before colon check
                 stream.skip_whitespace_and_comments()?;
-                // Check for double colon (YAML compliance: not allowed)
+                // Expect colon for key-value pair
                 if matches!(stream.current(), Some(Token::Colon)) {
-                    // Peek ahead for another colon (without whitespace/comments)
                     stream.next()?;
-                    stream.skip_whitespace_and_comments()?;
+
+                    // Check for double colon WITHOUT whitespace (invalid)
+                    // If there's a colon immediately (no whitespace consumed), reject it
                     if matches!(stream.current(), Some(Token::Colon)) {
-                        // Found double colon, which is not allowed in YAML 1.2 flow mappings
                         return Err(syntax_error(
                             stream.source_mut(),
                             "YAML 1.2 compliance error: Double colon (::) is not allowed as a key-value separator in flow mappings. Use a single colon only.",
                         ));
                     }
+
+                    stream.skip_whitespace_and_comments()?;
+
                     // Progress check: record position before parsing value
                     let before_value = stream.stream_position();
                     println!("DEBUG: before_value position = {}", before_value);
-                    // Skip whitespace
-                    stream.skip_whitespace_and_comments()?;
 
                     // Check for empty value (key: followed by , or })
                     let value = if matches!(stream.current(), Some(Token::Comma) | Some(Token::FlowMappingEnd)) {

@@ -34,4 +34,10 @@ fn test_specific_failures() {
 
     // Test 55WF - invalid escape (should now fail correctly)
     test_case("55WF", b"---\n\"\\.\"", true);
+
+    // Test C2DT - empty mapping value (should pass now)
+    test_case("C2DT", b"{\n\"adjacent\":value,\n\"readable\": value,\n\"empty\":\n}", false);
+
+    // Test 58MP - colon as value (should pass)
+    test_case("58MP", b"{x: :x}", false);
 }
