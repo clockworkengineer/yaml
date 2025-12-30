@@ -1,7 +1,9 @@
-//! Token-based value parser (proof of concept)
-//!
-//! This demonstrates how the tokenization approach solves the decorator parsing
-//! problem and eliminates infinite loops.
+
+/// Token-based value parser (proof of concept)
+///
+/// This demonstrates how the tokenization approach solves the decorator parsing
+/// problem and eliminates infinite loops.
+use crate::parser::document::node_utils::{make_set_node, make_tagged_node, make_anchored_node};
 
 use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
 use crate::parser::directives::DirectiveContext;
@@ -115,7 +117,7 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
                         _ => return None, // Not a valid set mapping
                     }
                 }
-                Some(Node::Set(set_items))
+                Some(make_set_node(set_items))
             }
             // Convert array to a set (remove duplicates)
             Node::Array(items) => {
@@ -125,7 +127,7 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
                         unique_items.push(item);
                     }
                 }
-                Some(Node::Set(unique_items))
+                Some(make_set_node(unique_items))
             }
             // FLATTEN: If already a set, flatten its items
             Node::Set(items) => {
@@ -136,10 +138,10 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
                         other => flat.push(other),
                     }
                 }
-                Some(Node::Set(flat))
+                Some(make_set_node(flat))
             }
             // Single value becomes a set with one element
-            _ => Some(Node::Set(vec![node])),
+            _ => Some(make_set_node(vec![node])),
         },
         "!!omap" | "!omap" | "tag:yaml.org,2002:omap" => match node {
             // Ordered mapping - preserve as tagged array of single-key mappings
@@ -151,10 +153,7 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
                         _ => return None, // Invalid omap format
                     }
                 }
-                Some(Node::Tagged(
-                    Box::new(Node::Array(items)),
-                    "tag:yaml.org,2002:omap".to_string(),
-                ))
+                Some(make_tagged_node(Node::Array(items), "tag:yaml.org,2002:omap".to_string()))
             }
             _ => None,
         },
@@ -213,7 +212,10 @@ pub fn parse_value_with_tokens(
     depth: usize,
 ) -> Result<Node, String> {
     if depth > MAX_NESTING_DEPTH {
-        return Err("Nesting too deep: possible malicious or malformed YAML".to_string());
+        return Err(structure_error(
+            stream.source_mut(),
+            "Nesting too deep: possible malicious or malformed YAML"
+        ));
     }
     println!(
         "DEBUG: ENTER parse_value_with_tokens (depth {}), current token: {:?}",
@@ -274,9 +276,9 @@ pub fn parse_value_with_tokens(
                     );
                 let seq =
                     parse_sequence_with_tokens(stream, *level, directives, &ctx_seq, depth + 1)?;
-                let mut result = Node::Tagged(Box::new(seq), "tag:yaml.org,2002:seq".to_string());
+                let mut result = make_tagged_node(seq, "tag:yaml.org,2002:seq".to_string());
                 if let Some(anchor_name) = decorators.anchor {
-                    result = Node::Anchored(Box::new(result), anchor_name);
+                    result = make_anchored_node(result, anchor_name);
                 }
                 return Ok(result);
             }

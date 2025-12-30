@@ -1,4 +1,5 @@
-//! Module: parser/document/anchors.rs
+use crate::parser::document::node_utils::make_array_node;
+// Module: parser/document/anchors.rs
 
 use crate::nodes::node::Node;
 use std::collections::HashMap;

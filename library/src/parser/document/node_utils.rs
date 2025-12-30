@@ -1,3 +1,17 @@
+/// Construct a set node from items.
+pub fn make_set_node(items: Vec<Node>) -> Node {
+    Node::Set(items)
+}
+
+/// Construct a tagged node from an inner node and tag string.
+pub fn make_tagged_node(inner: Node, tag: String) -> Node {
+    Node::Tagged(Box::new(inner), tag)
+}
+
+/// Construct an anchored node from an inner node and anchor name.
+pub fn make_anchored_node(inner: Node, name: String) -> Node {
+    Node::Anchored(Box::new(inner), name)
+}
 /// Construct a mapping node from key-value pairs.
 pub fn make_mapping_node(pairs: Vec<(Node, Node)>) -> Node {
     Node::Mapping(pairs)

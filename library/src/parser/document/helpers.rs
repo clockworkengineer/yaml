@@ -266,7 +266,10 @@ pub(crate) fn validate_comment_spacing_token(
         // match stream.previous() {
         //     None => Ok(()), // Start of stream
         //     Some(Token::Indent(_)) | Some(Token::Newline) => Ok(()),
-        //     _ => Err("Comment indicator (#) must be preceded by whitespace or newline".to_string()),
+        //     _ => Err(structure_error(
+        //         stream.source_mut(),
+        //         "Comment indicator (#) must be preceded by whitespace or newline"
+        //     )),
         // }
         // Since TokenStream may not have previous(), this is a placeholder for integration at the call site.
         // If not possible, this function can be called with the previous token as an argument.

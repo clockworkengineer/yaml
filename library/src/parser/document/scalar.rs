@@ -1,3 +1,4 @@
+use crate::parser::document::error_builder::syntax_error;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
 // Recursion guard removed
@@ -44,13 +45,13 @@ pub(crate) fn parse_scalar_with_tokens(
                 let _indicator = s.chars().next().unwrap();
                 // Validate indentation indicator range if present: must be a single digit 1-9
                 let header_meta = s[1..].trim();
-                let digits: String = header_meta
-                    .chars()
-                    .filter(|c| c.is_ascii_digit())
-                    .collect();
+                let digits: String = header_meta.chars().filter(|c| c.is_ascii_digit()).collect();
                 if !digits.is_empty() {
                     if digits.len() != 1 || digits.chars().next().unwrap() == '0' {
-                        return Err("Invalid block scalar indentation indicator: must be a single digit from 1-9".to_string());
+                        return Err(syntax_error(
+                            stream.source_mut(),
+                            "Invalid block scalar indentation indicator: must be a single digit from 1-9"
+                        ));
                     }
                 }
                 let block_header = s.clone();
@@ -143,15 +144,25 @@ pub(crate) fn parse_scalar_with_tokens(
                 "null" | "~" => Ok(Node::None),
                 "true" => Ok(Node::Boolean(true)),
                 "false" => Ok(Node::Boolean(false)),
-                v if directives.is_yaml_11() && matches!(v, "yes"|"Yes"|"YES"|"on"|"On"|"ON") => Ok(Node::Boolean(true)),
-                v if directives.is_yaml_11() && matches!(v, "no"|"No"|"NO"|"off"|"Off"|"OFF") => Ok(Node::Boolean(false)),
+                v if directives.is_yaml_11()
+                    && matches!(v, "yes" | "Yes" | "YES" | "on" | "On" | "ON") =>
+                {
+                    Ok(Node::Boolean(true))
+                }
+                v if directives.is_yaml_11()
+                    && matches!(v, "no" | "No" | "NO" | "off" | "Off" | "OFF") =>
+                {
+                    Ok(Node::Boolean(false))
+                }
                 v => {
                     if v.starts_with('0') && v.len() > 1 {
                         if v.starts_with("0o") || v.starts_with("0O") {
                             if let Ok(i) = i64::from_str_radix(&v[2..], 8) {
                                 return Ok(Node::Number(Numeric::Integer(i)));
                             }
-                        } else if directives.is_yaml_11() && v.chars().skip(1).all(|c| c >= '0' && c <= '7') {
+                        } else if directives.is_yaml_11()
+                            && v.chars().skip(1).all(|c| c >= '0' && c <= '7')
+                        {
                             if let Ok(i) = i64::from_str_radix(&v[1..], 8) {
                                 return Ok(Node::Number(Numeric::Integer(i)));
                             }
@@ -162,13 +173,18 @@ pub(crate) fn parse_scalar_with_tokens(
                     } else if let Ok(f) = v.parse::<f64>() {
                         Ok(Node::Number(Numeric::Float(f)))
                     } else {
-                        Ok(Node::Str(v.to_string(), QuoteType::Unquoted, BlockStyle::None))
+                        Ok(Node::Str(
+                            v.to_string(),
+                            QuoteType::Unquoted,
+                            BlockStyle::None,
+                        ))
                     }
                 }
             }
         }
         _ => Err(format!(
-            "Expected a scalar token, got {:?}", stream.current()
+            "Expected a scalar token, got {:?}",
+            stream.current()
         )),
     }
 }

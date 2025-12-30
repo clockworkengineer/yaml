@@ -1,7 +1,9 @@
-//! Token-based flow collection parsers
-//!
-//! Handles inline YAML collections using tokens instead of character parsing.
-//! This approach provides clearer boundaries and better error handling.
+
+/// Token-based flow collection parsers
+///
+/// Handles inline YAML collections using tokens instead of character parsing.
+/// This approach provides clearer boundaries and better error handling.
+use crate::parser::document::node_utils::make_set_node;
 
 use crate::nodes::node::Node;
 use crate::parser::directives::DirectiveContext;
@@ -122,10 +124,10 @@ pub fn parse_inline_mapping_with_tokens(
             println!(
                 "DEBUG: Exceeded 1000 iterations in parse_inline_mapping_with_tokens, possible infinite loop"
             );
-            return Err(
+            return Err(syntax_error(
+                stream.source_mut(),
                 "Exceeded 1000 iterations in flow mapping parser (possible infinite loop)"
-                    .to_string(),
-            );
+            ));
         }
         // Skip whitespace/comments
         stream.skip_whitespace_and_comments()?;
@@ -251,7 +253,7 @@ pub fn parse_inline_mapping_with_tokens(
                 return Ok(Node::Mapping(pairs));
             }
         }
-        Ok(Node::Set(set_items))
+        Ok(make_set_node(set_items))
     } else {
         Ok(Node::Mapping(pairs))
     }

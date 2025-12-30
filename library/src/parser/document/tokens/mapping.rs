@@ -1,7 +1,8 @@
-use crate::parser::document::node_utils::force_key_to_string;
-use crate::nodes::node::{BlockStyle, QuoteType};
+use crate::parser::document::error_builder::syntax_error;
 use crate::nodes::node::Node;
+use crate::nodes::node::{BlockStyle, QuoteType};
 use crate::parser::directives::DirectiveContext;
+use crate::parser::document::node_utils::force_key_to_string;
 use crate::parser::document::tokens::value::parse_value_with_tokens;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
@@ -129,7 +130,11 @@ pub fn parse_mapping_with_tokens(
                             // If no key, push as orphan (should not happen in valid YAML)
                             println!("DEBUG: EOF unwind: pushing orphan mapping_node to parent");
                             parent_pairs.push((
-                                force_key_to_string(Node::Str("<unwound>".to_string(), QuoteType::Unquoted, BlockStyle::None)),
+                                force_key_to_string(Node::Str(
+                                    "<unwound>".to_string(),
+                                    QuoteType::Unquoted,
+                                    BlockStyle::None,
+                                )),
                                 mapping_node,
                             ));
                         }
@@ -176,9 +181,9 @@ pub fn parse_mapping_with_tokens(
                         }
                         Some('\n') | Some('\r') | None => break,
                         Some(c) => {
-                            return Err(format!(
-                                "Invalid content '{}' after document end marker (...)",
-                                c
+                            return Err(syntax_error(
+                                stream.source_mut(),
+                                &format!("Invalid content '{}' after document end marker (...)", c)
                             ));
                         }
                     }
@@ -314,7 +319,11 @@ pub fn parse_mapping_with_tokens(
                             );
                             let mapping_node = Node::Mapping(top_pairs);
                             parent_pairs.push((
-                                force_key_to_string(Node::Str("<nested>".to_string(), QuoteType::Unquoted, BlockStyle::None)),
+                                force_key_to_string(Node::Str(
+                                    "<nested>".to_string(),
+                                    QuoteType::Unquoted,
+                                    BlockStyle::None,
+                                )),
                                 mapping_node,
                             ));
                             println!("DEBUG: Parent pairs after insert: {}", parent_pairs.len());

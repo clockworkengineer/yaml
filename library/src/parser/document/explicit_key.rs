@@ -1,6 +1,7 @@
-use crate::parser::document::node_utils::normalize_node_to_str;
+use crate::parser::document::error_builder::syntax_error;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
+use crate::parser::document::node_utils::normalize_node_to_str;
 
 /// Parses a single explicit key from the source and normalizes it to a string node.
 #[allow(dead_code)]
@@ -29,7 +30,6 @@ fn parse_and_normalize_explicit_key(source: &mut dyn ISource) -> Result<Node, St
     key_node = normalize_node_to_str(&key_node);
     Ok(key_node)
 }
-
 
 /// Parses multiple explicit keys and their values for mappings.
 ///
@@ -86,8 +86,10 @@ pub(crate) fn parse_explicit_mapping_entry(
     // Check for explicit key indicator
     if !is_explicit_key_start(stream) {
         // Use stream.current() for error context since TokenStream.lexer is private
-        return Err(format!(
-            "Expected '?' token for explicit key, got {:?}", stream.current()
+        let cur = stream.current().cloned();
+        return Err(syntax_error(
+            stream.source_mut(),
+            &format!("Expected '?' token for explicit key, got {:?}", cur)
         ));
     }
     stream.next()?;
