@@ -302,7 +302,10 @@ impl<'a> TokenStream<'a> {
                 Ok((result, ScalarType::DoubleQuoted))
             }
             Some(token) => Err(format!("Expected scalar, got {:?}", token)),
-            None => Err("Expected scalar, got EOF".to_string()),
+            None => Err(crate::parser::document::error_builder::syntax_error(
+                self.source_mut(),
+                "Expected scalar, got EOF"
+            )),
         }
     }
 
