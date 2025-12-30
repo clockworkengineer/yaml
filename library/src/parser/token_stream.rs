@@ -194,7 +194,10 @@ impl<'a> TokenStream<'a> {
             match self.current() {
                 Some(Token::Tag(tag_str)) => {
                     if decorators.tag.is_some() {
-                        return Err("Duplicate tag found".to_string());
+                        return Err(crate::parser::document::error_builder::syntax_error(
+                            self.source_mut(),
+                            "Duplicate tag found"
+                        ));
                     }
                     // Preserve raw tag handle; resolve later in value parsing
                     decorators.tag = Some(tag_str.clone());
@@ -202,7 +205,10 @@ impl<'a> TokenStream<'a> {
                 }
                 Some(Token::Anchor(name)) => {
                     if decorators.anchor.is_some() {
-                        return Err("Duplicate anchor found".to_string());
+                        return Err(crate::parser::document::error_builder::syntax_error(
+                            self.source_mut(),
+                            "Duplicate anchor found"
+                        ));
                     }
                     decorators.anchor = Some(name.clone());
                     self.next()?;
@@ -254,7 +260,10 @@ impl<'a> TokenStream<'a> {
                 Ok(result)
             }
             Some(token) => Err(format!("Expected plain scalar, got {:?}", token)),
-            None => Err("Expected plain scalar, got EOF".to_string()),
+            None => Err(crate::parser::document::error_builder::syntax_error(
+                self.source_mut(),
+                "Expected plain scalar, got EOF"
+            )),
         }
     }
 
@@ -267,7 +276,10 @@ impl<'a> TokenStream<'a> {
                 Ok(result)
             }
             Some(token) => Err(format!("Expected quoted scalar, got {:?}", token)),
-            None => Err("Expected quoted scalar, got EOF".to_string()),
+            None => Err(crate::parser::document::error_builder::syntax_error(
+                self.source_mut(),
+                "Expected quoted scalar, got EOF"
+            )),
         }
     }
 
@@ -290,7 +302,10 @@ impl<'a> TokenStream<'a> {
                 Ok((result, ScalarType::DoubleQuoted))
             }
             Some(token) => Err(format!("Expected scalar, got {:?}", token)),
-            None => Err("Expected scalar, got EOF".to_string()),
+            None => Err(crate::parser::document::error_builder::syntax_error(
+                self.source_mut(),
+                "Expected scalar, got EOF"
+            )),
         }
     }
 

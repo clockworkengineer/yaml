@@ -10,15 +10,6 @@ const MAX_NESTING_DEPTH: usize = 128;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
 
-/// Check if a node already has an anchor (including nested)
-fn has_anchor(node: &Node) -> bool {
-    match node {
-        Node::Anchored(_, _) => true,
-        Node::Tagged(inner, _) => has_anchor(inner),
-        _ => false,
-    }
-}
-
 /// Try to coerce a value based on a tag
 fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
     match tag {
@@ -285,9 +276,6 @@ pub fn parse_value_with_tokens(
                     parse_sequence_with_tokens(stream, *level, directives, &ctx_seq, depth + 1)?;
                 let mut result = Node::Tagged(Box::new(seq), "tag:yaml.org,2002:seq".to_string());
                 if let Some(anchor_name) = decorators.anchor {
-                    if has_anchor(&result) {
-                        return Err("YAML compliance error: Multiple anchors on single node".to_string());
-                    }
                     result = Node::Anchored(Box::new(result), anchor_name);
                 }
                 return Ok(result);
@@ -324,9 +312,6 @@ pub fn parse_value_with_tokens(
                 }
 
                 if let Some(anchor_name) = decorators.anchor {
-                    if has_anchor(&result) {
-                        return Err("YAML compliance error: Multiple anchors on single node".to_string());
-                    }
                     result = Node::Anchored(Box::new(result), anchor_name);
                 }
 
@@ -439,10 +424,10 @@ pub fn parse_value_with_tokens(
         }
 
         if let Some(anchor_name) = decorators.anchor {
-            if has_anchor(&result) {
+            if matches!(result, Node::Anchored(_, _)) {
                 return Err(structure_error(
                     stream.source_mut(),
-                    "YAML compliance error: Multiple anchors on single node",
+                    "A node cannot have multiple anchors",
                 ));
             }
             result = Node::Anchored(Box::new(result), anchor_name);

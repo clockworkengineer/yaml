@@ -309,7 +309,7 @@ pub fn parse_document_contents(
                 }
                 crate::utils::skip_whitespace_and_comments(source);
             }
-            Ok(Node::Mapping(pairs))
+            Ok(crate::parser::document::node_utils::make_mapping_node(pairs))
         }
         Some(c) if c == '?' => unreachable!(),
         Some(c) if c.is_alphanumeric() => {

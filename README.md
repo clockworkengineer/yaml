@@ -50,7 +50,17 @@ A comprehensive, high-performance YAML library for Rust with strong YAML 1.2 spe
 - **Comprehensive test suite** (362+ internal tests, 320/402 YAML 1.2 official tests)
 - **JSON Schema-style validation** for YAML documents
 - **Error codes and suggestions** for programmatic error handling
+
 ## 🛡️ Error Handling & Validation
+
+### Centralized Error Handling (Contributor Note)
+
+All parser and lexer error messages must use the centralized helpers in `parser/document/error_builder.rs` (e.g., `syntax_error`, `structure_error`, `limit_error`, `forbidden_error`).
+
+**Do not return raw error strings.**
+
+This ensures all errors are consistent, include context, and are easy to maintain. See the module-level docs in `error_builder.rs` for usage examples and extension guidelines.
+
 
 ### Error Handling
 - **Error codes (E001-E015)** for programmatic handling

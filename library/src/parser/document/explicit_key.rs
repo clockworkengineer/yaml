@@ -1,5 +1,7 @@
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
+use crate::parser::document::error_builder::syntax_error;
+use crate::parser::document::node_utils::normalize_node_to_str;
 
 /// Parses a single explicit key from the source and normalizes it to a string node.
 #[allow(dead_code)]
@@ -25,41 +27,9 @@ fn parse_and_normalize_explicit_key(source: &mut dyn ISource) -> Result<Node, St
             0,
         )?,
     };
-    use crate::nodes::node::BlockStyle;
-    use crate::parser::document::helpers::node_to_inline_string;
-    match key_node {
-        Node::Array(_) | Node::Mapping(_) => {
-            let inline = node_to_inline_string(&key_node);
-            key_node = Node::Str(
-                inline,
-                crate::nodes::node::QuoteType::Double,
-                BlockStyle::None,
-            );
-        }
-        Node::Str(s, _qt, style) => {
-            let key_string = if matches!(style, BlockStyle::Literal) {
-                format!("{}\n", s)
-            } else {
-                s
-            };
-            key_node = Node::Str(
-                key_string,
-                crate::nodes::node::QuoteType::Double,
-                BlockStyle::None,
-            );
-        }
-        other => {
-            let inline = node_to_inline_string(&other);
-            key_node = Node::Str(
-                inline,
-                crate::nodes::node::QuoteType::Double,
-                BlockStyle::None,
-            );
-        }
-    }
+    key_node = normalize_node_to_str(&key_node);
     Ok(key_node)
 }
-
 
 /// Parses multiple explicit keys and their values for mappings.
 ///
@@ -115,7 +85,12 @@ pub(crate) fn parse_explicit_mapping_entry(
 ) -> Result<(Node, Node), String> {
     // Check for explicit key indicator
     if !is_explicit_key_start(stream) {
-        return Err("Expected '?' token for explicit key".to_string());
+        // Use stream.current() for error context since TokenStream.lexer is private
+        let cur = stream.current().cloned();
+        return Err(syntax_error(
+            stream.source_mut(),
+            &format!("Expected '?' token for explicit key, got {:?}", cur),
+        ));
     }
     stream.next()?;
     stream.skip_whitespace()?;
@@ -133,38 +108,7 @@ pub(crate) fn parse_explicit_mapping_entry(
         }
     };
     // Normalize key_node to Node::Str if not already
-    use crate::nodes::node::BlockStyle;
-    use crate::parser::document::helpers::node_to_inline_string;
-    key_node = match key_node {
-        Node::Array(_) | Node::Mapping(_) => {
-            let inline = node_to_inline_string(&key_node);
-            Node::Str(
-                inline,
-                crate::nodes::node::QuoteType::Double,
-                BlockStyle::None,
-            )
-        }
-        Node::Str(s, _qt, style) => {
-            let key_string = if matches!(style, BlockStyle::Literal) {
-                format!("{}\n", s)
-            } else {
-                s
-            };
-            Node::Str(
-                key_string,
-                crate::nodes::node::QuoteType::Double,
-                BlockStyle::None,
-            )
-        }
-        other => {
-            let inline = node_to_inline_string(&other);
-            Node::Str(
-                inline,
-                crate::nodes::node::QuoteType::Double,
-                BlockStyle::None,
-            )
-        }
-    };
+    key_node = normalize_node_to_str(&key_node);
 
     // Skip whitespace/comments after key
     stream.skip_whitespace()?;

@@ -97,40 +97,9 @@ pub(crate) fn validate_indentation_tokens(
 ///
 /// * `source` - A mutable reference to a source implementing ISource trait
 /// Token-based whitespace skipping: advances past Indent, Newline, and Comment tokens.
-pub(crate) fn skip_whitespace_tokens(stream: &mut TokenStream) {
-    loop {
-        match stream.current() {
-            Some(Token::Indent(_)) | Some(Token::Newline) | Some(Token::Comment(_)) => {
-                let _ = stream.next();
-            }
-            _ => break,
-        }
-    }
-}
 
-/// Skips whitespace with context-aware tab validation.
-///
-/// This validates indentation first (before consuming), then skips whitespace.
-/// This order ensures tabs in indentation are caught before being consumed.
-///
-/// # Arguments
-///
-/// * `source` - A mutable reference to a source implementing ISource trait
-/// * `ctx` - The current parsing context
-///
-/// # Returns
-///
-/// `Ok(())` if successful, `Err(String)` if tabs found in forbidden context
-#[allow(dead_code)]
-/// Token-based whitespace skipping with indentation validation.
-pub(crate) fn skip_whitespace_with_context_tokens(
-    stream: &mut TokenStream,
-    ctx: &ParsingContext,
-) -> Result<(), String> {
-    validate_indentation_tokens(stream, ctx)?;
-    skip_whitespace_tokens(stream);
-    Ok(())
-}
+// DRY REFACTOR: Removed skip_whitespace_tokens and skip_whitespace_with_context_tokens.
+// Use stream.skip_whitespace_and_comments() from TokenStream directly in all token-based parsing code.
 
 /// Backward-compatible wrapper that validates no tabs are used for indentation in block context.
 ///
@@ -297,7 +266,10 @@ pub(crate) fn validate_comment_spacing_token(
         // match stream.previous() {
         //     None => Ok(()), // Start of stream
         //     Some(Token::Indent(_)) | Some(Token::Newline) => Ok(()),
-        //     _ => Err("Comment indicator (#) must be preceded by whitespace or newline".to_string()),
+        //     _ => Err(structure_error(
+        //         stream.source_mut(),
+        //         "Comment indicator (#) must be preceded by whitespace or newline"
+        //     )),
         // }
         // Since TokenStream may not have previous(), this is a placeholder for integration at the call site.
         // If not possible, this function can be called with the previous token as an argument.
@@ -503,7 +475,7 @@ mod tests {
         {
             let mut stream = TokenStream::new(&mut source, &directives, false)
                 .expect("TokenStream creation failed");
-            let result = skip_whitespace_with_context_tokens(&mut stream, &ctx);
+            let result = stream.skip_whitespace_and_comments();
             assert!(
                 result.is_ok(),
                 "Whitespace skipping in block context should succeed"
@@ -550,7 +522,7 @@ mod tests {
     fn test_skip_whitespace_with_context_flow() {
         // Tabs OK in flow context
         let mut source = Buffer::new(b"\tcontent");
-        let ctx = ParsingContext::new(0).child_flow_context(CollectionType::FlowMapping);
+        // let ctx = ParsingContext::new(0).child_flow_context(CollectionType::FlowMapping); // removed unused variable
 
         let directives = crate::parser::directives::DirectiveContext::new();
         let ts_result = TokenStream::new(&mut source, &directives, true);
@@ -563,7 +535,7 @@ mod tests {
             panic!("TokenStream should allow tabs in flow context");
         }
         let mut stream = ts_result.unwrap();
-        let result = skip_whitespace_with_context_tokens(&mut stream, &ctx);
+        let result = stream.skip_whitespace_and_comments();
         assert!(result.is_ok(), "Tabs should be allowed in flow context");
     }
 }
