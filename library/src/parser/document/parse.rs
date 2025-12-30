@@ -258,6 +258,14 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
                     Some(crate::parser::lexer::Token::FlowMappingEnd) => {
                         return Err(helpers::parse_error_token(&ts, "Unexpected closing brace '}' - no matching opening brace"));
                     }
+                    // Check for any other content that shouldn't be here (not document marker or EOF)
+                    Some(crate::parser::lexer::Token::Plain(_)) |
+                    Some(crate::parser::lexer::Token::SingleQuoted(_)) |
+                    Some(crate::parser::lexer::Token::DoubleQuoted(_)) |
+                    Some(crate::parser::lexer::Token::Dash) |
+                    Some(crate::parser::lexer::Token::Colon) => {
+                        return Err(helpers::parse_error_token(&ts, "Unexpected content after document - missing document separator or incorrect indentation"));
+                    }
                     _ => {}
                 }
             }
