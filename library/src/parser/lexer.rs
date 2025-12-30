@@ -235,7 +235,10 @@ impl<'a> Lexer<'a> {
                 }
                 if let Some('#') = self.source.current() {
                     if !seen_whitespace {
-                        return Err("YAML syntax error: comment must be preceded by whitespace after '}' in flow collection".to_string());
+                        return Err(crate::parser::document::error_builder::syntax_error(
+                            self.source,
+                            "YAML syntax error: comment must be preceded by whitespace after '}' in flow collection"
+                        ));
                     }
                 }
                 self.last_was_linebreak = false;
@@ -260,7 +263,10 @@ impl<'a> Lexer<'a> {
                 }
                 if let Some('#') = self.source.current() {
                     if !seen_whitespace {
-                        return Err("YAML syntax error: comment must be preceded by whitespace after ']' in flow collection".to_string());
+                        return Err(crate::parser::document::error_builder::syntax_error(
+                            self.source,
+                            "YAML syntax error: comment must be preceded by whitespace after ']' in flow collection"
+                        ));
                     }
                 }
                 self.last_was_linebreak = false;
@@ -285,7 +291,10 @@ impl<'a> Lexer<'a> {
                             "DEBUG: Comment after comma with no whitespace at {:?}",
                             self.source.current()
                         );
-                        return Err("YAML syntax error: comment must be preceded by whitespace after ',' in flow collection".to_string());
+                        return Err(crate::parser::document::error_builder::syntax_error(
+                            self.source,
+                            "YAML syntax error: comment must be preceded by whitespace after ',' in flow collection"
+                        ));
                     }
                 }
                 self.last_was_linebreak = false;
@@ -398,7 +407,11 @@ impl<'a> Lexer<'a> {
                     continue;
                 }
                 // Error in block context (YAML 1.2 compliant)
-                return Err("Tabs are not allowed as indentation in YAML".to_string());
+                return Err(crate::parser::document::error_builder::forbidden_error(
+                    self.source,
+                    "Tabs",
+                    "as indentation in YAML"
+                ));
             } else {
                 break;
             }
@@ -513,7 +526,10 @@ impl<'a> Lexer<'a> {
         }
 
         if name.is_empty() {
-            return Err("Empty anchor name".to_string());
+            return Err(crate::parser::document::error_builder::syntax_error(
+                self.source,
+                "Empty anchor name"
+            ));
         }
 
         Ok(Token::Anchor(name))
@@ -541,7 +557,10 @@ impl<'a> Lexer<'a> {
         }
 
         if name.is_empty() {
-            return Err("Empty alias name".to_string());
+            return Err(crate::parser::document::error_builder::syntax_error(
+                self.source,
+                "Empty alias name"
+            ));
         }
 
         Ok(Token::Alias(name))
@@ -581,10 +600,10 @@ impl<'a> Lexer<'a> {
                 None => {
                     #[cfg(debug_assertions)]
                     eprintln!("DEBUG: Unterminated single-quoted string: reached EOF");
-                    return Err(
+                    return Err(crate::parser::document::error_builder::syntax_error(
+                        self.source,
                         "YAML compliance error: Unterminated single-quoted string (unexpected EOF)"
-                            .to_string(),
-                    );
+                    ));
                 }
             }
         }
@@ -630,7 +649,10 @@ impl<'a> Lexer<'a> {
                                         hex.push(c);
                                         self.source.next();
                                     }
-                                    _ => return Err("YAML compliance error: Invalid \\x escape sequence, expected 2 hex digits".to_string()),
+                                    _ => return Err(crate::parser::document::error_builder::syntax_error(
+                                        self.source,
+                                        "YAML compliance error: Invalid \\x escape sequence, expected 2 hex digits"
+                                    )),
                                 }
                             }
                             let code = u8::from_str_radix(&hex, 16).unwrap();
@@ -646,13 +668,19 @@ impl<'a> Lexer<'a> {
                                         hex.push(c);
                                         self.source.next();
                                     }
-                                    _ => return Err("YAML compliance error: Invalid \\u escape sequence, expected 4 hex digits".to_string()),
+                                    _ => return Err(crate::parser::document::error_builder::syntax_error(
+                                        self.source,
+                                        "YAML compliance error: Invalid \\u escape sequence, expected 4 hex digits"
+                                    )),
                                 }
                             }
                             let code = u32::from_str_radix(&hex, 16).unwrap();
                             match char::from_u32(code) {
                                 Some(ch) => content.push(ch),
-                                None => return Err(format!("YAML compliance error: Invalid unicode codepoint U+{:04X}", code)),
+                                None => return Err(crate::parser::document::error_builder::syntax_error(
+                                    self.source,
+                                    &format!("YAML compliance error: Invalid unicode codepoint U+{:04X}", code)
+                                )),
                             }
                         }
                         Some('U') => {
@@ -665,7 +693,10 @@ impl<'a> Lexer<'a> {
                                         hex.push(c);
                                         self.source.next();
                                     }
-                                    _ => return Err("YAML compliance error: Invalid \\U escape sequence, expected 8 hex digits".to_string()),
+                                    _ => return Err(crate::parser::document::error_builder::syntax_error(
+                                        self.source,
+                                        "YAML compliance error: Invalid \\U escape sequence, expected 8 hex digits"
+                                    )),
                                 }
                             }
                             let code = u32::from_str_radix(&hex, 16).unwrap();
