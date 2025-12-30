@@ -119,6 +119,15 @@ fn main() -> Result<(), String> {
 
 ## Core Concepts
 
+### Centralized Error Handling (Contributor Note)
+
+All parser and lexer error messages must use the centralized helpers in `parser/document/error_builder.rs` (e.g., `syntax_error`, `structure_error`, `limit_error`, `forbidden_error`).
+
+**Do not return raw error strings.**
+
+This ensures all errors are consistent, include context, and are easy to maintain. See the module-level docs in `error_builder.rs` for usage examples and extension guidelines.
+
+
 ### Node Type
 
 The `Node` enum represents all YAML values:

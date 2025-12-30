@@ -132,10 +132,10 @@ impl ParserConfig {
             if let Some(ref msg) = self.depth_error_message {
                 Err(msg.clone())
             } else {
-                Err(alloc::format!(
-                    "Maximum nesting depth of {} exceeded (current: {})",
+                Err(crate::parser::document::error_builder::limit_error(
+                    "Nesting depth",
                     self.max_depth,
-                    current_depth
+                    &format!("current: {}", current_depth)
                 ))
             }
         } else {
@@ -147,10 +147,10 @@ impl ParserConfig {
     pub fn check_size(&self, current_size: usize) -> Result<(), String> {
         if let Some(max) = self.max_size {
             if current_size > max {
-                return Err(alloc::format!(
-                    "Maximum document size of {} bytes exceeded (current: {})",
+                return Err(crate::parser::document::error_builder::limit_error(
+                    "Document size (bytes)",
                     max,
-                    current_size
+                    &format!("current: {}", current_size)
                 ));
             }
         }
@@ -161,10 +161,10 @@ impl ParserConfig {
     pub fn check_anchor_count(&self, count: usize) -> Result<(), String> {
         if let Some(max) = self.max_anchors {
             if count > max {
-                return Err(alloc::format!(
-                    "Maximum anchor count of {} exceeded (current: {})",
+                return Err(crate::parser::document::error_builder::limit_error(
+                    "Anchor count",
                     max,
-                    count
+                    &format!("current: {}", count)
                 ));
             }
         }
