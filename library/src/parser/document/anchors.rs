@@ -154,7 +154,6 @@ pub(crate) fn expand_merge_keys(
             let mut i = 0usize;
             while i < snapshot.len() {
                 let (k, v) = snapshot[i].clone();
-
                 let mut handled = false;
                 if let Node::Str(ks, _, _) = &k {
                     if ks.trim() == "<<" {
@@ -213,63 +212,46 @@ pub(crate) fn expand_merge_keys(
                         handled = true;
                     }
                 }
-
                 if handled {
                     i += 1;
                     continue;
                 }
-
                 if let Node::Str(_, _, _) = &k {
                     if let Node::Str(s, _, _) = &v {
                         let ts = s.trim_start();
                         if ts.starts_with("<<:") && ts.contains('*') {
                             if let Some(pos) = ts.find('*') {
                                 let aname = ts[pos + 1..].trim().to_string();
-
                                 let mut nested: Vec<(Node, Node)> = Vec::new();
                                 let mut j = i + 1;
                                 while j < snapshot.len() {
-                                    // Stop if we find another merge key
                                     if let Node::Str(ns, _, _) = &snapshot[j].1 {
                                         if ns.trim_start().starts_with("<<:") {
                                             break;
                                         }
                                     }
-
-                                    // Check if this entry looks like it should be at root level
-                                    // by examining the key name for patterns that suggest it's not part of the current mapping
                                     if let Node::Str(key_name, _, _) = &snapshot[j].0 {
-                                        // Keys that contain "explicit" or "boolean" are likely root-level entries
-                                        // especially when they appear after a mapping section
                                         if key_name.contains("boolean")
                                             || key_name.contains("explicit")
                                         {
                                             break;
                                         }
-
-                                        // Also check for other common root-level patterns
-                                        // If the key doesn't look like a typical nested property,
-                                        // it might be a new root-level entry
                                         let trimmed_key = key_name.trim();
                                         if trimmed_key == "explicit_boolean" {
                                             break;
                                         }
                                     }
-
                                     nested.push(snapshot[j].clone());
                                     j += 1;
                                 }
-
                                 let mut merged_pairs: Vec<(Node, Node)> = Vec::new();
                                 if let Some(src) = anchors.get(&aname) {
                                     if let Node::Mapping(ap) = src {
                                         merged_pairs.extend(ap.clone());
                                     }
                                 }
-
                                 for (nk, nv) in nested.iter() {
                                     let mut replaced = false;
-
                                     if let Node::Str(nks, _, _) = nk {
                                         for p in merged_pairs.iter_mut() {
                                             if let Node::Str(pk, _, _) = &p.0 {
@@ -285,19 +267,21 @@ pub(crate) fn expand_merge_keys(
                                         merged_pairs.push((nk.clone(), nv.clone()));
                                     }
                                 }
-
-                                combined.push((k.clone(), Node::Mapping(merged_pairs)));
+                                combined.push((
+                                    k.clone(),
+                                    crate::parser::document::node_utils::make_mapping_node(
+                                        merged_pairs,
+                                    ),
+                                ));
                                 i = j;
                                 continue;
                             }
                         }
                     }
                 }
-
                 combined.push((k, v));
                 i += 1;
             }
-
             use std::collections::HashMap as Map;
             let mut last_index: Map<String, usize> = Map::new();
             for (idx, (k, _v)) in combined.iter().enumerate() {
@@ -313,9 +297,7 @@ pub(crate) fn expand_merge_keys(
                     }
                 }
             }
-
             *pairs = rebuilt;
-
             for (_k, v) in pairs.iter_mut() {
                 expand_merge_keys(v, anchors)?;
             }

@@ -1,38 +1,4 @@
-/// Normalizes a Node to a double-quoted Node::Str for use as a mapping key.
-fn normalize_node_to_str(node: &Node) -> Node {
-    use crate::nodes::node::BlockStyle;
-    use crate::parser::document::helpers::node_to_inline_string;
-    match node {
-        Node::Array(_) | Node::Mapping(_) => {
-            let inline = node_to_inline_string(node);
-            Node::Str(
-                inline,
-                crate::nodes::node::QuoteType::Double,
-                BlockStyle::None,
-            )
-        }
-        Node::Str(s, _qt, style) => {
-            let key_string = if matches!(style, BlockStyle::Literal) {
-                format!("{}\n", s)
-            } else {
-                s.clone()
-            };
-            Node::Str(
-                key_string,
-                crate::nodes::node::QuoteType::Double,
-                BlockStyle::None,
-            )
-        }
-        other => {
-            let inline = node_to_inline_string(other);
-            Node::Str(
-                inline,
-                crate::nodes::node::QuoteType::Double,
-                BlockStyle::None,
-            )
-        }
-    }
-}
+use crate::parser::document::node_utils::normalize_node_to_str;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 
@@ -119,7 +85,10 @@ pub(crate) fn parse_explicit_mapping_entry(
 ) -> Result<(Node, Node), String> {
     // Check for explicit key indicator
     if !is_explicit_key_start(stream) {
-        return Err("Expected '?' token for explicit key".to_string());
+        // Use stream.current() for error context since TokenStream.lexer is private
+        return Err(format!(
+            "Expected '?' token for explicit key, got {:?}", stream.current()
+        ));
     }
     stream.next()?;
     stream.skip_whitespace()?;

@@ -519,7 +519,7 @@ mod tests {
     fn test_skip_whitespace_with_context_flow() {
         // Tabs OK in flow context
         let mut source = Buffer::new(b"\tcontent");
-        let ctx = ParsingContext::new(0).child_flow_context(CollectionType::FlowMapping);
+        // let ctx = ParsingContext::new(0).child_flow_context(CollectionType::FlowMapping); // removed unused variable
 
         let directives = crate::parser::directives::DirectiveContext::new();
         let ts_result = TokenStream::new(&mut source, &directives, true);

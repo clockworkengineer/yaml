@@ -17,6 +17,7 @@ mod inline_tokens;
 mod loop_guards;
 mod main_loop;
 mod mapping;
+mod node_utils;
 mod parse;
 mod scalar;
 mod sequence;
@@ -36,7 +37,9 @@ mod tests {
 
     use crate::parser::document::scalar::parse_scalar_with_tokens;
 
-    use crate::parser::document::inline_tokens::{parse_inline_mapping_with_tokens, parse_inline_sequence_with_tokens};
+    use crate::parser::document::inline_tokens::{
+        parse_inline_mapping_with_tokens, parse_inline_sequence_with_tokens,
+    };
     use crate::parser::document::value::parse_value;
 
     #[test]

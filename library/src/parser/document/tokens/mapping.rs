@@ -1,52 +1,5 @@
+use crate::parser::document::node_utils::force_key_to_string;
 use crate::nodes::node::{BlockStyle, QuoteType};
-/// Helper to forcibly convert any mapping key to a string node (double quoted)
-fn force_key_to_string(key: Node) -> Node {
-    use crate::nodes::node::{BlockStyle, QuoteType};
-    match key {
-        Node::Str(_, _, _) => key,
-        Node::Array(items) => {
-            let mut s = String::from("[");
-            for (i, item) in items.iter().enumerate() {
-                if i > 0 {
-                    s.push_str(", ");
-                }
-                match item {
-                    Node::Str(val, _, _) => s.push_str(val),
-                    Node::Number(n) => s.push_str(&format!("{:?}", n)),
-                    Node::Boolean(b) => s.push_str(&format!("{}", b)),
-                    _ => s.push_str(&format!("{:?}", item)),
-                }
-            }
-            s.push(']');
-            Node::Str(s, QuoteType::Double, BlockStyle::None)
-        }
-        Node::Mapping(_) => {
-            // Stringify mapping keys (rare, but for completeness)
-            Node::Str(format!("{:?}", key), QuoteType::Double, BlockStyle::None)
-        }
-        Node::Tagged(inner, tag) => {
-            // If the inner is an empty string, preserve as Tagged(empty string)
-            if matches!(*inner, Node::Str(ref s, _, _) if s.is_empty()) {
-                Node::Tagged(inner, tag)
-            } else {
-                // Otherwise, normalize the inner
-                Node::Tagged(Box::new(force_key_to_string(*inner)), tag)
-            }
-        }
-        Node::Anchored(inner, name) => {
-            // If the inner is an empty string, preserve as Anchored(empty string)
-            if matches!(*inner, Node::Str(ref s, _, _) if s.is_empty()) {
-                Node::Anchored(inner, name)
-            } else {
-                Node::Anchored(Box::new(force_key_to_string(*inner)), name)
-            }
-        }
-        other => {
-            // Fallback: use debug string
-            Node::Str(format!("{:?}", other), QuoteType::Double, BlockStyle::None)
-        }
-    }
-}
 use crate::nodes::node::Node;
 use crate::parser::directives::DirectiveContext;
 use crate::parser::document::tokens::value::parse_value_with_tokens;
@@ -176,11 +129,7 @@ pub fn parse_mapping_with_tokens(
                             // If no key, push as orphan (should not happen in valid YAML)
                             println!("DEBUG: EOF unwind: pushing orphan mapping_node to parent");
                             parent_pairs.push((
-                                Node::Str(
-                                    "<unwound>".to_string(),
-                                    QuoteType::Unquoted,
-                                    BlockStyle::None,
-                                ),
+                                force_key_to_string(Node::Str("<unwound>".to_string(), QuoteType::Unquoted, BlockStyle::None)),
                                 mapping_node,
                             ));
                         }
@@ -365,11 +314,7 @@ pub fn parse_mapping_with_tokens(
                             );
                             let mapping_node = Node::Mapping(top_pairs);
                             parent_pairs.push((
-                                Node::Str(
-                                    "<nested>".to_string(),
-                                    QuoteType::Unquoted,
-                                    BlockStyle::None,
-                                ),
+                                force_key_to_string(Node::Str("<nested>".to_string(), QuoteType::Unquoted, BlockStyle::None)),
                                 mapping_node,
                             ));
                             println!("DEBUG: Parent pairs after insert: {}", parent_pairs.len());
@@ -483,11 +428,7 @@ pub fn parse_mapping_with_tokens(
         }
     }
 
-    // Should not reach here, but return top-level mapping if stack not empty
-    if let Some((_, pairs)) = stack.pop() {
-        return Ok(Node::Mapping(pairs));
-    }
-    Err("parse_mapping_with_tokens: mapping stack unexpectedly empty".to_string())
+    // unreachable: loop always returns on end condition
 }
 
 /// Parse a single key-value pair

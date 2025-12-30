@@ -167,7 +167,9 @@ pub(crate) fn parse_scalar_with_tokens(
                 }
             }
         }
-        _ => Err("Expected a scalar token".to_string()),
+        _ => Err(format!(
+            "Expected a scalar token, got {:?}", stream.current()
+        )),
     }
 }
 // Module: parser/document/scalar.rs
