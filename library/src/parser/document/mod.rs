@@ -10,7 +10,7 @@ mod block_scalar;
 mod bridge;
 mod contents;
 mod context;
-mod error_builder;
+pub mod error_builder;
 mod explicit_key;
 mod helpers;
 mod inline_tokens;
