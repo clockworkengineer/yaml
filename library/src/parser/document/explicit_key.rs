@@ -1,6 +1,6 @@
-use crate::parser::document::error_builder::syntax_error;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
+use crate::parser::document::error_builder::syntax_error;
 use crate::parser::document::node_utils::normalize_node_to_str;
 
 /// Parses a single explicit key from the source and normalizes it to a string node.
@@ -89,7 +89,7 @@ pub(crate) fn parse_explicit_mapping_entry(
         let cur = stream.current().cloned();
         return Err(syntax_error(
             stream.source_mut(),
-            &format!("Expected '?' token for explicit key, got {:?}", cur)
+            &format!("Expected '?' token for explicit key, got {:?}", cur),
         ));
     }
     stream.next()?;

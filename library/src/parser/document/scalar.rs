@@ -50,7 +50,7 @@ pub(crate) fn parse_scalar_with_tokens(
                     if digits.len() != 1 || digits.chars().next().unwrap() == '0' {
                         return Err(syntax_error(
                             stream.source_mut(),
-                            "Invalid block scalar indentation indicator: must be a single digit from 1-9"
+                            "Invalid block scalar indentation indicator: must be a single digit from 1-9",
                         ));
                     }
                 }
