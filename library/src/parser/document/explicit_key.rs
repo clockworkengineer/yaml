@@ -1,3 +1,38 @@
+/// Normalizes a Node to a double-quoted Node::Str for use as a mapping key.
+fn normalize_node_to_str(node: &Node) -> Node {
+    use crate::nodes::node::BlockStyle;
+    use crate::parser::document::helpers::node_to_inline_string;
+    match node {
+        Node::Array(_) | Node::Mapping(_) => {
+            let inline = node_to_inline_string(node);
+            Node::Str(
+                inline,
+                crate::nodes::node::QuoteType::Double,
+                BlockStyle::None,
+            )
+        }
+        Node::Str(s, _qt, style) => {
+            let key_string = if matches!(style, BlockStyle::Literal) {
+                format!("{}\n", s)
+            } else {
+                s.clone()
+            };
+            Node::Str(
+                key_string,
+                crate::nodes::node::QuoteType::Double,
+                BlockStyle::None,
+            )
+        }
+        other => {
+            let inline = node_to_inline_string(other);
+            Node::Str(
+                inline,
+                crate::nodes::node::QuoteType::Double,
+                BlockStyle::None,
+            )
+        }
+    }
+}
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 
@@ -25,38 +60,7 @@ fn parse_and_normalize_explicit_key(source: &mut dyn ISource) -> Result<Node, St
             0,
         )?,
     };
-    use crate::nodes::node::BlockStyle;
-    use crate::parser::document::helpers::node_to_inline_string;
-    match key_node {
-        Node::Array(_) | Node::Mapping(_) => {
-            let inline = node_to_inline_string(&key_node);
-            key_node = Node::Str(
-                inline,
-                crate::nodes::node::QuoteType::Double,
-                BlockStyle::None,
-            );
-        }
-        Node::Str(s, _qt, style) => {
-            let key_string = if matches!(style, BlockStyle::Literal) {
-                format!("{}\n", s)
-            } else {
-                s
-            };
-            key_node = Node::Str(
-                key_string,
-                crate::nodes::node::QuoteType::Double,
-                BlockStyle::None,
-            );
-        }
-        other => {
-            let inline = node_to_inline_string(&other);
-            key_node = Node::Str(
-                inline,
-                crate::nodes::node::QuoteType::Double,
-                BlockStyle::None,
-            );
-        }
-    }
+    key_node = normalize_node_to_str(&key_node);
     Ok(key_node)
 }
 
@@ -133,38 +137,7 @@ pub(crate) fn parse_explicit_mapping_entry(
         }
     };
     // Normalize key_node to Node::Str if not already
-    use crate::nodes::node::BlockStyle;
-    use crate::parser::document::helpers::node_to_inline_string;
-    key_node = match key_node {
-        Node::Array(_) | Node::Mapping(_) => {
-            let inline = node_to_inline_string(&key_node);
-            Node::Str(
-                inline,
-                crate::nodes::node::QuoteType::Double,
-                BlockStyle::None,
-            )
-        }
-        Node::Str(s, _qt, style) => {
-            let key_string = if matches!(style, BlockStyle::Literal) {
-                format!("{}\n", s)
-            } else {
-                s
-            };
-            Node::Str(
-                key_string,
-                crate::nodes::node::QuoteType::Double,
-                BlockStyle::None,
-            )
-        }
-        other => {
-            let inline = node_to_inline_string(&other);
-            Node::Str(
-                inline,
-                crate::nodes::node::QuoteType::Double,
-                BlockStyle::None,
-            )
-        }
-    };
+    key_node = normalize_node_to_str(&key_node);
 
     // Skip whitespace/comments after key
     stream.skip_whitespace()?;

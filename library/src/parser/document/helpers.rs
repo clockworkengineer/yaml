@@ -97,40 +97,9 @@ pub(crate) fn validate_indentation_tokens(
 ///
 /// * `source` - A mutable reference to a source implementing ISource trait
 /// Token-based whitespace skipping: advances past Indent, Newline, and Comment tokens.
-pub(crate) fn skip_whitespace_tokens(stream: &mut TokenStream) {
-    loop {
-        match stream.current() {
-            Some(Token::Indent(_)) | Some(Token::Newline) | Some(Token::Comment(_)) => {
-                let _ = stream.next();
-            }
-            _ => break,
-        }
-    }
-}
 
-/// Skips whitespace with context-aware tab validation.
-///
-/// This validates indentation first (before consuming), then skips whitespace.
-/// This order ensures tabs in indentation are caught before being consumed.
-///
-/// # Arguments
-///
-/// * `source` - A mutable reference to a source implementing ISource trait
-/// * `ctx` - The current parsing context
-///
-/// # Returns
-///
-/// `Ok(())` if successful, `Err(String)` if tabs found in forbidden context
-#[allow(dead_code)]
-/// Token-based whitespace skipping with indentation validation.
-pub(crate) fn skip_whitespace_with_context_tokens(
-    stream: &mut TokenStream,
-    ctx: &ParsingContext,
-) -> Result<(), String> {
-    validate_indentation_tokens(stream, ctx)?;
-    skip_whitespace_tokens(stream);
-    Ok(())
-}
+// DRY REFACTOR: Removed skip_whitespace_tokens and skip_whitespace_with_context_tokens.
+// Use stream.skip_whitespace_and_comments() from TokenStream directly in all token-based parsing code.
 
 /// Backward-compatible wrapper that validates no tabs are used for indentation in block context.
 ///
@@ -503,7 +472,7 @@ mod tests {
         {
             let mut stream = TokenStream::new(&mut source, &directives, false)
                 .expect("TokenStream creation failed");
-            let result = skip_whitespace_with_context_tokens(&mut stream, &ctx);
+            let result = stream.skip_whitespace_and_comments();
             assert!(
                 result.is_ok(),
                 "Whitespace skipping in block context should succeed"
@@ -563,7 +532,7 @@ mod tests {
             panic!("TokenStream should allow tabs in flow context");
         }
         let mut stream = ts_result.unwrap();
-        let result = skip_whitespace_with_context_tokens(&mut stream, &ctx);
+        let result = stream.skip_whitespace_and_comments();
         assert!(result.is_ok(), "Tabs should be allowed in flow context");
     }
 }

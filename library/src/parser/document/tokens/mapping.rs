@@ -484,7 +484,10 @@ pub fn parse_mapping_with_tokens(
     }
 
     // Should not reach here, but return top-level mapping if stack not empty
-    // unreachable: loop always returns on end condition
+    if let Some((_, pairs)) = stack.pop() {
+        return Ok(Node::Mapping(pairs));
+    }
+    Err("parse_mapping_with_tokens: mapping stack unexpectedly empty".to_string())
 }
 
 /// Parse a single key-value pair
