@@ -260,7 +260,10 @@ impl<'a> TokenStream<'a> {
                 Ok(result)
             }
             Some(token) => Err(format!("Expected plain scalar, got {:?}", token)),
-            None => Err("Expected plain scalar, got EOF".to_string()),
+            None => Err(crate::parser::document::error_builder::syntax_error(
+                self.source_mut(),
+                "Expected plain scalar, got EOF"
+            )),
         }
     }
 
@@ -273,7 +276,10 @@ impl<'a> TokenStream<'a> {
                 Ok(result)
             }
             Some(token) => Err(format!("Expected quoted scalar, got {:?}", token)),
-            None => Err("Expected quoted scalar, got EOF".to_string()),
+            None => Err(crate::parser::document::error_builder::syntax_error(
+                self.source_mut(),
+                "Expected quoted scalar, got EOF"
+            )),
         }
     }
 
