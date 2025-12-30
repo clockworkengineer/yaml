@@ -40,4 +40,10 @@ fn test_specific_failures() {
 
     // Test 58MP - colon as value (should pass)
     test_case("58MP", b"{x: :x}", false);
+
+    // Test 4ZYM - plain scalar with continuation lines
+    test_case("4ZYM", b"plain: text\n  lines\nquoted: \"text\n  \tlines\"\nblock: |\n  text\n   \tlines", false);
+
+    // Test 4JVG - scalar with two anchors (should fail)
+    test_case("4JVG", b"top1: &node1\n  &k1 key1: val1\ntop2: &node2\n  &v2 val2", true);
 }
