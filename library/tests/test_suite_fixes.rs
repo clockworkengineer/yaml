@@ -46,4 +46,10 @@ fn test_specific_failures() {
 
     // Test 4JVG - scalar with two anchors (should fail)
     test_case("4JVG", b"top1: &node1\n  &k1 key1: val1\ntop2: &node2\n  &v2 val2", true);
+
+    // Test 62EZ - invalid content after flow mapping (should fail, now fixed)
+    test_case("62EZ", b"---\nx: { y: z }in: valid", true);
+
+    // Test 4H7K - extra closing bracket (should fail)
+    test_case("4H7K", b"---\n[ a, b, c ] ]", true);
 }

@@ -238,6 +238,15 @@ impl<'a> Lexer<'a> {
                         return Err("YAML syntax error: comment must be preceded by whitespace after '}' in flow collection".to_string());
                     }
                 }
+                // Validate what comes after } - must be whitespace, newline, flow indicator, or EOF
+                if let Some(c) = self.source.current() {
+                    if !seen_whitespace && c != '\n' && c != '\r' && c != ',' && c != ']' && c != '}' && c != '#' && c != ':' {
+                        // Check if it's alphanumeric which clearly indicates invalid
+                        if c.is_alphanumeric() {
+                            return Err(format!("YAML syntax error: Invalid content '{}' immediately after '}}' - whitespace or newline required", c));
+                        }
+                    }
+                }
                 self.last_was_linebreak = false;
                 Ok(Some(Token::FlowMappingEnd))
             }
@@ -261,6 +270,15 @@ impl<'a> Lexer<'a> {
                 if let Some('#') = self.source.current() {
                     if !seen_whitespace {
                         return Err("YAML syntax error: comment must be preceded by whitespace after ']' in flow collection".to_string());
+                    }
+                }
+                // Validate what comes after ] - must be whitespace, newline, flow indicator, or EOF
+                if let Some(c) = self.source.current() {
+                    if !seen_whitespace && c != '\n' && c != '\r' && c != ',' && c != ']' && c != '}' && c != '#' && c != ':' {
+                        // Check if it's alphanumeric which clearly indicates invalid
+                        if c.is_alphanumeric() {
+                            return Err(format!("YAML syntax error: Invalid content '{}' immediately after ']' - whitespace or newline required", c));
+                        }
                     }
                 }
                 self.last_was_linebreak = false;
