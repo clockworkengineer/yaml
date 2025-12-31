@@ -75,11 +75,37 @@ pub fn parse_inline_sequence_with_tokens(
                     ));
                 }
 
-                // Parse the value
-                let value = parse_value_with_tokens(stream, directives, depth + 1)?;
-                #[cfg(feature = "debug-trace")]
-                log::debug!("inline_tokens: seq item -> {:?}", value);
-                items.push(value);
+                // Parse what might be a value or the key of an implicit mapping
+                let value_or_key = parse_value_with_tokens(stream, directives, depth + 1)?;
+
+                // Skip whitespace to check if this is actually a key (followed by colon)
+                stream.skip_whitespace_and_comments()?;
+
+                // Check if this is an implicit mapping (key: value in a flow sequence)
+                if matches!(stream.current(), Some(Token::Colon)) {
+                    // This is actually a key, not a standalone value
+                    // Parse as a single-pair mapping
+                    stream.next()?; // consume colon
+                    stream.skip_whitespace_and_comments()?;
+
+                    // Parse the value (or use None if followed by comma/bracket)
+                    let val = if matches!(stream.current(), Some(Token::Comma) | Some(Token::FlowSequenceEnd)) {
+                        Node::None
+                    } else {
+                        parse_value_with_tokens(stream, directives, depth + 1)?
+                    };
+
+                    // Create a single-pair mapping
+                    let mapping = Node::Mapping(vec![(value_or_key, val)]);
+                    #[cfg(feature = "debug-trace")]
+                    log::debug!("inline_tokens: seq item (implicit mapping) -> {:?}", mapping);
+                    items.push(mapping);
+                } else {
+                    // It's a regular value
+                    #[cfg(feature = "debug-trace")]
+                    log::debug!("inline_tokens: seq item -> {:?}", value_or_key);
+                    items.push(value_or_key);
+                }
                 expect_item = false;
             }
         }
