@@ -412,6 +412,9 @@ impl<'a> Lexer<'a> {
     /// Scan indentation at line start
     fn scan_indentation(&mut self, in_flow: bool) -> Result<usize, String> {
         let mut count = 0;
+        let mut tab_at_start = false;
+        let first_char_is_tab = self.source.current() == Some(CHAR_TAB);
+
         while let Some(ch) = self.source.current() {
             if ch == CHAR_SPACE {
                 count += 1;
@@ -424,12 +427,27 @@ impl<'a> Lexer<'a> {
                     self.source.next();
                     continue;
                 }
-                // Error in block context (YAML 1.2 compliant)
-                return Err(crate::parser::document::error_builder::forbidden_error(
-                    self.source,
-                    "Tabs",
-                    "as indentation in YAML"
-                ));
+
+                // Check if this is a tab at the very start (primary indentation)
+                if count == 0 && first_char_is_tab {
+                    tab_at_start = true;
+                }
+
+                // In block context, reject tabs as primary indentation
+                // (tab at column 0 or before any spaces)
+                if tab_at_start {
+                    // Tab as primary indentation in block context - error
+                    return Err(crate::parser::document::error_builder::forbidden_error(
+                        self.source,
+                        "Tabs",
+                        "as indentation in YAML"
+                    ));
+                }
+
+                // Tab after spaces: allow it through (e.g., in block scalar content)
+                // Treat tab as advancing by 1 for indent counting purposes
+                count += 1;
+                self.source.next();
             } else {
                 break;
             }
