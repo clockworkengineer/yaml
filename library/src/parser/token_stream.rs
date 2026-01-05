@@ -392,6 +392,24 @@ impl<'a> TokenStream<'a> {
         }
     }
 
+    /// DRY helper: consume a comma if present.
+    #[inline]
+    pub fn consume_comma(&mut self) -> Result<bool, String> {
+        self.consume_if(Token::Comma)
+    }
+
+    /// DRY helper: consume a flow sequence end (']') if present.
+    #[inline]
+    pub fn consume_flow_sequence_end(&mut self) -> Result<bool, String> {
+        self.consume_if(Token::FlowSequenceEnd)
+    }
+
+    /// DRY helper: consume a flow mapping end ('}') if present.
+    #[inline]
+    pub fn consume_flow_mapping_end(&mut self) -> Result<bool, String> {
+        self.consume_if(Token::FlowMappingEnd)
+    }
+
     /// Expose a mutable reference to the underlying source for error reporting
     pub fn source_mut(&mut self) -> &mut dyn crate::io::traits::ISource {
         self.lexer.source

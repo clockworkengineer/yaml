@@ -43,7 +43,7 @@ pub fn parse_inline_sequence_with_tokens(
         match stream.current() {
             Some(Token::FlowSequenceEnd) => {
                 // Closing bracket - done
-                let _ = stream.consume_if(Token::FlowSequenceEnd)?;
+                let _ = stream.consume_flow_sequence_end()?;
                 break;
             }
             Some(Token::Comma) => {
@@ -56,7 +56,7 @@ pub fn parse_inline_sequence_with_tokens(
                 }
                 // Allow trailing comma: set to expect next item, but do not error
                 // If immediately followed by ']', the loop will close cleanly
-                let _ = stream.consume_if(Token::Comma)?;
+                let _ = stream.consume_comma()?;
                 expect_item = true;
             }
             None | Some(Token::Eof) => {
@@ -171,13 +171,13 @@ pub fn parse_inline_mapping_with_tokens(
         match stream.current() {
             Some(Token::FlowMappingEnd) => {
                 // Closing brace - done
-                let _ = stream.consume_if(Token::FlowMappingEnd)?;
+                let _ = stream.consume_flow_mapping_end()?;
                 break;
             }
             Some(Token::Comma) => {
                 // Allow trailing comma: set to expect next entry, but do not error
                 // If immediately followed by '}', the loop will close cleanly
-                let _ = stream.consume_if(Token::Comma)?;
+                let _ = stream.consume_comma()?;
                 expect_entry = true;
             }
             None | Some(Token::Eof) => {
