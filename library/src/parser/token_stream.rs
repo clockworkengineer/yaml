@@ -206,6 +206,20 @@ impl<'a> TokenStream<'a> {
         self.skip_whitespace_and_comments()
     }
 
+    /// Skip only newlines and comments, preserving `Indent` tokens for dedent detection.
+    #[inline]
+    pub fn skip_newlines_and_comments(&mut self) -> Result<(), String> {
+        #[cfg(feature = "debug-trace")]
+        ts_log(format!(
+            "token_stream: skip_newlines_and_comments at {:?}",
+            self.current()
+        ));
+        while matches!(self.current(), Some(Token::Newline) | Some(Token::Comment(_))) {
+            self.next()?;
+        }
+        Ok(())
+    }
+
     #[inline]
     fn is_trivia(token: &Token) -> bool {
         matches!(token, Token::Newline | Token::Indent(_) | Token::Comment(_))

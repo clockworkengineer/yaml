@@ -52,12 +52,7 @@ pub fn parse_sequence_with_tokens(
     loop {
         // Skip comments and newlines between sequence items
         // DO NOT skip Indent tokens here - we need them for dedent detection
-        while matches!(
-            stream.current(),
-            Some(Token::Comment(_)) | Some(Token::Newline)
-        ) {
-            stream.next()?;
-        }
+        stream.skip_newlines_and_comments()?;
         // If a stray comma remains after an inline flow item, consume it
         if matches!(stream.current(), Some(Token::Comma)) {
             stream.next()?;
@@ -68,9 +63,7 @@ pub fn parse_sequence_with_tokens(
                 stream.next()?;
             }
             // Don't skip Indent tokens - we need them for dedent detection
-            while matches!(stream.current(), Some(Token::Newline) | Some(Token::Comment(_))) {
-                stream.next()?;
-            }
+            stream.skip_newlines_and_comments()?;
         }
         // End sequence if dedent or document marker, but only if not in explicit key or flow context
         let current_indent = stack.last().map(|(lvl, _)| *lvl).unwrap_or(base_indent);
@@ -135,9 +128,7 @@ pub fn parse_sequence_with_tokens(
             stream.next()?;
             // Skip whitespace after dash, but preserve Indent tokens for dedent detection
             // Only skip newlines and comments here
-            while matches!(stream.current(), Some(Token::Newline) | Some(Token::Comment(_))) {
-                stream.next()?;
-            }
+            stream.skip_newlines_and_comments()?;
             match stream.current() {
                 Some(Token::Newline) | None => {
                     if let Some((_, items)) = stack.last_mut() {

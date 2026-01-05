@@ -48,12 +48,8 @@ pub fn parse_mapping_with_tokens(
     stream.skip_trivia()?;
 
     loop {
-        while matches!(
-            stream.current(),
-            Some(Token::Newline) | Some(Token::Comment(_))
-        ) {
-            stream.next()?;
-        }
+        // Skip comments and newlines between entries; preserve Indent for dedent detection
+        stream.skip_newlines_and_comments()?;
 
         // Before parsing a new key, check for dedent and unwind stack if needed
         let mut _dedented = false;
@@ -513,16 +509,8 @@ fn parse_mapping_pair(
         "DEBUG: parse_mapping_pair: after key, token = {:?}",
         stream.current()
     );
-    // Allow newlines and whitespace after key before colon
-    loop {
-        match stream.current() {
-            Some(Token::Newline) | Some(Token::Comment(_)) => {
-                stream.next()?;
-                continue;
-            }
-            _ => break,
-        }
-    }
+    // Allow newlines/comments after key before colon
+    stream.skip_newlines_and_comments()?;
     match stream.current() {
         Some(Token::Colon) => {
             stream.next()?;
@@ -604,15 +592,7 @@ fn parse_mapping_pair(
                 stream.next()?;
             }
             // Allow comments and blank lines immediately after the colon
-            loop {
-                match stream.current() {
-                    Some(Token::Newline) | Some(Token::Comment(_)) => {
-                        stream.next()?;
-                        continue;
-                    }
-                    _ => break,
-                }
-            }
+            stream.skip_newlines_and_comments()?;
             // Check for indent starting the nested value
             let indent_level = if let Some(Token::Indent(level)) = stream.current() {
                 if *level > cur_indent {
@@ -627,14 +607,7 @@ fn parse_mapping_pair(
             };
             if let Some(level) = indent_level {
                 // After indent, skip newlines/comments before checking for dash
-                loop {
-                    match stream.current() {
-                        Some(Token::Newline) | Some(Token::Comment(_)) => {
-                            stream.next()?;
-                        }
-                        _ => break,
-                    }
-                }
+                stream.skip_newlines_and_comments()?;
                 println!(
                     "DEBUG: parse_mapping_pair: after value indent/newline, token = {:?}",
                     stream.current()
