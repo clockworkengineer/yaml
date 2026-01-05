@@ -1,4 +1,3 @@
-
 /// Token-based flow collection parsers
 ///
 /// Handles inline YAML collections using tokens instead of character parsing.
@@ -89,7 +88,10 @@ pub fn parse_inline_sequence_with_tokens(
                     stream.skip_trivia()?;
 
                     // Parse the value (or use None if followed by comma/bracket)
-                    let val = if matches!(stream.current(), Some(Token::Comma) | Some(Token::FlowSequenceEnd)) {
+                    let val = if matches!(
+                        stream.current(),
+                        Some(Token::Comma) | Some(Token::FlowSequenceEnd)
+                    ) {
                         Node::None
                     } else {
                         parse_value_with_tokens(stream, directives, depth + 1)?
@@ -98,7 +100,10 @@ pub fn parse_inline_sequence_with_tokens(
                     // Create a single-pair mapping
                     let mapping = Node::Mapping(vec![(value_or_key, val)]);
                     #[cfg(feature = "debug-trace")]
-                    log::debug!("inline_tokens: seq item (implicit mapping) -> {:?}", mapping);
+                    log::debug!(
+                        "inline_tokens: seq item (implicit mapping) -> {:?}",
+                        mapping
+                    );
                     items.push(mapping);
                 } else {
                     // It's a regular value
@@ -152,7 +157,7 @@ pub fn parse_inline_mapping_with_tokens(
             );
             return Err(syntax_error(
                 stream.source_mut(),
-                "Exceeded 1000 iterations in flow mapping parser (possible infinite loop)"
+                "Exceeded 1000 iterations in flow mapping parser (possible infinite loop)",
             ));
         }
         // Skip whitespace/comments
@@ -210,17 +215,8 @@ pub fn parse_inline_mapping_with_tokens(
                 stream.skip_trivia()?;
                 // Expect colon for key-value pair
                 if matches!(stream.current(), Some(Token::Colon)) {
-                    let _ = stream.consume_if(Token::Colon)?;
-
-                    // Check for double colon WITHOUT whitespace (invalid)
-                    // If there's a colon immediately (no whitespace consumed), reject it
-                    if matches!(stream.current(), Some(Token::Colon)) {
-                        return Err(syntax_error(
-                            stream.source_mut(),
-                            "YAML 1.2 compliance error: Double colon (::) is not allowed as a key-value separator in flow mappings. Use a single colon only.",
-                        ));
-                    }
-
+                    // DRY: consume single colon with compliance validation (no behavior change)
+                    let _ = stream.consume_single_colon()?;
                     stream.skip_trivia()?;
 
                     // Progress check: record position before parsing value
@@ -228,14 +224,22 @@ pub fn parse_inline_mapping_with_tokens(
                     println!("DEBUG: before_value position = {}", before_value);
 
                     // Check for empty value (key: followed by , or })
-                    let value = if matches!(stream.current(), Some(Token::Comma) | Some(Token::FlowMappingEnd)) {
+                    let value = if matches!(
+                        stream.current(),
+                        Some(Token::Comma) | Some(Token::FlowMappingEnd)
+                    ) {
                         // Empty value - use None (null)
                         Node::None
                     } else {
                         let val = parse_value_with_tokens(stream, directives, depth + 1)?;
                         let after_value = stream.stream_position();
                         println!("DEBUG: after_value position = {}", after_value);
-                        ensure_progress(stream, before_value, after_value, "value in flow mapping")?;
+                        ensure_progress(
+                            stream,
+                            before_value,
+                            after_value,
+                            "value in flow mapping",
+                        )?;
                         val
                     };
                     #[cfg(feature = "debug-trace")]
@@ -246,7 +250,10 @@ pub fn parse_inline_mapping_with_tokens(
                     // In flow mappings, a key without a colon has an implicit null value
                     // This is valid in YAML 1.2: {key} is equivalent to {key: null}
                     #[cfg(feature = "debug-trace")]
-                    log::debug!("inline_tokens: map entry with implicit null -> ({:?}, None)", key);
+                    log::debug!(
+                        "inline_tokens: map entry with implicit null -> ({:?}, None)",
+                        key
+                    );
                     pairs.push((key, Node::None));
                 }
                 expect_entry = false;

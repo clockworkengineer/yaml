@@ -229,7 +229,7 @@ impl<'a> TokenStream<'a> {
                     if decorators.tag.is_some() {
                         return Err(crate::parser::document::error_builder::syntax_error(
                             self.source_mut(),
-                            "Duplicate tag found"
+                            "Duplicate tag found",
                         ));
                     }
                     // Preserve raw tag handle; resolve later in value parsing
@@ -240,7 +240,7 @@ impl<'a> TokenStream<'a> {
                     if decorators.anchor.is_some() {
                         return Err(crate::parser::document::error_builder::syntax_error(
                             self.source_mut(),
-                            "Duplicate anchor found"
+                            "Duplicate anchor found",
                         ));
                     }
                     decorators.anchor = Some(name.clone());
@@ -295,7 +295,7 @@ impl<'a> TokenStream<'a> {
             Some(token) => Err(format!("Expected plain scalar, got {:?}", token)),
             None => Err(crate::parser::document::error_builder::syntax_error(
                 self.source_mut(),
-                "Expected plain scalar, got EOF"
+                "Expected plain scalar, got EOF",
             )),
         }
     }
@@ -311,7 +311,7 @@ impl<'a> TokenStream<'a> {
             Some(token) => Err(format!("Expected quoted scalar, got {:?}", token)),
             None => Err(crate::parser::document::error_builder::syntax_error(
                 self.source_mut(),
-                "Expected quoted scalar, got EOF"
+                "Expected quoted scalar, got EOF",
             )),
         }
     }
@@ -337,7 +337,7 @@ impl<'a> TokenStream<'a> {
             Some(token) => Err(format!("Expected scalar, got {:?}", token)),
             None => Err(crate::parser::document::error_builder::syntax_error(
                 self.source_mut(),
-                "Expected scalar, got EOF"
+                "Expected scalar, got EOF",
             )),
         }
     }
@@ -367,6 +367,29 @@ impl<'a> TokenStream<'a> {
         #[cfg(feature = "debug-trace")]
         ts_log(format!("token_stream: has_colon_ahead -> {}", has_colon));
         Ok(has_colon)
+    }
+
+    /// Consume a single colon token, erroring if an immediate second colon follows.
+    ///
+    /// This enforces YAML 1.2 compliance for key-value separators in flow mappings,
+    /// rejecting a double-colon sequence (::) without intervening trivia.
+    /// Returns true if a colon was consumed, false if current token is not a colon.
+    pub fn consume_single_colon(&mut self) -> Result<bool, String> {
+        match self.current() {
+            Some(Token::Colon) => {
+                // Consume the colon
+                self.next()?;
+                // If another colon is immediately present, that's invalid (::)
+                if matches!(self.current(), Some(Token::Colon)) {
+                    return Err(crate::parser::document::error_builder::syntax_error(
+                        self.source_mut(),
+                        "YAML 1.2 compliance error: Double colon (::) is not allowed as a key-value separator in flow mappings. Use a single colon only.",
+                    ));
+                }
+                Ok(true)
+            }
+            _ => Ok(false),
+        }
     }
 
     /// Expose a mutable reference to the underlying source for error reporting
