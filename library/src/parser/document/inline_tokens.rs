@@ -217,7 +217,7 @@ pub fn parse_inline_mapping_with_tokens(
                 if matches!(stream.current(), Some(Token::Colon)) {
                     // DRY: consume single colon with compliance validation (no behavior change)
                     let _ = stream.consume_single_colon()?;
-                    stream.skip_trivia()?;
+                    // No need to call skip_trivia twice; one call above suffices
 
                     // Progress check: record position before parsing value
                     let before_value = stream.stream_position();
