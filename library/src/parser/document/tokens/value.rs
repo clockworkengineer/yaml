@@ -458,10 +458,8 @@ fn parse_value_content(
         "value_tokens: parse_value_content at token = {:?}",
         stream.current()
     );
-    // Skip comments before parsing value
-    while matches!(stream.current(), Some(Token::Comment(_))) {
-        stream.next()?;
-    }
+    // Skip comments before parsing value (DRY)
+    stream.skip_comments()?;
     match stream.current() {
         // Tolerate stray commas in block contexts: consume and treat as empty value
         Some(Token::Comma) => {
