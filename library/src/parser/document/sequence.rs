@@ -43,19 +43,17 @@ fn parse_sequence_inner(
 ) -> Result<crate::nodes::node::Node, String> {
     let mut items = Vec::new();
     while let Some(token) = stream.current() {
-        match token {
-            crate::parser::lexer::Token::Newline | crate::parser::lexer::Token::Comment(_) => {
-                stream.next()?;
-                continue;
-            }
-            crate::parser::lexer::Token::Indent(level) => {
+        // DRY: skip consecutive newlines and comments upfront
+        stream.skip_newlines_and_comments()?;
+        match stream.current() {
+            Some(crate::parser::lexer::Token::Indent(level)) => {
                 if *level < indent_level {
                     break;
                 }
                 stream.next()?;
                 continue;
             }
-            crate::parser::lexer::Token::Dash => {
+            Some(crate::parser::lexer::Token::Dash) => {
                 stream.next()?;
                 stream.skip_whitespace()?;
                 match stream.current() {
@@ -79,14 +77,15 @@ fn parse_sequence_inner(
                     }
                 }
             }
-            crate::parser::lexer::Token::Eof
-            | crate::parser::lexer::Token::DocumentEnd
-            | crate::parser::lexer::Token::DocumentStart => {
+            Some(crate::parser::lexer::Token::Eof)
+            | Some(crate::parser::lexer::Token::DocumentEnd)
+            | Some(crate::parser::lexer::Token::DocumentStart) => {
                 break;
             }
-            _ => {
+            Some(_) => {
                 stream.next()?;
             }
+            None => break,
         }
     }
     Ok(crate::nodes::node::Node::Array(items))
