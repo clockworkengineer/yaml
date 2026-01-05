@@ -44,8 +44,8 @@ pub fn parse_mapping_with_tokens(
     let mut stack: Vec<(usize, Vec<(Node, Node)>)> = Vec::new();
     stack.push((base_indent, Vec::new()));
 
-    // Skip initial whitespace/newlines
-    stream.skip_whitespace()?;
+    // Skip initial trivia (whitespace, comments)
+    stream.skip_trivia()?;
 
     loop {
         while matches!(
@@ -683,7 +683,7 @@ fn parse_mapping_pair(
         }
         _ => {
             // Skip whitespace before value
-            stream.skip_whitespace()?;
+            stream.skip_trivia()?;
             // Parse the actual value
             let v = parse_value_with_tokens(stream, directives, depth + 1)?;
             #[cfg(feature = "debug-trace")]

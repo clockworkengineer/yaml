@@ -46,8 +46,8 @@ pub fn parse_sequence_with_tokens(
     let mut stack: Vec<(usize, Vec<Node>)> = Vec::new();
     stack.push((base_indent, Vec::new()));
 
-    // Skip initial whitespace/newlines but track where we start
-    stream.skip_whitespace()?;
+    // Skip initial trivia (whitespace, comments)
+    stream.skip_trivia()?;
 
     loop {
         // Skip comments and newlines between sequence items
