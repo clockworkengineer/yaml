@@ -187,14 +187,7 @@ pub fn parse_mapping_with_tokens(
                 let (_, pairs) = stack.pop().unwrap();
                 return Ok(Node::Mapping(pairs));
             }
-            Some(Token::Newline) => {
-                stream.next()?;
-                continue;
-            }
-            Some(Token::Comment(_)) => {
-                stream.next()?;
-                continue;
-            }
+            // Newlines and comments are already skipped at loop start via skip_newlines_and_comments()
             Some(Token::Indent(level)) => {
                 println!(
                     "TRACE: Token::Indent encountered: level={}, stack_len={}, stack={:?}",
@@ -249,10 +242,7 @@ pub fn parse_mapping_with_tokens(
             stack.iter().map(|(i, v)| (*i, v.len())).collect::<Vec<_>>()
         );
         match token {
-            Some(Token::Newline) | Some(Token::Comment(_)) => {
-                stream.next()?;
-                continue;
-            }
+            // Newlines and comments already handled by skip_newlines_and_comments()
             Some(Token::Indent(level)) => {
                 println!(
                     "TRACE: Token::Indent encountered: level={}, stack_len={}, stack={:?}",
