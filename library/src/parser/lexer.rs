@@ -145,20 +145,10 @@ impl<'a> Lexer<'a> {
             }
         };
 
-        // Handle line-start indentation
+        // Handle line-start indentation via helper to keep logic centralized
         if self.at_line_start {
-            if ch == CHAR_SPACE || ch == CHAR_TAB {
-                let indent = self.scan_indentation(self.in_flow)?;
-                self.at_line_start = false;
-                self.last_indent = indent;
-                println!("LEXER TRACE: Emitting Token::Indent({})", indent);
-                return Ok(Some(Token::Indent(indent)));
-            } else if self.last_indent > 0 {
-                // No leading space/tab, but previous indent was > 0: emit Indent(0) to signal dedent
-                self.at_line_start = false;
-                self.last_indent = 0;
-                println!("LEXER TRACE: Emitting Token::Indent(0) (dedent to top level)");
-                return Ok(Some(Token::Indent(0)));
+            if let Some(tok) = self.emit_indentation_token_if_any(ch)? {
+                return Ok(Some(tok));
             }
         }
 
@@ -166,37 +156,8 @@ impl<'a> Lexer<'a> {
 
         // Match token types
         match ch {
-            CHAR_NEWLINE => {
-                println!(
-                    "LEXER TRACE: Emitting Token::Newline (in_flow={})",
-                    self.in_flow
-                );
-                self.source.next();
-                self.at_line_start = true;
-                self.last_was_linebreak = true;
-                if self.in_flow {
-                    // Suppress Token::Newline in flow context
-                    return self.scan_token();
-                }
-                Ok(Some(Token::Newline))
-            }
-            CHAR_CARRIAGE_RETURN => {
-                println!(
-                    "LEXER TRACE: Emitting Token::Newline (CR) (in_flow={})",
-                    self.in_flow
-                );
-                self.source.next();
-                if self.source.current() == Some(CHAR_NEWLINE) {
-                    self.source.next();
-                }
-                self.at_line_start = true;
-                self.last_was_linebreak = true;
-                if self.in_flow {
-                    // Suppress Token::Newline in flow context
-                    return self.scan_token();
-                }
-                Ok(Some(Token::Newline))
-            }
+            CHAR_NEWLINE => self.handle_newline(false),
+            CHAR_CARRIAGE_RETURN => self.handle_newline(true),
             CHAR_HASH => {
                 self.source.next();
                 let comment = self.scan_until_newline();
@@ -223,33 +184,7 @@ impl<'a> Lexer<'a> {
             CHAR_RBRACE => {
                 println!("LEXER TRACE: Emitting Token::FlowMappingEnd");
                 self.source.next();
-                // Allow any horizontal whitespace before comment
-                let mut seen_whitespace = false;
-                while let Some(c) = self.source.current() {
-                    if c == ' ' || c == '\t' {
-                        seen_whitespace = true;
-                        self.source.next();
-                    } else {
-                        break;
-                    }
-                }
-                if let Some('#') = self.source.current() {
-                    if !seen_whitespace {
-                        return Err(crate::parser::document::error_builder::syntax_error(
-                            self.source,
-                            "YAML syntax error: comment must be preceded by whitespace after '}' in flow collection"
-                        ));
-                    }
-                }
-                // Validate what comes after } - must be whitespace, newline, flow indicator, or EOF
-                if let Some(c) = self.source.current() {
-                    if !seen_whitespace && c != '\n' && c != '\r' && c != ',' && c != ']' && c != '}' && c != '#' && c != ':' {
-                        // Check if it's alphanumeric which clearly indicates invalid
-                        if c.is_alphanumeric() {
-                            return Err(format!("YAML syntax error: Invalid content '{}' immediately after '}}' - whitespace or newline required", c));
-                        }
-                    }
-                }
+                self.validate_post_flow_closer('}')?;
                 self.last_was_linebreak = false;
                 Ok(Some(Token::FlowMappingEnd))
             }
@@ -260,33 +195,7 @@ impl<'a> Lexer<'a> {
             }
             CHAR_RBRACKET => {
                 self.source.next();
-                // Allow any horizontal whitespace before comment
-                let mut seen_whitespace = false;
-                while let Some(c) = self.source.current() {
-                    if c == ' ' || c == '\t' {
-                        seen_whitespace = true;
-                        self.source.next();
-                    } else {
-                        break;
-                    }
-                }
-                if let Some('#') = self.source.current() {
-                    if !seen_whitespace {
-                        return Err(crate::parser::document::error_builder::syntax_error(
-                            self.source,
-                            "YAML syntax error: comment must be preceded by whitespace after ']' in flow collection"
-                        ));
-                    }
-                }
-                // Validate what comes after ] - must be whitespace, newline, flow indicator, or EOF
-                if let Some(c) = self.source.current() {
-                    if !seen_whitespace && c != '\n' && c != '\r' && c != ',' && c != ']' && c != '}' && c != '#' && c != ':' {
-                        // Check if it's alphanumeric which clearly indicates invalid
-                        if c.is_alphanumeric() {
-                            return Err(format!("YAML syntax error: Invalid content '{}' immediately after ']' - whitespace or newline required", c));
-                        }
-                    }
-                }
+                self.validate_post_flow_closer(']')?;
                 self.last_was_linebreak = false;
                 Ok(Some(Token::FlowSequenceEnd))
             }
@@ -311,7 +220,7 @@ impl<'a> Lexer<'a> {
                         );
                         return Err(crate::parser::document::error_builder::syntax_error(
                             self.source,
-                            "YAML syntax error: comment must be preceded by whitespace after ',' in flow collection"
+                            "YAML syntax error: comment must be preceded by whitespace after ',' in flow collection",
                         ));
                     }
                 }
@@ -409,6 +318,25 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Emit an indentation token if applicable at line start.
+    /// Returns Ok(Some(Token)) if an indent/dedent should be emitted, Ok(None) otherwise.
+    fn emit_indentation_token_if_any(&mut self, ch: char) -> Result<Option<Token>, String> {
+        if ch == CHAR_SPACE || ch == CHAR_TAB {
+            let indent = self.scan_indentation(self.in_flow)?;
+            self.at_line_start = false;
+            self.last_indent = indent;
+            println!("LEXER TRACE: Emitting Token::Indent({})", indent);
+            return Ok(Some(Token::Indent(indent)));
+        } else if self.last_indent > 0 {
+            // No leading space/tab, but previous indent was > 0: emit Indent(0) to signal dedent
+            self.at_line_start = false;
+            self.last_indent = 0;
+            println!("LEXER TRACE: Emitting Token::Indent(0) (dedent to top level)");
+            return Ok(Some(Token::Indent(0)));
+        }
+        Ok(None)
+    }
+
     /// Scan indentation at line start
     fn scan_indentation(&mut self, in_flow: bool) -> Result<usize, String> {
         let mut count = 0;
@@ -440,7 +368,7 @@ impl<'a> Lexer<'a> {
                     return Err(crate::parser::document::error_builder::forbidden_error(
                         self.source,
                         "Tabs",
-                        "as indentation in YAML"
+                        "as indentation in YAML",
                     ));
                 }
 
@@ -455,6 +383,35 @@ impl<'a> Lexer<'a> {
         // Indentation consumed; reset linebreak flag
         self.last_was_linebreak = false;
         Ok(count)
+    }
+
+    /// Handle newline characters (LF and CR[LF]) consistently.
+    /// If in flow context, suppress newline tokens and continue scanning.
+    fn handle_newline(&mut self, is_cr: bool) -> Result<Option<Token>, String> {
+        if is_cr {
+            println!(
+                "LEXER TRACE: Emitting Token::Newline (CR) (in_flow={})",
+                self.in_flow
+            );
+            self.source.next();
+            if self.source.current() == Some(CHAR_NEWLINE) {
+                self.source.next();
+            }
+        } else {
+            println!(
+                "LEXER TRACE: Emitting Token::Newline (in_flow={})",
+                self.in_flow
+            );
+            self.source.next();
+        }
+
+        self.at_line_start = true;
+        self.last_was_linebreak = true;
+        if self.in_flow {
+            // Suppress Token::Newline in flow context
+            return self.scan_token();
+        }
+        Ok(Some(Token::Newline))
     }
 
     /// Scan until newline
@@ -481,6 +438,54 @@ impl<'a> Lexer<'a> {
         let result = self.source.current();
         self.source.restore_state(state);
         result
+    }
+
+    /// Validate what may follow immediately after a flow closer ('}' or ']')
+    /// Consumes any horizontal whitespace; enforces that a comment must be preceded by whitespace.
+    /// Also validates that immediate non-whitespace characters are allowed flow delimiters or line breaks.
+    fn validate_post_flow_closer(&mut self, closer: char) -> Result<(), String> {
+        // Allow any horizontal whitespace before comment
+        let mut seen_whitespace = false;
+        while let Some(c) = self.source.current() {
+            if c == ' ' || c == '\t' {
+                seen_whitespace = true;
+                self.source.next();
+            } else {
+                break;
+            }
+        }
+        if let Some('#') = self.source.current() {
+            if !seen_whitespace {
+                return Err(crate::parser::document::error_builder::syntax_error(
+                    self.source,
+                    &format!(
+                        "YAML syntax error: comment must be preceded by whitespace after '{}' in flow collection",
+                        closer
+                    ),
+                ));
+            }
+        }
+        // Validate next non-whitespace char - must be newline, flow indicator, or EOF
+        if let Some(c) = self.source.current() {
+            if !seen_whitespace
+                && c != '\n'
+                && c != '\r'
+                && c != ','
+                && c != ']'
+                && c != '}'
+                && c != '#'
+                && c != ':'
+            {
+                // Check if it's alphanumeric which clearly indicates invalid adjacent content
+                if c.is_alphanumeric() {
+                    return Err(format!(
+                        "YAML syntax error: Invalid content '{}' immediately after '{}' - whitespace or newline required",
+                        c, closer
+                    ));
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Scan a tag: !tag or !!tag
@@ -564,7 +569,7 @@ impl<'a> Lexer<'a> {
         if name.is_empty() {
             return Err(crate::parser::document::error_builder::syntax_error(
                 self.source,
-                "Empty anchor name"
+                "Empty anchor name",
             ));
         }
 
@@ -595,7 +600,7 @@ impl<'a> Lexer<'a> {
         if name.is_empty() {
             return Err(crate::parser::document::error_builder::syntax_error(
                 self.source,
-                "Empty alias name"
+                "Empty alias name",
             ));
         }
 
@@ -638,7 +643,7 @@ impl<'a> Lexer<'a> {
                     eprintln!("DEBUG: Unterminated single-quoted string: reached EOF");
                     return Err(crate::parser::document::error_builder::syntax_error(
                         self.source,
-                        "YAML compliance error: Unterminated single-quoted string (unexpected EOF)"
+                        "YAML compliance error: Unterminated single-quoted string (unexpected EOF)",
                     ));
                 }
             }
@@ -658,23 +663,74 @@ impl<'a> Lexer<'a> {
                 Some('\\') => {
                     self.source.next();
                     match self.source.current() {
-                        Some('0') => { content.push('\0'); self.source.next(); }
-                        Some('a') => { content.push('\x07'); self.source.next(); }
-                        Some('b') => { content.push('\x08'); self.source.next(); }
-                        Some('t') | Some('\t') => { content.push('\t'); self.source.next(); }
-                        Some('n') => { content.push('\n'); self.source.next(); }
-                        Some('v') => { content.push('\x0B'); self.source.next(); }
-                        Some('f') => { content.push('\x0C'); self.source.next(); }
-                        Some('r') => { content.push('\r'); self.source.next(); }
-                        Some('e') => { content.push('\x1B'); self.source.next(); }
-                        Some(' ') => { content.push(' '); self.source.next(); }
-                        Some('"') => { content.push('"'); self.source.next(); }
-                        Some('/') => { content.push('/'); self.source.next(); }
-                        Some('\\') => { content.push('\\'); self.source.next(); }
-                        Some('N') => { content.push('\u{0085}'); self.source.next(); }
-                        Some('_') => { content.push('\u{00A0}'); self.source.next(); }
-                        Some('L') => { content.push('\u{2028}'); self.source.next(); }
-                        Some('P') => { content.push('\u{2029}'); self.source.next(); }
+                        Some('0') => {
+                            content.push('\0');
+                            self.source.next();
+                        }
+                        Some('a') => {
+                            content.push('\x07');
+                            self.source.next();
+                        }
+                        Some('b') => {
+                            content.push('\x08');
+                            self.source.next();
+                        }
+                        Some('t') | Some('\t') => {
+                            content.push('\t');
+                            self.source.next();
+                        }
+                        Some('n') => {
+                            content.push('\n');
+                            self.source.next();
+                        }
+                        Some('v') => {
+                            content.push('\x0B');
+                            self.source.next();
+                        }
+                        Some('f') => {
+                            content.push('\x0C');
+                            self.source.next();
+                        }
+                        Some('r') => {
+                            content.push('\r');
+                            self.source.next();
+                        }
+                        Some('e') => {
+                            content.push('\x1B');
+                            self.source.next();
+                        }
+                        Some(' ') => {
+                            content.push(' ');
+                            self.source.next();
+                        }
+                        Some('"') => {
+                            content.push('"');
+                            self.source.next();
+                        }
+                        Some('/') => {
+                            content.push('/');
+                            self.source.next();
+                        }
+                        Some('\\') => {
+                            content.push('\\');
+                            self.source.next();
+                        }
+                        Some('N') => {
+                            content.push('\u{0085}');
+                            self.source.next();
+                        }
+                        Some('_') => {
+                            content.push('\u{00A0}');
+                            self.source.next();
+                        }
+                        Some('L') => {
+                            content.push('\u{2028}');
+                            self.source.next();
+                        }
+                        Some('P') => {
+                            content.push('\u{2029}');
+                            self.source.next();
+                        }
                         Some('x') => {
                             // \xXX - 2 hex digits
                             self.source.next();
@@ -685,10 +741,14 @@ impl<'a> Lexer<'a> {
                                         hex.push(c);
                                         self.source.next();
                                     }
-                                    _ => return Err(crate::parser::document::error_builder::syntax_error(
-                                        self.source,
-                                        "YAML compliance error: Invalid \\x escape sequence, expected 2 hex digits"
-                                    )),
+                                    _ => {
+                                        return Err(
+                                            crate::parser::document::error_builder::syntax_error(
+                                                self.source,
+                                                "YAML compliance error: Invalid \\x escape sequence, expected 2 hex digits",
+                                            ),
+                                        );
+                                    }
                                 }
                             }
                             let code = u8::from_str_radix(&hex, 16).unwrap();
@@ -704,19 +764,30 @@ impl<'a> Lexer<'a> {
                                         hex.push(c);
                                         self.source.next();
                                     }
-                                    _ => return Err(crate::parser::document::error_builder::syntax_error(
-                                        self.source,
-                                        "YAML compliance error: Invalid \\u escape sequence, expected 4 hex digits"
-                                    )),
+                                    _ => {
+                                        return Err(
+                                            crate::parser::document::error_builder::syntax_error(
+                                                self.source,
+                                                "YAML compliance error: Invalid \\u escape sequence, expected 4 hex digits",
+                                            ),
+                                        );
+                                    }
                                 }
                             }
                             let code = u32::from_str_radix(&hex, 16).unwrap();
                             match char::from_u32(code) {
                                 Some(ch) => content.push(ch),
-                                None => return Err(crate::parser::document::error_builder::syntax_error(
-                                    self.source,
-                                    &format!("YAML compliance error: Invalid unicode codepoint U+{:04X}", code)
-                                )),
+                                None => {
+                                    return Err(
+                                        crate::parser::document::error_builder::syntax_error(
+                                            self.source,
+                                            &format!(
+                                                "YAML compliance error: Invalid unicode codepoint U+{:04X}",
+                                                code
+                                            ),
+                                        ),
+                                    );
+                                }
                             }
                         }
                         Some('U') => {
@@ -729,16 +800,25 @@ impl<'a> Lexer<'a> {
                                         hex.push(c);
                                         self.source.next();
                                     }
-                                    _ => return Err(crate::parser::document::error_builder::syntax_error(
-                                        self.source,
-                                        "YAML compliance error: Invalid \\U escape sequence, expected 8 hex digits"
-                                    )),
+                                    _ => {
+                                        return Err(
+                                            crate::parser::document::error_builder::syntax_error(
+                                                self.source,
+                                                "YAML compliance error: Invalid \\U escape sequence, expected 8 hex digits",
+                                            ),
+                                        );
+                                    }
                                 }
                             }
                             let code = u32::from_str_radix(&hex, 16).unwrap();
                             match char::from_u32(code) {
                                 Some(ch) => content.push(ch),
-                                None => return Err(format!("YAML compliance error: Invalid unicode codepoint U+{:08X}", code)),
+                                None => {
+                                    return Err(format!(
+                                        "YAML compliance error: Invalid unicode codepoint U+{:08X}",
+                                        code
+                                    ));
+                                }
                             }
                         }
                         // Invalid escape sequences - reject per YAML 1.2 spec

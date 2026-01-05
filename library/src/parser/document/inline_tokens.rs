@@ -44,7 +44,7 @@ pub fn parse_inline_sequence_with_tokens(
         match stream.current() {
             Some(Token::FlowSequenceEnd) => {
                 // Closing bracket - done
-                stream.next()?;
+                let _ = stream.consume_if(Token::FlowSequenceEnd)?;
                 break;
             }
             Some(Token::Comma) => {
@@ -57,7 +57,7 @@ pub fn parse_inline_sequence_with_tokens(
                 }
                 // Allow trailing comma: set to expect next item, but do not error
                 // If immediately followed by ']', the loop will close cleanly
-                stream.next()?;
+                let _ = stream.consume_if(Token::Comma)?;
                 expect_item = true;
             }
             None | Some(Token::Eof) => {
@@ -79,14 +79,14 @@ pub fn parse_inline_sequence_with_tokens(
                 let value_or_key = parse_value_with_tokens(stream, directives, depth + 1)?;
 
                 // Skip whitespace to check if this is actually a key (followed by colon)
-                stream.skip_whitespace_and_comments()?;
+                stream.skip_trivia()?;
 
                 // Check if this is an implicit mapping (key: value in a flow sequence)
                 if matches!(stream.current(), Some(Token::Colon)) {
                     // This is actually a key, not a standalone value
                     // Parse as a single-pair mapping
-                    stream.next()?; // consume colon
-                    stream.skip_whitespace_and_comments()?;
+                    let _ = stream.consume_if(Token::Colon)?; // consume colon
+                    stream.skip_trivia()?;
 
                     // Parse the value (or use None if followed by comma/bracket)
                     let val = if matches!(stream.current(), Some(Token::Comma) | Some(Token::FlowSequenceEnd)) {
@@ -156,7 +156,7 @@ pub fn parse_inline_mapping_with_tokens(
             ));
         }
         // Skip whitespace/comments
-        stream.skip_whitespace_and_comments()?;
+        stream.skip_trivia()?;
 
         println!(
             "DEBUG: Iteration {}, current token: {:?}",
@@ -166,13 +166,13 @@ pub fn parse_inline_mapping_with_tokens(
         match stream.current() {
             Some(Token::FlowMappingEnd) => {
                 // Closing brace - done
-                stream.next()?;
+                let _ = stream.consume_if(Token::FlowMappingEnd)?;
                 break;
             }
             Some(Token::Comma) => {
                 // Allow trailing comma: set to expect next entry, but do not error
                 // If immediately followed by '}', the loop will close cleanly
-                stream.next()?;
+                let _ = stream.consume_if(Token::Comma)?;
                 expect_entry = true;
             }
             None | Some(Token::Eof) => {
@@ -196,15 +196,10 @@ pub fn parse_inline_mapping_with_tokens(
                 let key = parse_value_with_tokens(stream, directives, depth + 1)?;
                 let after_key = stream.stream_position();
                 println!("DEBUG: after_key position = {}", after_key);
-                if before_key == after_key {
-                    return Err(syntax_error(
-                        stream.source_mut(),
-                        "Parser did not advance when parsing key in flow mapping (possible malformed input)",
-                    ));
-                }
+                ensure_progress(stream, before_key, after_key, "key in flow mapping")?;
 
                 // Skip whitespace
-                stream.skip_whitespace_and_comments()?;
+                stream.skip_trivia()?;
 
                 // Debug: print current token before colon check
                 println!(
@@ -212,10 +207,10 @@ pub fn parse_inline_mapping_with_tokens(
                     stream.current()
                 );
                 // Ensure all comments and newlines are skipped before colon check
-                stream.skip_whitespace_and_comments()?;
+                stream.skip_trivia()?;
                 // Expect colon for key-value pair
                 if matches!(stream.current(), Some(Token::Colon)) {
-                    stream.next()?;
+                    let _ = stream.consume_if(Token::Colon)?;
 
                     // Check for double colon WITHOUT whitespace (invalid)
                     // If there's a colon immediately (no whitespace consumed), reject it
@@ -226,7 +221,7 @@ pub fn parse_inline_mapping_with_tokens(
                         ));
                     }
 
-                    stream.skip_whitespace_and_comments()?;
+                    stream.skip_trivia()?;
 
                     // Progress check: record position before parsing value
                     let before_value = stream.stream_position();
@@ -240,12 +235,7 @@ pub fn parse_inline_mapping_with_tokens(
                         let val = parse_value_with_tokens(stream, directives, depth + 1)?;
                         let after_value = stream.stream_position();
                         println!("DEBUG: after_value position = {}", after_value);
-                        if before_value == after_value {
-                            return Err(syntax_error(
-                                stream.source_mut(),
-                                "Parser did not advance when parsing value in flow mapping (possible malformed input)",
-                            ));
-                        }
+                        ensure_progress(stream, before_value, after_value, "value in flow mapping")?;
                         val
                     };
                     #[cfg(feature = "debug-trace")]
@@ -283,6 +273,25 @@ pub fn parse_inline_mapping_with_tokens(
     } else {
         Ok(Node::Mapping(pairs))
     }
+}
+
+/// Ensure that the token stream progressed between two checkpoints, else raise a syntax error.
+fn ensure_progress(
+    stream: &mut TokenStream,
+    before: usize,
+    after: usize,
+    context: &str,
+) -> Result<(), String> {
+    if before == after {
+        return Err(syntax_error(
+            stream.source_mut(),
+            &format!(
+                "Parser did not advance when parsing {} (possible malformed input)",
+                context
+            ),
+        ));
+    }
+    Ok(())
 }
 
 #[cfg(test)]

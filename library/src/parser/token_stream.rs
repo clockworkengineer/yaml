@@ -21,6 +21,8 @@ pub struct TokenStream<'a> {
     _directives: &'a DirectiveContext,
     // Track a simple position counter for progress checks
     position_counter: usize,
+    // Track current flow collection nesting depth for instrumentation
+    flow_depth: i32,
 }
 
 // Env-controlled logging for token stream internals
@@ -59,6 +61,7 @@ impl<'a> TokenStream<'a> {
             lexer,
             _directives: directives,
             position_counter: 0,
+            flow_depth: 0,
         };
         #[cfg(feature = "debug-trace")]
         ts_log(format!("token_stream: new -> current = {:?}", ts.current()));
@@ -78,6 +81,18 @@ impl<'a> TokenStream<'a> {
         let out = self.lexer.next();
         if out.is_ok() {
             self.position_counter = self.position_counter.wrapping_add(1);
+        }
+        // Instrument: update flow depth counter (no behavior change)
+        if let Ok(Some(tok)) = &out {
+            match tok {
+                Token::FlowMappingStart | Token::FlowSequenceStart => {
+                    self.flow_depth = self.flow_depth.saturating_add(1);
+                }
+                Token::FlowMappingEnd | Token::FlowSequenceEnd => {
+                    self.flow_depth = (self.flow_depth - 1).max(0);
+                }
+                _ => {}
+            }
         }
         #[cfg(feature = "debug-trace")]
         if let Ok(ref _t) = out {
@@ -128,6 +143,18 @@ impl<'a> TokenStream<'a> {
         }
     }
 
+    /// If the current token matches `expected`, consume it and return true; otherwise return false.
+    #[inline]
+    pub fn consume_if(&mut self, expected: Token) -> Result<bool, String> {
+        match self.current() {
+            Some(token) if token == &expected => {
+                self.next()?;
+                Ok(true)
+            }
+            _ => Ok(false),
+        }
+    }
+
     /// Skip whitespace tokens (newlines, indents)
     #[inline]
     pub fn skip_whitespace(&mut self) -> Result<(), String> {
@@ -171,6 +198,12 @@ impl<'a> TokenStream<'a> {
             self.next()?;
         }
         Ok(())
+    }
+
+    /// Alias for skipping all trivia (whitespace + comments) to encourage DRY usage
+    #[inline]
+    pub fn skip_trivia(&mut self) -> Result<(), String> {
+        self.skip_whitespace_and_comments()
     }
 
     #[inline]
@@ -339,6 +372,11 @@ impl<'a> TokenStream<'a> {
     /// Expose a mutable reference to the underlying source for error reporting
     pub fn source_mut(&mut self) -> &mut dyn crate::io::traits::ISource {
         self.lexer.source
+    }
+
+    /// Current flow nesting depth (0 = not inside flow)
+    pub fn current_flow_depth(&self) -> i32 {
+        self.flow_depth
     }
 }
 
