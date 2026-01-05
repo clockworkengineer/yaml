@@ -60,7 +60,7 @@ fn parse_document_main_loop(
             '#' => {
                 let mut stream =
                     crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-                stream.skip_whitespace_and_comments()?;
+                stream.skip_trivia()?;
                 continue;
             }
             '%' => {
