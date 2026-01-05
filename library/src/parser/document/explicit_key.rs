@@ -10,7 +10,7 @@ fn parse_and_normalize_explicit_key(source: &mut dyn ISource) -> Result<Node, St
     {
         let mut stream =
             crate::parser::token_stream::TokenStream::new(source, &directives_local, false)?;
-        stream.skip_whitespace_and_comments()?;
+        stream.skip_trivia()?;
     }
     let mut stream =
         crate::parser::token_stream::TokenStream::new(source, &directives_local, false)?;
@@ -54,7 +54,7 @@ pub fn parse_multiple_explicit_keys(
             &directives_local,
         )?;
         pairs.push((key, value));
-        stream.skip_whitespace_and_comments()?;
+        stream.skip_trivia()?;
         // Only continue if next token is another explicit key at the same indent
         if !matches!(
             stream.current(),
@@ -93,13 +93,13 @@ pub(crate) fn parse_explicit_mapping_entry(
         ));
     }
     stream.next()?;
-    stream.skip_whitespace()?;
+    stream.skip_trivia()?;
 
     // Parse the key (may be empty), then normalize to string
     let mut key_node = match stream.current() {
         Some(Token::Newline) => {
             stream.next()?;
-            stream.skip_whitespace()?;
+            stream.skip_trivia()?;
             // Parse document contents as key (empty explicit key)
             crate::parser::document::tokens::value::parse_value_with_tokens(stream, directives, 0)?
         }
@@ -111,17 +111,17 @@ pub(crate) fn parse_explicit_mapping_entry(
     key_node = normalize_node_to_str(&key_node);
 
     // Skip whitespace/comments after key
-    stream.skip_whitespace()?;
+    stream.skip_trivia()?;
 
     // Look for the colon indicator
     let value_node = match stream.current() {
         Some(Token::Colon) => {
             stream.next()?;
-            stream.skip_whitespace()?;
+            stream.skip_trivia()?;
             match stream.current() {
                 Some(Token::Newline) => {
                     stream.next()?;
-                    stream.skip_whitespace()?;
+                    stream.skip_trivia()?;
                     crate::parser::document::tokens::value::parse_value_with_tokens(
                         stream, directives, 0,
                     )?
