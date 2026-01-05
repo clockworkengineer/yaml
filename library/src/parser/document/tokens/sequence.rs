@@ -181,12 +181,7 @@ pub fn parse_sequence_with_tokens(
                         }
                         continue;
                     }
-                    while matches!(
-                        stream.current(),
-                        Some(Token::Newline) | Some(Token::Comment(_))
-                    ) {
-                        stream.next()?;
-                    }
+                    stream.skip_newlines_and_comments()?;
                 }
                 Some(Token::FlowSequenceStart) | Some(Token::FlowMappingStart) => {
                     let value = parse_value_with_tokens(stream, directives, depth + 1)?;
@@ -195,9 +190,7 @@ pub fn parse_sequence_with_tokens(
                     }
                     loop {
                         // Don't skip Indent tokens - needed for dedent detection
-                        while matches!(stream.current(), Some(Token::Newline) | Some(Token::Comment(_))) {
-                            stream.next()?;
-                        }
+                        stream.skip_newlines_and_comments()?;
                         match stream.current() {
                             Some(Token::Comma) => {
                                 stream.next()?;
@@ -210,15 +203,14 @@ pub fn parse_sequence_with_tokens(
                             _ => break,
                         }
                     }
+                    // Preserve behavior: only skip newlines here
                     while matches!(stream.current(), Some(Token::Newline)) {
                         stream.next()?;
                     }
                 }
                 Some(Token::Plain(_)) => {
                     // Don't skip indent tokens here - we need them for dedent detection
-                    while matches!(stream.current(), Some(Token::Newline) | Some(Token::Comment(_))) {
-                        stream.next()?;
-                    }
+                    stream.skip_newlines_and_comments()?;
                     let mut is_colon = false;
                     if let Some(Token::Plain(_)) = stream.current() {
                         if let Some(Token::Colon) = stream.peek()? {
@@ -234,9 +226,7 @@ pub fn parse_sequence_with_tokens(
                             items.push(mapping);
                         }
                         // Don't skip Indent tokens - needed for dedent detection
-                        while matches!(stream.current(), Some(Token::Newline) | Some(Token::Comment(_))) {
-                            stream.next()?;
-                        }
+                        stream.skip_newlines_and_comments()?;
                         if matches!(stream.current(), Some(Token::Comma)) {
                             stream.next()?;
                             if matches!(
@@ -246,16 +236,9 @@ pub fn parse_sequence_with_tokens(
                                 stream.next()?;
                             }
                             // Don't skip Indent tokens - needed for dedent detection
-                            while matches!(stream.current(), Some(Token::Newline) | Some(Token::Comment(_))) {
-                                stream.next()?;
-                            }
+                            stream.skip_newlines_and_comments()?;
                         }
-                        while matches!(
-                            stream.current(),
-                            Some(Token::Newline) | Some(Token::Comment(_))
-                        ) {
-                            stream.next()?;
-                        }
+                        stream.skip_newlines_and_comments()?;
                     } else {
                         let value = parse_value_with_tokens(stream, directives, depth + 1)?;
                         if let Some((_, items)) = stack.last_mut() {
@@ -273,9 +256,7 @@ pub fn parse_sequence_with_tokens(
 
             // After parsing an item, skip whitespace/comments and check for another dash at the same indent
             // Skip newlines and comments, but NOT indents (we need to check indent level)
-            while matches!(stream.current(), Some(Token::Newline) | Some(Token::Comment(_))) {
-                stream.next()?;
-            }
+            stream.skip_newlines_and_comments()?;
 
             // Check if there's another dash at the current indent level
             match stream.current() {
