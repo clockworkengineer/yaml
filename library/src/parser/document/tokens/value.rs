@@ -466,7 +466,7 @@ fn parse_value_content(
         // Tolerate stray commas in block contexts: consume and treat as empty value
         Some(Token::Comma) => {
             stream.next()?;
-            stream.skip_whitespace_and_comments()?;
+            stream.skip_trivia()?;
             return Ok(Node::Str(
                 String::new(),
                 QuoteType::Unquoted,

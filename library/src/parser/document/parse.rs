@@ -148,7 +148,7 @@ fn check_explicit_directives(
     if has_explicit_directives {
         let st = source.save_state();
         let mut ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-        ts.skip_whitespace_and_comments()?;
+        ts.skip_trivia()?;
         match ts.current() {
             Some(crate::parser::lexer::Token::DocumentStart) => {}
             Some(crate::parser::lexer::Token::DocumentEnd)
@@ -250,7 +250,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
             crate::utils::skip_whitespace_and_comments(source);
             let st = source.save_state();
             if let Ok(mut ts) = crate::parser::token_stream::TokenStream::new(source, &directives, false) {
-                ts.skip_whitespace_and_comments().ok();
+                ts.skip_trivia().ok();
                 match ts.current() {
                     Some(crate::parser::lexer::Token::FlowSequenceEnd) => {
                         return Err(helpers::parse_error_token(&ts, "Unexpected closing bracket ']' - no matching opening bracket"));
@@ -340,7 +340,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
             let dir = crate::parser::directives::DirectiveContext::new();
             let mut ts_ahead = crate::parser::token_stream::TokenStream::new(source, &dir, false)?;
             // Skip trivia
-            ts_ahead.skip_whitespace_and_comments()?;
+            ts_ahead.skip_trivia()?;
             let has_next_doc = matches!(ts_ahead.current(), Some(crate::parser::lexer::Token::DocumentStart));
             source.restore_state(st_ahead);
             if !has_next_doc {
