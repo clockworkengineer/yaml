@@ -508,12 +508,7 @@ fn parse_value_content(
                     let lvl = *level;
                     stream.next()?; // consume Indent
                     // Skip subsequent newlines/comments
-                    while matches!(
-                        stream.current(),
-                        Some(Token::Newline) | Some(Token::Comment(_))
-                    ) {
-                        stream.next()?;
-                    }
+                    stream.skip_newlines_and_comments()?;
                     // Decide between sequence or mapping based on next token
                     if matches!(stream.current(), Some(Token::Dash)) {
                         use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
