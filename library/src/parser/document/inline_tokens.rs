@@ -75,10 +75,7 @@ pub fn parse_inline_sequence_with_tokens(
                 }
 
                 // Parse what might be a value or the key of an implicit mapping
-                let before_item = stream.stream_position();
                 let value_or_key = parse_value_with_tokens(stream, directives, depth + 1)?;
-                let after_item = stream.stream_position();
-                ensure_progress(stream, before_item, after_item, "item in flow sequence")?;
 
                 // Skip whitespace to check if this is actually a key (followed by colon)
                 stream.skip_trivia()?;
