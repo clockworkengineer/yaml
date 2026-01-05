@@ -176,7 +176,7 @@ pub fn parse_document_contents(
             // Use token stream to skip comments and whitespace uniformly
             let mut stream =
                 crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-            stream.skip_whitespace_and_comments()?;
+            stream.skip_trivia()?;
             parse_document_contents(source, indent_level, directives, ctx)
         }
         Some(c) if c == '{' => {
@@ -210,7 +210,7 @@ pub fn parse_document_contents(
             match stream.current() {
                 Some(crate::parser::lexer::Token::Tag(_)) => {
                     stream.next()?;
-                    stream.skip_whitespace_and_comments()?;
+                    stream.skip_trivia()?;
                     let is_mapping_key =
                         matches!(stream.current(), Some(crate::parser::lexer::Token::Colon));
                     if is_mapping_key {
@@ -241,7 +241,7 @@ pub fn parse_document_contents(
             match stream.current() {
                 Some(crate::parser::lexer::Token::Anchor(_)) => {
                     stream.next()?;
-                    stream.skip_whitespace_and_comments()?;
+                    stream.skip_trivia()?;
                     let is_mapping_key =
                         matches!(stream.current(), Some(crate::parser::lexer::Token::Colon));
                     if is_mapping_key {
