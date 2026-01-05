@@ -55,12 +55,12 @@ pub fn parse_sequence_with_tokens(
         stream.skip_newlines_and_comments()?;
         // If a stray comma remains after an inline flow item, consume it
         if matches!(stream.current(), Some(Token::Comma)) {
-            stream.next()?;
-            if matches!(
-                stream.current(),
-                Some(Token::FlowMappingEnd) | Some(Token::FlowSequenceEnd)
-            ) {
-                stream.next()?;
+            let _ = stream.consume_comma()?;
+            // If immediately followed by a flow closer, consume it
+            if matches!(stream.current(), Some(Token::FlowMappingEnd)) {
+                let _ = stream.consume_flow_mapping_end()?;
+            } else if matches!(stream.current(), Some(Token::FlowSequenceEnd)) {
+                let _ = stream.consume_flow_sequence_end()?;
             }
             // Don't skip Indent tokens - we need them for dedent detection
             stream.skip_newlines_and_comments()?;
