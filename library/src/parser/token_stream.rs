@@ -214,7 +214,10 @@ impl<'a> TokenStream<'a> {
             "token_stream: skip_newlines_and_comments at {:?}",
             self.current()
         ));
-        while matches!(self.current(), Some(Token::Newline) | Some(Token::Comment(_))) {
+        while matches!(
+            self.current(),
+            Some(Token::Newline) | Some(Token::Comment(_))
+        ) {
             self.next()?;
         }
         Ok(())
