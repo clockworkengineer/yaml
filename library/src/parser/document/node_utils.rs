@@ -145,3 +145,8 @@ pub fn resolved_is_set(tag: &str) -> bool {
 pub fn resolved_is_seq(tag: &str) -> bool {
     tag == "!!seq" || tag == "tag:yaml.org,2002:seq"
 }
+
+#[inline]
+pub fn resolved_is_map(tag: &str) -> bool {
+    tag == "!!map" || tag == "tag:yaml.org,2002:map"
+}

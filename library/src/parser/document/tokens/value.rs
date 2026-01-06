@@ -405,7 +405,7 @@ pub fn parse_value_with_tokens(
                             Node::Tagged(Box::new(result), "tag:yaml.org,2002:seq".to_string());
                     }
                 }
-            } else if tag_resolved == "!!map" || tag_resolved == "tag:yaml.org,2002:map" {
+            } else if crate::parser::document::node_utils::resolved_is_map(&tag_resolved) {
                 // Always wrap as Tagged with canonical tag for mappings
                 match &result {
                     Node::Mapping(pairs) => {
