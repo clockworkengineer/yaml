@@ -336,7 +336,8 @@ pub fn parse_mapping_with_tokens(
                         false
                     };
                     if (is_empty_str && is_mapping_set)
-                        || (is_empty_str && matches!(stream.current(), Some(Token::QuestionMark)))
+                        || (is_empty_str
+                            && crate::parser::document::explicit_key::is_explicit_key_start(stream))
                     {
                         let mapping_value =
                             parse_mapping_with_tokens(stream, cur_indent, directives, depth + 1)?;
@@ -412,7 +413,7 @@ fn parse_mapping_pair(
     // Unify explicit and implicit key handling: always use token stream for key detection
     // If the next token is a question mark, it's an explicit key
     let mut explicit_key = false;
-    if matches!(stream.current(), Some(Token::QuestionMark)) {
+    if crate::parser::document::explicit_key::is_explicit_key_start(stream) {
         stream.next()?;
         explicit_key = true;
     }
