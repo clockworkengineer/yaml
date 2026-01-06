@@ -691,6 +691,31 @@ impl<'a> Lexer<'a> {
                 Some('\\') => {
                     self.source.next();
                     match self.source.current() {
+                        // Line folding: backslash followed by a line break (CR, LF, or CRLF)
+                        // YAML allows escaping a line break in double-quoted scalars; the newline
+                        // and any following indentation are suppressed (no characters added).
+                        Some(c) if c == CHAR_NEWLINE || c == CHAR_CARRIAGE_RETURN => {
+                            // Consume CR and optional LF
+                            if c == CHAR_CARRIAGE_RETURN {
+                                self.source.next();
+                                if self.source.current() == Some(CHAR_NEWLINE) {
+                                    self.source.next();
+                                }
+                            } else {
+                                // LF
+                                self.source.next();
+                            }
+                            // Suppress any following indentation (spaces or tabs)
+                            while let Some(ws) = self.source.current() {
+                                if ws == CHAR_SPACE || ws == CHAR_TAB {
+                                    self.source.next();
+                                } else {
+                                    break;
+                                }
+                            }
+                            // Do not push any character; continue scanning content
+                            continue;
+                        }
                         Some('0') => {
                             content.push('\0');
                             self.source.next();
