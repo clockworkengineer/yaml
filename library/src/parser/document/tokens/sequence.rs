@@ -84,29 +84,7 @@ pub fn parse_sequence_with_tokens(
                 }
                 Some(Token::DocumentEnd) => {
                     // Document end marker - validate no content after it on same line
-                    // The lexer has already consumed "..." and positioned us right after it
-                    // Check for invalid content after ... on same line (before newline)
-                    loop {
-                        match stream.source_mut().current() {
-                            Some(' ') | Some('\t') => stream.source_mut().next(),
-                            Some('#') => {
-                                while let Some(c) = stream.source_mut().current() {
-                                    if c == '\n' || c == '\r' {
-                                        break;
-                                    }
-                                    stream.source_mut().next();
-                                }
-                                break;
-                            }
-                            Some('\n') | Some('\r') | None => break,
-                            Some(c) => {
-                                return Err(format!(
-                                    "Invalid content '{}' after document end marker (...)",
-                                    c
-                                ));
-                            }
-                        }
-                    }
+                    crate::parser::document::helpers::validate_no_inline_content_after_document_end(stream)?;
                     let (_, items) = stack.pop().unwrap();
                     if items.is_empty() {
                         return Ok(Node::None);

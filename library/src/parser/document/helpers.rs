@@ -217,6 +217,44 @@ pub(crate) fn peek_ahead_for_mapping_key(
     result
 }
 
+/// Validates that no inline content exists after a document end marker ('...') on the same line.
+///
+/// Assumes the TokenStream is positioned immediately after the DocumentEnd token.
+/// Consumes any spaces or an inline comment up to the end of the line. Errors if non-trivia
+/// content is encountered before the newline.
+pub(crate) fn validate_no_inline_content_after_document_end(
+    stream: &mut TokenStream,
+) -> Result<(), String> {
+    loop {
+        match stream.source_mut().current() {
+            Some(' ') | Some('\t') => {
+                stream.source_mut().next();
+            }
+            Some('#') => {
+                // Inline comment: consume until end of line
+                while let Some(c) = stream.source_mut().current() {
+                    if c == '\n' || c == '\r' {
+                        break;
+                    }
+                    stream.source_mut().next();
+                }
+                break;
+            }
+            Some('\n') | Some('\r') | None => break,
+            Some(c) => {
+                return Err(parse_error_token(
+                    stream,
+                    &format!(
+                        "Invalid content '{}' after document end marker (...)",
+                        c
+                    ),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Parses a comment line from the source.
 ///
 /// Consumes a comment starting with '#' and returns the comment text

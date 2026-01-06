@@ -1,7 +1,6 @@
 use crate::nodes::node::Node;
 use crate::nodes::node::{BlockStyle, QuoteType};
 use crate::parser::directives::DirectiveContext;
-use crate::parser::document::error_builder::syntax_error;
 use crate::parser::document::node_utils::force_key_to_string;
 use crate::parser::document::tokens::value::parse_value_with_tokens;
 use crate::parser::lexer::Token;
@@ -198,29 +197,7 @@ pub fn parse_mapping_with_tokens(
             }
             Some(Token::DocumentEnd) => {
                 // Document end marker - validate no content after it on same line
-                // The lexer has already consumed "..." and positioned us right after it
-                // Check for invalid content after ... on same line (before newline)
-                loop {
-                    match stream.source_mut().current() {
-                        Some(' ') | Some('\t') => stream.source_mut().next(),
-                        Some('#') => {
-                            while let Some(c) = stream.source_mut().current() {
-                                if c == '\n' || c == '\r' {
-                                    break;
-                                }
-                                stream.source_mut().next();
-                            }
-                            break;
-                        }
-                        Some('\n') | Some('\r') | None => break,
-                        Some(c) => {
-                            return Err(syntax_error(
-                                stream.source_mut(),
-                                &format!("Invalid content '{}' after document end marker (...)", c),
-                            ));
-                        }
-                    }
-                }
+                crate::parser::document::helpers::validate_no_inline_content_after_document_end(stream)?;
                 let (_, pairs) = stack.pop().unwrap();
                 return Ok(Node::Mapping(pairs));
             }
