@@ -294,7 +294,9 @@ pub fn parse_inline_mapping_with_tokens(
     );
     if is_set {
         // For !!set, convert mapping pairs with Node::None values to Node::Set
-        if let Some(set_items) = crate::parser::document::node_utils::pairs_to_set_items_if_all_none(&pairs) {
+        if let Some(set_items) =
+            crate::parser::document::node_utils::pairs_to_set_items_if_all_none(&pairs)
+        {
             Ok(make_set_node(set_items))
         } else {
             // Fallback to mapping for compatibility when any value isn't None
