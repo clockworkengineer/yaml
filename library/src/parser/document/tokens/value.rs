@@ -507,28 +507,28 @@ fn parse_value_content(
             // Check for indentation increase
             if let Some(Token::Indent(level)) = stream.current() {
                 if *level > 0 {
-                    let lvl = *level;
+                    let _lvl = *level;
                     stream.next()?; // consume Indent
                     // Skip subsequent newlines/comments
                     stream.skip_newlines_and_comments()?;
                     // Decide between sequence or mapping based on next token
                     if matches!(stream.current(), Some(Token::Dash)) {
                         use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
-                        let ctx_seq = crate::parser::document::context::ParsingContext::new(lvl)
+                        let ctx_seq = crate::parser::document::context::ParsingContext::new(_lvl)
                             .child_block_context(
-                                lvl,
+                                _lvl,
                                 crate::parser::document::context::CollectionType::BlockSequence,
                             );
                         return parse_sequence_with_tokens(
                             stream,
-                            lvl,
+                            _lvl,
                             directives,
                             &ctx_seq,
                             depth + 1,
                         );
                     } else {
                         use crate::parser::document::tokens::mapping::parse_mapping_with_tokens;
-                        return parse_mapping_with_tokens(stream, lvl, directives, depth + 1);
+                        return parse_mapping_with_tokens(stream, _lvl, directives, depth + 1);
                     }
                 }
             }

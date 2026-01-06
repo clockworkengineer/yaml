@@ -541,9 +541,9 @@ fn parse_mapping_pair(
             // Check for indent starting the nested value
             let indent_level = if let Some(Token::Indent(level)) = stream.current() {
                 if *level > cur_indent {
-                    let lvl = *level;
+                    let _lvl = *level;
                     stream.next()?; // consume Indent
-                    Some(lvl)
+                    Some(_lvl)
                 } else {
                     None
                 }
