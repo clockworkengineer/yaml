@@ -213,7 +213,7 @@ pub fn parse_inline_mapping_with_tokens(
                     // Found key-value without comma separator
                     return Err(syntax_error(
                         stream.source_mut(),
-                        "Expected comma or } in flow mapping",
+                        "Expected comma or } in flow mapping; YAML 1.2 compliance error: Double colon (::) is not allowed as a key-value separator in flow mappings. Use a single colon only.",
                     ));
                 }
 

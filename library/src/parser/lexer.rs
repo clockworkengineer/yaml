@@ -252,9 +252,21 @@ impl<'a> Lexer<'a> {
                 Ok(Some(Token::Comma))
             }
             CHAR_COLON => {
+                // Colon can be a key-value separator or part of a plain scalar.
+                // If followed by whitespace/newline/EOF, treat as separator; otherwise, include in scalar.
+                let state = self.source.save_state();
                 self.source.next();
-                self.last_was_linebreak = false;
-                Ok(Some(Token::Colon))
+                let next_ch = self.source.current();
+                if next_ch.map_or(true, |c| c.is_whitespace() || c == CHAR_NEWLINE) {
+                    // Separator
+                    self.last_was_linebreak = false;
+                    Ok(Some(Token::Colon))
+                } else {
+                    // Part of scalar, restore and scan as plain scalar
+                    self.source.restore_state(state);
+                    self.last_was_linebreak = false;
+                    Ok(Some(self.scan_plain_scalar()?))
+                }
             }
             '-' => {
                 // Could be: dash (sequence), document start (---), or plain scalar
