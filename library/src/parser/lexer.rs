@@ -119,6 +119,14 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Set whether the lexer is currently inside a flow collection context.
+    ///
+    /// When `in_flow` is true, newlines are suppressed as tokens and tabs are
+    /// treated as allowable horizontal whitespace instead of invalid indentation.
+    pub fn set_in_flow(&mut self, in_flow: bool) {
+        self.in_flow = in_flow;
+    }
+
     /// Get the current token without consuming it
     #[inline]
     pub fn current(&self) -> Option<&Token> {
@@ -358,6 +366,32 @@ impl<'a> Lexer<'a> {
     /// Returns Ok(Some(Token)) if an indent/dedent should be emitted, Ok(None) otherwise.
     fn emit_indentation_token_if_any(&mut self, ch: char) -> Result<Option<Token>, String> {
         if ch == CHAR_SPACE || ch == CHAR_TAB {
+            // Special case: leading tab(s) at line start before a flow collection.
+            // YAML allows tabs as horizontal whitespace inside flow collections.
+            // If the next non-whitespace character starts a flow collection, suppress
+            // emitting an Indent token and treat the leading tabs/spaces as whitespace.
+            if ch == CHAR_TAB && !self.in_flow {
+                // Peek ahead to next non-space/tab character
+                let state = self.source.save_state();
+                // Consume spaces/tabs temporarily
+                while let Some(c) = self.source.current() {
+                    if c == CHAR_SPACE || c == CHAR_TAB {
+                        self.source.next();
+                    } else {
+                        break;
+                    }
+                }
+                let next_non_ws = self.source.current();
+                // Restore to original position
+                self.source.restore_state(state);
+                if matches!(next_non_ws, Some(CHAR_LBRACKET) | Some(CHAR_LBRACE)) {
+                    // Consume indentation as flow whitespace and do not emit Indent
+                    let _ = self.scan_indentation(true)?; // allow tabs
+                    self.at_line_start = false;
+                    self.last_indent = 0;
+                    return Ok(None);
+                }
+            }
             let indent = self.scan_indentation(self.in_flow)?;
             self.at_line_start = false;
             self.last_indent = indent;

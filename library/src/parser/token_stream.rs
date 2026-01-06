@@ -93,6 +93,8 @@ impl<'a> TokenStream<'a> {
                 }
                 _ => {}
             }
+            // Propagate flow context to lexer so indentation/newline semantics match flow rules
+            self.lexer.set_in_flow(self.flow_depth > 0);
         }
         #[cfg(feature = "debug-trace")]
         if let Ok(ref _t) = out {
