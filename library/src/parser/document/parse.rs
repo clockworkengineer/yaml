@@ -3,8 +3,8 @@ use crate::nodes::node::Node;
 use crate::nodes::node::Node::Document;
 use crate::parser::directives::parse_directives;
 
-use crate::parser::document::main_loop::parse_document;
 use crate::parser::document::helpers;
+use crate::parser::document::main_loop::parse_document;
 
 /// Checks for and processes the document start marker (---).
 /// Returns an error if invalid content is found after the marker.
@@ -116,7 +116,8 @@ fn parse_document_end_marker(
                 }
                 Some('\n') | Some('\r') | None => break,
                 Some(_) => {
-                    let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+                    let ts =
+                        crate::parser::token_stream::TokenStream::new(source, directives, false)?;
                     return Err(helpers::parse_error_token(
                         &ts,
                         "Invalid content after document end marker (...)",
@@ -211,7 +212,10 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
         let has_document_start = {
             let st = source.save_state();
             let ts = crate::parser::token_stream::TokenStream::new(source, &directives, false)?;
-            let res = matches!(ts.current(), Some(crate::parser::lexer::Token::DocumentStart));
+            let res = matches!(
+                ts.current(),
+                Some(crate::parser::lexer::Token::DocumentStart)
+            );
             source.restore_state(st);
             res
         };
@@ -231,8 +235,12 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
             // Consume any additional consecutive document start markers on following lines
             loop {
                 let st2 = source.save_state();
-                let ts2 = crate::parser::token_stream::TokenStream::new(source, &directives, false)?;
-                let next_is_start = matches!(ts2.current(), Some(crate::parser::lexer::Token::DocumentStart));
+                let ts2 =
+                    crate::parser::token_stream::TokenStream::new(source, &directives, false)?;
+                let next_is_start = matches!(
+                    ts2.current(),
+                    Some(crate::parser::lexer::Token::DocumentStart)
+                );
                 source.restore_state(st2);
                 if next_is_start {
                     parse_document_markers(source, &directives)?;
@@ -250,22 +258,33 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
         if document.is_ok() {
             crate::utils::skip_whitespace_and_comments(source);
             let st = source.save_state();
-            if let Ok(mut ts) = crate::parser::token_stream::TokenStream::new(source, &directives, false) {
+            if let Ok(mut ts) =
+                crate::parser::token_stream::TokenStream::new(source, &directives, false)
+            {
                 ts.skip_trivia().ok();
                 match ts.current() {
                     Some(crate::parser::lexer::Token::FlowSequenceEnd) => {
-                        return Err(helpers::parse_error_token(&ts, "Unexpected closing bracket ']' - no matching opening bracket"));
+                        return Err(helpers::parse_error_token(
+                            &ts,
+                            "Unexpected closing bracket ']' - no matching opening bracket",
+                        ));
                     }
                     Some(crate::parser::lexer::Token::FlowMappingEnd) => {
-                        return Err(helpers::parse_error_token(&ts, "Unexpected closing brace '}' - no matching opening brace"));
+                        return Err(helpers::parse_error_token(
+                            &ts,
+                            "Unexpected closing brace '}' - no matching opening brace",
+                        ));
                     }
                     // Check for any other content that shouldn't be here (not document marker or EOF)
-                    Some(crate::parser::lexer::Token::Plain(_)) |
-                    Some(crate::parser::lexer::Token::SingleQuoted(_)) |
-                    Some(crate::parser::lexer::Token::DoubleQuoted(_)) |
-                    Some(crate::parser::lexer::Token::Dash) |
-                    Some(crate::parser::lexer::Token::Colon) => {
-                        return Err(helpers::parse_error_token(&ts, "Unexpected content after document - missing document separator or incorrect indentation"));
+                    Some(crate::parser::lexer::Token::Plain(_))
+                    | Some(crate::parser::lexer::Token::SingleQuoted(_))
+                    | Some(crate::parser::lexer::Token::DoubleQuoted(_))
+                    | Some(crate::parser::lexer::Token::Dash)
+                    | Some(crate::parser::lexer::Token::Colon) => {
+                        return Err(helpers::parse_error_token(
+                            &ts,
+                            "Unexpected content after document - missing document separator or incorrect indentation",
+                        ));
                     }
                     _ => {}
                 }
@@ -308,7 +327,11 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
                             _doc_count += 1;
                             let single_doc = Document(vec![node.clone()]);
                             #[cfg(feature = "debug-trace")]
-                            log::debug!("parse: Parsed document #{}: {:#?}", _doc_count, single_doc);
+                            log::debug!(
+                                "parse: Parsed document #{}: {:#?}",
+                                _doc_count,
+                                single_doc
+                            );
                             docs.push(single_doc);
                         }
                     }
@@ -347,7 +370,10 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
             let mut ts_ahead = crate::parser::token_stream::TokenStream::new(source, &dir, false)?;
             // Skip trivia
             ts_ahead.skip_trivia()?;
-            let has_next_doc = matches!(ts_ahead.current(), Some(crate::parser::lexer::Token::DocumentStart));
+            let has_next_doc = matches!(
+                ts_ahead.current(),
+                Some(crate::parser::lexer::Token::DocumentStart)
+            );
             source.restore_state(st_ahead);
             if !has_next_doc {
                 break;
@@ -374,7 +400,8 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
         let st = source.save_state();
         source.reset();
         let directives_scan = crate::parser::directives::DirectiveContext::new();
-        let mut ts = crate::parser::token_stream::TokenStream::new(source, &directives_scan, false)?;
+        let mut ts =
+            crate::parser::token_stream::TokenStream::new(source, &directives_scan, false)?;
         let mut last_sig: Option<crate::parser::lexer::Token> = None;
         let mut prev_sig: Option<crate::parser::lexer::Token> = None;
         loop {

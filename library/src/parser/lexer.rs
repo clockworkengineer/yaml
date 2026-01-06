@@ -261,19 +261,27 @@ impl<'a> Lexer<'a> {
             }
             CHAR_COLON => {
                 // Colon can be a key-value separator or part of a plain scalar.
-                // If followed by whitespace/newline/EOF, treat as separator; otherwise, include in scalar.
-                let state = self.source.save_state();
-                self.source.next();
-                let next_ch = self.source.current();
-                if next_ch.map_or(true, |c| c.is_whitespace() || c == CHAR_NEWLINE) {
-                    // Separator
+                // In flow context, always treat ':' as a separator (no whitespace required).
+                // In block context, treat ':' followed by whitespace/newline/EOF as separator;
+                // otherwise include it as part of the plain scalar.
+                if self.in_flow {
+                    self.source.next();
                     self.last_was_linebreak = false;
                     Ok(Some(Token::Colon))
                 } else {
-                    // Part of scalar, restore and scan as plain scalar
-                    self.source.restore_state(state);
-                    self.last_was_linebreak = false;
-                    Ok(Some(self.scan_plain_scalar()?))
+                    let state = self.source.save_state();
+                    self.source.next();
+                    let next_ch = self.source.current();
+                    if next_ch.map_or(true, |c| c.is_whitespace() || c == CHAR_NEWLINE) {
+                        // Separator in block context
+                        self.last_was_linebreak = false;
+                        Ok(Some(Token::Colon))
+                    } else {
+                        // Part of scalar, restore and scan as plain scalar
+                        self.source.restore_state(state);
+                        self.last_was_linebreak = false;
+                        Ok(Some(self.scan_plain_scalar()?))
+                    }
                 }
             }
             '-' => {

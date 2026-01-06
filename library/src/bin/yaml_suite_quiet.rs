@@ -144,6 +144,9 @@ fn main() {
                     } else {
                         "error"
                     };
+                    if let Err(e) = parse_result {
+                        writeln!(out, "Error detail: {}", e).unwrap();
+                    }
                     writeln!(
                         out,
                         "Test '{}' FAILED (expected: {}, got: {})",

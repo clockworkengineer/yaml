@@ -1,0 +1,2 @@
+Error detail: Expected comma or } in flow mapping (current: '}', indent: 7)
+Test '5MUD' FAILED (expected: success, got: error)

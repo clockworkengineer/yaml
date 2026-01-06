@@ -57,13 +57,13 @@ fn test_5t43_double_colon() {
 
     match parse(&mut source) {
         Ok(_) => {
-            panic!("Test should fail: double colon in flow mapping is not allowed by YAML 1.2");
+            #[cfg(feature = "debug-trace")]
+            println!("Parsed successfully (double colon treated as value prefix)");
         }
         Err(e) => {
             #[cfg(feature = "debug-trace")]
             println!("Parse error: {}", e);
-            assert!(e.contains("YAML 1.2 compliance error: Double colon (::) is not allowed"),
-                "Error message should indicate YAML 1.2 compliance error for double colon, got: {}", e);
+            panic!("Failed to parse double-colon value case: {}", e);
         }
     }
 }

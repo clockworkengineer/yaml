@@ -55,7 +55,7 @@ pub fn parse_sequence_with_tokens(
         stream.skip_newlines_and_comments()?;
         // If a stray comma remains after an inline flow item, consume it
         if matches!(stream.current(), Some(Token::Comma)) {
-            let _ = stream.consume_comma()?;
+            let _ = stream.consume_if(Token::Comma)?;
             // If immediately followed by a flow closer, consume it
             if matches!(stream.current(), Some(Token::FlowMappingEnd)) {
                 let _ = stream.consume_flow_mapping_end()?;

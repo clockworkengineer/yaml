@@ -10,6 +10,7 @@ use crate::parser::document::error_builder::syntax_error;
 use crate::parser::document::tokens::value::parse_value_with_tokens;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
+use crate::{BlockStyle, QuoteType};
 
 #[cfg(feature = "debug-trace")]
 #[inline]
@@ -74,7 +75,7 @@ pub fn parse_inline_sequence_with_tokens(
                 }
                 // Allow trailing comma: set to expect next item, but do not error
                 // If immediately followed by ']', the loop will close cleanly
-                let _ = stream.consume_comma()?;
+                let _ = stream.consume_if(Token::Comma)?;
                 expect_item = true;
             }
             None | Some(Token::Eof) => {
@@ -199,7 +200,7 @@ pub fn parse_inline_mapping_with_tokens(
             Some(Token::Comma) => {
                 // Allow trailing comma: set to expect next entry, but do not error
                 // If immediately followed by '}', the loop will close cleanly
-                let _ = stream.consume_comma()?;
+                let _ = stream.consume_if(Token::Comma)?;
                 expect_entry = true;
             }
             None | Some(Token::Eof) => {
@@ -210,10 +211,21 @@ pub fn parse_inline_mapping_with_tokens(
             }
             _ => {
                 if !expect_entry {
-                    // Found key-value without comma separator
+                    // After a key-value pair, allow either a comma separator or closing brace.
+                    // If we see a closing '}' here, end the mapping gracefully.
+                    if matches!(stream.current(), Some(Token::FlowMappingEnd)) {
+                        let _ = stream.consume_flow_mapping_end()?;
+                        break;
+                    }
+                    if matches!(stream.current(), Some(Token::Comma)) {
+                        let _ = stream.consume_if(Token::Comma)?;
+                        expect_entry = true;
+                        continue;
+                    }
+                    // Otherwise, found key-value without required separator
                     return Err(syntax_error(
                         stream.source_mut(),
-                        "Expected comma or } in flow mapping; YAML 1.2 compliance error: Double colon (::) is not allowed as a key-value separator in flow mappings. Use a single colon only.",
+                        "Expected comma or } in flow mapping",
                     ));
                 }
 
@@ -248,6 +260,38 @@ pub fn parse_inline_mapping_with_tokens(
                     let before_value = stream.stream_position();
                     #[cfg(feature = "debug-trace")]
                     inline_log(format!("before_value position = {}", before_value));
+
+                    // Special case: a second ':' immediately after the key-value separator
+                    // should be treated as part of the plain value (e.g., {"key"::value} => ":value").
+                    if matches!(stream.current(), Some(Token::Colon)) {
+                        let _ = stream.consume_if(Token::Colon)?; // consume leading ':' of value
+                        stream.skip_trivia()?;
+                        // Consume the following scalar and prepend ':'
+                        match stream.consume_scalar() {
+                            Ok((s, _)) => {
+                                let combined = format!(":{}", s);
+                                pairs.push((
+                                    key,
+                                    Node::Str(combined, QuoteType::Unquoted, BlockStyle::None),
+                                ));
+                                expect_entry = false;
+                                continue;
+                            }
+                            Err(_) => {
+                                // No scalar follows; treat value as just ':'
+                                pairs.push((
+                                    key,
+                                    Node::Str(
+                                        ":".to_string(),
+                                        QuoteType::Unquoted,
+                                        BlockStyle::None,
+                                    ),
+                                ));
+                                expect_entry = false;
+                                continue;
+                            }
+                        }
+                    }
 
                     // Check for empty value (key: followed by , or })
                     let value = if matches!(

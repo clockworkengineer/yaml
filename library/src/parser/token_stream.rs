@@ -387,29 +387,12 @@ impl<'a> TokenStream<'a> {
     pub fn consume_single_colon(&mut self) -> Result<bool, String> {
         match self.current() {
             Some(Token::Colon) => {
-                // Consume the colon
-                self.next()?;
-                // If another colon is immediately present, that's invalid (::)
-                if matches!(self.current(), Some(Token::Colon)) {
-                    return Err(crate::parser::document::error_builder::syntax_error(
-                        self.source_mut(),
-                        "YAML 1.2 compliance error: Double colon (::) is not allowed as a key-value separator in flow mappings. Use a single colon only.",
-                    ));
-                }
+                let _ = self.consume_if(Token::Colon)?;
                 Ok(true)
             }
-            _ => Ok(false),
+            _ => Err("Expected ':' in flow mapping".to_string()),
         }
     }
-
-    /// DRY helper: consume a comma if present.
-    #[inline]
-    pub fn consume_comma(&mut self) -> Result<bool, String> {
-        self.consume_if(Token::Comma)
-    }
-
-    /// DRY helper: consume a flow sequence end (']') if present.
-    #[inline]
     pub fn consume_flow_sequence_end(&mut self) -> Result<bool, String> {
         self.consume_if(Token::FlowSequenceEnd)
     }
