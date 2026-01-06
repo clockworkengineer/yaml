@@ -66,6 +66,19 @@ pub fn parse_mapping_with_tokens(
         stack.last().map(|(lvl, _)| *lvl).unwrap_or(base_indent)
     }
 
+    #[inline]
+    fn dedent_unwind_mapping_stack(
+        stack: &mut Vec<(usize, Vec<(Node, Node)>)>,
+        target_level: usize,
+    ) {
+        while stack.len() > 1 && stack.last().map(|(i, _)| *i).unwrap_or(0) > target_level {
+            let (_, closed_pairs) = stack.pop().unwrap();
+            if let Some((_, parent_pairs)) = stack.last_mut() {
+                parent_pairs.push((Node::None, Node::Mapping(closed_pairs)));
+            }
+        }
+    }
+
     // Skip initial trivia (whitespace, comments)
     stream.skip_trivia()?;
 
@@ -105,24 +118,7 @@ pub fn parse_mapping_with_tokens(
                     stack.len()
                 ));
                 // Pop stack frames until the current indent matches the token's indent
-                while stack.len() > 1 && stack.last().map(|(i, _)| *i).unwrap_or(0) > level {
-                    let (_, closed_pairs) = stack.pop().unwrap();
-                    #[cfg(feature = "debug-trace")]
-                    mapping_log(format!(
-                        "Dedent pop: stack now {:?}",
-                        stack.iter().map(|(i, v)| (*i, v.len())).collect::<Vec<_>>()
-                    ));
-                    if let Some((_, parent_pairs)) = stack.last_mut() {
-                        #[cfg(feature = "debug-trace")]
-                        mapping_log(format!(
-                            "Inserting dedented mapping into parent. Parent pairs before: {}",
-                            parent_pairs.len()
-                        ));
-                        parent_pairs.push((Node::None, Node::Mapping(closed_pairs)));
-                        #[cfg(feature = "debug-trace")]
-                        mapping_log(format!("Parent pairs after: {}", parent_pairs.len()));
-                    }
-                }
+                dedent_unwind_mapping_stack(&mut stack, level);
                 // After dedent, return to parent so the next key is parsed at the correct level
                 let (_, pairs) = stack.last().unwrap();
                 return Ok(Node::Mapping(pairs.clone()));
@@ -305,73 +301,7 @@ pub fn parse_mapping_with_tokens(
                         current_indent,
                         stack.len()
                     ));
-                    let mut _pop_count = 0;
-                    while let Some((top_indent, top_pairs)) = stack.pop() {
-                        #[cfg(feature = "debug-trace")]
-                        mapping_log(format!(
-                            "Popped stack frame: indent={}, pairs_len={}",
-                            top_indent,
-                            top_pairs.len()
-                        ));
-                        _pop_count += 1;
-                        if top_indent == level {
-                            #[cfg(feature = "debug-trace")]
-                            mapping_log(format!(
-                                "Reached matching indent, pushing frame back: indent={}, pairs_len={}",
-                                top_indent,
-                                top_pairs.len()
-                            ));
-                            stack.push((top_indent, top_pairs));
-                            break;
-                        }
-                        if let Some((_parent_indent, parent_pairs)) = stack.last_mut() {
-                            #[cfg(feature = "debug-trace")]
-                            mapping_log(format!(
-                                "Inserting completed mapping into parent (parent_indent={}, parent_pairs_len={})",
-                                _parent_indent,
-                                parent_pairs.len()
-                            ));
-                            let mapping_node = Node::Mapping(top_pairs);
-                            parent_pairs.push((
-                                force_key_to_string(Node::Str(
-                                    "<nested>".to_string(),
-                                    QuoteType::Unquoted,
-                                    BlockStyle::None,
-                                )),
-                                mapping_node,
-                            ));
-                            #[cfg(feature = "debug-trace")]
-                            mapping_log(format!(
-                                "Parent pairs after insert: {}",
-                                parent_pairs.len()
-                            ));
-                        } else {
-                            #[cfg(feature = "debug-trace")]
-                            mapping_log("No parent found, pushing frame back as root".to_string());
-                            stack.push((top_indent, top_pairs));
-                            break;
-                        }
-                        if let Some((new_top_indent, _)) = stack.last() {
-                            #[cfg(feature = "debug-trace")]
-                            mapping_log(format!(
-                                "Top of stack after pop: indent={}",
-                                new_top_indent
-                            ));
-                            if *new_top_indent <= level {
-                                break;
-                            }
-                        } else {
-                            #[cfg(feature = "debug-trace")]
-                            mapping_log("Stack is empty after pop".to_string());
-                            break;
-                        }
-                    }
-                    #[cfg(feature = "debug-trace")]
-                    mapping_log(format!(
-                        "Dedent pop loop exited after {} pops. Stack now: {:?}",
-                        _pop_count,
-                        stack.iter().map(|(i, v)| (*i, v.len())).collect::<Vec<_>>()
-                    ));
+                    dedent_unwind_mapping_stack(&mut stack, level);
                     stream.next()?;
                     continue;
                 } else {
