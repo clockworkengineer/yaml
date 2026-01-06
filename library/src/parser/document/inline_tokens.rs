@@ -11,6 +11,24 @@ use crate::parser::document::tokens::value::parse_value_with_tokens;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
 
+#[cfg(feature = "debug-trace")]
+#[inline]
+fn inline_log(msg: String) {
+    #[cfg(feature = "std")]
+    {
+        if let Ok(v) = std::env::var("YAML_TRACE_INLINE") {
+            if v.eq_ignore_ascii_case("1")
+                || v.eq_ignore_ascii_case("true")
+                || v.eq_ignore_ascii_case("on")
+            {
+                log::debug!("{}", msg);
+                return;
+            }
+        }
+    }
+    log::trace!("{}", msg);
+}
+
 /// Parse a flow (inline) sequence using tokens
 ///
 /// Example: `[1, 2, 3]` or `[a, b, c]`
@@ -138,10 +156,11 @@ pub fn parse_inline_mapping_with_tokens(
     depth: usize,
     is_set: bool,
 ) -> Result<Node, String> {
-    println!(
-        "DEBUG: ENTER parse_inline_mapping_with_tokens, current token: {:?}",
+    #[cfg(feature = "debug-trace")]
+    inline_log(format!(
+        "ENTER parse_inline_mapping_with_tokens, current token: {:?}",
         stream.current()
-    );
+    ));
     // Expect opening brace
     stream.expect(Token::FlowMappingStart)?;
 
@@ -152,8 +171,10 @@ pub fn parse_inline_mapping_with_tokens(
     loop {
         iteration += 1;
         if iteration > 1000 {
-            println!(
-                "DEBUG: Exceeded 1000 iterations in parse_inline_mapping_with_tokens, possible infinite loop"
+            #[cfg(feature = "debug-trace")]
+            inline_log(
+                "Exceeded 1000 iterations in parse_inline_mapping_with_tokens, possible infinite loop"
+                    .to_string(),
             );
             return Err(syntax_error(
                 stream.source_mut(),
@@ -163,11 +184,12 @@ pub fn parse_inline_mapping_with_tokens(
         // Skip whitespace/comments
         stream.skip_trivia()?;
 
-        println!(
-            "DEBUG: Iteration {}, current token: {:?}",
+        #[cfg(feature = "debug-trace")]
+        inline_log(format!(
+            "Iteration {}, current token: {:?}",
             iteration,
             stream.current()
-        );
+        ));
         match stream.current() {
             Some(Token::FlowMappingEnd) => {
                 // Closing brace - done
@@ -197,20 +219,23 @@ pub fn parse_inline_mapping_with_tokens(
 
                 // Progress check: record position before parsing key
                 let before_key = stream.stream_position();
-                println!("DEBUG: before_key position = {}", before_key);
+                #[cfg(feature = "debug-trace")]
+                inline_log(format!("before_key position = {}", before_key));
                 let key = parse_value_with_tokens(stream, directives, depth + 1)?;
                 let after_key = stream.stream_position();
-                println!("DEBUG: after_key position = {}", after_key);
+                #[cfg(feature = "debug-trace")]
+                inline_log(format!("after_key position = {}", after_key));
                 ensure_progress(stream, before_key, after_key, "key in flow mapping")?;
 
                 // Skip whitespace
                 stream.skip_trivia()?;
 
                 // Debug: print current token before colon check
-                println!(
-                    "DEBUG: Before colon check, current token: {:?}",
+                #[cfg(feature = "debug-trace")]
+                inline_log(format!(
+                    "Before colon check, current token: {:?}",
                     stream.current()
-                );
+                ));
                 // Ensure all comments and newlines are skipped before colon check
                 stream.skip_trivia()?;
                 // Expect colon for key-value pair
@@ -221,7 +246,8 @@ pub fn parse_inline_mapping_with_tokens(
 
                     // Progress check: record position before parsing value
                     let before_value = stream.stream_position();
-                    println!("DEBUG: before_value position = {}", before_value);
+                    #[cfg(feature = "debug-trace")]
+                    inline_log(format!("before_value position = {}", before_value));
 
                     // Check for empty value (key: followed by , or })
                     let value = if matches!(
@@ -233,7 +259,8 @@ pub fn parse_inline_mapping_with_tokens(
                     } else {
                         let val = parse_value_with_tokens(stream, directives, depth + 1)?;
                         let after_value = stream.stream_position();
-                        println!("DEBUG: after_value position = {}", after_value);
+                        #[cfg(feature = "debug-trace")]
+                        inline_log(format!("after_value position = {}", after_value));
                         ensure_progress(
                             stream,
                             before_value,

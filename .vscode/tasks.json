@@ -26,5 +26,17 @@
 				"--nocapture"
 			]
 		},
+		{
+			"label": "cargo test quiet",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"--package",
+				"yaml_lib",
+				"--lib",
+				"--quiet"
+			]
+		}
 	]
 }

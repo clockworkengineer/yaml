@@ -42,7 +42,7 @@ fn parse_sequence_inner(
     directives: &crate::parser::directives::DirectiveContext,
 ) -> Result<crate::nodes::node::Node, String> {
     let mut items = Vec::new();
-    while let Some(token) = stream.current() {
+    while stream.current().is_some() {
         // DRY: skip consecutive newlines and comments upfront
         stream.skip_newlines_and_comments()?;
         match stream.current() {

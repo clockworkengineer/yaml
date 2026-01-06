@@ -7,6 +7,24 @@ use crate::parser::document::tokens::value::parse_value_with_tokens;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
 
+#[cfg(feature = "debug-trace")]
+#[inline]
+fn mapping_log(msg: String) {
+    #[cfg(feature = "std")]
+    {
+        if let Ok(v) = std::env::var("YAML_TRACE_MAPPING") {
+            if v.eq_ignore_ascii_case("1")
+                || v.eq_ignore_ascii_case("true")
+                || v.eq_ignore_ascii_case("on")
+            {
+                log::debug!("{}", msg);
+                return;
+            }
+        }
+    }
+    log::trace!("{}", msg);
+}
+
 /// Parse a single key-value mapping pair (for sequence items)
 #[allow(dead_code)]
 pub fn parse_single_mapping_pair_with_tokens(
@@ -44,6 +62,11 @@ pub fn parse_mapping_with_tokens(
     let mut stack: Vec<(usize, Vec<(Node, Node)>)> = Vec::new();
     stack.push((base_indent, Vec::new()));
 
+    #[inline]
+    fn get_current_indent(stack: &Vec<(usize, Vec<(Node, Node)>)>, base_indent: usize) -> usize {
+        stack.last().map(|(lvl, _)| *lvl).unwrap_or(base_indent)
+    }
+
     // Skip initial trivia (whitespace, comments)
     stream.skip_trivia()?;
 
@@ -71,30 +94,34 @@ pub fn parse_mapping_with_tokens(
             }
         }
 
-        let current_indent = stack.last().map(|(lvl, _)| *lvl).unwrap_or(base_indent);
+        let current_indent = get_current_indent(&stack, base_indent);
         let token = stream.current().cloned();
         match token {
             Some(Token::Indent(level)) if level < current_indent => {
-                println!(
-                    "DEBUG: Dedent (level: {}, current_indent: {}, stack_len: {}) - closing current mapping",
+                #[cfg(feature = "debug-trace")]
+                mapping_log(format!(
+                    "Dedent (level: {}, current_indent: {}, stack_len: {}) - closing current mapping",
                     level,
                     current_indent,
                     stack.len()
-                );
+                ));
                 // Pop stack frames until the current indent matches the token's indent
                 while stack.len() > 1 && stack.last().map(|(i, _)| *i).unwrap_or(0) > level {
                     let (_, closed_pairs) = stack.pop().unwrap();
-                    println!(
-                        "DEBUG: Dedent pop: stack now {:?}",
+                    #[cfg(feature = "debug-trace")]
+                    mapping_log(format!(
+                        "Dedent pop: stack now {:?}",
                         stack.iter().map(|(i, v)| (*i, v.len())).collect::<Vec<_>>()
-                    );
+                    ));
                     if let Some((_, parent_pairs)) = stack.last_mut() {
-                        println!(
-                            "DEBUG: Inserting dedented mapping into parent. Parent pairs before: {}",
+                        #[cfg(feature = "debug-trace")]
+                        mapping_log(format!(
+                            "Inserting dedented mapping into parent. Parent pairs before: {}",
                             parent_pairs.len()
-                        );
+                        ));
                         parent_pairs.push((Node::None, Node::Mapping(closed_pairs)));
-                        println!("DEBUG: Parent pairs after: {}", parent_pairs.len());
+                        #[cfg(feature = "debug-trace")]
+                        mapping_log(format!("Parent pairs after: {}", parent_pairs.len()));
                     }
                 }
                 // After dedent, return to parent so the next key is parsed at the correct level
@@ -103,28 +130,35 @@ pub fn parse_mapping_with_tokens(
             }
             Some(Token::Eof) => {
                 // At EOF: unwind the stack, closing all open mappings
-                println!(
-                    "DEBUG: EOF encountered, unwinding stack. stack_len={}",
+                #[cfg(feature = "debug-trace")]
+                mapping_log(format!(
+                    "EOF encountered, unwinding stack. stack_len={}",
                     stack.len()
-                );
+                ));
                 while stack.len() > 1 {
-                    let (top_indent, top_pairs) = stack.pop().unwrap();
-                    println!(
-                        "DEBUG: EOF unwind: closing mapping at indent {} with {} pairs",
-                        top_indent,
+                    let (_top_indent, top_pairs) = stack.pop().unwrap();
+                    #[cfg(feature = "debug-trace")]
+                    mapping_log(format!(
+                        "EOF unwind: closing mapping at indent {} with {} pairs",
+                        _top_indent,
                         top_pairs.len()
-                    );
+                    ));
                     if let Some((_, parent_pairs)) = stack.last_mut() {
                         let mapping_node = Node::Mapping(top_pairs);
                         // Insert as value for last key in parent if possible
                         if let Some((_, last_value)) = parent_pairs.last_mut() {
-                            println!(
-                                "DEBUG: EOF unwind: inserting mapping_node as last_value in parent"
+                            #[cfg(feature = "debug-trace")]
+                            mapping_log(
+                                "EOF unwind: inserting mapping_node as last_value in parent"
+                                    .to_string(),
                             );
                             *last_value = mapping_node;
                         } else {
                             // If no key, push as orphan (should not happen in valid YAML)
-                            println!("DEBUG: EOF unwind: pushing orphan mapping_node to parent");
+                            #[cfg(feature = "debug-trace")]
+                            mapping_log(
+                                "EOF unwind: pushing orphan mapping_node to parent".to_string(),
+                            );
                             parent_pairs.push((
                                 force_key_to_string(Node::Str(
                                     "<unwound>".to_string(),
@@ -134,21 +168,24 @@ pub fn parse_mapping_with_tokens(
                                 mapping_node,
                             ));
                         }
-                        println!(
-                            "DEBUG: Parent pairs after EOF unwind: {}",
+                        #[cfg(feature = "debug-trace")]
+                        mapping_log(format!(
+                            "Parent pairs after EOF unwind: {}",
                             parent_pairs.len()
-                        );
+                        ));
                     }
-                    println!(
-                        "DEBUG: Stack after EOF unwind pop: {:?}",
+                    #[cfg(feature = "debug-trace")]
+                    mapping_log(format!(
+                        "Stack after EOF unwind pop: {:?}",
                         stack.iter().map(|(i, v)| (*i, v.len())).collect::<Vec<_>>()
-                    );
+                    ));
                 }
                 let (_, pairs) = stack.pop().unwrap();
-                println!(
-                    "DEBUG: Final mapping pairs at EOF: {:?}",
+                #[cfg(feature = "debug-trace")]
+                mapping_log(format!(
+                    "Final mapping pairs at EOF: {:?}",
                     pairs.iter().map(|(k, v)| (k, v)).collect::<Vec<_>>()
-                );
+                ));
                 return Ok(Node::Mapping(pairs));
             }
             Some(Token::DocumentStart)
@@ -189,42 +226,47 @@ pub fn parse_mapping_with_tokens(
             }
             // Newlines and comments are already skipped at loop start via skip_newlines_and_comments()
             Some(Token::Indent(level)) => {
-                println!(
-                    "TRACE: Token::Indent encountered: level={}, stack_len={}, stack={:?}",
+                #[cfg(feature = "debug-trace")]
+                mapping_log(format!(
+                    "Token::Indent encountered: level={}, stack_len={}, stack={:?}",
                     level,
                     stack.len(),
                     stack.iter().map(|(i, v)| (*i, v.len())).collect::<Vec<_>>()
-                );
-                let current_indent = stack.last().map(|(lvl, _)| *lvl).unwrap_or(base_indent);
-                println!(
-                    "DEBUG: INDENT token encountered: level={}, current_indent={}, stack_len={}",
+                ));
+                let current_indent = get_current_indent(&stack, base_indent);
+                #[cfg(feature = "debug-trace")]
+                mapping_log(format!(
+                    "INDENT token encountered: level={}, current_indent={}, stack_len={}",
                     level,
                     current_indent,
                     stack.len()
-                );
+                ));
                 if level > current_indent {
                     // New nested mapping: push to stack
-                    println!(
-                        "DEBUG: Pushing new stack frame for nested mapping at indent {} (current_indent={}, stack_len={})",
+                    #[cfg(feature = "debug-trace")]
+                    mapping_log(format!(
+                        "Pushing new stack frame for nested mapping at indent {} (current_indent={}, stack_len={})",
                         level,
                         current_indent,
                         stack.len()
-                    );
+                    ));
                     stack.push((level, Vec::new()));
-                    println!(
-                        "DEBUG: Stack after push: {:?}",
+                    #[cfg(feature = "debug-trace")]
+                    mapping_log(format!(
+                        "Stack after push: {:?}",
                         stack.iter().map(|(i, v)| (*i, v.len())).collect::<Vec<_>>()
-                    );
+                    ));
                     stream.next()?;
                     continue;
                 } else if level < current_indent {
                     // Dedent: pop stack and insert completed mapping into parent
-                    println!(
-                        "DEBUG: Dedent detected: popping stack. level={}, current_indent={}, stack_len={}",
+                    #[cfg(feature = "debug-trace")]
+                    mapping_log(format!(
+                        "Dedent detected: popping stack. level={}, current_indent={}, stack_len={}",
                         level,
                         current_indent,
                         stack.len()
-                    );
+                    ));
                     // ...existing code for dedent...
                     stream.next()?;
                     continue;
@@ -235,74 +277,83 @@ pub fn parse_mapping_with_tokens(
             }
             _ => {}
         }
-        println!(
-            "TRACE: At top of loop, token={:?}, stack_len={}, stack={:?}",
+        #[cfg(feature = "debug-trace")]
+        mapping_log(format!(
+            "At top of loop, token={:?}, stack_len={}, stack={:?}",
             token,
             stack.len(),
             stack.iter().map(|(i, v)| (*i, v.len())).collect::<Vec<_>>()
-        );
+        ));
         match token {
             // Newlines and comments already handled by skip_newlines_and_comments()
             Some(Token::Indent(level)) => {
-                println!(
-                    "TRACE: Token::Indent encountered: level={}, stack_len={}, stack={:?}",
+                #[cfg(feature = "debug-trace")]
+                mapping_log(format!(
+                    "Token::Indent encountered: level={}, stack_len={}, stack={:?}",
                     level,
                     stack.len(),
                     stack.iter().map(|(i, v)| (*i, v.len())).collect::<Vec<_>>()
-                );
+                ));
                 let current_indent = stack.last().map(|(lvl, _)| *lvl).unwrap_or(base_indent);
-                println!(
-                    "DEBUG: INDENT token encountered: level={}, current_indent={}, stack_len={}",
+                #[cfg(feature = "debug-trace")]
+                mapping_log(format!(
+                    "INDENT token encountered: level={}, current_indent={}, stack_len={}",
                     level,
                     current_indent,
                     stack.len()
-                );
+                ));
                 if level > current_indent {
                     // New nested mapping: push to stack
-                    println!(
-                        "DEBUG: Pushing new stack frame for nested mapping at indent {} (current_indent={}, stack_len={})",
+                    #[cfg(feature = "debug-trace")]
+                    mapping_log(format!(
+                        "Pushing new stack frame for nested mapping at indent {} (current_indent={}, stack_len={})",
                         level,
                         current_indent,
                         stack.len()
-                    );
+                    ));
                     stack.push((level, Vec::new()));
-                    println!(
-                        "DEBUG: Stack after push: {:?}",
+                    #[cfg(feature = "debug-trace")]
+                    mapping_log(format!(
+                        "Stack after push: {:?}",
                         stack.iter().map(|(i, v)| (*i, v.len())).collect::<Vec<_>>()
-                    );
+                    ));
                     stream.next()?;
                     continue;
                 } else if level < current_indent {
                     // Dedent: pop stack and insert completed mapping into parent
-                    println!(
-                        "DEBUG: Dedent detected: popping stack. level={}, current_indent={}, stack_len={}",
+                    #[cfg(feature = "debug-trace")]
+                    mapping_log(format!(
+                        "Dedent detected: popping stack. level={}, current_indent={}, stack_len={}",
                         level,
                         current_indent,
                         stack.len()
-                    );
-                    let mut pop_count = 0;
+                    ));
+                    let mut _pop_count = 0;
                     while let Some((top_indent, top_pairs)) = stack.pop() {
-                        println!(
-                            "DEBUG: Popped stack frame: indent={}, pairs_len={}",
+                        #[cfg(feature = "debug-trace")]
+                        mapping_log(format!(
+                            "Popped stack frame: indent={}, pairs_len={}",
                             top_indent,
                             top_pairs.len()
-                        );
-                        pop_count += 1;
+                        ));
+                        _pop_count += 1;
                         if top_indent == level {
-                            println!(
-                                "DEBUG: Reached matching indent, pushing frame back: indent={}, pairs_len={}",
+                            #[cfg(feature = "debug-trace")]
+                            mapping_log(format!(
+                                "Reached matching indent, pushing frame back: indent={}, pairs_len={}",
                                 top_indent,
                                 top_pairs.len()
-                            );
+                            ));
                             stack.push((top_indent, top_pairs));
                             break;
                         }
-                        if let Some((parent_indent, parent_pairs)) = stack.last_mut() {
-                            println!(
-                                "DEBUG: Inserting completed mapping into parent (parent_indent={}, parent_pairs_len={})",
-                                parent_indent,
+                        if let Some((_parent_indent, parent_pairs)) = stack.last_mut() {
+                            #[cfg(feature = "debug-trace")]
+                            mapping_log(format!(
+                                "Inserting completed mapping into parent (parent_indent={}, parent_pairs_len={})",
+                                _parent_indent,
                                 parent_pairs.len()
-                            );
+                            ));
                             let mapping_node = Node::Mapping(top_pairs);
                             parent_pairs.push((
                                 force_key_to_string(Node::Str(
@@ -312,27 +363,38 @@ pub fn parse_mapping_with_tokens(
                                 )),
                                 mapping_node,
                             ));
-                            println!("DEBUG: Parent pairs after insert: {}", parent_pairs.len());
+                            #[cfg(feature = "debug-trace")]
+                            mapping_log(format!(
+                                "Parent pairs after insert: {}",
+                                parent_pairs.len()
+                            ));
                         } else {
-                            println!("DEBUG: No parent found, pushing frame back as root");
+                            #[cfg(feature = "debug-trace")]
+                            mapping_log("No parent found, pushing frame back as root".to_string());
                             stack.push((top_indent, top_pairs));
                             break;
                         }
                         if let Some((new_top_indent, _)) = stack.last() {
-                            println!("DEBUG: Top of stack after pop: indent={}", new_top_indent);
+                            #[cfg(feature = "debug-trace")]
+                            mapping_log(format!(
+                                "Top of stack after pop: indent={}",
+                                new_top_indent
+                            ));
                             if *new_top_indent <= level {
                                 break;
                             }
                         } else {
-                            println!("DEBUG: Stack is empty after pop");
+                            #[cfg(feature = "debug-trace")]
+                            mapping_log("Stack is empty after pop".to_string());
                             break;
                         }
                     }
-                    println!(
-                        "DEBUG: Dedent pop loop exited after {} pops. Stack now: {:?}",
-                        pop_count,
+                    #[cfg(feature = "debug-trace")]
+                    mapping_log(format!(
+                        "Dedent pop loop exited after {} pops. Stack now: {:?}",
+                        _pop_count,
                         stack.iter().map(|(i, v)| (*i, v.len())).collect::<Vec<_>>()
-                    );
+                    ));
                     stream.next()?;
                     continue;
                 } else {
@@ -350,12 +412,12 @@ pub fn parse_mapping_with_tokens(
                 return Ok(Node::Mapping(pairs));
             }
             _ => {
-                let cur_indent = stack.last().map(|(lvl, _)| *lvl).unwrap_or(base_indent);
+                let cur_indent = get_current_indent(&stack, base_indent);
                 let (key, value) = parse_mapping_pair(stream, directives, cur_indent, depth)?;
                 let norm_key = force_key_to_string(key);
                 // Debug: print key type before insertion
-                #[cfg(debug_assertions)]
-                println!("DEBUG: Inserting mapping key: {:?}", norm_key);
+                #[cfg(feature = "debug-trace")]
+                mapping_log(format!("Inserting mapping key: {:?}", norm_key));
                 // Patch: If the value is a Set with a single empty string, and the next token is an explicit key (?),
                 // treat the following block as the value for this key (for !!set explicit block format)
                 if let Node::Set(items) = &value {
@@ -399,24 +461,26 @@ pub fn parse_mapping_with_tokens(
                 if let Some((_, _pairs)) = stack.last_mut() {
                     // Get stack info before mutable borrow
                     let stack_idx = stack.len().saturating_sub(1);
-                    let (stack_indent, pairs_len) = if let Some((lvl, pairs)) = stack.get(stack_idx)
-                    {
-                        (*lvl, pairs.len())
-                    } else {
-                        (base_indent, 0)
-                    };
-                    println!(
-                        "DEBUG: Inserting pair: key={:?}, value={:?} into stack at indent {} (pairs before: {})",
-                        norm_key, value, stack_indent, pairs_len
-                    );
+                    let (_stack_indent, _pairs_len) =
+                        if let Some((lvl, pairs)) = stack.get(stack_idx) {
+                            (*lvl, pairs.len())
+                        } else {
+                            (base_indent, 0)
+                        };
+                    #[cfg(feature = "debug-trace")]
+                    mapping_log(format!(
+                        "Inserting pair: key={:?}, value={:?} into stack at indent {} (pairs before: {})",
+                        norm_key, value, _stack_indent, _pairs_len
+                    ));
                     if let Some((_, pairs)) = stack.last_mut() {
                         pairs.push((norm_key, value));
                         // After push, print only the new pairs length for this stack frame
-                        println!(
-                            "DEBUG: Stack at indent {} now has {} pairs",
-                            stack_indent,
+                        #[cfg(feature = "debug-trace")]
+                        mapping_log(format!(
+                            "Stack at indent {} now has {} pairs",
+                            _stack_indent,
                             pairs.len()
-                        );
+                        ));
                     }
                 }
             }
@@ -434,10 +498,11 @@ fn parse_mapping_pair(
     cur_indent: usize,
     depth: usize,
 ) -> Result<(Node, Node), String> {
-    println!(
-        "DEBUG: parse_mapping_pair: start, token = {:?}",
+    #[cfg(feature = "debug-trace")]
+    mapping_log(format!(
+        "parse_mapping_pair: start, token = {:?}",
         stream.current()
-    );
+    ));
     #[cfg(feature = "debug-trace")]
     log::debug!("mapping_pair: start at token = {:?}", stream.current());
     // Unify explicit and implicit key handling: always use token stream for key detection
@@ -450,15 +515,16 @@ fn parse_mapping_pair(
 
     // Handle decorators (tag/anchor) and parse the key value
     let key = {
-        let mut parsed_key = if matches!(
+        let parsed_key = if matches!(
             stream.current(),
             Some(Token::Tag(_)) | Some(Token::Anchor(_))
         ) {
             let decorators = stream.consume_decorators()?;
-            println!(
-                "DEBUG: parse_mapping_pair: after decorators, token = {:?}",
+            #[cfg(feature = "debug-trace")]
+            mapping_log(format!(
+                "parse_mapping_pair: after decorators, token = {:?}",
                 stream.current()
-            );
+            ));
             if matches!(stream.current(), Some(Token::Colon)) {
                 use crate::nodes::node::{BlockStyle, QuoteType};
                 let mut node = Node::Str("".to_string(), QuoteType::Unquoted, BlockStyle::None);
@@ -475,30 +541,13 @@ fn parse_mapping_pair(
         } else {
             parse_value_with_tokens(stream, directives, depth + 1)?
         };
-        // If the key is an array, convert to string representation for mapping key (with double quotes)
-        if let Node::Array(items) = &parsed_key {
-            let mut s = String::from("[");
-            for (i, item) in items.iter().enumerate() {
-                if i > 0 {
-                    s.push_str(", ");
-                }
-                match item {
-                    Node::Str(val, _, _) => s.push_str(val),
-                    Node::Number(n) => s.push_str(&format!("{:?}", n)),
-                    Node::Boolean(b) => s.push_str(&format!("{}", b)),
-                    _ => s.push_str(&format!("{:?}", item)),
-                }
-            }
-            s.push(']');
-            use crate::nodes::node::{BlockStyle, QuoteType};
-            parsed_key = Node::Str(s, QuoteType::Double, BlockStyle::None);
-        }
         parsed_key
     };
-    println!(
-        "DEBUG: parse_mapping_pair: after key, token = {:?}",
+    #[cfg(feature = "debug-trace")]
+    mapping_log(format!(
+        "parse_mapping_pair: after key, token = {:?}",
         stream.current()
-    );
+    ));
     // Allow newlines/comments after key before colon
     stream.skip_newlines_and_comments()?;
     match stream.current() {
@@ -513,10 +562,11 @@ fn parse_mapping_pair(
             // If the next token is a new key, document boundary, or EOF, treat as empty value
             // This is critical for !!set block format: ? item1\n? item2\n? item3
             // Always treat as Node::None if not followed by colon/value.
-            println!(
-                "DEBUG: parse_mapping_pair: after explicit key newline/whitespace, token = {:?}",
+            #[cfg(feature = "debug-trace")]
+            mapping_log(format!(
+                "parse_mapping_pair: after explicit key newline/whitespace, token = {:?}",
                 stream.current()
-            );
+            ));
             match stream.current() {
                 Some(Token::Plain(_))
                 | Some(Token::Tag(_))
@@ -598,10 +648,11 @@ fn parse_mapping_pair(
             if let Some(level) = indent_level {
                 // After indent, skip newlines/comments before checking for dash
                 stream.skip_newlines_and_comments()?;
-                println!(
-                    "DEBUG: parse_mapping_pair: after value indent/newline, token = {:?}",
+                #[cfg(feature = "debug-trace")]
+                mapping_log(format!(
+                    "parse_mapping_pair: after value indent/newline, token = {:?}",
                     stream.current()
-                );
+                ));
                 if matches!(stream.current(), Some(Token::Dash)) {
                     // Parse block sequence as value
                     use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;

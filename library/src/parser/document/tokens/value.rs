@@ -215,13 +215,15 @@ pub fn parse_value_with_tokens(
     if depth > MAX_NESTING_DEPTH {
         return Err("Nesting too deep: possible malicious or malformed YAML".to_string());
     }
-    println!(
-        "DEBUG: ENTER parse_value_with_tokens (depth {}), current token: {:?}",
+    #[cfg(feature = "debug-trace")]
+    log::debug!(
+        "value_tokens: ENTER parse_value_with_tokens (depth {}), current token: {:?}",
         depth,
         stream.current()
     );
-    println!(
-        "DEBUG: parse_value_with_tokens (depth {}), current token: {:?}",
+    #[cfg(feature = "debug-trace")]
+    log::debug!(
+        "value_tokens: parse_value_with_tokens (depth {}), current token: {:?}",
         depth,
         stream.current()
     );

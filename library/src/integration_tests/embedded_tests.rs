@@ -222,6 +222,7 @@ empty_mapping: {}
         match parse(&mut source) {
             Ok(doc) => {
                 let mut node = &doc;
+                #[cfg(feature = "debug-trace")]
                 println!("DEBUG: Root node type: {:?}", node);
                 loop {
                     match node {
@@ -235,20 +236,23 @@ empty_mapping: {}
                         _ => break,
                     }
                 }
+                #[cfg(feature = "debug-trace")]
                 println!("DEBUG: Unwrapped node type: {:?}", node);
                 // Print keys and their types/lengths
                 if let Node::Mapping(pairs) = node {
-                    for (k, v) in pairs {
+                    for (_k, _v) in pairs {
+                        #[cfg(feature = "debug-trace")]
                         println!(
                             "DEBUG: Key: {:?}, Value: {:?}, Value len: {:?}",
-                            k,
-                            v,
-                            v.len()
+                            _k,
+                            _v,
+                            _v.len()
                         );
                     }
                 }
                 // Check array
                 if let Some(arr) = node.get_key("array") {
+                    #[cfg(feature = "debug-trace")]
                     println!("DEBUG: array: {:?}, len: {:?}", arr, arr.len());
                     assert!(arr.is_sequence());
                     assert!(!arr.is_mapping());
@@ -257,6 +261,7 @@ empty_mapping: {}
                 }
                 // Check mapping
                 if let Some(map) = node.get_key("mapping") {
+                    #[cfg(feature = "debug-trace")]
                     println!("DEBUG: mapping: {:?}, len: {:?}", map, map.len());
                     assert!(!map.is_sequence());
                     assert!(map.is_mapping());
@@ -265,6 +270,7 @@ empty_mapping: {}
                 }
                 // Check empty array
                 if let Some(empty_arr) = node.get_key("empty_array") {
+                    #[cfg(feature = "debug-trace")]
                     println!(
                         "DEBUG: empty_array: {:?}, len: {:?}",
                         empty_arr,
@@ -276,6 +282,7 @@ empty_mapping: {}
                 }
                 // Check empty mapping
                 if let Some(empty_map) = node.get_key("empty_mapping") {
+                    #[cfg(feature = "debug-trace")]
                     println!(
                         "DEBUG: empty_mapping: {:?}, len: {:?}",
                         empty_map,

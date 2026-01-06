@@ -7,6 +7,24 @@
 use crate::constants::*;
 use crate::io::traits::ISource;
 
+#[cfg(feature = "debug-trace")]
+#[inline]
+fn lexer_log(msg: String) {
+    #[cfg(feature = "std")]
+    {
+        if let Ok(v) = std::env::var("YAML_TRACE_LEXER") {
+            if v.eq_ignore_ascii_case("1")
+                || v.eq_ignore_ascii_case("true")
+                || v.eq_ignore_ascii_case("on")
+            {
+                log::debug!("{}", msg);
+                return;
+            }
+        }
+    }
+    log::trace!("{}", msg);
+}
+
 /// A YAML token with its type and associated data
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
@@ -140,7 +158,8 @@ impl<'a> Lexer<'a> {
         let ch = match self.source.current() {
             Some(c) => c,
             None => {
-                println!("LEXER TRACE: Emitting Token::Eof");
+                #[cfg(feature = "debug-trace")]
+                lexer_log("Emitting Token::Eof".to_string());
                 return Ok(Some(Token::Eof));
             }
         };
@@ -164,25 +183,30 @@ impl<'a> Lexer<'a> {
                 Ok(Some(Token::Comment(comment)))
             }
             '!' => {
-                println!("LEXER TRACE: Emitting Token::Tag");
+                #[cfg(feature = "debug-trace")]
+                lexer_log("Emitting Token::Tag".to_string());
                 Ok(Some(self.scan_tag()?))
             }
             '&' => {
-                println!("LEXER TRACE: Emitting Token::Anchor");
+                #[cfg(feature = "debug-trace")]
+                lexer_log("Emitting Token::Anchor".to_string());
                 Ok(Some(self.scan_anchor()?))
             }
             CHAR_ASTERISK => {
-                println!("LEXER TRACE: Emitting Token::Alias");
+                #[cfg(feature = "debug-trace")]
+                lexer_log("Emitting Token::Alias".to_string());
                 Ok(Some(self.scan_alias()?))
             }
             CHAR_LBRACE => {
                 self.source.next();
                 self.last_was_linebreak = false;
-                println!("LEXER TRACE: Emitting Token::FlowMappingStart");
+                #[cfg(feature = "debug-trace")]
+                lexer_log("Emitting Token::FlowMappingStart".to_string());
                 Ok(Some(Token::FlowMappingStart))
             }
             CHAR_RBRACE => {
-                println!("LEXER TRACE: Emitting Token::FlowMappingEnd");
+                #[cfg(feature = "debug-trace")]
+                lexer_log("Emitting Token::FlowMappingEnd".to_string());
                 self.source.next();
                 self.validate_post_flow_closer('}')?;
                 self.last_was_linebreak = false;
@@ -325,13 +349,15 @@ impl<'a> Lexer<'a> {
             let indent = self.scan_indentation(self.in_flow)?;
             self.at_line_start = false;
             self.last_indent = indent;
-            println!("LEXER TRACE: Emitting Token::Indent({})", indent);
+            #[cfg(feature = "debug-trace")]
+            lexer_log(format!("Emitting Token::Indent({})", indent));
             return Ok(Some(Token::Indent(indent)));
         } else if self.last_indent > 0 {
             // No leading space/tab, but previous indent was > 0: emit Indent(0) to signal dedent
             self.at_line_start = false;
             self.last_indent = 0;
-            println!("LEXER TRACE: Emitting Token::Indent(0) (dedent to top level)");
+            #[cfg(feature = "debug-trace")]
+            lexer_log("Emitting Token::Indent(0) (dedent to top level)".to_string());
             return Ok(Some(Token::Indent(0)));
         }
         Ok(None)
@@ -389,19 +415,21 @@ impl<'a> Lexer<'a> {
     /// If in flow context, suppress newline tokens and continue scanning.
     fn handle_newline(&mut self, is_cr: bool) -> Result<Option<Token>, String> {
         if is_cr {
-            println!(
-                "LEXER TRACE: Emitting Token::Newline (CR) (in_flow={})",
+            #[cfg(feature = "debug-trace")]
+            lexer_log(format!(
+                "Emitting Token::Newline (CR) (in_flow={})",
                 self.in_flow
-            );
+            ));
             self.source.next();
             if self.source.current() == Some(CHAR_NEWLINE) {
                 self.source.next();
             }
         } else {
-            println!(
-                "LEXER TRACE: Emitting Token::Newline (in_flow={})",
+            #[cfg(feature = "debug-trace")]
+            lexer_log(format!(
+                "Emitting Token::Newline (in_flow={})",
                 self.in_flow
-            );
+            ));
             self.source.next();
         }
 

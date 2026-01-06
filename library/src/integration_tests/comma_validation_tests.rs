@@ -43,8 +43,9 @@ mod test_comma_validation {
         let yaml = b"---\n[ a, b, c,#invalid\n]\n";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        if let Err(ref e) = result {
-            println!("Error (correct): {}", e);
+        if let Err(ref _e) = result {
+            #[cfg(feature = "debug-trace")]
+            println!("Error (correct): {}", _e);
         }
         assert!(
             result.is_err(),
@@ -58,9 +59,11 @@ mod test_comma_validation {
         let yaml = b"---\n[ a, b, c, ]#invalid\n";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        if let Err(ref e) = result {
-            println!("Error (correct): {}", e);
+        if let Err(ref _e) = result {
+            #[cfg(feature = "debug-trace")]
+            println!("Error (correct): {}", _e);
         } else {
+            #[cfg(feature = "debug-trace")]
             println!("Parsed (should be error): {:?}", result);
         }
         assert!(
@@ -79,6 +82,7 @@ mod test_comma_validation {
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
         if result.is_ok() {
+            #[cfg(feature = "debug-trace")]
             println!("Result: {:?}", result);
         }
         assert!(
@@ -96,6 +100,7 @@ mod test_comma_validation {
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
         if result.is_ok() {
+            #[cfg(feature = "debug-trace")]
             println!("Simplified result: {:?}", result);
         }
         assert!(result.is_err(), "Should reject flow mapping missing comma");

@@ -14,3 +14,6 @@ pub mod lexer;
 
 /// Token stream wrapper for parser integration
 pub mod token_stream;
+
+/// Shared parser utilities
+pub mod utils;

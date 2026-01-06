@@ -155,6 +155,15 @@ impl<'a> TokenStream<'a> {
         }
     }
 
+    /// Internal DRY helper: advance while predicate matches current token
+    #[inline]
+    fn advance_while(&mut self, mut predicate: impl FnMut(&Token) -> bool) -> Result<(), String> {
+        while self.current().map_or(false, |t| predicate(t)) {
+            self.next()?;
+        }
+        Ok(())
+    }
+
     /// Skip whitespace tokens (newlines, indents)
     #[inline]
     pub fn skip_whitespace(&mut self) -> Result<(), String> {
@@ -163,13 +172,7 @@ impl<'a> TokenStream<'a> {
             "token_stream: skip_whitespace at {:?}",
             self.current()
         ));
-        while self
-            .current()
-            .map_or(false, |t| matches!(t, Token::Newline | Token::Indent(_)))
-        {
-            self.next()?;
-        }
-        Ok(())
+        self.advance_while(|t| matches!(t, Token::Newline | Token::Indent(_)))
     }
 
     /// Skip comments
@@ -180,10 +183,7 @@ impl<'a> TokenStream<'a> {
             "token_stream: skip_comments at {:?}",
             self.current()
         ));
-        while matches!(self.current(), Some(Token::Comment(_))) {
-            self.next()?;
-        }
-        Ok(())
+        self.advance_while(|t| matches!(t, Token::Comment(_)))
     }
 
     /// Skip whitespace and comments
@@ -194,10 +194,7 @@ impl<'a> TokenStream<'a> {
             "token_stream: skip_whitespace_and_comments at {:?}",
             self.current()
         ));
-        while self.current().map_or(false, |t| Self::is_trivia(t)) {
-            self.next()?;
-        }
-        Ok(())
+        self.advance_while(Self::is_trivia)
     }
 
     /// Alias for skipping all trivia (whitespace + comments) to encourage DRY usage
@@ -214,13 +211,7 @@ impl<'a> TokenStream<'a> {
             "token_stream: skip_newlines_and_comments at {:?}",
             self.current()
         ));
-        while matches!(
-            self.current(),
-            Some(Token::Newline) | Some(Token::Comment(_))
-        ) {
-            self.next()?;
-        }
-        Ok(())
+        self.advance_while(|t| matches!(t, Token::Newline | Token::Comment(_)))
     }
 
     #[inline]

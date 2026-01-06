@@ -28,6 +28,7 @@ mod tests {
         let mut source = Buffer::new(input);
         let result = parse(&mut source);
         if result.is_ok() {
+            #[cfg(feature = "debug-trace")]
             eprintln!("X4QW parsed successfully (WRONG): {:?}", result);
         }
         assert!(

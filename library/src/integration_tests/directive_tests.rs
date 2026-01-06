@@ -14,6 +14,7 @@ mod tests {
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
 
+        #[cfg(feature = "debug-trace")]
         println!("5TYM Result: {:?}", result);
 
         assert!(
@@ -29,6 +30,7 @@ mod tests {
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
 
+        #[cfg(feature = "debug-trace")]
         println!("6WLZ Result: {:?}", result);
 
         assert!(result.is_ok(), "Should parse primary TAG handle directive");
@@ -49,6 +51,7 @@ mod tests {
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
 
+        #[cfg(feature = "debug-trace")]
         println!("Simple TAG Result: {:?}", result);
 
         assert!(result.is_ok(), "Should parse simple TAG directive");

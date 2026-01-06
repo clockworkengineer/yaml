@@ -7,14 +7,17 @@ fn test_5c5m_trailing_comma_mapping() {
     // Test: Flow mapping with trailing comma
     let yaml = "- { one : two , three: four , }\n- {five: six,seven : eight}";
 
+    #[cfg(feature = "debug-trace")]
     println!("Testing 5C5M: {}", yaml);
     let mut source = BufferSource::new(yaml.as_bytes());
 
     match parse(&mut source) {
         Ok(_) => {
+            #[cfg(feature = "debug-trace")]
             println!("Parsed successfully");
         }
         Err(e) => {
+            #[cfg(feature = "debug-trace")]
             println!("Parse error: {}", e);
             panic!("Failed to parse: {}", e);
         }
@@ -26,14 +29,17 @@ fn test_5kje_trailing_comma_sequence() {
     // Test: Flow sequence with trailing comma
     let yaml = "- [ one, two, ]\n- [three ,four]";
 
+    #[cfg(feature = "debug-trace")]
     println!("Testing 5KJE: {}", yaml);
     let mut source = BufferSource::new(yaml.as_bytes());
 
     match parse(&mut source) {
         Ok(_) => {
+            #[cfg(feature = "debug-trace")]
             println!("Parsed successfully");
         }
         Err(e) => {
+            #[cfg(feature = "debug-trace")]
             println!("Parse error: {}", e);
             panic!("Failed to parse: {}", e);
         }
@@ -45,6 +51,7 @@ fn test_5t43_double_colon() {
     // Test: Colon at beginning of adjacent flow scalar
     let yaml = "- { \"key\":value }\n- { \"key\"::value }";
 
+    #[cfg(feature = "debug-trace")]
     println!("Testing 5T43: {}", yaml);
     let mut source = BufferSource::new(yaml.as_bytes());
 
@@ -53,6 +60,7 @@ fn test_5t43_double_colon() {
             panic!("Test should fail: double colon in flow mapping is not allowed by YAML 1.2");
         }
         Err(e) => {
+            #[cfg(feature = "debug-trace")]
             println!("Parse error: {}", e);
             assert!(e.contains("YAML 1.2 compliance error: Double colon (::) is not allowed"),
                 "Error message should indicate YAML 1.2 compliance error for double colon, got: {}", e);
@@ -65,14 +73,17 @@ fn test_7zz5_empty_collections() {
     // Test: Empty flow collections
     let yaml = "---\nnested sequences:\n- - - []\n- - - {}\nkey1: []\nkey2: {}";
 
+    #[cfg(feature = "debug-trace")]
     println!("Testing 7ZZ5: {}", yaml);
     let mut source = BufferSource::new(yaml.as_bytes());
 
     match parse(&mut source) {
         Ok(_) => {
+            #[cfg(feature = "debug-trace")]
             println!("Parsed successfully");
         }
         Err(e) => {
+            #[cfg(feature = "debug-trace")]
             println!("Parse error: {}", e);
             panic!("Failed to parse: {}", e);
         }
@@ -82,14 +93,17 @@ fn test_7zz5_empty_collections() {
 #[test]
 fn test_simple_trailing_comma_mapping() {
     let yaml = "{ one : two , }";
+    #[cfg(feature = "debug-trace")]
     println!("Testing simple trailing comma mapping: {}", yaml);
     let mut source = BufferSource::new(yaml.as_bytes());
 
     match parse(&mut source) {
         Ok(_) => {
+            #[cfg(feature = "debug-trace")]
             println!("Parsed successfully");
         }
         Err(e) => {
+            #[cfg(feature = "debug-trace")]
             println!("Parse error: {}", e);
             panic!("Failed to parse: {}", e);
         }
@@ -99,14 +113,17 @@ fn test_simple_trailing_comma_mapping() {
 #[test]
 fn test_simple_trailing_comma_sequence() {
     let yaml = "[ one, two, ]";
+    #[cfg(feature = "debug-trace")]
     println!("Testing simple trailing comma sequence: {}", yaml);
     let mut source = BufferSource::new(yaml.as_bytes());
 
     match parse(&mut source) {
         Ok(_) => {
+            #[cfg(feature = "debug-trace")]
             println!("Parsed successfully");
         }
         Err(e) => {
+            #[cfg(feature = "debug-trace")]
             println!("Parse error: {}", e);
             panic!("Failed to parse: {}", e);
         }
@@ -118,14 +135,17 @@ fn test_simple_crlf() {
     // Simplest possible CRLF test
     let yaml = "key: value\r\n";
 
+    #[cfg(feature = "debug-trace")]
     println!("Testing simple CRLF");
     let mut source = BufferSource::new(yaml.as_bytes());
 
     match parse(&mut source) {
         Ok(_) => {
+            #[cfg(feature = "debug-trace")]
             println!("Parsed successfully");
         }
         Err(e) => {
+            #[cfg(feature = "debug-trace")]
             println!("Parse error: {}", e);
             panic!("Failed to parse: {}", e);
         }
@@ -137,14 +157,17 @@ fn test_flow_mapping_crlf() {
     // Flow mapping with CRLF
     let yaml = "{ one : two }\r\n";
 
+    #[cfg(feature = "debug-trace")]
     println!("Testing flow mapping with CRLF");
     let mut source = BufferSource::new(yaml.as_bytes());
 
     match parse(&mut source) {
         Ok(_) => {
+            #[cfg(feature = "debug-trace")]
             println!("Parsed successfully");
         }
         Err(e) => {
+            #[cfg(feature = "debug-trace")]
             println!("Parse error: {}", e);
             panic!("Failed to parse: {}", e);
         }
@@ -157,14 +180,17 @@ fn test_5c5m_with_crlf() {
     let yaml = "- { one : two , three: four , }\r\n- {five: six,seven : eight}\r\n";
     let normalized = yaml.replace("\r\n", "\n");
 
+    #[cfg(feature = "debug-trace")]
     println!("Testing 5C5M with normalized CRLF");
     let mut source = BufferSource::new(normalized.as_bytes());
 
     match parse(&mut source) {
         Ok(_) => {
+            #[cfg(feature = "debug-trace")]
             println!("Parsed successfully");
         }
         Err(e) => {
+            #[cfg(feature = "debug-trace")]
             println!("Parse error: {}", e);
             panic!("Failed to parse: {}", e);
         }
@@ -186,14 +212,17 @@ fn test_5c5m_exact_bytes() {
     // Normalize CRLF to LF
     let yaml_string = String::from_utf8_lossy(yaml_bytes).replace("\r\n", "\n");
 
+    #[cfg(feature = "debug-trace")]
     println!("Testing 5C5M with normalized exact bytes");
     let mut source = BufferSource::new(yaml_string.as_bytes());
 
     match parse(&mut source) {
         Ok(_) => {
+            #[cfg(feature = "debug-trace")]
             println!("Parsed successfully");
         }
         Err(e) => {
+            #[cfg(feature = "debug-trace")]
             println!("Parse error: {}", e);
             panic!("Failed to parse: {}", e);
         }

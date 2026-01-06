@@ -22,6 +22,7 @@ mod tests {
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
 
+        #[cfg(feature = "debug-trace")]
         println!("229Q Result: {:?}", result);
 
         if let Ok(node) = result {
@@ -57,6 +58,7 @@ key3:value3
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
 
+        #[cfg(feature = "debug-trace")]
         println!("26DV Result: {:?}", result);
 
         assert!(
@@ -77,6 +79,7 @@ key3:value3
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
 
+        #[cfg(feature = "debug-trace")]
         println!("2CMS Result: {:?}", result);
 
         // If this is marked as false positive, we should succeed
@@ -97,11 +100,13 @@ key3:value3
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
 
+        #[cfg(feature = "debug-trace")]
         println!("36F6 Result: {:?}", result);
 
         // Empty lines in plain scalars are tricky
         // This test will help us understand the issue
         if result.is_err() {
+            #[cfg(feature = "debug-trace")]
             println!("36F6 Error: {:?}", result.err());
         }
     }
@@ -114,6 +119,7 @@ key3:value3
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
 
+        #[cfg(feature = "debug-trace")]
         println!("3RLN Result: {:?}", result);
 
         assert!(
@@ -144,6 +150,7 @@ quoted: \"So does this
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
 
+        #[cfg(feature = "debug-trace")]
         println!("4CQQ Result: {:?}", result);
 
         assert!(
@@ -164,10 +171,12 @@ quoted: \"So does this
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
 
+        #[cfg(feature = "debug-trace")]
         println!("4FJ6 Result: {:?}", result);
 
         // This is an advanced feature - explicit complex key
         if result.is_err() {
+            #[cfg(feature = "debug-trace")]
             println!("4FJ6 Error: {:?}", result.err());
         }
     }
@@ -183,6 +192,7 @@ quoted: \"So does this
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
 
+        #[cfg(feature = "debug-trace")]
         println!("4HVU Result: {:?}", result);
 
         // If marked as false positive, we should succeed
@@ -208,6 +218,7 @@ literal: |
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
 
+        #[cfg(feature = "debug-trace")]
         println!("4ZYM Result: {:?}", result);
 
         assert!(

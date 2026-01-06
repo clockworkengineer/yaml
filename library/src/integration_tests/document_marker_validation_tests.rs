@@ -9,8 +9,9 @@ mod test_document_marker_validation {
         let yaml = b"--- key1: value1\n    key2: value2\n";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        if let Err(ref e) = result {
-            println!("Error (correct): {}", e);
+        if let Err(ref _e) = result {
+            #[cfg(feature = "debug-trace")]
+            println!("Error (correct): {}", _e);
         }
         assert!(result.is_err(), "Should reject content on --- line");
     }

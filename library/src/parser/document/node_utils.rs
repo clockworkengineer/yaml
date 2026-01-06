@@ -4,11 +4,13 @@ pub fn make_set_node(items: Vec<Node>) -> Node {
 }
 
 /// Construct a tagged node from an inner node and tag string.
+#[allow(dead_code)]
 pub fn make_tagged_node(inner: Node, tag: String) -> Node {
     Node::Tagged(Box::new(inner), tag)
 }
 
 /// Construct an anchored node from an inner node and anchor name.
+#[allow(dead_code)]
 pub fn make_anchored_node(inner: Node, name: String) -> Node {
     Node::Anchored(Box::new(inner), name)
 }
@@ -18,11 +20,13 @@ pub fn make_mapping_node(pairs: Vec<(Node, Node)>) -> Node {
 }
 
 /// Construct an array node from items.
+#[allow(dead_code)]
 pub fn make_array_node(items: Vec<Node>) -> Node {
     Node::Array(items)
 }
 
 /// Construct a block scalar node (literal | or folded >)
+#[allow(dead_code)]
 pub fn make_block_scalar_node(content: String, is_folded: bool) -> Node {
     let style = if is_folded {
         BlockStyle::Folded
@@ -32,7 +36,6 @@ pub fn make_block_scalar_node(content: String, is_folded: bool) -> Node {
     Node::Str(content, QuoteType::Unquoted, style)
 }
 /// Shared node construction helpers for parser modules
-
 use crate::nodes::node::{BlockStyle, Node, QuoteType};
 use crate::parser::document::helpers::node_to_inline_string;
 
@@ -78,9 +81,7 @@ pub fn force_key_to_string(key: Node) -> Node {
             s.push(']');
             Node::Str(s, QuoteType::Double, BlockStyle::None)
         }
-        Node::Mapping(_) => {
-            Node::Str(format!("{:?}", key), QuoteType::Double, BlockStyle::None)
-        }
+        Node::Mapping(_) => Node::Str(format!("{:?}", key), QuoteType::Double, BlockStyle::None),
         Node::Tagged(inner, tag) => {
             if matches!(*inner, Node::Str(ref s, _, _) if s.is_empty()) {
                 Node::Tagged(inner, tag)
@@ -95,8 +96,27 @@ pub fn force_key_to_string(key: Node) -> Node {
                 Node::Anchored(Box::new(force_key_to_string(*inner)), name)
             }
         }
-        other => {
-            Node::Str(format!("{:?}", other), QuoteType::Double, BlockStyle::None)
+        other => Node::Str(format!("{:?}", other), QuoteType::Double, BlockStyle::None),
+    }
+}
+
+/// Dedupe mapping by last key occurrence, preserving relative order of surviving pairs.
+/// Keys are compared using inline string representation.
+pub fn dedupe_mapping_pairs_by_last_occurrence(pairs: Vec<(Node, Node)>) -> Vec<(Node, Node)> {
+    use std::collections::HashMap as Map;
+    let mut last_index: Map<String, usize> = Map::new();
+    for (idx, (k, _v)) in pairs.iter().enumerate() {
+        let key_s = node_to_inline_string(k);
+        last_index.insert(key_s, idx);
+    }
+    let mut rebuilt: Vec<(Node, Node)> = Vec::new();
+    for (idx, (k, v)) in pairs.into_iter().enumerate() {
+        let key_s = node_to_inline_string(&k);
+        if let Some(&last) = last_index.get(&key_s) {
+            if last == idx {
+                rebuilt.push((k, v));
+            }
         }
     }
+    rebuilt
 }

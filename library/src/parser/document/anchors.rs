@@ -1,4 +1,3 @@
-use crate::parser::document::node_utils::make_array_node;
 // Module: parser/document/anchors.rs
 
 use crate::nodes::node::Node;
@@ -23,44 +22,19 @@ pub(crate) fn collect_anchors(
     node: &Node,
     anchors: &mut HashMap<String, Node>,
 ) -> Result<(), String> {
-    match node {
-        Node::Anchored(inner, name) => {
+    let mut err: Option<String> = None;
+    let mut collect = |n: &Node| {
+        if let Node::Anchored(inner, name) = n {
             if name.trim().is_empty() {
-                return Err(crate::error::messages::ERR_EMPTY_ANCHOR_NAME.to_string());
+                err = Some(crate::error::messages::ERR_EMPTY_ANCHOR_NAME.to_string());
+                return;
             }
             // According to YAML spec, later anchor definitions override earlier ones
-            // So we don't error on duplicate anchors, we just replace them
             anchors.insert(name.clone(), (**inner).clone());
-            collect_anchors(inner, anchors)?;
-            Ok(())
         }
-        Node::Mapping(pairs) => {
-            for (k, v) in pairs {
-                collect_anchors(k, anchors)?;
-                collect_anchors(v, anchors)?;
-            }
-            Ok(())
-        }
-        Node::Array(items) => {
-            for it in items {
-                collect_anchors(it, anchors)?;
-            }
-            Ok(())
-        }
-        Node::Document(nodes) => {
-            for n in nodes {
-                collect_anchors(n, anchors)?;
-            }
-            Ok(())
-        }
-        Node::Documents(docs) => {
-            for d in docs {
-                collect_anchors(d, anchors)?;
-            }
-            Ok(())
-        }
-        _ => Ok(()),
-    }
+    };
+    crate::parser::utils::visit::visit(node, &mut collect);
+    if let Some(e) = err { Err(e) } else { Ok(()) }
 }
 
 /// Recursively replaces all alias references with their corresponding anchor values.
@@ -82,51 +56,27 @@ pub(crate) fn replace_aliases(
     node: &mut Node,
     anchors: &HashMap<String, Node>,
 ) -> Result<(), String> {
-    match node {
+    let mut err: Option<String> = None;
+    let mut replacer = |n: &mut Node| match n {
         Node::Alias(name) => {
             if let Some(found) = anchors.get(name) {
-                *node = found.clone();
-                Ok(())
+                *n = found.clone();
             } else {
-                Err(format!(
+                err = Some(format!(
                     "{}{}",
                     crate::error::messages::ERR_UNDEFINED_ANCHOR_PREFIX,
                     name
-                ))
+                ));
             }
         }
         Node::Anchored(inner, _name) => {
             let replacement = (**inner).clone();
-            *node = replacement;
-            replace_aliases(node, anchors)
+            *n = replacement;
         }
-        Node::Mapping(pairs) => {
-            for (k, v) in pairs.iter_mut() {
-                replace_aliases(k, anchors)?;
-                replace_aliases(v, anchors)?;
-            }
-            Ok(())
-        }
-        Node::Array(items) => {
-            for it in items.iter_mut() {
-                replace_aliases(it, anchors)?;
-            }
-            Ok(())
-        }
-        Node::Document(nodes) => {
-            for n in nodes.iter_mut() {
-                replace_aliases(n, anchors)?;
-            }
-            Ok(())
-        }
-        Node::Documents(docs) => {
-            for d in docs.iter_mut() {
-                replace_aliases(d, anchors)?;
-            }
-            Ok(())
-        }
-        _ => Ok(()),
-    }
+        _ => {}
+    };
+    crate::parser::utils::visit::visit_mut(node, &mut replacer);
+    if let Some(e) = err { Err(e) } else { Ok(()) }
 }
 
 /// Expands YAML merge keys (<<) by incorporating referenced mapping values.
@@ -148,8 +98,9 @@ pub(crate) fn expand_merge_keys(
     node: &mut Node,
     anchors: &HashMap<String, Node>,
 ) -> Result<(), String> {
-    match node {
-        Node::Mapping(pairs) => {
+    let mut err: Option<String> = None;
+    let mut expander = |n: &mut Node| {
+        if let Node::Mapping(pairs) = n {
             let mut combined: Vec<(Node, Node)> = Vec::new();
             let snapshot = pairs.clone();
             let mut i = 0usize;
@@ -165,17 +116,19 @@ pub(crate) fn expand_merge_keys(
                                     if let Node::Mapping(src_pairs) = src {
                                         expanded_pairs.extend(src_pairs.clone());
                                     } else {
-                                        return Err(format!(
+                                        err = Some(format!(
                                             "Merge source '{}' is not a mapping",
                                             name
                                         ));
+                                        break;
                                     }
                                 } else {
-                                    return Err(format!(
+                                    err = Some(format!(
                                         "{}{}",
                                         crate::error::messages::ERR_UNDEFINED_ANCHOR_PREFIX,
                                         name
                                     ));
+                                    break;
                                 }
                             }
                             Node::Array(items) => {
@@ -186,16 +139,24 @@ pub(crate) fn expand_merge_keys(
                                                 if let Node::Mapping(src_pairs) = src {
                                                     expanded_pairs.extend(src_pairs.clone());
                                                 } else {
-                                                    return Err(format!("Merge source '{}' is not a mapping", name));
+                                                    err = Some(format!(
+                                                        "Merge source '{}' is not a mapping",
+                                                        name
+                                                    ));
+                                                    break;
                                                 }
                                             } else {
-                                                return Err(format!("{}{}", crate::error::messages::ERR_UNDEFINED_ANCHOR_PREFIX, name));
+                                                err = Some(format!("{}{}", crate::error::messages::ERR_UNDEFINED_ANCHOR_PREFIX, name));
+                                                break;
                                             }
                                         }
                                         Node::Mapping(src_pairs) => {
                                             expanded_pairs.extend(src_pairs.clone());
                                         }
-                                        _ => return Err("Invalid merge sequence item: expected alias or mapping".to_string()),
+                                        _ => {
+                                            err = Some("Invalid merge sequence item: expected alias or mapping".to_string());
+                                            break;
+                                        }
                                     }
                                 }
                             }
@@ -203,7 +164,7 @@ pub(crate) fn expand_merge_keys(
                                 expanded_pairs.extend(src_pairs.clone());
                             }
                             other => {
-                                return Err(format!(
+                                err = Some(format!(
                                     "Invalid merge value: expected alias, sequence or mapping, got {:?}",
                                     other
                                 ));
@@ -283,46 +244,11 @@ pub(crate) fn expand_merge_keys(
                 combined.push((k, v));
                 i += 1;
             }
-            use std::collections::HashMap as Map;
-            let mut last_index: Map<String, usize> = Map::new();
-            for (idx, (k, _v)) in combined.iter().enumerate() {
-                let key_s = crate::parser::document::helpers::node_to_inline_string(k);
-                last_index.insert(key_s, idx);
-            }
-            let mut rebuilt: Vec<(Node, Node)> = Vec::new();
-            for (idx, (k, v)) in combined.into_iter().enumerate() {
-                let key_s = crate::parser::document::helpers::node_to_inline_string(&k);
-                if let Some(&last) = last_index.get(&key_s) {
-                    if last == idx {
-                        rebuilt.push((k, v));
-                    }
-                }
-            }
-            *pairs = rebuilt;
-            for (_k, v) in pairs.iter_mut() {
-                expand_merge_keys(v, anchors)?;
-            }
-            Ok(())
+            *pairs = crate::parser::document::node_utils::dedupe_mapping_pairs_by_last_occurrence(
+                combined,
+            );
         }
-        Node::Array(items) => {
-            for it in items.iter_mut() {
-                expand_merge_keys(it, anchors)?;
-            }
-            Ok(())
-        }
-        Node::Document(nodes) => {
-            for n in nodes.iter_mut() {
-                expand_merge_keys(n, anchors)?;
-            }
-            Ok(())
-        }
-        Node::Documents(docs) => {
-            for d in docs.iter_mut() {
-                expand_merge_keys(d, anchors)?;
-            }
-            Ok(())
-        }
-        Node::Anchored(inner, _name) => expand_merge_keys(inner, anchors),
-        _ => Ok(()),
-    }
+    };
+    crate::parser::utils::visit::visit_mut(node, &mut expander);
+    if let Some(e) = err { Err(e) } else { Ok(()) }
 }

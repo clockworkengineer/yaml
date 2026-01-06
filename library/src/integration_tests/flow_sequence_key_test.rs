@@ -8,11 +8,13 @@ mod test_flow_sequence_as_key {
         let yaml = b"{a: [b, c], [d, e]: f}";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        if let Err(ref e) = result {
-            println!("Error: {}", e);
+        if let Err(ref _e) = result {
+            #[cfg(feature = "debug-trace")]
+            println!("Error: {}", _e);
         }
-        if let Ok(ref res) = result {
-            println!("Parsed: {:?}", res);
+        if let Ok(ref _res) = result {
+            #[cfg(feature = "debug-trace")]
+            println!("Parsed: {:?}", _res);
         }
         assert!(result.is_ok(), "Should accept flow sequence as mapping key");
     }
@@ -23,11 +25,13 @@ mod test_flow_sequence_as_key {
         let yaml = b"{a: [b, c], [d, e]: f}\n";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        if let Err(ref e) = result {
-            println!("Error parsing SBG9: {}", e);
+        if let Err(ref _e) = result {
+            #[cfg(feature = "debug-trace")]
+            println!("Error parsing SBG9: {}", _e);
         }
-        if let Ok(ref res) = result {
-            println!("Parsed SBG9: {:?}", res);
+        if let Ok(ref _res) = result {
+            #[cfg(feature = "debug-trace")]
+            println!("Parsed SBG9: {:?}", _res);
         }
         assert!(result.is_ok(), "Should parse SBG9 successfully");
     }

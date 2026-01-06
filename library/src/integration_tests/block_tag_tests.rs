@@ -13,6 +13,7 @@ mod tests {
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
 
+        #[cfg(feature = "debug-trace")]
         println!("test_tag_with_block_literal_scalar result: {:?}", result);
 
         assert!(
@@ -57,6 +58,7 @@ mod tests {
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
 
+        #[cfg(feature = "debug-trace")]
         println!("test_tag_with_block_folded_scalar result: {:?}", result);
 
         assert!(
@@ -94,6 +96,7 @@ mod tests {
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
 
+        #[cfg(feature = "debug-trace")]
         println!("test_tag_with_block_sequence result: {:?}", result);
 
         assert!(
@@ -130,6 +133,7 @@ mod tests {
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
 
+        #[cfg(feature = "debug-trace")]
         println!("test_tag_with_block_mapping result: {:?}", result);
 
         assert!(
@@ -160,6 +164,7 @@ mod tests {
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
 
+        #[cfg(feature = "debug-trace")]
         println!(
             "test_standalone_tag_with_literal_block result: {:?}",
             result
@@ -198,6 +203,7 @@ mod tests {
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
 
+        #[cfg(feature = "debug-trace")]
         println!("test_tag_with_nested_block_structures result: {:?}", result);
 
         assert!(
@@ -208,6 +214,7 @@ mod tests {
 
         if let Ok(Node::Documents(ref docs)) = result {
             if let Document(nodes) = &docs[0] {
+                #[cfg(feature = "debug-trace")]
                 println!("Document has {} nodes", nodes.len());
                 // The parser might structure this differently - just verify it parsed successfully
                 // and contains the expected data somewhere in the tree
@@ -236,6 +243,7 @@ mod tests {
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
 
+        #[cfg(feature = "debug-trace")]
         println!("test_custom_tag_with_block_literal result: {:?}", result);
 
         assert!(

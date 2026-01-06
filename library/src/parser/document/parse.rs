@@ -190,7 +190,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
     let mut docs: Vec<Node> = Vec::new();
     let mut saw_marker = false;
     let mut any_content = false;
-    let mut doc_count = 0;
+    let mut _doc_count = 0;
     // Print the input for debug
     #[cfg(debug_assertions)]
     eprintln!("DEBUG: Starting parse() with YAML input");
@@ -217,7 +217,8 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
         };
 
         let marker_res = parse_document_markers(source, &directives);
-        eprintln!("DEBUG: parse_document_markers result: {:?}", marker_res);
+        #[cfg(feature = "debug-trace")]
+        log::debug!("parse: parse_document_markers result: {:?}", marker_res);
         if let Err(err) = marker_res {
             return Err(err);
         }
@@ -297,34 +298,39 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
                         })
                         .collect();
                     if non_empty.len() == 1 {
-                        doc_count += 1;
+                        _doc_count += 1;
                         let doc = Document(vec![(*non_empty.pop().unwrap()).clone()]);
-                        eprintln!("DEBUG: Parsed document #{}: {:#?}", doc_count, doc);
+                        #[cfg(feature = "debug-trace")]
+                        log::debug!("parse: Parsed document #{}: {:#?}", _doc_count, doc);
                         docs.push(doc);
                     } else {
                         for node in nodes {
-                            doc_count += 1;
+                            _doc_count += 1;
                             let single_doc = Document(vec![node.clone()]);
-                            eprintln!("DEBUG: Parsed document #{}: {:#?}", doc_count, single_doc);
+                            #[cfg(feature = "debug-trace")]
+                            log::debug!("parse: Parsed document #{}: {:#?}", _doc_count, single_doc);
                             docs.push(single_doc);
                         }
                     }
                 } else {
-                    doc_count += 1;
+                    _doc_count += 1;
                     let doc = Document(nodes);
-                    eprintln!("DEBUG: Parsed document #{}: {:#?}", doc_count, doc);
+                    #[cfg(feature = "debug-trace")]
+                    log::debug!("parse: Parsed document #{}: {:#?}", _doc_count, doc);
                     docs.push(doc);
                 }
                 any_content = true;
             }
             Ok(doc) => {
-                doc_count += 1;
-                eprintln!("DEBUG: Parsed document #{}: {:#?}", doc_count, doc);
+                _doc_count += 1;
+                #[cfg(feature = "debug-trace")]
+                log::debug!("parse: Parsed document #{}: {:#?}", _doc_count, doc);
                 docs.push(doc);
                 any_content = true;
             }
             Err(err) => {
-                eprintln!("DEBUG: Error parsing document #{}: {}", doc_count + 1, err);
+                #[cfg(feature = "debug-trace")]
+                log::debug!("parse: Error parsing document #{}: {}", _doc_count + 1, err);
                 return Err(err);
             }
         }
@@ -348,14 +354,16 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
             }
         }
     }
-    eprintln!("DEBUG: Total documents parsed: {}", docs.len());
+    #[cfg(feature = "debug-trace")]
+    log::debug!("parse: Total documents parsed: {}", docs.len());
     if docs.is_empty() {
         docs.push(Document(Vec::new()));
     }
     if saw_marker && !any_content {
         docs.push(Document(Vec::new()));
     }
-    eprintln!("DEBUG: Final docs vector: {:#?}", docs);
+    #[cfg(feature = "debug-trace")]
+    log::debug!("parse: Final docs vector: {:#?}", docs);
     #[cfg(feature = "debug-trace")]
     log::debug!("parse: end stream with {} document(s)", docs.len());
     // Special-case: if the stream ends with '...\n---\n', count a trailing empty document.
