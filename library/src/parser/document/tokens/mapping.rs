@@ -341,24 +341,21 @@ pub fn parse_mapping_with_tokens(
                         let mapping_value =
                             parse_mapping_with_tokens(stream, cur_indent, directives, depth + 1)?;
                         if let Node::Mapping(ref pairs) = mapping_value {
-                            let mut set_items = Vec::new();
-                            for (k, v) in pairs {
-                                if matches!(v, Node::None) {
-                                    set_items.push(k.clone());
-                                } else {
-                                    // Not a valid set, return as mapping
-                                    return Ok(Node::Mapping(pairs.clone()));
+                            // Use DRY helper to convert mapping pairs with None values into set items
+                            if let Some(mut set_items) = crate::parser::document::node_utils::pairs_to_set_items_if_all_none(pairs) {
+                                // FLATTEN: If the current value is a Set, merge its items
+                                let mut all_items = Vec::new();
+                                for item in items.iter() {
+                                    if !matches!(item, Node::Str(s, _, _) if s.is_empty()) {
+                                        all_items.push(item.clone());
+                                    }
                                 }
+                                all_items.append(&mut set_items);
+                                return Ok(Node::Set(all_items));
+                            } else {
+                                // Not a valid set, return as mapping
+                                return Ok(Node::Mapping(pairs.clone()));
                             }
-                            // FLATTEN: If the current value is a Set, merge its items
-                            let mut all_items = Vec::new();
-                            for item in items.iter() {
-                                if !matches!(item, Node::Str(s, _, _) if s.is_empty()) {
-                                    all_items.push(item.clone());
-                                }
-                            }
-                            all_items.extend(set_items);
-                            return Ok(Node::Set(all_items));
                         } else {
                             // Not a mapping, just return as-is
                             return Ok(mapping_value);

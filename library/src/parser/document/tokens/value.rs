@@ -117,6 +117,14 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
                 }
                 Some(Node::Set(set_items))
             }
+                // Convert mapping with null values to a set (DRY)
+                Node::Mapping(pairs) => {
+                    if let Some(set_items) = crate::parser::document::node_utils::pairs_to_set_items_if_all_none(&pairs) {
+                        Some(Node::Set(set_items))
+                    } else {
+                        None
+                    }
+                }
             // Convert array to a set (remove duplicates)
             Node::Array(items) => {
                 let mut unique_items = Vec::new();
@@ -260,10 +268,7 @@ pub fn parse_value_with_tokens(
         let tag_is_seq = decorators
             .tag
             .as_ref()
-            .map(|t| {
-                let resolved = directives.resolve_tag(t);
-                resolved == "!!seq" || resolved == "tag:yaml.org,2002:seq"
-            })
+            .map(|t| crate::parser::document::node_utils::resolved_is_seq(&directives.resolve_tag(t)))
             .unwrap_or(false);
 
         if tag_is_seq {
@@ -330,10 +335,7 @@ pub fn parse_value_with_tokens(
         let tag_is_set = decorators
             .tag
             .as_ref()
-            .map(|t| {
-                let resolved = directives.resolve_tag(t);
-                resolved == "!!set" || resolved == "tag:yaml.org,2002:set"
-            })
+            .map(|t| crate::parser::document::node_utils::resolved_is_set(&directives.resolve_tag(t)))
             .unwrap_or(false);
 
         let mut result = if tag_is_set {
@@ -388,7 +390,7 @@ pub fn parse_value_with_tokens(
                         );
                     }
                 }
-            } else if tag_resolved == "!!seq" || tag_resolved == "tag:yaml.org,2002:seq" {
+            } else if crate::parser::document::node_utils::resolved_is_seq(&tag_resolved) {
                 // Always wrap as Tagged with canonical tag for sequences
                 match &result {
                     Node::Array(items) => {

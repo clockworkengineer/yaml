@@ -137,3 +137,24 @@ pub(crate) fn parse_explicit_mapping_entry(
 
     Ok((key_node, value_node))
 }
+
+/// Collect consecutive explicit key entries ('? key' lines) into mapping pairs.
+/// Stops when the next token is not a question mark or structure changes.
+#[allow(dead_code)]
+pub(crate) fn collect_explicit_keys_block(
+    stream: &mut TokenStream,
+    directives: &crate::parser::directives::DirectiveContext,
+) -> Result<Vec<(Node, Node)>, String> {
+    let mut pairs: Vec<(Node, Node)> = Vec::new();
+    loop {
+        // Skip trivia before checking for next explicit key
+        stream.skip_trivia()?;
+        if !matches!(stream.current(), Some(Token::QuestionMark)) {
+            break;
+        }
+        let (key, value) = parse_explicit_mapping_entry(stream, directives)?;
+        pairs.push((key, value));
+        // Continue loop to fetch next explicit key at same level
+    }
+    Ok(pairs)
+}

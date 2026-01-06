@@ -120,3 +120,28 @@ pub fn dedupe_mapping_pairs_by_last_occurrence(pairs: Vec<(Node, Node)>) -> Vec<
     }
     rebuilt
 }
+
+/// If all mapping values are Node::None, return the keys as set items; otherwise None.
+pub fn pairs_to_set_items_if_all_none(pairs: &[(Node, Node)]) -> Option<Vec<Node>> {
+    let mut items = Vec::new();
+    for (k, v) in pairs.iter() {
+        if matches!(v, Node::None) {
+            items.push(k.clone());
+        } else {
+            return None;
+        }
+    }
+    Some(items)
+}
+
+/// Tag helpers (for DRY checks on resolved tag strings)
+/// The input should be a resolved tag string (e.g., "!!set" or "tag:yaml.org,2002:set").
+#[inline]
+pub fn resolved_is_set(tag: &str) -> bool {
+    tag == "!!set" || tag == "tag:yaml.org,2002:set"
+}
+
+#[inline]
+pub fn resolved_is_seq(tag: &str) -> bool {
+    tag == "!!seq" || tag == "tag:yaml.org,2002:seq"
+}
