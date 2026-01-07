@@ -264,7 +264,7 @@ pub fn parse_value_with_tokens(
         // Only skip comments; structural whitespace must be preserved.
         stream.skip_comments()?;
 
-        // Special handling: if tag is !!seq and next token is Indent, parse a sequence, not a mapping
+        // Special handling: if tag is !!seq, parse a sequence (block or flow)
         let tag_is_seq = decorators
             .tag
             .as_ref()
@@ -272,6 +272,33 @@ pub fn parse_value_with_tokens(
             .unwrap_or(false);
 
         if tag_is_seq {
+            // In flow context, a tagged sequence may be written as
+            // `!!seq [ a, b ]` but split across lines, e.g. in EHF6:
+            // `k: !!seq` then on the next indented line `[ a, !!str b ]`.
+            // Inside a flow collection, indentation is just horizontal
+            // whitespace, so we can safely skip Indent tokens here and
+            // detect a following flow sequence start.
+            if stream.current_flow_depth() > 0 {
+                // Skip any indentation directly after the tag
+                while matches!(stream.current(), Some(Token::Indent(_))) {
+                    stream.next()?;
+                }
+
+                if matches!(stream.current(), Some(Token::FlowSequenceStart)) {
+                    use crate::parser::document::inline_tokens::parse_inline_sequence_with_tokens;
+                    let seq =
+                        parse_inline_sequence_with_tokens(stream, directives, depth + 1)?;
+                    let mut result =
+                        Node::Tagged(Box::new(seq), "tag:yaml.org,2002:seq".to_string());
+                    if let Some(anchor_name) = decorators.anchor {
+                        result = Node::Anchored(Box::new(result), anchor_name);
+                    }
+                    return Ok(result);
+                }
+            }
+
+            // Outside flow, an increased indentation after !!seq indicates
+            // a block sequence value (e.g. `!!seq` followed by `- a`).
             if let Some(Token::Indent(level)) = stream.current() {
                 use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
                 let ctx_seq = crate::parser::document::context::ParsingContext::new(*level)
