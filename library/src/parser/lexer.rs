@@ -442,11 +442,15 @@ impl<'a> Lexer<'a> {
             }
             // In flow context, tabs that appear immediately after a newline
             // (i.e., as indentation inside a flow collection) are generally
-            // forbidden by our validation rules, except when they only
-            // indent a closing ']' or '}' (as in the 6CA3 test, which has
-            // a tab before "]"). To support that, we peek ahead past any
-            // horizontal whitespace: if the next non-whitespace character is
-            // a flow closer, we allow the tabs; otherwise, we reject them.
+            // forbidden by our validation rules, except when they either:
+            //   - only indent a closing ']' or '}' (as in 6CA3), or
+            //   - occur on a line that contains no non-whitespace content
+            //     before the newline (as in Y79Y/002, which has a tab-only
+            //     line between '[' and 'foo'). To support this, we peek
+            //     ahead past any horizontal whitespace: if the next
+            //     non-whitespace character is a flow closer, a newline/CR,
+            //     or EOF (no content), we allow the tabs; otherwise, we
+            //     reject them as illegal indentation in flow collections.
             if ch == CHAR_TAB && self.in_flow && self.last_was_linebreak {
                 let state = self.source.save_state();
                 // Consume spaces/tabs temporarily to inspect the next
@@ -461,7 +465,14 @@ impl<'a> Lexer<'a> {
                 let next_non_ws = self.source.current();
                 self.source.restore_state(state);
 
-                if !matches!(next_non_ws, Some(CHAR_RBRACKET) | Some(CHAR_RBRACE)) {
+                if !matches!(
+                    next_non_ws,
+                    Some(CHAR_RBRACKET)
+                        | Some(CHAR_RBRACE)
+                        | Some(CHAR_NEWLINE)
+                        | Some(CHAR_CARRIAGE_RETURN)
+                        | None
+                ) {
                     return Err(crate::parser::document::error_builder::forbidden_error(
                         self.source,
                         "Tabs",

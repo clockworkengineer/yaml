@@ -193,7 +193,9 @@ pub fn parse_mapping_with_tokens(
             }
             Some(Token::DocumentEnd) => {
                 // Document end marker - validate no content after it on same line
-                crate::parser::document::helpers::validate_no_inline_content_after_document_end(stream)?;
+                crate::parser::document::helpers::validate_no_inline_content_after_document_end(
+                    stream,
+                )?;
                 let (_, pairs) = stack.pop().unwrap();
                 return Ok(Node::Mapping(pairs));
             }
@@ -343,7 +345,11 @@ pub fn parse_mapping_with_tokens(
                             parse_mapping_with_tokens(stream, cur_indent, directives, depth + 1)?;
                         if let Node::Mapping(ref pairs) = mapping_value {
                             // Use DRY helper to convert mapping pairs with None values into set items
-                            if let Some(mut set_items) = crate::parser::document::node_utils::pairs_to_set_items_if_all_none(pairs) {
+                            if let Some(mut set_items) =
+                                crate::parser::document::node_utils::pairs_to_set_items_if_all_none(
+                                    pairs,
+                                )
+                            {
                                 // FLATTEN: If the current value is a Set, merge its items
                                 let mut all_items = Vec::new();
                                 for item in items.iter() {
