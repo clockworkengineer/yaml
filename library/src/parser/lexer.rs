@@ -498,6 +498,40 @@ impl<'a> Lexer<'a> {
                 count += 1;
                 self.source.next();
             } else if ch == CHAR_TAB {
+                // Special-case: a leading tab at column 0 in block
+                // context that directly precedes a flow collection
+                // delimiter ("[", "]", "{", or "}") should be
+                // treated as flow whitespace rather than indentation.
+                // This matches YAML test 6CA3, where a tab is used
+                // before a flow sequence start/end.
+                if !in_flow && count == 0 && first_char_is_tab {
+                    let state = self.source.save_state();
+                    // Temporarily consume spaces/tabs to inspect the
+                    // next non-whitespace character on this line.
+                    while let Some(c) = self.source.current() {
+                        if c == CHAR_SPACE || c == CHAR_TAB {
+                            self.source.next();
+                        } else {
+                            break;
+                        }
+                    }
+                    let next_non_ws = self.source.current();
+                    self.source.restore_state(state);
+
+                    if matches!(
+                        next_non_ws,
+                        Some(CHAR_LBRACKET)
+                            | Some(CHAR_RBRACKET)
+                            | Some(CHAR_LBRACE)
+                            | Some(CHAR_RBRACE)
+                    ) {
+                        // Consume the leading tab as horizontal
+                        // whitespace and do not contribute to
+                        // indentation level.
+                        self.source.next();
+                        continue;
+                    }
+                }
                 // Tabs are forbidden for indentation in YAML block context
                 // but allowed as whitespace in flow context (inside [], {}).
                 // Flow-specific indentation checks (e.g., tabs immediately
@@ -1126,13 +1160,17 @@ impl<'a> Lexer<'a> {
                     break;
                 }
                 Some(ch)
-                    if ch == CHAR_COMMA
-                        || ch == CHAR_LBRACKET
-                        || ch == CHAR_RBRACKET
-                        || ch == CHAR_LBRACE
-                        || ch == CHAR_RBRACE =>
+                    if self.in_flow
+                        && (ch == CHAR_COMMA
+                            || ch == CHAR_LBRACKET
+                            || ch == CHAR_RBRACKET
+                            || ch == CHAR_LBRACE
+                            || ch == CHAR_RBRACE) =>
                 {
-                    // Flow indicators - end of scalar
+                    // In flow context, these characters act as flow
+                    // indicators and terminate the plain scalar. Outside
+                    // of flow, they are allowed as part of the scalar
+                    // content (e.g., the ']' in "bla]keks" in AZW3).
                     break;
                 }
                 Some(ch) => {
@@ -1194,7 +1232,9 @@ mod tests {
     #[test]
     fn test_flow_indicators() {
         let mut source = Buffer::new(b"{a: b}");
-        let mut lexer = Lexer::new(&mut source, false);
+        // In flow context, braces should be treated as flow mapping
+        // delimiters and not included in plain scalars.
+        let mut lexer = Lexer::new(&mut source, true);
 
         assert_eq!(lexer.next().unwrap().unwrap(), Token::FlowMappingStart);
         assert_eq!(
