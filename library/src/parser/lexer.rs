@@ -441,18 +441,33 @@ impl<'a> Lexer<'a> {
                 }
             }
             // In flow context, tabs that appear immediately after a newline
-            // (i.e., as indentation inside a flow collection) are forbidden
-            // by our validation rules, even though tabs elsewhere in flow
-            // content are allowed. Detect this specific case here so that
-            // inputs like "[\n\titem\n]" are rejected, while tests that
-            // use leading tabs in flow context without a preceding newline
-            // still succeed.
+            // (i.e., as indentation inside a flow collection) are generally
+            // forbidden by our validation rules, except when they only
+            // indent a closing ']' or '}' (as in the 6CA3 test, which has
+            // a tab before "]"). To support that, we peek ahead past any
+            // horizontal whitespace: if the next non-whitespace character is
+            // a flow closer, we allow the tabs; otherwise, we reject them.
             if ch == CHAR_TAB && self.in_flow && self.last_was_linebreak {
-                return Err(crate::parser::document::error_builder::forbidden_error(
-                    self.source,
-                    "Tabs",
-                    "as indentation in YAML flow collections",
-                ));
+                let state = self.source.save_state();
+                // Consume spaces/tabs temporarily to inspect the next
+                // non-whitespace character on this line.
+                while let Some(c) = self.source.current() {
+                    if c == CHAR_SPACE || c == CHAR_TAB {
+                        self.source.next();
+                    } else {
+                        break;
+                    }
+                }
+                let next_non_ws = self.source.current();
+                self.source.restore_state(state);
+
+                if !matches!(next_non_ws, Some(CHAR_RBRACKET) | Some(CHAR_RBRACE)) {
+                    return Err(crate::parser::document::error_builder::forbidden_error(
+                        self.source,
+                        "Tabs",
+                        "as indentation in YAML flow collections",
+                    ));
+                }
             }
 
             let indent = self.scan_indentation(self.in_flow)?;
