@@ -61,6 +61,8 @@ impl<'a> TokenStream<'a> {
             lexer,
             _directives: directives,
             position_counter: 0,
+            // Flow depth is tracked only for instrumentation; it starts at 0
+            // and is updated as we consume tokens via `next()`.
             flow_depth: 0,
         };
         #[cfg(feature = "debug-trace")]

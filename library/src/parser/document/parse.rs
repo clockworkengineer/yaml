@@ -275,9 +275,22 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
                             "Unexpected closing brace '}' - no matching opening brace",
                         ));
                     }
-                    // Check for any other content that shouldn't be here (not document marker or EOF)
-                    Some(crate::parser::lexer::Token::Plain(_))
-                    | Some(crate::parser::lexer::Token::SingleQuoted(_))
+                    // Check for any other content that shouldn't be here (not document marker or EOF).
+                    //
+                    // However, lines starting with a '%' are YAML directive lines
+                    // (e.g. "%YAML", "%TAG") and are handled by the character-based
+                    // directive parser, not the token stream. Treat those as potential
+                    // starts of the next document rather than as stray content.
+                    Some(crate::parser::lexer::Token::Plain(text)) => {
+                        let trimmed = text.trim_start();
+                        if !trimmed.starts_with('%') {
+                            return Err(helpers::parse_error_token(
+                                &ts,
+                                "Unexpected content after document - missing document separator or incorrect indentation",
+                            ));
+                        }
+                    }
+                    Some(crate::parser::lexer::Token::SingleQuoted(_))
                     | Some(crate::parser::lexer::Token::DoubleQuoted(_))
                     | Some(crate::parser::lexer::Token::Dash)
                     | Some(crate::parser::lexer::Token::Colon) => {

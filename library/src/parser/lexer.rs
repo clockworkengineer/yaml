@@ -384,7 +384,15 @@ impl<'a> Lexer<'a> {
                 self.last_was_linebreak = false;
                 Ok(Some(Token::QuestionMark))
             }
-            '%' => Ok(Some(self.scan_directive()?)),
+            '%' => {
+                // Treat '%' as part of a plain scalar for token-based
+                // parsing. Top-level YAML directives (e.g. %YAML, %TAG)
+                // are handled separately by the document parser using the
+                // raw character stream, so emitting a dedicated Directive
+                // token here would only interfere with content such as
+                // flow mappings that legitimately contain '%'.
+                Ok(Some(self.scan_plain_scalar()?))
+            }
             CHAR_SINGLE_QUOTE => Ok(Some(self.scan_single_quoted()?)),
             CHAR_DOUBLE_QUOTE => Ok(Some(self.scan_double_quoted()?)),
             _ => Ok(Some(self.scan_plain_scalar()?)),
@@ -1015,6 +1023,35 @@ impl<'a> Lexer<'a> {
 
         loop {
             match self.source.current() {
+                // In flow context, allow line breaks inside a plain scalar
+                // and fold them (plus any following spaces) into a single
+                // space. This matches YAML's treatment of plain scalars in
+                // flow collections (e.g., the UT92 test case where a key is
+                // split across lines: "{ matches\n% : 20 }"). Tabs remain a
+                // terminator and are not treated as indentation here.
+                Some(ch) if self.in_flow && (ch == CHAR_NEWLINE || ch == CHAR_CARRIAGE_RETURN) => {
+                    // Consume the newline or CRLF
+                    if ch == CHAR_CARRIAGE_RETURN {
+                        self.source.next();
+                        if self.source.current() == Some(CHAR_NEWLINE) {
+                            self.source.next();
+                        }
+                    } else {
+                        self.source.next();
+                    }
+                    // Consume any following spaces (but not tabs) so we
+                    // don't accumulate multiple spaces.
+                    while let Some(ws) = self.source.current() {
+                        if ws == CHAR_SPACE {
+                            self.source.next();
+                        } else {
+                            break;
+                        }
+                    }
+                    if !content.is_empty() {
+                        content.push(CHAR_SPACE);
+                    }
+                }
                 Some(ch) if ch == CHAR_COLON => {
                     // Colon could be part of scalar or a separator
                     let state = self.source.save_state();
@@ -1050,7 +1087,8 @@ impl<'a> Lexer<'a> {
                     self.source.next();
                 }
                 Some(ch) if ch.is_whitespace() && ch != CHAR_SPACE => {
-                    // Newline, tab, etc. - end of scalar
+                    // Newline, tab, etc. - end of scalar in block context
+                    // or when not handled by the flow-specific branch above.
                     break;
                 }
                 Some(ch)

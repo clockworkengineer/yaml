@@ -57,7 +57,7 @@ fn get_all_test_dirs(suite_dir: &Path) -> Vec<PathBuf> {
     test_dirs
 }
 
-// /// Run all YAML test suite cases and assert pass rate >= 80%
+// /// Run all YAML test suite cases and assert pass rate >= 85%
 #[test]
 fn run_yaml_test_suite() {
     // Try multiple possible paths for the test suite
@@ -165,7 +165,7 @@ fn run_yaml_test_suite() {
     if total_tests > 0 {
         let pass_rate = (passed as f64 / total_tests as f64) * 100.0;
         println!("\nPass Rate: {:.1}%", pass_rate);
-        assert!(pass_rate >= 80.0, "YAML test suite pass rate is below 80%: {:.1}%", pass_rate);
+        assert!(pass_rate >= 85.0, "YAML test suite pass rate is below 85%: {:.1}%", pass_rate);
     }
 }
 

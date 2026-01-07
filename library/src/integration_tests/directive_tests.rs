@@ -14,8 +14,10 @@ mod tests {
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
 
-        #[cfg(feature = "debug-trace")]
-        println!("5TYM Result: {:?}", result);
+        if let Err(ref e) = result {
+            // Helpful context if this regression ever reappears
+            eprintln!("5TYM parse error: {}", e);
+        }
 
         assert!(
             result.is_ok(),
