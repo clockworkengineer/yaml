@@ -14,6 +14,7 @@ mod tests {
         let mut source = BufferSource::new(b"&a: key: &a value");
         let result = parse(&mut source);
 
+        #[cfg(feature = "debug-trace")]
         println!("Result: {:?}", result);
 
         assert!(result.is_ok(), "Should parse anchor with colon in name");
@@ -34,6 +35,7 @@ mod tests {
         let mut source = BufferSource::new(b"a: &anchor\nb: *anchor");
         let result = parse(&mut source);
 
+        #[cfg(feature = "debug-trace")]
         println!("Result: {:?}", result);
 
         assert!(result.is_ok(), "Should parse anchor with empty/null value");
@@ -45,6 +47,7 @@ mod tests {
         let mut source = BufferSource::new(b"&sequence\n- a");
         let result = parse(&mut source);
 
+        #[cfg(feature = "debug-trace")]
         println!("Result: {:?}", result);
 
         assert!(result.is_ok(), "Should parse anchor on sequence");

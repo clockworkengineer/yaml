@@ -201,6 +201,7 @@ impl DocumentStats {
 #[derive(Debug)]
 pub struct Timer {
     start: Instant,
+    #[allow(dead_code)]
     label: String,
 }
 
@@ -224,10 +225,13 @@ impl Timer {
         self.elapsed()
     }
 
-    /// Stop the timer and print elapsed time
+    /// Stop the timer and print elapsed time (debug only)
     pub fn stop_and_print(self) {
-        let elapsed = self.elapsed();
-        println!("{}: {:?}", self.label, elapsed);
+        #[cfg(feature = "debug-trace")]
+        {
+            let elapsed = self.elapsed();
+            println!("{}: {:?}", self.label, elapsed);
+        }
     }
 }
 
@@ -269,15 +273,18 @@ impl Profiler {
         self.measurements.iter().map(|(_, d)| *d).sum()
     }
 
-    /// Print all measurements
+    /// Print all measurements (debug only)
     pub fn print_results(&self) {
-        println!("Performance Profile:");
-        println!("{:-<60}", "");
-        for (label, duration) in &self.measurements {
-            println!("{:<40} {:>15?}", label, duration);
+        #[cfg(feature = "debug-trace")]
+        {
+            println!("Performance Profile:");
+            println!("{:-<60}", "");
+            for (label, duration) in &self.measurements {
+                println!("{:<40} {:>15?}", label, duration);
+            }
+            println!("{:-<60}", "");
+            println!("{:<40} {:>15?}", "Total", self.total_time());
         }
-        println!("{:-<60}", "");
-        println!("{:<40} {:>15?}", "Total", self.total_time());
     }
 
     /// Clear all measurements
@@ -301,17 +308,23 @@ where
     f2();
     let time2 = timer2.stop();
 
+    #[cfg(feature = "debug-trace")]
     println!("Performance Comparison:");
+    #[cfg(feature = "debug-trace")]
     println!("  {}: {:?}", label1, time1);
+    #[cfg(feature = "debug-trace")]
     println!("  {}: {:?}", label2, time2);
 
     if time1 < time2 {
-        let ratio = time2.as_secs_f64() / time1.as_secs_f64();
-        println!("  {} is {:.2}x faster", label1, ratio);
+        let _ratio = time2.as_secs_f64() / time1.as_secs_f64();
+        #[cfg(feature = "debug-trace")]
+        println!("  {} is {:.2}x faster", label1, _ratio);
     } else if time2 < time1 {
-        let ratio = time1.as_secs_f64() / time2.as_secs_f64();
-        println!("  {} is {:.2}x faster", label2, ratio);
+        let _ratio = time1.as_secs_f64() / time2.as_secs_f64();
+        #[cfg(feature = "debug-trace")]
+        println!("  {} is {:.2}x faster", label2, _ratio);
     } else {
+        #[cfg(feature = "debug-trace")]
         println!("  Both approaches have similar performance");
     }
 }

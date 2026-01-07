@@ -313,6 +313,10 @@ mod tests {
         let yaml = b"---\nnested sequences:\n- - - []\n- - - {}\nkey1: []\nkey2: {}";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
+        if let Err(_e) = &result {
+            #[cfg(feature = "debug-trace")]
+            println!("7ZZ5 Error: {}", _e);
+        }
         assert!(
             result.is_ok(),
             "Should parse nested sequences with empty flow collections"
@@ -328,7 +332,10 @@ mod tests {
 
         match &result {
             Ok(_) => {}
-            Err(e) => println!("5C5M Error: {}", e),
+            Err(_e) => {
+                #[cfg(feature = "debug-trace")]
+                println!("5C5M Error: {}", _e)
+            }
         }
 
         assert!(

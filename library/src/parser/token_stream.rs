@@ -18,7 +18,30 @@ pub struct Decorators {
 /// Token stream for high-level parser operations
 pub struct TokenStream<'a> {
     lexer: Lexer<'a>,
-    directives: &'a DirectiveContext,
+    _directives: &'a DirectiveContext,
+    // Track a simple position counter for progress checks
+    position_counter: usize,
+    // Track current flow collection nesting depth for instrumentation
+    flow_depth: i32,
+}
+
+// Env-controlled logging for token stream internals
+#[cfg(feature = "debug-trace")]
+#[inline]
+fn ts_log(msg: String) {
+    #[cfg(feature = "std")]
+    {
+        if let Ok(v) = std::env::var("YAML_TRACE_TOKENS") {
+            if v.eq_ignore_ascii_case("1")
+                || v.eq_ignore_ascii_case("true")
+                || v.eq_ignore_ascii_case("on")
+            {
+                log::debug!("{}", msg);
+                return;
+            }
+        }
+    }
+    log::trace!("{}", msg);
 }
 
 #[allow(dead_code)]
@@ -29,11 +52,22 @@ impl<'a> TokenStream<'a> {
     pub fn new(
         source: &'a mut dyn ISource,
         directives: &'a DirectiveContext,
+        in_flow: bool,
     ) -> Result<Self, String> {
-        let mut lexer = Lexer::new(source);
+        let mut lexer = Lexer::new(source, in_flow);
         // Load the first token - propagate errors
         lexer.next()?;
-        Ok(TokenStream { lexer, directives })
+        let ts = TokenStream {
+            lexer,
+            _directives: directives,
+            position_counter: 0,
+            // Flow depth is tracked only for instrumentation; it starts at 0
+            // and is updated as we consume tokens via `next()`.
+            flow_depth: 0,
+        };
+        #[cfg(feature = "debug-trace")]
+        ts_log(format!("token_stream: new -> current = {:?}", ts.current()));
+        Ok(ts)
     }
 
     /// Get the current token without consuming it
@@ -45,13 +79,62 @@ impl<'a> TokenStream<'a> {
     /// Advance to the next token
     #[inline]
     pub fn next(&mut self) -> Result<Option<Token>, String> {
-        self.lexer.next()
+        // Capture the token we are about to consume so we can update
+        // flow depth *before* lexing the next token. This ensures that
+        // the lexer sees the correct `in_flow` context when scanning
+        // content inside flow collections, which is important for
+        // handling newlines and ':' correctly in cases like 5MUD.
+        let prev = self.lexer.current().cloned();
+
+        if let Some(tok) = prev.as_ref() {
+            match tok {
+                Token::FlowMappingStart | Token::FlowSequenceStart => {
+                    // Entering a flow collection; subsequent tokens
+                    // should be scanned in flow context.
+                    self.flow_depth = self.flow_depth.saturating_add(1);
+                }
+                Token::FlowMappingEnd | Token::FlowSequenceEnd => {
+                    // Leaving a flow collection; if depth reaches 0,
+                    // revert to block (non-flow) context.
+                    self.flow_depth = (self.flow_depth - 1).max(0);
+                }
+                _ => {}
+            }
+        }
+
+        // Propagate flow state to the lexer *before* fetching the next
+        // token so that its scanning rules match the current context.
+        self.lexer.set_in_flow(self.flow_depth > 0);
+
+        let out = self.lexer.next();
+        if out.is_ok() {
+            self.position_counter = self.position_counter.wrapping_add(1);
+        }
+        #[cfg(feature = "debug-trace")]
+        if let Ok(ref _t) = out {
+            ts_log(format!(
+                "token_stream: next {:?} -> {:?}",
+                prev,
+                self.lexer.current()
+            ));
+        }
+        out
+    }
+
+    /// Returns a simple position counter for progress checks
+    pub fn stream_position(&self) -> usize {
+        self.position_counter
     }
 
     /// Peek at the next token without consuming it
     #[inline]
     pub fn peek(&mut self) -> Result<Option<&Token>, String> {
-        self.lexer.peek()
+        let res = self.lexer.peek();
+        #[cfg(feature = "debug-trace")]
+        if let Ok(tok) = res {
+            ts_log(format!("token_stream: peek -> {:?}", tok));
+        }
+        res
     }
 
     /// Check if current token matches a predicate
@@ -76,34 +159,75 @@ impl<'a> TokenStream<'a> {
         }
     }
 
-    /// Skip whitespace tokens (newlines, indents)
+    /// If the current token matches `expected`, consume it and return true; otherwise return false.
     #[inline]
-    pub fn skip_whitespace(&mut self) -> Result<(), String> {
-        while self
-            .current()
-            .map_or(false, |t| matches!(t, Token::Newline | Token::Indent(_)))
-        {
+    pub fn consume_if(&mut self, expected: Token) -> Result<bool, String> {
+        match self.current() {
+            Some(token) if token == &expected => {
+                self.next()?;
+                Ok(true)
+            }
+            _ => Ok(false),
+        }
+    }
+
+    /// Internal DRY helper: advance while predicate matches current token
+    #[inline]
+    fn advance_while(&mut self, mut predicate: impl FnMut(&Token) -> bool) -> Result<(), String> {
+        while self.current().map_or(false, |t| predicate(t)) {
             self.next()?;
         }
         Ok(())
+    }
+
+    /// Skip whitespace tokens (newlines, indents)
+    #[inline]
+    pub fn skip_whitespace(&mut self) -> Result<(), String> {
+        #[cfg(feature = "debug-trace")]
+        ts_log(format!(
+            "token_stream: skip_whitespace at {:?}",
+            self.current()
+        ));
+        self.advance_while(|t| matches!(t, Token::Newline | Token::Indent(_)))
     }
 
     /// Skip comments
     #[inline]
     pub fn skip_comments(&mut self) -> Result<(), String> {
-        while matches!(self.current(), Some(Token::Comment(_))) {
-            self.next()?;
-        }
-        Ok(())
+        #[cfg(feature = "debug-trace")]
+        ts_log(format!(
+            "token_stream: skip_comments at {:?}",
+            self.current()
+        ));
+        self.advance_while(|t| matches!(t, Token::Comment(_)))
     }
 
     /// Skip whitespace and comments
     #[inline]
     pub fn skip_whitespace_and_comments(&mut self) -> Result<(), String> {
-        while self.current().map_or(false, |t| Self::is_trivia(t)) {
-            self.next()?;
-        }
-        Ok(())
+        #[cfg(feature = "debug-trace")]
+        ts_log(format!(
+            "token_stream: skip_whitespace_and_comments at {:?}",
+            self.current()
+        ));
+        self.advance_while(Self::is_trivia)
+    }
+
+    /// Alias for skipping all trivia (whitespace + comments) to encourage DRY usage
+    #[inline]
+    pub fn skip_trivia(&mut self) -> Result<(), String> {
+        self.skip_whitespace_and_comments()
+    }
+
+    /// Skip only newlines and comments, preserving `Indent` tokens for dedent detection.
+    #[inline]
+    pub fn skip_newlines_and_comments(&mut self) -> Result<(), String> {
+        #[cfg(feature = "debug-trace")]
+        ts_log(format!(
+            "token_stream: skip_newlines_and_comments at {:?}",
+            self.current()
+        ));
+        self.advance_while(|t| matches!(t, Token::Newline | Token::Comment(_)))
     }
 
     #[inline]
@@ -117,7 +241,7 @@ impl<'a> TokenStream<'a> {
     /// - tag then anchor: `!!str &name`
     /// - anchor then tag: `&name !!str`
     ///
-    /// Returns the decorators and resolves tags using the directive context.
+    /// Returns the decorators without resolving tag handles.
     pub fn consume_decorators(&mut self) -> Result<Decorators, String> {
         let mut decorators = Decorators::default();
 
@@ -127,16 +251,21 @@ impl<'a> TokenStream<'a> {
             match self.current() {
                 Some(Token::Tag(tag_str)) => {
                     if decorators.tag.is_some() {
-                        return Err("Duplicate tag found".to_string());
+                        return Err(crate::parser::document::error_builder::syntax_error(
+                            self.source_mut(),
+                            "Duplicate tag found",
+                        ));
                     }
-                    // Resolve the tag using directive context
-                    let resolved = self.directives.resolve_tag(tag_str);
-                    decorators.tag = Some(resolved);
+                    // Preserve raw tag handle; resolve later in value parsing
+                    decorators.tag = Some(tag_str.clone());
                     self.next()?;
                 }
                 Some(Token::Anchor(name)) => {
                     if decorators.anchor.is_some() {
-                        return Err("Duplicate anchor found".to_string());
+                        return Err(crate::parser::document::error_builder::syntax_error(
+                            self.source_mut(),
+                            "Duplicate anchor found",
+                        ));
                     }
                     decorators.anchor = Some(name.clone());
                     self.next()?;
@@ -145,6 +274,11 @@ impl<'a> TokenStream<'a> {
             }
         }
 
+        #[cfg(feature = "debug-trace")]
+        ts_log(format!(
+            "token_stream: consume_decorators -> {:?}",
+            decorators
+        ));
         Ok(decorators)
     }
 
@@ -183,7 +317,10 @@ impl<'a> TokenStream<'a> {
                 Ok(result)
             }
             Some(token) => Err(format!("Expected plain scalar, got {:?}", token)),
-            None => Err("Expected plain scalar, got EOF".to_string()),
+            None => Err(crate::parser::document::error_builder::syntax_error(
+                self.source_mut(),
+                "Expected plain scalar, got EOF",
+            )),
         }
     }
 
@@ -196,7 +333,10 @@ impl<'a> TokenStream<'a> {
                 Ok(result)
             }
             Some(token) => Err(format!("Expected quoted scalar, got {:?}", token)),
-            None => Err("Expected quoted scalar, got EOF".to_string()),
+            None => Err(crate::parser::document::error_builder::syntax_error(
+                self.source_mut(),
+                "Expected quoted scalar, got EOF",
+            )),
         }
     }
 
@@ -219,7 +359,10 @@ impl<'a> TokenStream<'a> {
                 Ok((result, ScalarType::DoubleQuoted))
             }
             Some(token) => Err(format!("Expected scalar, got {:?}", token)),
-            None => Err("Expected scalar, got EOF".to_string()),
+            None => Err(crate::parser::document::error_builder::syntax_error(
+                self.source_mut(),
+                "Expected scalar, got EOF",
+            )),
         }
     }
 
@@ -245,7 +388,43 @@ impl<'a> TokenStream<'a> {
         // In a real implementation, we'd need a more sophisticated approach
         // For now, this is a simplified version
 
+        #[cfg(feature = "debug-trace")]
+        ts_log(format!("token_stream: has_colon_ahead -> {}", has_colon));
         Ok(has_colon)
+    }
+
+    /// Consume a single colon token, erroring if an immediate second colon follows.
+    ///
+    /// This enforces YAML 1.2 compliance for key-value separators in flow mappings,
+    /// rejecting a double-colon sequence (::) without intervening trivia.
+    /// Returns true if a colon was consumed, false if current token is not a colon.
+    pub fn consume_single_colon(&mut self) -> Result<bool, String> {
+        match self.current() {
+            Some(Token::Colon) => {
+                let _ = self.consume_if(Token::Colon)?;
+                Ok(true)
+            }
+            _ => Err("Expected ':' in flow mapping".to_string()),
+        }
+    }
+    pub fn consume_flow_sequence_end(&mut self) -> Result<bool, String> {
+        self.consume_if(Token::FlowSequenceEnd)
+    }
+
+    /// DRY helper: consume a flow mapping end ('}') if present.
+    #[inline]
+    pub fn consume_flow_mapping_end(&mut self) -> Result<bool, String> {
+        self.consume_if(Token::FlowMappingEnd)
+    }
+
+    /// Expose a mutable reference to the underlying source for error reporting
+    pub fn source_mut(&mut self) -> &mut dyn crate::io::traits::ISource {
+        self.lexer.source
+    }
+
+    /// Current flow nesting depth (0 = not inside flow)
+    pub fn current_flow_depth(&self) -> i32 {
+        self.flow_depth
     }
 }
 
@@ -267,7 +446,7 @@ mod tests {
     fn test_consume_decorators_tag_only() {
         let mut source = Buffer::new(b"!!str value");
         let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
         let decorators = stream.consume_decorators().unwrap();
 
@@ -280,7 +459,7 @@ mod tests {
     fn test_consume_decorators_anchor_only() {
         let mut source = Buffer::new(b"&myanchor value");
         let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
         let decorators = stream.consume_decorators().unwrap();
 
@@ -293,7 +472,7 @@ mod tests {
     fn test_consume_decorators_both() {
         let mut source = Buffer::new(b"!!str &myanchor value");
         let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
         let decorators = stream.consume_decorators().unwrap();
 
@@ -307,7 +486,7 @@ mod tests {
     fn test_consume_decorators_reversed() {
         let mut source = Buffer::new(b"&myanchor !!str value");
         let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
         let decorators = stream.consume_decorators().unwrap();
 
@@ -321,11 +500,30 @@ mod tests {
     fn test_skip_whitespace() {
         let mut source = Buffer::new(b"\n  \n  value");
         let directives = DirectiveContext::default();
-        let mut stream = TokenStream::new(&mut source, &directives).unwrap();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
         stream.next().unwrap(); // Initialize
         stream.skip_whitespace().unwrap();
 
         assert!(matches!(stream.current(), Some(Token::Plain(_))));
+    }
+
+    #[test]
+    fn test_document_markers() {
+        use crate::io::sources::buffer::Buffer;
+        let mut source = Buffer::new(b"---\n...\n");
+        let mut lexer = Lexer::new(&mut source, false);
+
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::DocumentStart);
+
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::Newline);
+
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::DocumentEnd);
+
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token, Token::Newline);
     }
 }

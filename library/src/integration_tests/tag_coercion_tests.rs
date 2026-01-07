@@ -20,6 +20,9 @@ mod tests {
                         assert_eq!(s.as_str(), "123");
                         assert_eq!(*qt, QuoteType::Unquoted);
                         return;
+                    } else {
+                        #[cfg(feature = "debug-trace")]
+                        println!("DEBUG: Got node: {:?}", v);
                     }
                 }
             }

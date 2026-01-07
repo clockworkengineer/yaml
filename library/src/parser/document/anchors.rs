@@ -1,4 +1,4 @@
-//! Module: parser/document/anchors.rs
+// Module: parser/document/anchors.rs
 
 use crate::nodes::node::Node;
 use std::collections::HashMap;
@@ -22,44 +22,19 @@ pub(crate) fn collect_anchors(
     node: &Node,
     anchors: &mut HashMap<String, Node>,
 ) -> Result<(), String> {
-    match node {
-        Node::Anchored(inner, name) => {
+    let mut err: Option<String> = None;
+    let mut collect = |n: &Node| {
+        if let Node::Anchored(inner, name) = n {
             if name.trim().is_empty() {
-                return Err(crate::error::messages::ERR_EMPTY_ANCHOR_NAME.to_string());
+                err = Some(crate::error::messages::ERR_EMPTY_ANCHOR_NAME.to_string());
+                return;
             }
             // According to YAML spec, later anchor definitions override earlier ones
-            // So we don't error on duplicate anchors, we just replace them
             anchors.insert(name.clone(), (**inner).clone());
-            collect_anchors(inner, anchors)?;
-            Ok(())
         }
-        Node::Mapping(pairs) => {
-            for (k, v) in pairs {
-                collect_anchors(k, anchors)?;
-                collect_anchors(v, anchors)?;
-            }
-            Ok(())
-        }
-        Node::Array(items) => {
-            for it in items {
-                collect_anchors(it, anchors)?;
-            }
-            Ok(())
-        }
-        Node::Document(nodes) => {
-            for n in nodes {
-                collect_anchors(n, anchors)?;
-            }
-            Ok(())
-        }
-        Node::Documents(docs) => {
-            for d in docs {
-                collect_anchors(d, anchors)?;
-            }
-            Ok(())
-        }
-        _ => Ok(()),
-    }
+    };
+    crate::parser::utils::visit::visit(node, &mut collect);
+    if let Some(e) = err { Err(e) } else { Ok(()) }
 }
 
 /// Recursively replaces all alias references with their corresponding anchor values.
@@ -81,51 +56,27 @@ pub(crate) fn replace_aliases(
     node: &mut Node,
     anchors: &HashMap<String, Node>,
 ) -> Result<(), String> {
-    match node {
+    let mut err: Option<String> = None;
+    let mut replacer = |n: &mut Node| match n {
         Node::Alias(name) => {
             if let Some(found) = anchors.get(name) {
-                *node = found.clone();
-                Ok(())
+                *n = found.clone();
             } else {
-                Err(format!(
+                err = Some(format!(
                     "{}{}",
                     crate::error::messages::ERR_UNDEFINED_ANCHOR_PREFIX,
                     name
-                ))
+                ));
             }
         }
         Node::Anchored(inner, _name) => {
             let replacement = (**inner).clone();
-            *node = replacement;
-            replace_aliases(node, anchors)
+            *n = replacement;
         }
-        Node::Mapping(pairs) => {
-            for (k, v) in pairs.iter_mut() {
-                replace_aliases(k, anchors)?;
-                replace_aliases(v, anchors)?;
-            }
-            Ok(())
-        }
-        Node::Array(items) => {
-            for it in items.iter_mut() {
-                replace_aliases(it, anchors)?;
-            }
-            Ok(())
-        }
-        Node::Document(nodes) => {
-            for n in nodes.iter_mut() {
-                replace_aliases(n, anchors)?;
-            }
-            Ok(())
-        }
-        Node::Documents(docs) => {
-            for d in docs.iter_mut() {
-                replace_aliases(d, anchors)?;
-            }
-            Ok(())
-        }
-        _ => Ok(()),
-    }
+        _ => {}
+    };
+    crate::parser::utils::visit::visit_mut(node, &mut replacer);
+    if let Some(e) = err { Err(e) } else { Ok(()) }
 }
 
 /// Expands YAML merge keys (<<) by incorporating referenced mapping values.
@@ -147,14 +98,14 @@ pub(crate) fn expand_merge_keys(
     node: &mut Node,
     anchors: &HashMap<String, Node>,
 ) -> Result<(), String> {
-    match node {
-        Node::Mapping(pairs) => {
+    let mut err: Option<String> = None;
+    let mut expander = |n: &mut Node| {
+        if let Node::Mapping(pairs) = n {
             let mut combined: Vec<(Node, Node)> = Vec::new();
             let snapshot = pairs.clone();
             let mut i = 0usize;
             while i < snapshot.len() {
                 let (k, v) = snapshot[i].clone();
-
                 let mut handled = false;
                 if let Node::Str(ks, _, _) = &k {
                     if ks.trim() == "<<" {
@@ -165,17 +116,19 @@ pub(crate) fn expand_merge_keys(
                                     if let Node::Mapping(src_pairs) = src {
                                         expanded_pairs.extend(src_pairs.clone());
                                     } else {
-                                        return Err(format!(
+                                        err = Some(format!(
                                             "Merge source '{}' is not a mapping",
                                             name
                                         ));
+                                        break;
                                     }
                                 } else {
-                                    return Err(format!(
+                                    err = Some(format!(
                                         "{}{}",
                                         crate::error::messages::ERR_UNDEFINED_ANCHOR_PREFIX,
                                         name
                                     ));
+                                    break;
                                 }
                             }
                             Node::Array(items) => {
@@ -186,16 +139,24 @@ pub(crate) fn expand_merge_keys(
                                                 if let Node::Mapping(src_pairs) = src {
                                                     expanded_pairs.extend(src_pairs.clone());
                                                 } else {
-                                                    return Err(format!("Merge source '{}' is not a mapping", name));
+                                                    err = Some(format!(
+                                                        "Merge source '{}' is not a mapping",
+                                                        name
+                                                    ));
+                                                    break;
                                                 }
                                             } else {
-                                                return Err(format!("{}{}", crate::error::messages::ERR_UNDEFINED_ANCHOR_PREFIX, name));
+                                                err = Some(format!("{}{}", crate::error::messages::ERR_UNDEFINED_ANCHOR_PREFIX, name));
+                                                break;
                                             }
                                         }
                                         Node::Mapping(src_pairs) => {
                                             expanded_pairs.extend(src_pairs.clone());
                                         }
-                                        _ => return Err("Invalid merge sequence item: expected alias or mapping".to_string()),
+                                        _ => {
+                                            err = Some("Invalid merge sequence item: expected alias or mapping".to_string());
+                                            break;
+                                        }
                                     }
                                 }
                             }
@@ -203,7 +164,7 @@ pub(crate) fn expand_merge_keys(
                                 expanded_pairs.extend(src_pairs.clone());
                             }
                             other => {
-                                return Err(format!(
+                                err = Some(format!(
                                     "Invalid merge value: expected alias, sequence or mapping, got {:?}",
                                     other
                                 ));
@@ -213,63 +174,46 @@ pub(crate) fn expand_merge_keys(
                         handled = true;
                     }
                 }
-
                 if handled {
                     i += 1;
                     continue;
                 }
-
                 if let Node::Str(_, _, _) = &k {
                     if let Node::Str(s, _, _) = &v {
                         let ts = s.trim_start();
                         if ts.starts_with("<<:") && ts.contains('*') {
                             if let Some(pos) = ts.find('*') {
                                 let aname = ts[pos + 1..].trim().to_string();
-
                                 let mut nested: Vec<(Node, Node)> = Vec::new();
                                 let mut j = i + 1;
                                 while j < snapshot.len() {
-                                    // Stop if we find another merge key
                                     if let Node::Str(ns, _, _) = &snapshot[j].1 {
                                         if ns.trim_start().starts_with("<<:") {
                                             break;
                                         }
                                     }
-
-                                    // Check if this entry looks like it should be at root level
-                                    // by examining the key name for patterns that suggest it's not part of the current mapping
                                     if let Node::Str(key_name, _, _) = &snapshot[j].0 {
-                                        // Keys that contain "explicit" or "boolean" are likely root-level entries
-                                        // especially when they appear after a mapping section
                                         if key_name.contains("boolean")
                                             || key_name.contains("explicit")
                                         {
                                             break;
                                         }
-
-                                        // Also check for other common root-level patterns
-                                        // If the key doesn't look like a typical nested property,
-                                        // it might be a new root-level entry
                                         let trimmed_key = key_name.trim();
                                         if trimmed_key == "explicit_boolean" {
                                             break;
                                         }
                                     }
-
                                     nested.push(snapshot[j].clone());
                                     j += 1;
                                 }
-
                                 let mut merged_pairs: Vec<(Node, Node)> = Vec::new();
                                 if let Some(src) = anchors.get(&aname) {
                                     if let Node::Mapping(ap) = src {
                                         merged_pairs.extend(ap.clone());
                                     }
                                 }
-
                                 for (nk, nv) in nested.iter() {
                                     let mut replaced = false;
-
                                     if let Node::Str(nks, _, _) = nk {
                                         for p in merged_pairs.iter_mut() {
                                             if let Node::Str(pk, _, _) = &p.0 {
@@ -285,61 +229,26 @@ pub(crate) fn expand_merge_keys(
                                         merged_pairs.push((nk.clone(), nv.clone()));
                                     }
                                 }
-
-                                combined.push((k.clone(), Node::Mapping(merged_pairs)));
+                                combined.push((
+                                    k.clone(),
+                                    crate::parser::document::node_utils::make_mapping_node(
+                                        merged_pairs,
+                                    ),
+                                ));
                                 i = j;
                                 continue;
                             }
                         }
                     }
                 }
-
                 combined.push((k, v));
                 i += 1;
             }
-
-            use std::collections::HashMap as Map;
-            let mut last_index: Map<String, usize> = Map::new();
-            for (idx, (k, _v)) in combined.iter().enumerate() {
-                let key_s = crate::parser::document::helpers::node_to_inline_string(k);
-                last_index.insert(key_s, idx);
-            }
-            let mut rebuilt: Vec<(Node, Node)> = Vec::new();
-            for (idx, (k, v)) in combined.into_iter().enumerate() {
-                let key_s = crate::parser::document::helpers::node_to_inline_string(&k);
-                if let Some(&last) = last_index.get(&key_s) {
-                    if last == idx {
-                        rebuilt.push((k, v));
-                    }
-                }
-            }
-
-            *pairs = rebuilt;
-
-            for (_k, v) in pairs.iter_mut() {
-                expand_merge_keys(v, anchors)?;
-            }
-            Ok(())
+            *pairs = crate::parser::document::node_utils::dedupe_mapping_pairs_by_last_occurrence(
+                combined,
+            );
         }
-        Node::Array(items) => {
-            for it in items.iter_mut() {
-                expand_merge_keys(it, anchors)?;
-            }
-            Ok(())
-        }
-        Node::Document(nodes) => {
-            for n in nodes.iter_mut() {
-                expand_merge_keys(n, anchors)?;
-            }
-            Ok(())
-        }
-        Node::Documents(docs) => {
-            for d in docs.iter_mut() {
-                expand_merge_keys(d, anchors)?;
-            }
-            Ok(())
-        }
-        Node::Anchored(inner, _name) => expand_merge_keys(inner, anchors),
-        _ => Ok(()),
-    }
+    };
+    crate::parser::utils::visit::visit_mut(node, &mut expander);
+    if let Some(e) = err { Err(e) } else { Ok(()) }
 }

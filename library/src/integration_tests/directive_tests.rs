@@ -14,7 +14,10 @@ mod tests {
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
 
-        println!("5TYM Result: {:?}", result);
+        if let Err(ref e) = result {
+            // Helpful context if this regression ever reappears
+            eprintln!("5TYM parse error: {}", e);
+        }
 
         assert!(
             result.is_ok(),
@@ -29,6 +32,7 @@ mod tests {
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
 
+        #[cfg(feature = "debug-trace")]
         println!("6WLZ Result: {:?}", result);
 
         assert!(result.is_ok(), "Should parse primary TAG handle directive");
@@ -49,6 +53,7 @@ mod tests {
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
 
+        #[cfg(feature = "debug-trace")]
         println!("Simple TAG Result: {:?}", result);
 
         assert!(result.is_ok(), "Should parse simple TAG directive");

@@ -50,7 +50,17 @@ A comprehensive, high-performance YAML library for Rust with strong YAML 1.2 spe
 - **Comprehensive test suite** (362+ internal tests, 320/402 YAML 1.2 official tests)
 - **JSON Schema-style validation** for YAML documents
 - **Error codes and suggestions** for programmatic error handling
+
 ## 🛡️ Error Handling & Validation
+
+### Centralized Error Handling (Contributor Note)
+
+All parser and lexer error messages must use the centralized helpers in `parser/document/error_builder.rs` (e.g., `syntax_error`, `structure_error`, `limit_error`, `forbidden_error`).
+
+**Do not return raw error strings.**
+
+This ensures all errors are consistent, include context, and are easy to maintain. See the module-level docs in `error_builder.rs` for usage examples and extension guidelines.
+
 
 ### Error Handling
 - **Error codes (E001-E015)** for programmatic handling
@@ -272,6 +282,50 @@ cargo test error_handling
 # Run with output
 cargo test -- --nocapture
 ```
+
+## 🪵 Debug Logging
+
+Debug logging is opt-in and disabled by default to avoid overhead. Enable it with the `debug-trace` feature and a logger (e.g., `env_logger`).
+
+### Enable in tests (Windows PowerShell)
+
+```powershell
+# Enable logging for this session
+$env:RUST_LOG = 'yaml_lib=debug'
+
+# Promote token-stream internals to debug without global trace
+$env:YAML_TRACE_TOKENS = '1'
+
+# Run tests with logging enabled
+cargo test -p yaml_lib --features debug-trace -- --nocapture
+
+# For very verbose internals, use full trace instead of YAML_TRACE_TOKENS
+# $env:RUST_LOG = 'yaml_lib=trace'
+```
+
+### Enable in binaries/examples
+
+Add a logger init (once) in your `main`:
+
+```rust
+fn main() {
+  // Initialize any `log` compatible logger
+  let _ = env_logger::try_init();
+  // ... your code
+}
+```
+
+Run with the feature and env vars as needed:
+
+```powershell
+$env:RUST_LOG = 'yaml_lib=debug'; $env:YAML_TRACE_TOKENS = '1'
+cargo run --features debug-trace
+```
+
+Notes:
+- `yaml_lib=debug` shows high-level parser decisions; token-stream stays quiet unless `YAML_TRACE_TOKENS` is set.
+- Set `yaml_lib=trace` for maximum verbosity (may be very chatty).
+- Feature-gating ensures zero overhead when `debug-trace` is not enabled.
 
 ## 🔧 Performance
 

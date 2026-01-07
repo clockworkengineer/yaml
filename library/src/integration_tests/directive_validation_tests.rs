@@ -8,8 +8,9 @@ mod test_directive_validation {
         let yaml = b"%YAML 1.2\n";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        if let Err(ref e) = result {
-            println!("Error (correct): {}", e);
+        if let Err(ref _e) = result {
+            #[cfg(feature = "debug-trace")]
+            println!("Error (correct): {}", _e);
         }
         assert!(result.is_err(), "Should reject directive without document");
     }
@@ -20,8 +21,9 @@ mod test_directive_validation {
         let yaml = b"%YAML 1.2\n...\n";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
-        if let Err(ref e) = result {
-            println!("Error (correct): {}", e);
+        if let Err(ref _e) = result {
+            #[cfg(feature = "debug-trace")]
+            println!("Error (correct): {}", _e);
         }
         assert!(
             result.is_err(),
