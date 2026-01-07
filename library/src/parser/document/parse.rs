@@ -27,7 +27,17 @@ fn parse_document_markers(
         source.next();
         source.next();
         source.next();
-        // After --- marker, only allow whitespace, comments, block scalar indicators, or tags until end of line
+        // After --- marker, only allow whitespace, comments, block scalar indicators, or tags until end of line.
+        // Tabs immediately after the marker act as separation, not indentation (K54U), so skip
+        // horizontal whitespace at the character level before invoking the token stream.
+        while let Some(c) = source.current() {
+            if c == ' ' || c == '\t' {
+                source.next();
+            } else {
+                break;
+            }
+        }
+
         // Use token stream to check for forbidden tokens before newline
         let st = source.save_state();
         if let Ok(mut ts) = crate::parser::token_stream::TokenStream::new(source, directives, false)

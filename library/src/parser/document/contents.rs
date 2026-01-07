@@ -158,7 +158,6 @@ fn handle_multiple_explicit_keys(
     Ok(parse_multiple_explicit_keys(source, current_indent)?)
 }
 
-
 /// Parses the contents of a YAML document based on the current character and context.
 ///
 /// Determines the appropriate parsing strategy based on the current character:
@@ -391,7 +390,9 @@ pub fn parse_document_contents(
                 }
                 crate::utils::skip_whitespace_and_comments(source);
             }
-            Ok(crate::parser::document::node_utils::make_mapping_node(pairs))
+            Ok(crate::parser::document::node_utils::make_mapping_node(
+                pairs,
+            ))
         }
         Some(c) if c == '?' => unreachable!(),
         Some(c) if c.is_alphanumeric() => {
