@@ -294,12 +294,14 @@ pub fn parse_value_with_tokens(
         // - EOF/None: end of document
         // - Dash: next sequence item (e.g., "- !!str\n-" = empty tagged value)
         // - Colon: mapping key (e.g., "!!str :")
+        // - Comma: next entry in a flow collection (e.g., "foo: !!str,")
         // - FlowMappingEnd/FlowSequenceEnd: end of flow collection
         // - DocumentStart/DocumentEnd: document boundary
         match stream.current() {
             Some(Token::Eof)
             | Some(Token::Dash)
             | Some(Token::Colon)
+            | Some(Token::Comma)
             | Some(Token::FlowMappingEnd)
             | Some(Token::FlowSequenceEnd)
             | Some(Token::DocumentStart)
