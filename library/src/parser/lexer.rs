@@ -201,9 +201,41 @@ impl<'a> Lexer<'a> {
                 Ok(Some(self.scan_anchor()?))
             }
             CHAR_ASTERISK => {
-                #[cfg(feature = "debug-trace")]
-                lexer_log("Emitting Token::Alias".to_string());
-                Ok(Some(self.scan_alias()?))
+                // Disambiguate between an alias token (e.g. "*anchor") and
+                // plain scalar content starting with '*', such as lines inside
+                // block scalars (e.g. "* bullet").
+                //
+                // We only treat '*' as an alias indicator when it is
+                // immediately followed by a non-whitespace character on the
+                // same line. Otherwise, we fall back to scanning a plain
+                // scalar starting with '*'. This avoids emitting alias
+                // tokens (and "Empty alias name" errors) for content inside
+                // block scalars like the YAML test 7T8X.
+                let state = self.source.save_state();
+                self.source.next(); // temporarily consume '*'
+                let next_ch = self.source.current();
+                self.source.restore_state(state);
+
+                // Treat '*' as an alias only when the very next
+                // character is not a space or tab. This preserves
+                // errors for truly empty aliases like "*\n" (where the
+                // next char is a newline), while allowing constructs
+                // like "* bullet" inside block scalars to be lexed as
+                // plain scalars.
+                let treat_as_alias = matches!(
+                    next_ch,
+                    Some(c) if c != CHAR_SPACE && c != '\t'
+                );
+
+                if treat_as_alias {
+                    #[cfg(feature = "debug-trace")]
+                    lexer_log("Emitting Token::Alias".to_string());
+                    Ok(Some(self.scan_alias()?))
+                } else {
+                    #[cfg(feature = "debug-trace")]
+                    lexer_log("Emitting Token::Plain (leading '*')".to_string());
+                    Ok(Some(self.scan_plain_scalar()?))
+                }
             }
             CHAR_LBRACE => {
                 self.source.next();
