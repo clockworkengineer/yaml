@@ -361,23 +361,23 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
         if !source.more() {
             break;
         }
-        // If we didn't see a document start marker for this document and there isn't one ahead,
-        // avoid implicitly splitting into multiple documents from remaining top-level nodes.
-        // Continue only when an explicit '---' marker is present.
-        if !saw_marker {
-            let st_ahead = source.save_state();
-            let dir = crate::parser::directives::DirectiveContext::new();
-            let mut ts_ahead = crate::parser::token_stream::TokenStream::new(source, &dir, false)?;
-            // Skip trivia
-            ts_ahead.skip_trivia()?;
-            let has_next_doc = matches!(
-                ts_ahead.current(),
-                Some(crate::parser::lexer::Token::DocumentStart)
-            );
-            source.restore_state(st_ahead);
-            if !has_next_doc {
-                break;
-            }
+        // Only start another document when an explicit '---' marker is present
+        // ahead in the token stream. This avoids treating trailing content
+        // (such as lines that look like directives) as a separate document
+        // when no document separator is present, which matches YAML test
+        // suite expectations for cases like XLQ9.
+        let st_ahead = source.save_state();
+        let dir = crate::parser::directives::DirectiveContext::new();
+        let mut ts_ahead = crate::parser::token_stream::TokenStream::new(source, &dir, false)?;
+        // Skip trivia
+        ts_ahead.skip_trivia()?;
+        let has_next_doc = matches!(
+            ts_ahead.current(),
+            Some(crate::parser::lexer::Token::DocumentStart)
+        );
+        source.restore_state(st_ahead);
+        if !has_next_doc {
+            break;
         }
     }
     #[cfg(feature = "debug-trace")]
