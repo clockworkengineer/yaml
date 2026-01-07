@@ -561,13 +561,34 @@ impl<'a> Lexer<'a> {
                 }
 
                 // In block context, reject tabs as primary indentation
-                // (tab at column 0 or before any spaces).
+                // (tab at column 0 or before any spaces), unless the line
+                // contains only whitespace (blank line). Check if there's
+                // any non-whitespace content after the tabs/spaces.
                 if tab_at_start {
-                    return Err(crate::parser::document::error_builder::forbidden_error(
-                        self.source,
-                        "Tabs",
-                        "as indentation in YAML",
-                    ));
+                    let state = self.source.save_state();
+                    // Consume all remaining spaces/tabs on this line
+                    while let Some(c) = self.source.current() {
+                        if c == CHAR_SPACE || c == CHAR_TAB {
+                            self.source.next();
+                        } else {
+                            break;
+                        }
+                    }
+                    let next_non_ws = self.source.current();
+                    self.source.restore_state(state);
+                    
+                    // If the line is blank (only whitespace before newline/EOF),
+                    // allow the tabs. Otherwise, reject them as indentation.
+                    if !matches!(
+                        next_non_ws,
+                        Some(CHAR_NEWLINE) | Some(CHAR_CARRIAGE_RETURN) | None
+                    ) {
+                        return Err(crate::parser::document::error_builder::forbidden_error(
+                            self.source,
+                            "Tabs",
+                            "as indentation in YAML",
+                        ));
+                    }
                 }
 
                 // Tab after spaces: allow it through (e.g., in block scalar

@@ -421,7 +421,9 @@ mod tests {
 
     #[test]
     fn test_validate_indentation_blank_line() {
-        // Tab at line start is indentation even if followed by newline
+        // Tab-only line (tab followed by newline) should be allowed in block context
+        // as it represents a blank line, not indentation of content.
+        // This matches YAML test case DK95/04.
         let mut source = Buffer::new(b"\t\n");
         let mut ctx = ParsingContext::new(0);
         ctx.mark_newline_consumed();
@@ -429,17 +431,9 @@ mod tests {
         let directives = crate::parser::directives::DirectiveContext::new();
         let ts_result = TokenStream::new(&mut source, &directives, false);
         assert!(
-            ts_result.is_err(),
-            "TokenStream should error on tabs in block context"
+            ts_result.is_ok(),
+            "TokenStream should allow tab-only lines (blank lines) in block context"
         );
-        if let Err(ref err) = ts_result {
-            assert!(
-                err.contains("Tabs") && err.contains("not allowed"),
-                "Error: {}",
-                err
-            );
-            return;
-        }
     }
 
     #[test]
