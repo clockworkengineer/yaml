@@ -79,30 +79,42 @@ impl<'a> TokenStream<'a> {
     /// Advance to the next token
     #[inline]
     pub fn next(&mut self) -> Result<Option<Token>, String> {
-        let _prev = self.lexer.current().cloned();
-        let out = self.lexer.next();
-        if out.is_ok() {
-            self.position_counter = self.position_counter.wrapping_add(1);
-        }
-        // Instrument: update flow depth counter (no behavior change)
-        if let Ok(Some(tok)) = &out {
+        // Capture the token we are about to consume so we can update
+        // flow depth *before* lexing the next token. This ensures that
+        // the lexer sees the correct `in_flow` context when scanning
+        // content inside flow collections, which is important for
+        // handling newlines and ':' correctly in cases like 5MUD.
+        let prev = self.lexer.current().cloned();
+
+        if let Some(tok) = prev.as_ref() {
             match tok {
                 Token::FlowMappingStart | Token::FlowSequenceStart => {
+                    // Entering a flow collection; subsequent tokens
+                    // should be scanned in flow context.
                     self.flow_depth = self.flow_depth.saturating_add(1);
                 }
                 Token::FlowMappingEnd | Token::FlowSequenceEnd => {
+                    // Leaving a flow collection; if depth reaches 0,
+                    // revert to block (non-flow) context.
                     self.flow_depth = (self.flow_depth - 1).max(0);
                 }
                 _ => {}
             }
-            // Propagate flow context to lexer so indentation/newline semantics match flow rules
-            self.lexer.set_in_flow(self.flow_depth > 0);
+        }
+
+        // Propagate flow state to the lexer *before* fetching the next
+        // token so that its scanning rules match the current context.
+        self.lexer.set_in_flow(self.flow_depth > 0);
+
+        let out = self.lexer.next();
+        if out.is_ok() {
+            self.position_counter = self.position_counter.wrapping_add(1);
         }
         #[cfg(feature = "debug-trace")]
         if let Ok(ref _t) = out {
             ts_log(format!(
                 "token_stream: next {:?} -> {:?}",
-                _prev,
+                prev,
                 self.lexer.current()
             ));
         }

@@ -440,6 +440,21 @@ impl<'a> Lexer<'a> {
                     return Ok(None);
                 }
             }
+            // In flow context, tabs that appear immediately after a newline
+            // (i.e., as indentation inside a flow collection) are forbidden
+            // by our validation rules, even though tabs elsewhere in flow
+            // content are allowed. Detect this specific case here so that
+            // inputs like "[\n\titem\n]" are rejected, while tests that
+            // use leading tabs in flow context without a preceding newline
+            // still succeed.
+            if ch == CHAR_TAB && self.in_flow && self.last_was_linebreak {
+                return Err(crate::parser::document::error_builder::forbidden_error(
+                    self.source,
+                    "Tabs",
+                    "as indentation in YAML flow collections",
+                ));
+            }
+
             let indent = self.scan_indentation(self.in_flow)?;
             self.at_line_start = false;
             self.last_indent = indent;
@@ -469,9 +484,13 @@ impl<'a> Lexer<'a> {
                 self.source.next();
             } else if ch == CHAR_TAB {
                 // Tabs are forbidden for indentation in YAML block context
-                // But allowed as whitespace in flow context (inside [], {})
+                // but allowed as whitespace in flow context (inside [], {}).
+                // Flow-specific indentation checks (e.g., tabs immediately
+                // after a newline inside a flow collection) are handled in
+                // `emit_indentation_token_if_any`.
                 if in_flow {
-                    // In flow context, tabs are just whitespace - skip them
+                    // In flow context, treat tabs here as horizontal
+                    // whitespace and do not contribute to indentation level.
                     self.source.next();
                     continue;
                 }
@@ -482,9 +501,8 @@ impl<'a> Lexer<'a> {
                 }
 
                 // In block context, reject tabs as primary indentation
-                // (tab at column 0 or before any spaces)
+                // (tab at column 0 or before any spaces).
                 if tab_at_start {
-                    // Tab as primary indentation in block context - error
                     return Err(crate::parser::document::error_builder::forbidden_error(
                         self.source,
                         "Tabs",
@@ -492,8 +510,9 @@ impl<'a> Lexer<'a> {
                     ));
                 }
 
-                // Tab after spaces: allow it through (e.g., in block scalar content)
-                // Treat tab as advancing by 1 for indent counting purposes
+                // Tab after spaces: allow it through (e.g., in block scalar
+                // content). Treat tab as advancing by 1 for indent counting
+                // purposes.
                 count += 1;
                 self.source.next();
             } else {
