@@ -93,8 +93,40 @@ pub fn parse_inline_sequence_with_tokens(
                     ));
                 }
 
-                // Parse what might be a value or the key of an implicit mapping
-                let value_or_key = parse_value_with_tokens(stream, directives, depth + 1)?;
+                // Parse what might be a value or the key of an implicit mapping.
+                // Special-case a leading double-colon inside a flow sequence
+                // (e.g., `::vector` in DBG4). The lexer tokenizes this as
+                // `Colon, Colon, Plain("vector")`, which would normally be
+                // misinterpreted as an implicit mapping and raise
+                // "Expected comma or ] in flow sequence". Instead, treat it
+                // as a single plain scalar "::vector" when it appears at the
+                // start of a sequence item.
+                let value_or_key = if matches!(stream.current(), Some(Token::Colon)) {
+                    if let Some(Token::Colon) = stream.peek()? {
+                        // Consume the leading "::" prefix
+                        stream.next()?; // first ':'
+                        stream.next()?; // second ':'
+                        stream.skip_trivia()?;
+
+                        // Consume the following scalar and prepend "::".
+                        match stream.consume_scalar() {
+                            Ok((s, _)) => Node::Str(
+                                format!("::{}", s),
+                                QuoteType::Unquoted,
+                                BlockStyle::None,
+                            ),
+                            Err(_) => Node::Str(
+                                "::".to_string(),
+                                QuoteType::Unquoted,
+                                BlockStyle::None,
+                            ),
+                        }
+                    } else {
+                        parse_value_with_tokens(stream, directives, depth + 1)?
+                    }
+                } else {
+                    parse_value_with_tokens(stream, directives, depth + 1)?
+                };
 
                 // Skip whitespace to check if this is actually a key (followed by colon)
                 stream.skip_trivia()?;
@@ -496,6 +528,29 @@ mod tests {
             assert_eq!(items.len(), 2);
             assert!(matches!(items[0], Node::Array(_)));
             assert!(matches!(items[1], Node::Array(_)));
+        } else {
+            panic!("Expected Array node");
+        }
+    }
+
+    #[test]
+    fn test_flow_sequence_double_colon_scalar() {
+        // Ensure a leading double-colon inside a flow sequence (DBG4 pattern
+        // "[ ::vector, ... ]") is parsed as a single plain scalar "::vector"
+        // and does not trigger the "Expected comma or ] in flow sequence" error.
+        let yaml = b"[ ::vector ]";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+
+        let result = parse_inline_sequence_with_tokens(&mut stream, &directives, 0).unwrap();
+
+        if let Node::Array(items) = result {
+            assert_eq!(items.len(), 1);
+            assert!(matches!(
+                &items[0],
+                Node::Str(s, _, _) if s == "::vector"
+            ));
         } else {
             panic!("Expected Array node");
         }
