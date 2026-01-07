@@ -409,39 +409,54 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
     // This satisfies tests expecting two documents for patterns like:
     // <content>\n...\n---\n
     {
-        // Scan the entire token stream (from start) to check final significant markers
+        // Scan the entire token stream (from start) to check final significant markers.
+        // This is a best-effort post-pass used only to detect a trailing empty
+        // document pattern like "...\n---\n". It should never turn a previously
+        // successful parse into an error. If tokenization fails here (for
+        // example, due to strict indentation validation on content that was
+        // already parsed successfully via the character-level parser), we
+        // simply skip this heuristic and return the parsed documents as-is.
         let st = source.save_state();
         source.reset();
         let directives_scan = crate::parser::directives::DirectiveContext::new();
-        let mut ts =
-            crate::parser::token_stream::TokenStream::new(source, &directives_scan, false)?;
-        let mut last_sig: Option<crate::parser::lexer::Token> = None;
-        let mut prev_sig: Option<crate::parser::lexer::Token> = None;
-        loop {
-            match ts.next()? {
-                Some(t) => {
-                    if matches!(t, crate::parser::lexer::Token::Eof) {
+        if let Ok(mut ts) =
+            crate::parser::token_stream::TokenStream::new(source, &directives_scan, false)
+        {
+            let mut last_sig: Option<crate::parser::lexer::Token> = None;
+            let mut prev_sig: Option<crate::parser::lexer::Token> = None;
+            loop {
+                match ts.next() {
+                    Ok(Some(t)) => {
+                        if matches!(t, crate::parser::lexer::Token::Eof) {
+                            break;
+                        }
+                        if !matches!(
+                            t,
+                            crate::parser::lexer::Token::Newline
+                                | crate::parser::lexer::Token::Indent(_)
+                                | crate::parser::lexer::Token::Comment(_)
+                        ) {
+                            prev_sig = last_sig.take();
+                            last_sig = Some(t.clone());
+                        }
+                    }
+                    Ok(None) => break,
+                    Err(_) => {
+                        // If tokenization fails during this heuristic scan,
+                        // abort the scan but keep the successfully parsed
+                        // documents unchanged.
                         break;
                     }
-                    if !matches!(
-                        t,
-                        crate::parser::lexer::Token::Newline
-                            | crate::parser::lexer::Token::Indent(_)
-                            | crate::parser::lexer::Token::Comment(_)
-                    ) {
-                        prev_sig = last_sig.take();
-                        last_sig = Some(t.clone());
-                    }
                 }
-                None => break,
             }
-        }
-        // Only add a trailing empty document when we specifically see '...' followed by '---'
-        if docs.len() == 1
-            && matches!(last_sig, Some(crate::parser::lexer::Token::DocumentStart))
-            && matches!(prev_sig, Some(crate::parser::lexer::Token::DocumentEnd))
-        {
-            docs.push(Document(Vec::new()));
+            // Only add a trailing empty document when we specifically see
+            // '...' followed by '---'.
+            if docs.len() == 1
+                && matches!(last_sig, Some(crate::parser::lexer::Token::DocumentStart))
+                && matches!(prev_sig, Some(crate::parser::lexer::Token::DocumentEnd))
+            {
+                docs.push(Document(Vec::new()));
+            }
         }
         source.restore_state(st);
     }

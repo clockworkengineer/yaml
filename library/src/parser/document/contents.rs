@@ -7,6 +7,85 @@ use crate::parser::document::helpers;
 use crate::parser::document::mapping::parse_mapping;
 use crate::parser::document::value::parse_value;
 
+/// Parse a top-level plain scalar spanning multiple non-empty lines, using
+/// YAML's plain line folding rules (spec example 7.12 / HS5T).
+///
+/// Treats consecutive non-empty lines as a "paragraph" where lines are
+/// folded into a single space, and blank lines separate paragraphs which
+/// are joined with a newline. Leading and trailing whitespace on each line
+/// (including tabs) is trimmed before folding, so indentation is preserved
+/// only structurally through folding, not as significant indentation.
+fn parse_plain_multiline_scalar(source: &mut dyn ISource, base_indent: usize) -> Node {
+    let mut paragraphs: Vec<Vec<String>> = Vec::new();
+    let mut current_paragraph: Vec<String> = Vec::new();
+
+    loop {
+        if !source.more() {
+            break;
+        }
+
+        // Save the start of this line so we can restore if we encounter
+        // a document marker ("---" or "...") at the base indentation
+        // level. This avoids folding document markers into the scalar
+        // content (which would break round-trip expectations) while still
+        // allowing HS5T-style plain multi-line scalars without markers.
+        let line_start_state = source.save_state();
+        let line_indent = source.get_current_indent_level();
+
+        // Read current line content, trimmed and without inline comments.
+        let line = crate::utils::read_line_trimmed_into_string(source);
+
+        // If this trimmed line is a document start/end marker at the
+        // same indentation as the scalar's base, stop before consuming
+        // it so the main document parser can handle it as a marker.
+        if (line == "..." || line == "---") && line_indent == base_indent {
+            source.restore_state(line_start_state);
+            break;
+        }
+
+        // Consume the newline (LF or CRLF) if present.
+        match source.current() {
+            Some('\r') => {
+                source.next();
+                if matches!(source.current(), Some('\n')) {
+                    source.next();
+                }
+            }
+            Some('\n') => {
+                source.next();
+            }
+            _ => {}
+        }
+
+        if line.is_empty() {
+            if !current_paragraph.is_empty() {
+                paragraphs.push(current_paragraph);
+                current_paragraph = Vec::new();
+            }
+        } else {
+            current_paragraph.push(line);
+        }
+    }
+
+    if !current_paragraph.is_empty() {
+        paragraphs.push(current_paragraph);
+    }
+
+    // Fold lines inside each paragraph with spaces, and join paragraphs
+    // with newlines to match HS5T expectations.
+    let mut parts: Vec<String> = Vec::new();
+    for para in paragraphs {
+        parts.push(para.join(" "));
+    }
+    let combined = parts.join("\n");
+
+    Node::Str(
+        combined,
+        crate::nodes::node::QuoteType::Unquoted,
+        crate::nodes::node::BlockStyle::None,
+    )
+}
+
 /// Fast token-dispatch for block constructs to prefer tokenized paths.
 fn token_dispatch(
     source: &mut dyn ISource,
@@ -329,45 +408,15 @@ pub fn parse_document_contents(
                         0,
                     )?,
                 )
+            } else if matches!(ctx.collection_type, CollectionType::None) {
+                // Top-level plain multiline scalar (HS5T): parse as a single folded
+                // scalar value using character-level folding rules, avoiding token-
+                // level indentation validation that would reject tabs used purely
+                // as visual indentation inside the scalar text.
+                Ok(parse_plain_multiline_scalar(source, indent_level))
             } else {
-                // Fallback: quick token check for Plain followed by Colon on same line
-                let st_map_check = source.save_state();
-                if let Ok(mut ts) =
-                    crate::parser::token_stream::TokenStream::new(source, directives, false)
-                {
-                    if matches!(ts.current(), Some(crate::parser::lexer::Token::Plain(_))) {
-                        let _ = ts.next();
-                        if matches!(ts.current(), Some(crate::parser::lexer::Token::Colon)) {
-                            source.restore_state(st_map_check);
-                            return Ok(parse_mapping(source, indent_level, directives)?);
-                        }
-                    }
-                }
-                source.restore_state(st_map_check);
-                // If a plain word is followed by a newline and greater indentation
-                // without a colon, this is likely a missing colon error.
-                let _state = source.save_state();
-                // Create token stream to align with lexer boundaries (no assignment needed)
-                let seq_indent = source.get_current_indent_level();
-                let mut stream =
-                    crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-                match stream.current() {
-                    // If this is actually a document start marker (---), do not parse as a sequence.
-                    // Leave the marker for the main loop to handle by returning Node::None without consuming.
-                    Some(crate::parser::lexer::Token::DocumentStart) => {
-                        return Ok(Node::None);
-                    }
-                    _ => {}
-                }
-                let ctx_seq = ctx.child_block_context(seq_indent, CollectionType::BlockSequence);
-                let node = crate::parser::document::tokens::sequence::parse_sequence_with_tokens(
-                    &mut stream,
-                    seq_indent,
-                    directives,
-                    &ctx_seq,
-                    0,
-                )?;
-                return Ok(node);
+                // In nested contexts, fall back to value parsing logic
+                Ok(parse_value(source, directives)?)
             }
         }
         Some(c) if c.is_whitespace() => {
