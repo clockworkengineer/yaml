@@ -293,7 +293,10 @@ pub fn parse_document_contents(
                 let mut stream =
                     crate::parser::token_stream::TokenStream::new(source, directives, false)?;
                 let value_node = match stream.current() {
-                    Some(crate::parser::lexer::Token::Newline) | None => Node::None,
+                    Some(crate::parser::lexer::Token::Newline)
+                    | Some(crate::parser::lexer::Token::DocumentStart)
+                    | Some(crate::parser::lexer::Token::DocumentEnd)
+                    | None => Node::None,
                     _ => crate::parser::document::tokens::value::parse_value_with_tokens(
                         &mut stream,
                         directives,

@@ -545,7 +545,11 @@ fn parse_mapping_pair(
         cur_token
     );
     let value = match cur_token {
-        Some(Token::Newline) | None | Some(Token::Eof) => {
+        Some(Token::Newline)
+        | None
+        | Some(Token::Eof)
+        | Some(Token::DocumentStart)
+        | Some(Token::DocumentEnd) => {
             // After colon and newline, skip any intervening comments/newlines,
             // then check for indent and dash for block sequence/mapping value.
             if matches!(stream.current(), Some(Token::Newline)) {

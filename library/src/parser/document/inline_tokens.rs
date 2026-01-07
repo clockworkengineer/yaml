@@ -229,15 +229,26 @@ pub fn parse_inline_mapping_with_tokens(
                     ));
                 }
 
-                // Progress check: record position before parsing key
-                let before_key = stream.stream_position();
-                #[cfg(feature = "debug-trace")]
-                inline_log(format!("before_key position = {}", before_key));
-                let key = parse_value_with_tokens(stream, directives, depth + 1)?;
-                let after_key = stream.stream_position();
-                #[cfg(feature = "debug-trace")]
-                inline_log(format!("after_key position = {}", after_key));
-                ensure_progress(stream, before_key, after_key, "key in flow mapping")?;
+                // Parse the mapping key. Special-case an empty key in flow
+                // context where the entry starts with ':' (e.g. `{ : value }`).
+                // In that case, the key is the empty string and the ':'
+                // remains for the separator logic below.
+                let key = if matches!(stream.current(), Some(Token::Colon)) {
+                    #[cfg(feature = "debug-trace")]
+                    inline_log("Empty key in flow mapping (starting with ':')".to_string());
+                    Node::Str(String::new(), QuoteType::Unquoted, BlockStyle::None)
+                } else {
+                    // Progress check: record position before parsing key
+                    let before_key = stream.stream_position();
+                    #[cfg(feature = "debug-trace")]
+                    inline_log(format!("before_key position = {}", before_key));
+                    let key = parse_value_with_tokens(stream, directives, depth + 1)?;
+                    let after_key = stream.stream_position();
+                    #[cfg(feature = "debug-trace")]
+                    inline_log(format!("after_key position = {}", after_key));
+                    ensure_progress(stream, before_key, after_key, "key in flow mapping")?;
+                    key
+                };
 
                 // Skip whitespace
                 stream.skip_trivia()?;
