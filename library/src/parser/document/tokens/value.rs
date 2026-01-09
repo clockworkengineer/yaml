@@ -104,27 +104,16 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
             _ => None,
         },
         "!!set" | "!set" | "tag:yaml.org,2002:set" => match node {
-            // Convert mapping with null values to a set
+            // Convert mapping with null values to a set (DRY)
             Node::Mapping(pairs) => {
-                let mut set_items = Vec::new();
-                for (key, value) in pairs {
-                    match value {
-                        Node::None => {
-                            set_items.push(key);
-                        }
-                        _ => return None, // Not a valid set mapping
-                    }
+                if let Some(set_items) =
+                    crate::parser::document::node_utils::pairs_to_set_items_if_all_none(&pairs)
+                {
+                    Some(Node::Set(set_items))
+                } else {
+                    None
                 }
-                Some(Node::Set(set_items))
             }
-                // Convert mapping with null values to a set (DRY)
-                Node::Mapping(pairs) => {
-                    if let Some(set_items) = crate::parser::document::node_utils::pairs_to_set_items_if_all_none(&pairs) {
-                        Some(Node::Set(set_items))
-                    } else {
-                        None
-                    }
-                }
             // Convert array to a set (remove duplicates)
             Node::Array(items) => {
                 let mut unique_items = Vec::new();

@@ -526,4 +526,78 @@ mod tests {
         let token = lexer.next().unwrap().unwrap();
         assert_eq!(token, Token::Newline);
     }
+
+    #[test]
+    fn test_consume_single_colon_behaviour() {
+        let mut source = Buffer::new(b": value");
+        let directives = DirectiveContext::default();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+
+        // Current token should be a colon; consuming it should succeed.
+        assert!(matches!(stream.current(), Some(Token::Colon)));
+        let consumed = stream.consume_single_colon().unwrap();
+        assert!(consumed, "Expected consume_single_colon to return true");
+
+        // When not positioned on a colon, consume_single_colon should error.
+        let mut source2 = Buffer::new(b"value");
+        let mut stream2 = TokenStream::new(&mut source2, &directives, false).unwrap();
+        assert!(matches!(stream2.current(), Some(Token::Plain(_))));
+        let err = stream2.consume_single_colon().unwrap_err();
+        assert!(err.contains(":"));
+    }
+
+    #[test]
+    fn test_consume_flow_sequence_end() {
+        let mut source = Buffer::new(b"[1, 2]");
+        let directives = DirectiveContext::default();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+
+        // First token is '[', second is ']'.
+        assert!(matches!(stream.current(), Some(Token::FlowSequenceStart)));
+        stream.next().unwrap();
+        // Skip up to closing bracket.
+        while !matches!(stream.current(), Some(Token::FlowSequenceEnd) | Some(Token::Eof)) {
+            stream.next().unwrap();
+        }
+        assert!(matches!(stream.current(), Some(Token::FlowSequenceEnd)));
+        let consumed = stream.consume_flow_sequence_end().unwrap();
+        assert!(consumed, "Expected consume_flow_sequence_end to return true when at ']' token");
+
+        // When not at a flow sequence end, helper should return false.
+        let mut source2 = Buffer::new(b"[1, 2");
+        let mut stream2 = TokenStream::new(&mut source2, &directives, false).unwrap();
+        assert!(matches!(stream2.current(), Some(Token::FlowSequenceStart)));
+        let consumed2 = stream2.consume_flow_sequence_end().unwrap();
+        assert!(!consumed2, "Expected consume_flow_sequence_end to return false when not at ']' token");
+    }
+
+    #[test]
+    fn test_consume_flow_mapping_end() {
+        let mut source = Buffer::new(b"{ key: value }");
+        let directives = DirectiveContext::default();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+
+        // First token is '{', eventually followed by '}'.
+        assert!(matches!(stream.current(), Some(Token::FlowMappingStart)));
+        stream.next().unwrap();
+        while !matches!(stream.current(), Some(Token::FlowMappingEnd) | Some(Token::Eof)) {
+            stream.next().unwrap();
+        }
+        assert!(matches!(stream.current(), Some(Token::FlowMappingEnd)));
+        let consumed = stream.consume_flow_mapping_end().unwrap();
+        assert!(
+            consumed,
+            "Expected consume_flow_mapping_end to return true when at closing brace token"
+        );
+
+        // When not at a flow mapping end, helper should return false.
+        let mut source2 = Buffer::new(b"{");
+        let mut stream2 = TokenStream::new(&mut source2, &directives, false).unwrap();
+        assert!(matches!(stream2.current(), Some(Token::FlowMappingStart)));
+        let consumed2 = stream2.consume_flow_mapping_end().unwrap();
+        assert!(
+            !consumed2,
+            "Expected consume_flow_mapping_end to return false when not at closing brace token"
+        );
+    }
 }

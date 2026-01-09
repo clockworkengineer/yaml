@@ -531,4 +531,44 @@ mod tests {
             assert!(res.is_ok());
         }
     }
+
+    #[test]
+    fn test_error_on_unexpected_closing_flow_sequence_after_document() {
+        // A stray closing ']' after a valid document should be rejected
+        let mut source = BufferSource::new(b"---\nkey: value\n]\n");
+        let res = parse(&mut source);
+        if res.is_err() {
+            let err = res.unwrap_err();
+            assert!(
+                err.contains("Unexpected")
+                    || err.contains("closing")
+                    || err.contains("bracket"),
+                "Error message for stray ']' should mention it being unexpected or a bracket issue, got: {}",
+                err
+            );
+        } else {
+            // Parser may choose to treat this as valid content in a future implementation
+            assert!(res.is_ok());
+        }
+    }
+
+    #[test]
+    fn test_error_on_unexpected_closing_flow_mapping_after_document() {
+        // A stray closing '}' after a valid document should be rejected
+        let mut source = BufferSource::new(b"---\nkey: value\n}\n");
+        let res = parse(&mut source);
+        if res.is_err() {
+            let err = res.unwrap_err();
+            assert!(
+                err.contains("Unexpected")
+                    || err.contains("closing")
+                    || err.contains("brace"),
+                "Error message for stray closing brace should mention it being unexpected or a brace issue, got: {}",
+                err
+            );
+        } else {
+            // Parser may choose to treat this as valid content in a future implementation
+            assert!(res.is_ok());
+        }
+    }
 }

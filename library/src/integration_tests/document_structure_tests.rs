@@ -472,6 +472,24 @@ mod tests {
     }
 
     #[test]
+    fn test_trailing_empty_document_after_end_and_start_markers() {
+        // Pattern: <content>"\n...\n---\n" should produce a trailing empty document
+        let mut source = BufferSource::new(b"---\nkey: value\n...\n---\n");
+        let result = parse(&mut source).unwrap();
+
+        if let Node::Documents(docs) = &result {
+            assert_eq!(docs.len(), 2, "Expected two documents including trailing empty one");
+            if let Document(nodes) = &docs[1] {
+                assert!(nodes.is_empty(), "Second document should be empty");
+            } else {
+                panic!("Second entry should be a Document node");
+            }
+        } else {
+            panic!("Expected Documents node");
+        }
+    }
+
+    #[test]
     fn test_parse_document_with_boolean_and_null_values() {
         let mut source = BufferSource::new(
             b"---\n\
