@@ -128,11 +128,31 @@ pub fn parse_inline_sequence_with_tokens(
                     parse_value_with_tokens(stream, directives, depth + 1)?
                 };
 
-                // Skip whitespace to check if this is actually a key (followed by colon)
-                stream.skip_trivia()?;
+                // Skip inline trivia to check if this is actually a key
+                // (followed by a colon) for an implicit mapping. Per YAML
+                // 1.2, the `key: value` pair in a flow sequence must keep
+                // the colon on the same logical line as the key. If a
+                // newline/indent appears before the colon (as in ZXT5:
+                // `[ "key"\n  :value ]`), this must *not* be treated as an
+                // implicit mapping and should instead trigger a sequence
+                // syntax error when the stray ':' is encountered.
+                let mut saw_line_break = false;
+                loop {
+                    match stream.current() {
+                        Some(Token::Newline) | Some(Token::Indent(_)) => {
+                            saw_line_break = true;
+                            stream.next()?;
+                        }
+                        Some(Token::Comment(_)) => {
+                            stream.next()?;
+                        }
+                        _ => break,
+                    }
+                }
 
-                // Check if this is an implicit mapping (key: value in a flow sequence)
-                if matches!(stream.current(), Some(Token::Colon)) {
+                // Check if this is an implicit mapping (key: value in a flow sequence),
+                // but only when the colon is on the same line (no intervening newline/indent).
+                if !saw_line_break && matches!(stream.current(), Some(Token::Colon)) {
                     // This is actually a key, not a standalone value
                     // Parse as a single-pair mapping
                     let _ = stream.consume_if(Token::Colon)?; // consume colon
