@@ -177,3 +177,27 @@ Planned steps:
 - Error-message alignment and strict/lenient modes: **planned**.
 
 This file is intended as the high-level roadmap; implementation details belong in the parser modules and existing refactor documents.
+
+---
+
+## What To Do Next (Concrete Suggestions)
+
+1. **Lock in baseline:**
+   - On the `yaml-test-suite-false-positives` branch, run `cargo test --package yaml_lib --lib` and `cargo test --test yaml_test_suite -- --nocapture` and snapshot the current failing YAML IDs and messages.
+
+2. **Start with indentation/whitespace (Section 2):**
+   - Implement the central indentation/whitespace validator and wire it into `parse_document_main_loop` and block scalar parsing.
+   - Re-run the official suite and record which `indent`/`whitespace`/`folded`/`literal` tests flipped from success to error.
+
+3. **Add the block-head classifier (Section 3):**
+   - Introduce `classify_block_head` (or equivalent) and replace character-based mapping/sequence/scalar decisions in `parse_document_contents`.
+   - Use a few representative mapping/sequence failures (e.g. 236B, 4HVU, 7MNF, BD7L, GT5M) as your inner loop while iterating.
+
+4. **Iterate on directives/tags (Section 4):**
+   - Implement strict parsing for `%YAML`, `%TAG`, and tag syntax, then run only the tests tagged `tag`, `header`, `footer`, `unknown-tag` until they match expectations.
+
+5. **Plan the scalar engine extraction (Section 5):**
+   - Sketch the API for a unified scalar module (`parser/document/scalar.rs`) and identify the minimum set of call sites to switch over in the first pass.
+
+6. **Continuously update this doc:**
+   - After each major parser change, update the "Status Summary" and, if helpful, add a short note under the relevant section listing which YAML IDs were fixed.
