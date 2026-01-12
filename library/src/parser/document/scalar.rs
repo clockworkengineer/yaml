@@ -35,10 +35,7 @@ pub(crate) fn parse_scalar_with_tokens(
                     let rest = &s[ind.len_utf8()..];
                     let meta = rest.trim_start_matches(' ');
                     if !meta.is_empty() {
-                        let first_token = meta
-                            .split_whitespace()
-                            .next()
-                            .unwrap_or("");
+                        let first_token = meta.split_whitespace().next().unwrap_or("");
                         if !first_token
                             .chars()
                             .all(|c| c == '+' || c == '-' || c.is_ascii_digit())
@@ -167,8 +164,9 @@ pub(crate) fn parse_scalar_with_tokens(
                     }
                 } else if blank_lines_before_content >= 3
                     && max_blank_indent_before_content > 0
-                    && pending_indent_for_line
-                        .map_or(false, |comment_indent| comment_indent < max_blank_indent_before_content)
+                    && pending_indent_for_line.map_or(false, |comment_indent| {
+                        comment_indent < max_blank_indent_before_content
+                    })
                 {
                     // YAML test S98Z: a block scalar header followed only by *increasingly*
                     // indented blank lines (e.g., 1, 2, 3 spaces) followed by a less-indented
@@ -179,8 +177,7 @@ pub(crate) fn parse_scalar_with_tokens(
                     // blank indent) remain accepted.
                     let msg = format!(
                         "Invalid empty block scalar: malformed indented blank lines without any content (blank max indent: {}, following indent: {:?})",
-                        max_blank_indent_before_content,
-                        pending_indent_for_line
+                        max_blank_indent_before_content, pending_indent_for_line
                     );
                     return Err(indentation_error(stream.source_mut(), &msg));
                 }

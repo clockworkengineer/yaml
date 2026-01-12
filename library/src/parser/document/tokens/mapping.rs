@@ -678,9 +678,12 @@ fn parse_mapping_pair(
             }
         }
         _ => {
-            // Skip whitespace before value
+            // Skip whitespace before value, then parse the actual value.
+            // Any anchored-or-tagged block values that are properly
+            // indented under the key (e.g., BU8L) are already handled
+            // by the Newline/Indent branches above; here we only route
+            // to the general value parser.
             stream.skip_trivia()?;
-            // Parse the actual value
             let v = parse_value_with_tokens(stream, directives, depth + 1)?;
             #[cfg(feature = "debug-trace")]
             log::debug!("mapping_pair: parsed value = {:?}", v);

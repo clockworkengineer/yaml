@@ -563,19 +563,28 @@ mod tests {
         assert!(matches!(stream.current(), Some(Token::FlowSequenceStart)));
         stream.next().unwrap();
         // Skip up to closing bracket.
-        while !matches!(stream.current(), Some(Token::FlowSequenceEnd) | Some(Token::Eof)) {
+        while !matches!(
+            stream.current(),
+            Some(Token::FlowSequenceEnd) | Some(Token::Eof)
+        ) {
             stream.next().unwrap();
         }
         assert!(matches!(stream.current(), Some(Token::FlowSequenceEnd)));
         let consumed = stream.consume_flow_sequence_end().unwrap();
-        assert!(consumed, "Expected consume_flow_sequence_end to return true when at ']' token");
+        assert!(
+            consumed,
+            "Expected consume_flow_sequence_end to return true when at ']' token"
+        );
 
         // When not at a flow sequence end, helper should return false.
         let mut source2 = Buffer::new(b"[1, 2");
         let mut stream2 = TokenStream::new(&mut source2, &directives, false).unwrap();
         assert!(matches!(stream2.current(), Some(Token::FlowSequenceStart)));
         let consumed2 = stream2.consume_flow_sequence_end().unwrap();
-        assert!(!consumed2, "Expected consume_flow_sequence_end to return false when not at ']' token");
+        assert!(
+            !consumed2,
+            "Expected consume_flow_sequence_end to return false when not at ']' token"
+        );
     }
 
     #[test]
@@ -587,7 +596,10 @@ mod tests {
         // First token is '{', eventually followed by '}'.
         assert!(matches!(stream.current(), Some(Token::FlowMappingStart)));
         stream.next().unwrap();
-        while !matches!(stream.current(), Some(Token::FlowMappingEnd) | Some(Token::Eof)) {
+        while !matches!(
+            stream.current(),
+            Some(Token::FlowMappingEnd) | Some(Token::Eof)
+        ) {
             stream.next().unwrap();
         }
         assert!(matches!(stream.current(), Some(Token::FlowMappingEnd)));
