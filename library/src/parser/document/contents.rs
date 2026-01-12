@@ -421,9 +421,12 @@ pub fn parse_document_contents(
         }
         Some(c) if c == '?' => unreachable!(),
         Some(c) if c.is_alphanumeric() => {
-            if matches!(head_kind, BlockHeadKind::BlockMapping)
-                || helpers::peek_ahead_for_mapping_key(source, directives)
-            {
+            // Rely on the token-based head classifier to decide whether this
+            // line begins a block mapping (e.g., a plain scalar followed by
+            // a ':' at the correct indentation) rather than re-running a
+            // separate character-level peek. This keeps the decision
+            // centralized in `classify_block_head`.
+            if matches!(head_kind, BlockHeadKind::BlockMapping) {
                 // Prefer token-based mapping parsing for reliability
                 let base_indent = source.get_current_indent_level();
                 let mut stream =
@@ -466,9 +469,12 @@ pub fn parse_document_contents(
             )?)
         }
         Some(c) if matches!(c, '<' | '>' | '"' | '\'' | '|') => {
-            if matches!(source.current(), Some('"') | Some('\''))
-                && helpers::peek_ahead_for_mapping_key(source, directives)
-            {
+            // For lines starting with quote characters or block scalar
+            // indicators that could form a complex key, defer entirely to
+            // the head classifier: if it determined this line is a
+            // BlockMapping head (e.g., quoted key followed by ':'), parse a
+            // mapping; otherwise, treat it as a value.
+            if matches!(head_kind, BlockHeadKind::BlockMapping) {
                 Ok(parse_mapping(source, indent_level, directives)?)
             } else {
                 Ok(parse_value(source, directives)?)
