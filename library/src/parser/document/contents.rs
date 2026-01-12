@@ -4,6 +4,7 @@ use crate::parser::directives::DirectiveContext;
 use crate::parser::document::context::{CollectionType, ParsingContext};
 use crate::parser::document::explicit_key::parse_multiple_explicit_keys;
 use crate::parser::document::helpers;
+use crate::parser::document::helpers::BlockHeadKind;
 use crate::parser::document::mapping::parse_mapping;
 use crate::parser::document::value::parse_value;
 
@@ -124,6 +125,7 @@ fn token_dispatch(
                 let result = crate::parser::document::tokens::sequence::parse_sequence_with_tokens(
                     &mut stream,
                     seq_indent,
+                    ctx.indent_level,
                     directives,
                     &ctx_seq,
                     0,
@@ -181,16 +183,42 @@ pub fn parse_document_contents(
 ) -> Result<Node, String> {
     // Normalize position to the next significant token
     crate::utils::skip_whitespace_and_comments(source);
+    // Central, context-aware indentation/whitespace validation hook.
+    // Currently conservative (no-op for valid inputs) but wired in so that
+    // future tightening of rules in `helpers::validate_indentation_and_whitespace`
+    // automatically applies to all document content parsing without further
+    // structural changes.
+    crate::parser::document::helpers::validate_indentation_and_whitespace(
+        source,
+        directives,
+        ctx,
+    )?;
+    // Use the block head classifier as a centralized, token-based view
+    // of the upcoming construct. On this first integration we largely
+    // mirror the existing character-based branching logic to avoid
+    // behavioral changes while preparing for future tightening.
+    let head_kind = helpers::classify_block_head(source, directives, ctx);
+
     // Handle explicit keys first so token-dispatch doesn't overshadow '?'
     if matches!(source.current(), Some('?')) {
-        // Always collect all consecutive explicit keys at this indent into a single mapping node
         let current_indent = source.get_current_indent_level();
         return handle_multiple_explicit_keys(source, current_indent);
     }
-    // (debug removed)
-    if let Some(result) = token_dispatch(source, directives, ctx) {
-        return result;
+
+    // Prefer token-dispatch for mappings/sequences when classifier
+    // indicates such constructs; otherwise fall back to the existing
+    // logic. This keeps current behavior while centralizing the
+    // decision about when to try token-based parsing.
+    if matches!(
+        head_kind,
+        BlockHeadKind::BlockMapping | BlockHeadKind::BlockSequence
+    ) {
+        if let Some(result) = token_dispatch(source, directives, ctx) {
+            return result;
+        }
     }
+
+    // (debug removed)
     match source.current() {
         Some(c) if c == '-' => {
             // Only treat dash as sequence start if not in flow context or explicit key context
@@ -220,6 +248,7 @@ pub fn parse_document_contents(
                         crate::parser::document::tokens::sequence::parse_sequence_with_tokens(
                             &mut stream,
                             seq_indent,
+                            indent_level,
                             directives,
                             &ctx_seq,
                             0,
@@ -396,7 +425,9 @@ pub fn parse_document_contents(
         }
         Some(c) if c == '?' => unreachable!(),
         Some(c) if c.is_alphanumeric() => {
-            if helpers::peek_ahead_for_mapping_key(source, directives) {
+            if matches!(head_kind, BlockHeadKind::BlockMapping)
+                || helpers::peek_ahead_for_mapping_key(source, directives)
+            {
                 // Prefer token-based mapping parsing for reliability
                 let base_indent = source.get_current_indent_level();
                 let mut stream =

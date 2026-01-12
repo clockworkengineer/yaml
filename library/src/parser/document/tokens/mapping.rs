@@ -593,8 +593,14 @@ fn parse_mapping_pair(
                             level,
                             crate::parser::document::context::CollectionType::BlockSequence,
                         );
-                    let seq =
-                        parse_sequence_with_tokens(stream, level, directives, &ctx_seq, depth + 1)?;
+                    let seq = parse_sequence_with_tokens(
+                        stream,
+                        level,
+                        cur_indent,
+                        directives,
+                        &ctx_seq,
+                        depth + 1,
+                    )?;
                     #[cfg(feature = "debug-trace")]
                     log::debug!("mapping_pair: sequence node for key {:?}: {:?}", key, seq);
                     return Ok((key, seq));
@@ -620,7 +626,14 @@ fn parse_mapping_pair(
                         level,
                         crate::parser::document::context::CollectionType::BlockSequence,
                     );
-                parse_sequence_with_tokens(stream, level, directives, &ctx_seq, depth + 1)?
+                parse_sequence_with_tokens(
+                    stream,
+                    level,
+                    cur_indent,
+                    directives,
+                    &ctx_seq,
+                    depth + 1,
+                )?
             } else {
                 parse_mapping_with_tokens(stream, level, directives, depth + 1)?
             }

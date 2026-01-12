@@ -1,4 +1,4 @@
-use crate::parser::document::error_builder::syntax_error;
+use crate::parser::document::error_builder::{indentation_error, syntax_error};
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
 // Recursion guard removed
@@ -58,24 +58,82 @@ pub(crate) fn parse_scalar_with_tokens(
                 stream.next()?;
                 let mut block_lines: Vec<String> = Vec::new();
                 let mut trailing_newlines: usize = 0;
-                // Collect subsequent lines: consume indentation tokens, capture plain content lines,
-                // and ignore standalone newline tokens (they serve as separators).
+                // Collect subsequent lines: track indentation for both blank and non-blank lines so
+                // we can validate indentation patterns that the YAML test suite marks as errors
+                // (e.g., 5LLU: blank lines that are more indented than the first content line).
+                let mut first_content_indent: Option<usize> = None;
+                let mut max_blank_indent_before_content: usize = 0;
+                let mut blank_lines_before_content: usize = 0;
+                let mut pending_indent_for_line: Option<usize> = None;
+                let mut saw_plain_current_line: bool = false;
+                // Consume indentation tokens, capture plain content lines, and treat newline tokens
+                // as line boundaries.
                 loop {
                     match stream.current() {
-                        Some(Token::Indent(_)) => {
+                        Some(Token::Indent(level)) => {
+                            pending_indent_for_line = Some(*level);
                             stream.next()?;
                         }
-                        Some(Token::Plain(line)) => {
-                            block_lines.push(line.clone());
+                        Some(Token::Plain(_)) => {
+                            // Do not treat a mapping key as block scalar content.
+                            // If this plain token is immediately followed by a colon,
+                            // it's the start of a mapping key/value pair, so we should
+                            // stop collecting block scalar lines and let the caller
+                            // handle the mapping instead of misinterpreting it as
+                            // scalar content (see yaml-test-suite case Y79Y/001).
+                            if matches!(stream.peek()?, Some(Token::Colon)) {
+                                break;
+                            }
+
+                            let indent = pending_indent_for_line.unwrap_or(0);
+                            if first_content_indent.is_none() {
+                                first_content_indent = Some(indent);
+                            }
+                            if let Some(Token::Plain(line)) = stream.current().cloned() {
+                                block_lines.push(line);
+                            }
                             trailing_newlines = 0; // reset when we see content
+                            saw_plain_current_line = true;
                             stream.next()?;
                         }
                         Some(Token::Newline) => {
+                            // If we haven't seen content on this line yet and we are still
+                            // before the first content line, treat this as a "significant"
+                            // blank line only when it has an explicit indentation token.
+                            // This skips the header's own newline (no Indent), while still
+                            // counting truly indented blank lines like in 5LLU.
+                            if !saw_plain_current_line
+                                && first_content_indent.is_none()
+                                && pending_indent_for_line.is_some()
+                            {
+                                let indent = pending_indent_for_line.unwrap_or(0);
+                                if indent > max_blank_indent_before_content {
+                                    max_blank_indent_before_content = indent;
+                                }
+                                blank_lines_before_content += 1;
+                            }
                             // Treat as separator; count for trailing chomping semantics
                             trailing_newlines += 1;
                             stream.next()?;
+                            // Reset per-line state
+                            pending_indent_for_line = None;
+                            saw_plain_current_line = false;
                         }
                         _ => break,
+                    }
+                }
+                // YAML test 5LLU: if any blank line *before* the first content line is more
+                // indented than that first content line, the scalar is invalid. Enforce this
+                // as an indentation error so those cases no longer parse successfully.
+                if let Some(first_indent) = first_content_indent {
+                    if blank_lines_before_content >= 2
+                        && max_blank_indent_before_content > first_indent
+                    {
+                        let msg = format!(
+                            "Blank lines before block scalar content are more indented than the content (blank max: {}, first content indent: {})",
+                            max_blank_indent_before_content, first_indent
+                        );
+                        return Err(indentation_error(stream.source_mut(), &msg));
                     }
                 }
                 // Build result as header + newline + joined lines; no folding here.

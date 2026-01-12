@@ -28,6 +28,7 @@ use crate::parser::document::context::ParsingContext;
 pub fn parse_sequence_with_tokens(
     stream: &mut TokenStream,
     base_indent: usize,
+    parent_indent: usize,
     directives: &DirectiveContext,
     ctx: &ParsingContext,
     depth: usize,
@@ -93,8 +94,22 @@ pub fn parse_sequence_with_tokens(
                     }
                 }
                 Some(Token::Indent(level)) if *level < current_indent => {
-                    let (_, items) = stack.pop().unwrap();
-                    return Ok(Node::Array(items));
+                    let dedent_level = *level;
+                    // If the dedent takes us back to or above the parent
+                    // indentation, treat it as the natural end of this
+                    // sequence. Otherwise, we have an inconsistent
+                    // indentation within the sequence body (e.g. 4HVU),
+                    // which should be reported as an indentation error
+                    // rather than silently starting a new structural block.
+                    if dedent_level <= parent_indent {
+                        let (_, items) = stack.pop().unwrap();
+                        return Ok(Node::Array(items));
+                    } else {
+                        return Err(crate::parser::document::error_builder::indentation_error(
+                            stream.source_mut(),
+                            "Invalid indentation for sequence item",
+                        ));
+                    }
                 }
                 _ => {}
             }
@@ -127,6 +142,7 @@ pub fn parse_sequence_with_tokens(
                     let seq = parse_sequence_with_tokens(
                         stream,
                         nested_base,
+                        parent_indent,
                         directives,
                         &ctx_seq,
                         depth + 1,

@@ -295,8 +295,14 @@ pub fn parse_value_with_tokens(
                         *level,
                         crate::parser::document::context::CollectionType::BlockSequence,
                     );
-                let seq =
-                    parse_sequence_with_tokens(stream, *level, directives, &ctx_seq, depth + 1)?;
+                let seq = parse_sequence_with_tokens(
+                    stream,
+                    *level,
+                    0,
+                    directives,
+                    &ctx_seq,
+                    depth + 1,
+                )?;
                 let mut result = Node::Tagged(Box::new(seq), "tag:yaml.org,2002:seq".to_string());
                 if let Some(anchor_name) = decorators.anchor {
                     result = Node::Anchored(Box::new(result), anchor_name);
@@ -511,7 +517,7 @@ fn parse_value_content(
                     0,
                     crate::parser::document::context::CollectionType::BlockSequence,
                 );
-            parse_sequence_with_tokens(stream, 0, directives, &ctx_seq, depth + 1)
+            parse_sequence_with_tokens(stream, 0, 0, directives, &ctx_seq, depth + 1)
         }
         Some(Token::Indent(level)) => {
             // Indented value: parse nested mapping
@@ -540,6 +546,7 @@ fn parse_value_content(
                         return parse_sequence_with_tokens(
                             stream,
                             _lvl,
+                            0,
                             directives,
                             &ctx_seq,
                             depth + 1,

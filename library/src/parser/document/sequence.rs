@@ -28,6 +28,7 @@ pub(crate) fn parse_sequence(
     crate::parser::document::tokens::sequence::parse_sequence_with_tokens(
         &mut stream,
         indent_level,
+        indent_level.saturating_sub(1),
         directives,
         &ctx,
         0,

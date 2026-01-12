@@ -29,40 +29,40 @@ pub(crate) fn parse_error_token(
     format!("{} (token: {}, pos: {})", msg, current, pos)
 }
 
-/// Unified indentation validation using parsing context.
+/// Unified indentation and whitespace validation entry point.
 ///
-/// This function provides context-aware validation of indentation, particularly
-/// for tab characters which are forbidden in certain contexts per YAML 1.2 spec.
+/// This is the central hook for indentation/whitespace validation used by the
+/// document parser. It is intentionally conservative in its initial
+/// implementation so that we can wire it into the parsing pipeline without
+/// changing behavior, and then progressively tighten the rules in
+/// `validate_indentation_tokens` as we address specific false positives from
+/// the official YAML test suite.
 ///
-/// Tabs are forbidden when:
-/// - In block context (not flow collections like [], {})
-/// - Used as indentation (after newlines, before content)
+/// The function operates in two stages:
+/// - Build a temporary `TokenStream` snapshot from the current `ISource`
+/// - Delegate to the token-level validator, restoring the source state after
+///   the check so that parsing continues unchanged
+pub(crate) fn validate_indentation_and_whitespace(
+    source: &mut dyn ISource,
+    directives: &crate::parser::directives::DirectiveContext,
+    ctx: &ParsingContext,
+) -> Result<(), String> {
+    use crate::parser::token_stream::TokenStream;
+
+    let state = source.save_state();
+    let stream = TokenStream::new(source, directives, false)?;
+    let result = validate_indentation_tokens(&stream, ctx);
+    source.restore_state(state);
+    result
+}
+
+/// Token-based indentation validation using `TokenStream`.
 ///
-/// Tabs are allowed when:
-/// - In flow context (inside [], {}, quoted strings)
-/// - Part of string content (not indentation)
-///
-/// # Arguments
-///
-/// * `source` - A mutable reference to a source implementing ISource trait
-/// * `ctx` - The current parsing context (determines validation rules)
-///
-/// # Returns
-///
-/// `Ok(())` if indentation is valid, `Err(String)` if tabs found in forbidden context
-///
-/// # Example
-///
-/// ```ignore
-/// let ctx = ParsingContext::new(0);
-/// validate_indentation(source, &ctx)?;
-/// ```
-#[allow(dead_code)]
-/// Token-based indentation validation using TokenStream.
-///
-/// Checks for forbidden tabs in indentation by inspecting Indent tokens.
-/// Only applies in block context (not flow).
-pub(crate) fn validate_indentation_tokens(
+/// At the moment this function is intentionally minimal and only set up as a
+/// customization point; it will be extended to enforce stricter
+/// indentation/whitespace rules (using `ParsingContext`) as we work through
+/// the official YAML test suite false positives.
+fn validate_indentation_tokens(
     stream: &TokenStream,
     ctx: &ParsingContext,
 ) -> Result<(), String> {
@@ -74,13 +74,10 @@ pub(crate) fn validate_indentation_tokens(
     }
     if let Some(Token::Indent(_)) = stream.current() {
         // In YAML, indentation is always spaces. Tabs are forbidden.
-        // If the lexer/tokenizer is correct, Indent tokens should only be produced for spaces.
-        // But if the lexer allows tabs, we can check for a flag or error here.
-        // For now, assume Indent tokens are valid. If not, this is a lexer responsibility.
-        // Optionally, add a check if Indent tokens can encode tab info.
-        // If not, this function is a no-op.
-        // If you want to enforce, you could add a custom IndentKind or metadata to Token::Indent.
-        // For now, just return Ok.
+        // If the lexer encodes tab usage in Indent tokens, we can extend this
+        // function to report an error when tabs are used for indentation.
+        // Until then, this function is effectively a no-op and serves as a
+        // centralized place to evolve indentation rules.
         Ok(())
     } else {
         Ok(())
@@ -215,6 +212,79 @@ pub(crate) fn peek_ahead_for_mapping_key(
     // Restore original source position
     source.restore_state(state);
     result
+}
+
+/// High-level classification of the current document-head position.
+///
+/// This is an early, token-based classifier intended to centralize the
+/// decision about whether the upcoming construct is a mapping, sequence,
+/// inline collection, scalar, directive, or document marker. On its first
+/// iteration it mirrors the existing character-based branching logic in
+/// `parse_document_contents` and is not yet used to change behavior; it
+/// primarily serves as scaffolding for future false-positive reductions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum BlockHeadKind {
+    DocumentStartOrEnd,
+    Directive,
+    BlockSequence,
+    BlockMapping,
+    InlineMapping,
+    InlineSequence,
+    Alias,
+    Value,
+    CommentOrTrivia,
+    None,
+}
+
+/// Classify the upcoming block head using TokenStream without consuming
+/// any characters from the underlying source.
+pub(crate) fn classify_block_head(
+    source: &mut dyn ISource,
+    directives: &DirectiveContext,
+    _ctx: &ParsingContext,
+) -> BlockHeadKind {
+    if !source.more() {
+        return BlockHeadKind::None;
+    }
+
+    let state = source.save_state();
+    let kind = if let Ok(stream) = TokenStream::new(source, directives, false) {
+        match stream.current() {
+            Some(Token::DocumentStart) | Some(Token::DocumentEnd) => {
+                BlockHeadKind::DocumentStartOrEnd
+            }
+            Some(Token::Directive(_)) => BlockHeadKind::Directive,
+            Some(Token::Dash) => BlockHeadKind::BlockSequence,
+            Some(Token::FlowMappingStart) => BlockHeadKind::InlineMapping,
+            Some(Token::FlowSequenceStart) => BlockHeadKind::InlineSequence,
+            Some(Token::Alias(_)) => BlockHeadKind::Alias,
+            Some(Token::Tag(_)) | Some(Token::Anchor(_)) => {
+                // Tagged or anchored value; we still need downstream logic
+                // to distinguish "tagged key" vs "tagged value", so
+                // classify as generic value for now.
+                BlockHeadKind::Value
+            }
+            Some(Token::Plain(_))
+            | Some(Token::SingleQuoted(_))
+            | Some(Token::DoubleQuoted(_)) => {
+                if peek_ahead_for_mapping_key(source, directives) {
+                    BlockHeadKind::BlockMapping
+                } else {
+                    BlockHeadKind::Value
+                }
+            }
+            Some(Token::Comment(_)) | Some(Token::Indent(_)) | Some(Token::Newline) => {
+                BlockHeadKind::CommentOrTrivia
+            }
+            Some(Token::Colon) | Some(Token::QuestionMark) => BlockHeadKind::BlockMapping,
+            Some(Token::Eof) | None => BlockHeadKind::None,
+            _ => BlockHeadKind::None,
+        }
+    } else {
+        BlockHeadKind::None
+    };
+    source.restore_state(state);
+    kind
 }
 
 /// Validates that no inline content exists after a document end marker ('...') on the same line.
