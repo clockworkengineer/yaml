@@ -167,16 +167,35 @@ Planned steps:
 
 ---
 
-## Status Summary (Initial)
+## Status Summary (2026-01-12)
 
 - Inventory of failing IDs and tags: **complete**.
-- Central indent/whitespace validator: **planned, not implemented here**.
-- Token-first classifier for mapping/sequence/scalar: **planned**.
+- Central indent/whitespace validator:
+   - **Implemented (initial)** via `validate_indentation_and_whitespace` and `validate_indentation_tokens`, wired into `parse_document_contents`.
+   - Currently conservative, but extended to enforce a block-scalar blank-line rule that fixes `5LLU` while keeping valid shapes like `R4YG` and `Y79Y/001` parsing successfully.
+- Token-first classifier for mapping/sequence/scalar:
+   - **Implemented (initial)** as a `BlockHeadKind` classifier plus a parent-indent–aware sequence parser.
+   - Integrated into `parse_document_contents` without yet flipping the bulk of mapping/sequence false positives (e.g., `236B`, `4HVU`), which remain as future work.
+- Unified scalar engine:
+   - **In progress**: scalar parsing is now centralized in `parser/document/scalar.rs` over `TokenStream`, with additional indentation checks for block scalars.
+   - Used to fix `5LLU` (invalid block scalar indentation) and preserve success for spec examples like `R4YG` and tab-related case `Y79Y/001`.
 - Directive/tag validation layer: **planned**.
-- Unified scalar engine: **planned**.
 - Error-message alignment and strict/lenient modes: **planned**.
 
-This file is intended as the high-level roadmap; implementation details belong in the parser modules and existing refactor documents.
+Current yaml-test-suite quiet runner baseline (data-2022-01-17, limit 402):
+
+- Passed: **337**
+- Failed: **65** (all "expected: error, got: success")
+- Pass rate: **83.8%**
+
+Notable fixed IDs so far:
+
+- `5LLU` (block scalar with wrong indented line after spaces only) now correctly fails to parse.
+- `R4YG` (Spec Example 8.2. Block Indentation Indicator) parses successfully under the tightened rules.
+- `Y79Y/001` (Tabs in various contexts) parses successfully, while still allowing future tabs-in-indentation tightening in other contexts.
+- `W9L4` (Literal block scalar with more spaces in first line) now correctly fails to parse due to invalid indentation.
+- `X4QW` (Comment without whitespace after block scalar indicator) now correctly fails to parse due to an invalid block scalar header.
+- `S4GJ` (Folded block scalar with invalid text after the indicator on the header line) now correctly fails to parse due to an invalid block scalar header.
 
 ---
 

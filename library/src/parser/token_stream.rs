@@ -70,6 +70,13 @@ impl<'a> TokenStream<'a> {
         Ok(ts)
     }
 
+    /// Returns true if the token stream is currently in a flow collection
+    /// context (i.e., inside [] or {}), based on the tracked flow_depth.
+    #[inline]
+    pub fn in_flow(&self) -> bool {
+        self.flow_depth > 0
+    }
+
     /// Get the current token without consuming it
     #[inline]
     pub fn current(&self) -> Option<&Token> {

@@ -257,7 +257,9 @@ pub fn parse_value_with_tokens(
         let tag_is_seq = decorators
             .tag
             .as_ref()
-            .map(|t| crate::parser::document::node_utils::resolved_is_seq(&directives.resolve_tag(t)))
+            .map(|t| {
+                crate::parser::document::node_utils::resolved_is_seq(&directives.resolve_tag(t))
+            })
             .unwrap_or(false);
 
         if tag_is_seq {
@@ -275,8 +277,7 @@ pub fn parse_value_with_tokens(
 
                 if matches!(stream.current(), Some(Token::FlowSequenceStart)) {
                     use crate::parser::document::inline_tokens::parse_inline_sequence_with_tokens;
-                    let seq =
-                        parse_inline_sequence_with_tokens(stream, directives, depth + 1)?;
+                    let seq = parse_inline_sequence_with_tokens(stream, directives, depth + 1)?;
                     let mut result =
                         Node::Tagged(Box::new(seq), "tag:yaml.org,2002:seq".to_string());
                     if let Some(anchor_name) = decorators.anchor {
@@ -295,14 +296,8 @@ pub fn parse_value_with_tokens(
                         *level,
                         crate::parser::document::context::CollectionType::BlockSequence,
                     );
-                let seq = parse_sequence_with_tokens(
-                    stream,
-                    *level,
-                    0,
-                    directives,
-                    &ctx_seq,
-                    depth + 1,
-                )?;
+                let seq =
+                    parse_sequence_with_tokens(stream, *level, 0, directives, &ctx_seq, depth + 1)?;
                 let mut result = Node::Tagged(Box::new(seq), "tag:yaml.org,2002:seq".to_string());
                 if let Some(anchor_name) = decorators.anchor {
                     result = Node::Anchored(Box::new(result), anchor_name);
@@ -359,7 +354,9 @@ pub fn parse_value_with_tokens(
         let tag_is_set = decorators
             .tag
             .as_ref()
-            .map(|t| crate::parser::document::node_utils::resolved_is_set(&directives.resolve_tag(t)))
+            .map(|t| {
+                crate::parser::document::node_utils::resolved_is_set(&directives.resolve_tag(t))
+            })
             .unwrap_or(false);
 
         let mut result = if tag_is_set {

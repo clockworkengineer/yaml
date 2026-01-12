@@ -248,7 +248,7 @@ pub fn parse_sequence_with_tokens(
                 }
             }
 
-            // After parsing an item, skip whitespace/comments and check for another dash at the same indent
+            // After parsing an item, skip whitespace/comments and check for another dash at the same indent.
             // Skip newlines and comments, but NOT indents (we need to check indent level)
             stream.skip_newlines_and_comments()?;
 
@@ -259,8 +259,23 @@ pub fn parse_sequence_with_tokens(
                     continue;
                 }
                 Some(Token::Indent(level)) if *level < current_indent => {
-                    // Dedent detected, break out to return
-                    break;
+                    // Dedent detected. If we have returned to or above the
+                    // parent indentation, treat this as the natural end of
+                    // the sequence; otherwise, the dedent is shallow (e.g.
+                    // 4HVU: sequence under a key where a later item is less
+                    // indented than its siblings but still more indented than
+                    // the parent), which should be reported as an
+                    // indentation error instead of silently ending the
+                    // sequence and continuing as a separate structural block.
+                    let dedent_level = *level;
+                    if dedent_level <= parent_indent {
+                        break;
+                    } else {
+                        return Err(crate::parser::document::error_builder::indentation_error(
+                            stream.source_mut(),
+                            "Invalid indentation for sequence item",
+                        ));
+                    }
                 }
                 Some(Token::Indent(level)) if *level == current_indent => {
                     // Check if there's a dash after this indent

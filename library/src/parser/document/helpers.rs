@@ -62,10 +62,7 @@ pub(crate) fn validate_indentation_and_whitespace(
 /// customization point; it will be extended to enforce stricter
 /// indentation/whitespace rules (using `ParsingContext`) as we work through
 /// the official YAML test suite false positives.
-fn validate_indentation_tokens(
-    stream: &TokenStream,
-    ctx: &ParsingContext,
-) -> Result<(), String> {
+fn validate_indentation_tokens(stream: &TokenStream, ctx: &ParsingContext) -> Result<(), String> {
     if ctx.in_flow {
         return Ok(());
     }
@@ -264,9 +261,7 @@ pub(crate) fn classify_block_head(
                 // classify as generic value for now.
                 BlockHeadKind::Value
             }
-            Some(Token::Plain(_))
-            | Some(Token::SingleQuoted(_))
-            | Some(Token::DoubleQuoted(_)) => {
+            Some(Token::Plain(_)) | Some(Token::SingleQuoted(_)) | Some(Token::DoubleQuoted(_)) => {
                 if peek_ahead_for_mapping_key(source, directives) {
                     BlockHeadKind::BlockMapping
                 } else {
@@ -314,10 +309,7 @@ pub(crate) fn validate_no_inline_content_after_document_end(
             Some(c) => {
                 return Err(parse_error_token(
                     stream,
-                    &format!(
-                        "Invalid content '{}' after document end marker (...)",
-                        c
-                    ),
+                    &format!("Invalid content '{}' after document end marker (...)", c),
                 ));
             }
         }

@@ -188,11 +188,7 @@ pub fn parse_document_contents(
     // future tightening of rules in `helpers::validate_indentation_and_whitespace`
     // automatically applies to all document content parsing without further
     // structural changes.
-    crate::parser::document::helpers::validate_indentation_and_whitespace(
-        source,
-        directives,
-        ctx,
-    )?;
+    crate::parser::document::helpers::validate_indentation_and_whitespace(source, directives, ctx)?;
     // Use the block head classifier as a centralized, token-based view
     // of the upcoming construct. On this first integration we largely
     // mirror the existing character-based branching logic to avoid

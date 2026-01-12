@@ -24,6 +24,34 @@ pub(crate) fn parse_scalar_with_tokens(
             Ok(Node::Str(unescaped, QuoteType::Double, BlockStyle::None))
         }
         Some(Token::Plain(s)) => {
+            // Special-case invalid block scalar header where a comment or other
+            // non-metadata text immediately follows the indicator without the
+            // required whitespace-only remainder, e.g. the YAML tests:
+            //   - X4QW: "block: ># comment" (comment without whitespace)
+            //   - S4GJ: "folded: > first line" (invalid text after indicator)
+            // In such cases, treat this as a syntax error rather than a plain scalar.
+            if let Some(ind) = s.chars().next() {
+                if (ind == '|' || ind == '>') && !stream.in_flow() {
+                    let rest = &s[ind.len_utf8()..];
+                    let meta = rest.trim_start_matches(' ');
+                    if !meta.is_empty() {
+                        let first_token = meta
+                            .split_whitespace()
+                            .next()
+                            .unwrap_or("");
+                        if !first_token
+                            .chars()
+                            .all(|c| c == '+' || c == '-' || c.is_ascii_digit())
+                        {
+                            return Err(syntax_error(
+                                stream.source_mut(),
+                                "Invalid block scalar header: unexpected text immediately after '|' or '>'",
+                            ));
+                        }
+                    }
+                }
+            }
+
             // Block scalar detection: treat as block scalar ONLY when the plain token is a valid block header line
             // i.e., first char '|' or '>' and the remainder contains only spaces, '+', '-', or digits (indent hints).
             // This avoids misinterpreting plain tokens like ">folded" inside flow collections.
@@ -46,6 +74,7 @@ pub(crate) fn parse_scalar_with_tokens(
                 // Validate indentation indicator range if present: must be a single digit 1-9
                 let header_meta = s[1..].trim();
                 let digits: String = header_meta.chars().filter(|c| c.is_ascii_digit()).collect();
+                let has_explicit_indent_indicator = !digits.is_empty();
                 if !digits.is_empty() {
                     if digits.len() != 1 || digits.chars().next().unwrap() == '0' {
                         return Err(syntax_error(
@@ -122,22 +151,50 @@ pub(crate) fn parse_scalar_with_tokens(
                         _ => break,
                     }
                 }
-                // YAML test 5LLU: if any blank line *before* the first content line is more
-                // indented than that first content line, the scalar is invalid. Enforce this
-                // as an indentation error so those cases no longer parse successfully.
+                // YAML test 5LLU: if multiple blank lines *before* the first content
+                // line are more indented than that first content line, the scalar is
+                // invalid. Enforce this as an indentation error so those cases no
+                // longer parse successfully.
                 if let Some(first_indent) = first_content_indent {
                     if blank_lines_before_content >= 2
                         && max_blank_indent_before_content > first_indent
                     {
                         let msg = format!(
-                            "Blank lines before block scalar content are more indented than the content (blank max: {}, first content indent: {})",
+                            "Invalid indentation in block scalar: blank lines before block scalar content are more indented than the content (blank max: {}, first content indent: {})",
                             max_blank_indent_before_content, first_indent
                         );
                         return Err(indentation_error(stream.source_mut(), &msg));
                     }
+                } else if blank_lines_before_content > 0 && max_blank_indent_before_content > 0 {
+                    // YAML test S98Z: an "empty" block scalar header followed only by
+                    // indented blank lines (no actual content lines) should be treated
+                    // as invalid. Without any content to anchor the indentation level,
+                    // these indented blanks are considered a malformed block scalar.
+                    let msg = format!(
+                        "Invalid empty block scalar: indented blank lines without any content (blank max indent: {})",
+                        max_blank_indent_before_content
+                    );
+                    return Err(indentation_error(stream.source_mut(), &msg));
                 }
                 // Build result as header + newline + joined lines; no folding here.
                 let indicator = block_header.chars().next().unwrap();
+                // YAML test W9L4: literal block scalar where a single blank line before
+                // the first content line is more indented than the content itself,
+                // without an explicit indentation indicator. Treat this as an
+                // indentation error while keeping spec examples like R4YG valid.
+                if indicator == '|' && !has_explicit_indent_indicator {
+                    if let Some(first_indent) = first_content_indent {
+                        if blank_lines_before_content >= 1
+                            && max_blank_indent_before_content > first_indent
+                        {
+                            let msg = format!(
+                                "Invalid indentation in literal block scalar: blank lines before content are more indented than the content (blank max: {}, first content indent: {})",
+                                max_blank_indent_before_content, first_indent
+                            );
+                            return Err(indentation_error(stream.source_mut(), &msg));
+                        }
+                    }
+                }
                 let style = if indicator == '|' {
                     BlockStyle::Literal
                 } else {
@@ -314,5 +371,20 @@ mod tests {
         assert!(
             matches!(node, Node::Str(ref s, QuoteType::Unquoted, BlockStyle::Literal) if s.contains("a") && s.contains("b"))
         );
+    }
+
+    #[test]
+    fn test_block_scalar_w9l4_like_indentation_errors() {
+        // W9L4-style literal block scalar where a blank line before the first
+        // content line is more indented than the content itself. This should
+        // be rejected as an indentation error.
+        let directives = DirectiveContext::new();
+        let value = "|\n     \n  more spaces at the beginning\n  are invalid\n";
+        let mut source = Buffer::new(value.as_bytes());
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+        let res = parse_scalar_with_tokens(&mut stream, &directives, 0);
+        assert!(res.is_err());
+        let err = res.unwrap_err();
+        assert!(err.contains("indentation"));
     }
 }
