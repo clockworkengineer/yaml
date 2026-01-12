@@ -864,6 +864,17 @@ impl<'a> Lexer<'a> {
                         self.source.next();
                     } else {
                         // End of quoted string
+                        // SU5Z: A comment character '#' immediately after a
+                        // closing quoted scalar without any separating
+                        // whitespace is invalid. Detect this here so that we
+                        // can report a clear syntax error instead of
+                        // silently treating it as a valid comment.
+                        if let Some(CHAR_HASH) = self.source.current() {
+                            return Err(crate::parser::document::error_builder::syntax_error(
+                                self.source,
+                                "YAML syntax error: comment must be separated from quoted scalar by whitespace",
+                            ));
+                        }
                         break;
                     }
                 }
@@ -1097,6 +1108,17 @@ impl<'a> Lexer<'a> {
                 }
                 Some(CHAR_DOUBLE_QUOTE) => {
                     self.source.next();
+                    // SU5Z: A comment character '#' immediately after a
+                    // closing quoted scalar without any separating
+                    // whitespace is invalid. Detect this here so that we
+                    // can report a clear syntax error instead of
+                    // silently treating it as a valid comment.
+                    if let Some(CHAR_HASH) = self.source.current() {
+                        return Err(crate::parser::document::error_builder::syntax_error(
+                            self.source,
+                            "YAML syntax error: comment must be separated from quoted scalar by whitespace",
+                        ));
+                    }
                     break;
                 }
                 Some(ch) => {

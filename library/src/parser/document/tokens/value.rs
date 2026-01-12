@@ -449,6 +449,16 @@ pub fn parse_value_with_tokens(
         }
 
         if let Some(anchor_name) = decorators.anchor {
+            // SR86 / SU74: YAML 1.2 does not allow anchors to be applied
+            // directly to alias nodes (e.g., "&b *a" or "&b *alias : v").
+            // If the decorated value resolved to an alias, treat this as a
+            // structural error rather than accepting an anchored alias.
+            if matches!(result, Node::Alias(_)) {
+                return Err(structure_error(
+                    stream.source_mut(),
+                    "Invalid anchored alias: anchors cannot be applied to alias nodes",
+                ));
+            }
             if matches!(result, Node::Anchored(_, _)) {
                 return Err(structure_error(
                     stream.source_mut(),

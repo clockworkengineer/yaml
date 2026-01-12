@@ -60,6 +60,51 @@ fn parse_document_main_loop(
             '#' => {
                 let mut stream =
                     crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+
+                // Consume consecutive comment tokens starting at this position
+                while matches!(stream.current(), Some(crate::parser::lexer::Token::Comment(_))) {
+                    stream.next()?;
+                }
+
+                // If the comment is followed by a newline, inspect the indentation
+                // of the next line to catch patterns like 8XDJ where an indented
+                // scalar appears after a top-level comment with no enclosing
+                // block structure. In such cases, the official YAML test suite
+                // expects an error rather than silently treating the indented
+                // scalar as a separate top-level document node.
+                if let Some(crate::parser::lexer::Token::Newline) = stream.current() {
+                    // Move to the first token on the following line
+                    stream.next()?;
+                    match stream.current().cloned() {
+                        Some(crate::parser::lexer::Token::Indent(level)) if level > indent_level => {
+                            // Consume the Indent token, then skip any additional
+                            // newlines or comments to see what real content follows.
+                            stream.next()?;
+                            stream.skip_newlines_and_comments()?;
+                            match stream.current() {
+                                // If the next significant token is a value-like token
+                                // (plain scalar or the start of a flow collection),
+                                // report this as invalid indented content after a
+                                // top-level comment.
+                                Some(crate::parser::lexer::Token::Plain(_))
+                                | Some(crate::parser::lexer::Token::SingleQuoted(_))
+                                | Some(crate::parser::lexer::Token::DoubleQuoted(_))
+                                | Some(crate::parser::lexer::Token::FlowMappingStart)
+                                | Some(crate::parser::lexer::Token::FlowSequenceStart) => {
+                                    return Err(crate::parser::document::helpers::parse_error_token(
+                                        &stream,
+                                        "Unexpected indented content after top-level comment.",
+                                    ));
+                                }
+                                _ => {}
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                // Preserve existing behavior of skipping over the comment and
+                // any associated trivia before continuing the main loop.
                 stream.skip_trivia()?;
                 continue;
             }

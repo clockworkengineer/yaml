@@ -1,6 +1,7 @@
 use crate::nodes::node::Node;
 use crate::nodes::node::{BlockStyle, QuoteType};
 use crate::parser::directives::DirectiveContext;
+use crate::parser::document::error_builder::structure_error;
 use crate::parser::document::node_utils::force_key_to_string;
 use crate::parser::document::tokens::value::parse_value_with_tokens;
 use crate::parser::lexer::Token;
@@ -278,6 +279,27 @@ pub fn parse_mapping_with_tokens(
                     stack.len()
                 ));
                 if level > current_indent {
+                    // Only allow a new nested mapping when the last key at this
+                    // indentation level has an empty value (Node::None). This
+                    // matches YAML's rule that an indented block value may only
+                    // follow a key whose value is provided via a nested block
+                    // (i.e., after a "key:" line with no scalar on the same
+                    // line). For cases like 8XDJ, where the key already has a
+                    // scalar value on the same line, an additional more-indented
+                    // line should not start a nested mapping and is instead
+                    // treated as invalid.
+                    let allow_nested = stack
+                        .last()
+                        .and_then(|(_, pairs)| pairs.last())
+                        .map(|(_, v)| matches!(v, Node::None))
+                        .unwrap_or(false);
+                    if !allow_nested {
+                        return Err(structure_error(
+                            stream.source_mut(),
+                            "Invalid indentation: nested mapping value is only allowed after a key with an empty value",
+                        ));
+                    }
+
                     // New nested mapping: push to stack
                     #[cfg(feature = "debug-trace")]
                     mapping_log(format!(
@@ -460,6 +482,23 @@ fn parse_mapping_pair(
                     key_node = Node::Tagged(Box::new(key_node), tag);
                 }
                 if let Some(anchor) = decorators.anchor {
+                    // SU74: YAML 1.2 does not allow anchors to be applied
+                    // directly to alias nodes in key position (e.g.,
+                    // "&b *alias : value"). Treat such constructs as
+                    // structural errors rather than accepting an
+                    // "anchored alias" key.
+                    if matches!(key_node, Node::Alias(_)) {
+                        return Err(structure_error(
+                            stream.source_mut(),
+                            "Invalid anchored alias key: anchors cannot be applied to alias nodes",
+                        ));
+                    }
+                    if matches!(key_node, Node::Anchored(_, _)) {
+                        return Err(structure_error(
+                            stream.source_mut(),
+                            "A mapping key cannot have multiple anchors",
+                        ));
+                    }
                     key_node = Node::Anchored(Box::new(key_node), anchor);
                 }
                 key_node

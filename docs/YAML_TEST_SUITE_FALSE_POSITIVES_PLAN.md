@@ -184,9 +184,9 @@ Planned steps:
 
 Current yaml-test-suite quiet runner baseline (data-2022-01-17, limit 402):
 
-- Passed: **337**
-- Failed: **65** (all "expected: error, got: success")
-- Pass rate: **83.8%**
+- Passed: **341**
+- Failed: **61** (all "expected: error, got: success")
+- Pass rate: **84.8%**
 
 Notable fixed IDs so far:
 
@@ -196,6 +196,10 @@ Notable fixed IDs so far:
 - `W9L4` (Literal block scalar with more spaces in first line) now correctly fails to parse due to invalid indentation.
 - `X4QW` (Comment without whitespace after block scalar indicator) now correctly fails to parse due to an invalid block scalar header.
 - `S4GJ` (Folded block scalar with invalid text after the indicator on the header line) now correctly fails to parse due to an invalid block scalar header.
+ - `SU5Z` (Comment without whitespace after a quoted scalar) now correctly fails to parse due to a syntax error that enforces required whitespace before comments after scalars.
+ - `S98Z` (Empty block scalar with a staircase of indented blank lines and a less-indented comment) now correctly fails to parse due to an indentation error in the block scalar content.
+ - `SR86` (Anchors applied to an alias in a value position) now correctly fails to parse because anchors cannot be applied to alias nodes.
+ - `SU74` (Anchors applied to an alias in a mapping key/value position) now correctly fails to parse because anchors cannot be applied to alias nodes.
 
 ---
 

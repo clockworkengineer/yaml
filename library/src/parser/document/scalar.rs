@@ -165,14 +165,22 @@ pub(crate) fn parse_scalar_with_tokens(
                         );
                         return Err(indentation_error(stream.source_mut(), &msg));
                     }
-                } else if blank_lines_before_content > 0 && max_blank_indent_before_content > 0 {
-                    // YAML test S98Z: an "empty" block scalar header followed only by
-                    // indented blank lines (no actual content lines) should be treated
-                    // as invalid. Without any content to anchor the indentation level,
-                    // these indented blanks are considered a malformed block scalar.
+                } else if blank_lines_before_content >= 3
+                    && max_blank_indent_before_content > 0
+                    && pending_indent_for_line
+                        .map_or(false, |comment_indent| comment_indent < max_blank_indent_before_content)
+                {
+                    // YAML test S98Z: a block scalar header followed only by *increasingly*
+                    // indented blank lines (e.g., 1, 2, 3 spaces) followed by a less-indented
+                    // comment line is considered invalid. Without any content line to anchor
+                    // the indentation level, this "staircase" of indented blanks forms a
+                    // malformed block scalar and should be rejected, while valid cases like
+                    // 4QFQ/R4YG (which have fewer blanks and a comment aligned with the last
+                    // blank indent) remain accepted.
                     let msg = format!(
-                        "Invalid empty block scalar: indented blank lines without any content (blank max indent: {})",
-                        max_blank_indent_before_content
+                        "Invalid empty block scalar: malformed indented blank lines without any content (blank max indent: {}, following indent: {:?})",
+                        max_blank_indent_before_content,
+                        pending_indent_for_line
                     );
                     return Err(indentation_error(stream.source_mut(), &msg));
                 }
