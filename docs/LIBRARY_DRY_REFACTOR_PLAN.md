@@ -52,8 +52,8 @@ This plan complements, but does not replace, the existing internal notes in [doc
   - [ ] Optionally enrich `YamlError` with line/column when available.
 - [x] Add thin conversion functions for legacy callers that still expect `String`:
   - [x] `fn to_string_error(err: YamlError) -> String` for transitional use.
-- [ ] Gradually migrate document parsing functions from `Result<T, String>` to `ParseResult<T>` starting at the leaves (block/inline value parsing, anchor/tag helpers) and moving up to `parse_document`.
-  - [x] Convert core document helpers to `ParseResult<T>`: `parse_document_main_loop`, `parse_document_contents`, `parse_value`, `parse_mapping`, `parse_sequence`, `is_document_marker`, `is_doc_end`.
+  - [ ] Gradually migrate document parsing functions from `Result<T, String>` to `ParseResult<T>` starting at the leaves (block/inline value parsing, anchor/tag helpers) and moving up to `parse_document`.
+  - [x] Convert core document helpers to `ParseResult<T>`: `parse_document_main_loop`, `parse_document_contents`, `parse_value`, `parse_mapping`, `parse_sequence`, `is_document_marker`, `is_doc_end`, and anchor/merge helpers in `document/anchors.rs`.
 
 ### 1.2 Centralize structure/indentation/limit error text
 
@@ -66,7 +66,7 @@ This plan complements, but does not replace, the existing internal notes in [doc
   - [x] `fn tab_indentation_error(source: &mut dyn ISource) -> YamlError`
   - [x] `fn invalid_comment_spacing_error(...) -> YamlError`
   - [x] `fn mapping_key_error(...) -> YamlError`
-- [ ] Replace ad-hoc `return Err(structure_error(...))`/`forbidden_error` calls across document parsing with these new helpers to ensure consistent wording and category mapping.
+- [x] Replace ad-hoc `return Err(structure_error(...))`/`forbidden_error` calls across document parsing with these new helpers to ensure consistent wording and category mapping.
   - [x] Use `mapping_key_error_yaml` + `to_string_error` for mapping-key and anchored-mapping structural errors in token-based mapping/value/inline parsers and H7J7 document post-check.
 
 ---
@@ -81,8 +81,8 @@ This plan complements, but does not replace, the existing internal notes in [doc
 
 **Plan:**
 - [ ] Promote `validate_indentation_tokens` to a public (within parser) utility in [parser/utils](../library/src/parser/utils):
-  - [ ] Move it into a new `indentation.rs` or `validation.rs` module under `parser/utils`.
-  - [ ] Keep `ParsingContext` in [parser/document/context.rs](../library/src/parser/document/context.rs) as the shared context struct.
+  - [x] Move it into a new `indentation.rs` module under `parser/utils` and expose it via `parser::utils::indentation::validate_indentation_tokens`.
+  - [x] Keep `ParsingContext` in [parser/document/context.rs](../library/src/parser/document/context.rs) as the shared context struct, and use it from the shared indentation utility.
 - [ ] Standardize a small set of entry-points:
   - [ ] `validate_indentation_at_line_start(stream: &TokenStream, ctx: &ParsingContext)`
   - [ ] `validate_trailing_content_after_document_end(stream: &mut TokenStream)` (wrapping `validate_no_inline_content_after_document_end`).
@@ -94,9 +94,10 @@ This plan complements, but does not replace, the existing internal notes in [doc
 - There are overlapping concepts between `peek_ahead_for_mapping_key` and `classify_block_head` in [helpers.rs](../library/src/parser/document/helpers.rs), plus legacy character-based checks.
 
 **Plan:**
-- [ ] Finalize `BlockHeadKind`/`classify_block_head` as the single classifier API.
+- [x] Finalize `BlockHeadKind`/`classify_block_head` as the single classifier API.
+  - [x] Use `classify_block_head` in `parse_document_contents` to centralize head decisions for mappings/sequences/plain scalars/quoted keys.
 - [ ] Replace remaining character-level lookahead branches in [parser/document/value.rs](../library/src/parser/document/value.rs), [parser/document/mapping.rs](../library/src/parser/document/mapping.rs), and [parser/document/sequence.rs](../library/src/parser/document/sequence.rs) with calls to `classify_block_head`.
-- [ ] Keep `peek_ahead_for_mapping_key` as an implementation detail of `classify_block_head` (not called directly from higher-level parse functions).
+- [x] Keep `peek_ahead_for_mapping_key` as an implementation detail of `classify_block_head` (not called directly from higher-level parse functions).
 
 ### 2.3 DRY comment handling and trivia skipping
 
@@ -108,8 +109,8 @@ This plan complements, but does not replace, the existing internal notes in [doc
 - [ ] In `TokenStream` (see [parser/token_stream.rs](../library/src/parser/token_stream.rs)), harden/extend helpers:
   - [ ] `skip_trivia()` (whitespace + comments + newlines as appropriate).
   - [ ] `skip_newlines_and_comments()` as already used.
-- [ ] Introduce a dedicated helper for top-level comment + indentation validation (used by `8XDJ`, etc.), e.g. in `parser/utils/visit.rs` or a new `parser/utils/comments.rs`.
-- [ ] Replace ad-hoc comment loops in `parse_document_main_loop` and any other document-level scanners with this shared helper.
+- [x] Introduce a dedicated helper for top-level comment + indentation validation (used by `8XDJ`, etc.) in `parser/utils/comments.rs` and use it from `parse_document_main_loop`.
+- [x] Replace the ad-hoc 8XDJ comment loop in `parse_document_main_loop` with this shared helper.
 
 ---
 

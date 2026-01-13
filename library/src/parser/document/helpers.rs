@@ -4,6 +4,7 @@ use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::nodes::node::Node::Document;
 use crate::parser::document::context::ParsingContext;
+use crate::parser::ParseResult;
 
 /// Creates a formatted error message with current token context information (TokenStream-based).
 ///
@@ -46,39 +47,13 @@ pub(crate) fn validate_indentation_and_whitespace(
     source: &mut dyn ISource,
     directives: &crate::parser::directives::DirectiveContext,
     ctx: &ParsingContext,
-) -> Result<(), String> {
-    use crate::parser::token_stream::TokenStream;
-
+) -> ParseResult<()> {
     let state = source.save_state();
-    let stream = TokenStream::new(source, directives, false)?;
-    let result = validate_indentation_tokens(&stream, ctx);
+    let stream = crate::parser::token_stream::TokenStream::new(source, directives, false)
+        .map_err(crate::error::YamlError::from)?;
+    let result = crate::parser::utils::indentation::validate_indentation_tokens(&stream, ctx);
     source.restore_state(state);
     result
-}
-
-/// Token-based indentation validation using `TokenStream`.
-///
-/// At the moment this function is intentionally minimal and only set up as a
-/// customization point; it will be extended to enforce stricter
-/// indentation/whitespace rules (using `ParsingContext`) as we work through
-/// the official YAML test suite false positives.
-fn validate_indentation_tokens(stream: &TokenStream, ctx: &ParsingContext) -> Result<(), String> {
-    if ctx.in_flow {
-        return Ok(());
-    }
-    if !ctx.should_validate_tab_indentation() {
-        return Ok(());
-    }
-    if let Some(Token::Indent(_)) = stream.current() {
-        // In YAML, indentation is always spaces. Tabs are forbidden.
-        // If the lexer encodes tab usage in Indent tokens, we can extend this
-        // function to report an error when tabs are used for indentation.
-        // Until then, this function is effectively a no-op and serves as a
-        // centralized place to evolve indentation rules.
-        Ok(())
-    } else {
-        Ok(())
-    }
 }
 
 /// Skips whitespace characters in the source.
@@ -104,7 +79,10 @@ pub(crate) fn validate_no_tab_indentation_tokens(
     stream: &TokenStream,
     ctx: &ParsingContext,
 ) -> Result<(), String> {
-    validate_indentation_tokens(stream, ctx)
+    // Legacy wrapper: keep String-based result for older call sites by
+    // mapping the internal YamlError back to String.
+    crate::parser::utils::indentation::validate_indentation_tokens(stream, ctx)
+        .map_err(|e| e.to_string())
 }
 
 /// Determines if a node represents blank or empty content.
@@ -430,7 +408,7 @@ mod tests {
         ctx.mark_newline_consumed();
 
         let directives = crate::parser::directives::DirectiveContext::new();
-        let result = validate_indentation_tokens(
+        let result = crate::parser::utils::indentation::validate_indentation_tokens(
             &TokenStream::new(&mut source, &directives, false)
                 .expect("TokenStream creation failed"),
             &ctx,
@@ -455,7 +433,7 @@ mod tests {
             panic!("TokenStream should allow tabs in flow context");
         }
         let stream = ts_result.unwrap();
-        let result = validate_indentation_tokens(&stream, &ctx);
+        let result = crate::parser::utils::indentation::validate_indentation_tokens(&stream, &ctx);
         assert!(result.is_ok(), "Tabs should be allowed in flow context");
     }
 
@@ -477,7 +455,7 @@ mod tests {
             panic!("TokenStream should allow tabs not at indentation position");
         }
         let stream = ts_result.unwrap();
-        let result = validate_indentation_tokens(&stream, &ctx);
+        let result = crate::parser::utils::indentation::validate_indentation_tokens(&stream, &ctx);
         assert!(result.is_ok(), "Tabs OK when not at indentation position");
     }
 
@@ -506,7 +484,7 @@ mod tests {
         ctx.mark_newline_consumed();
 
         let directives = crate::parser::directives::DirectiveContext::new();
-        let result = validate_indentation_tokens(
+        let result = crate::parser::utils::indentation::validate_indentation_tokens(
             &TokenStream::new(&mut source, &directives, false)
                 .expect("TokenStream creation failed"),
             &ctx,

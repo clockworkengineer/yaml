@@ -5,13 +5,14 @@ use crate::parser::directives::parse_directives;
 
 use crate::parser::document::helpers;
 use crate::parser::document::main_loop::parse_document;
+use crate::parser::ParseResult;
 
 /// Checks for and processes the document start marker (---).
 /// Returns an error if invalid content is found after the marker.
 fn parse_document_markers(
     source: &mut dyn ISource,
     directives: &crate::parser::directives::DirectiveContext,
-) -> Result<(), String> {
+) -> ParseResult<()> {
     // Check for document start marker (---)
     let has_document_marker = {
         let st = source.save_state();
@@ -64,17 +65,21 @@ fn parse_document_markers(
                 Some(crate::parser::lexer::Token::Plain(_)) => {
                     // Check if next token is Colon (indicating a mapping key)
                     if let Some(crate::parser::lexer::Token::Colon) = ts.peek().ok().flatten() {
-                        return Err(helpers::parse_error_token(
-                            &ts,
-                            "Mapping keys are not allowed on the same line as document start marker (---).",
+                        return Err(crate::error::YamlError::from(
+                            helpers::parse_error_token(
+                                &ts,
+                                "Mapping keys are not allowed on the same line as document start marker (---).",
+                            ),
                         ));
                     }
                     // Otherwise, it's a plain scalar which is allowed
                 }
                 Some(crate::parser::lexer::Token::Colon) => {
-                    return Err(helpers::parse_error_token(
-                        &ts,
-                        "Mapping keys are not allowed on the same line as document start marker (---).",
+                    return Err(crate::error::YamlError::from(
+                        helpers::parse_error_token(
+                            &ts,
+                            "Mapping keys are not allowed on the same line as document start marker (---).",
+                        ),
                     ));
                 }
                 _ => {
@@ -96,7 +101,7 @@ fn parse_document_markers(
 fn parse_document_end_marker(
     source: &mut dyn ISource,
     directives: &crate::parser::directives::DirectiveContext,
-) -> Result<(), String> {
+) -> ParseResult<()> {
     crate::utils::skip_whitespace_and_comments(source);
     let has_document_end = {
         let st = source.save_state();
@@ -128,9 +133,11 @@ fn parse_document_end_marker(
                 Some(_) => {
                     let ts =
                         crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-                    return Err(helpers::parse_error_token(
-                        &ts,
-                        "Invalid content after document end marker (...)",
+                    return Err(crate::error::YamlError::from(
+                        helpers::parse_error_token(
+                            &ts,
+                            "Invalid content after document end marker (...)",
+                        ),
                     ));
                 }
             }
@@ -153,7 +160,7 @@ fn parse_document_end_marker(
 fn check_explicit_directives(
     source: &mut dyn ISource,
     directives: &crate::parser::directives::DirectiveContext,
-) -> Result<(), String> {
+) -> ParseResult<()> {
     let has_explicit_directives =
         directives.yaml_version.is_some() || directives.tag_prefixes.len() > 2;
     if has_explicit_directives {
@@ -167,9 +174,11 @@ fn check_explicit_directives(
             | None => {
                 source.restore_state(st);
                 let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-                return Err(helpers::parse_error_token(
-                    &ts,
-                    "Directive must be followed by a document",
+                return Err(crate::error::YamlError::from(
+                    helpers::parse_error_token(
+                        &ts,
+                        "Directive must be followed by a document",
+                    ),
                 ));
             }
             _ => {}
@@ -216,7 +225,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
         directives
             .tag_prefixes
             .extend(parsed_directives.tag_prefixes);
-        check_explicit_directives(source, &directives)?;
+        check_explicit_directives(source, &directives).map_err(|e| e.to_string())?;
 
         // Detect if there is a document start marker (---) at the current position
         let has_document_start = {
@@ -230,7 +239,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
             res
         };
 
-        let marker_res = parse_document_markers(source, &directives);
+        let marker_res = parse_document_markers(source, &directives).map_err(|e| e.to_string());
         #[cfg(feature = "debug-trace")]
         log::debug!("parse: parse_document_markers result: {:?}", marker_res);
         if let Err(err) = marker_res {
@@ -253,7 +262,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
                 );
                 source.restore_state(st2);
                 if next_is_start {
-                    parse_document_markers(source, &directives)?;
+                    parse_document_markers(source, &directives).map_err(|e| e.to_string())?;
                     // continue the loop to collapse runs of '---'
                     continue;
                 }
@@ -380,7 +389,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
                 return Err(err);
             }
         }
-        parse_document_end_marker(source, &directives)?;
+        parse_document_end_marker(source, &directives).map_err(|e| e.to_string())?;
         if !source.more() {
             break;
         }

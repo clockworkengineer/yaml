@@ -2,10 +2,11 @@ use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::parser::document::error_builder::syntax_error;
 use crate::parser::document::node_utils::normalize_node_to_str;
+use crate::parser::ParseResult;
 
 /// Parses a single explicit key from the source and normalizes it to a string node.
 #[allow(dead_code)]
-fn parse_and_normalize_explicit_key(source: &mut dyn ISource) -> Result<Node, String> {
+fn parse_and_normalize_explicit_key(source: &mut dyn ISource) -> ParseResult<Node> {
     let directives_local = crate::parser::directives::DirectiveContext::new();
     {
         let mut stream =
@@ -52,7 +53,8 @@ pub fn parse_multiple_explicit_keys(
         let (key, value) = crate::parser::document::explicit_key::parse_explicit_mapping_entry(
             &mut stream,
             &directives_local,
-        )?;
+        )
+        .map_err(|e| e.to_string())?;
         pairs.push((key, value));
         stream.skip_trivia()?;
         // Only continue if next token is another explicit key at the same indent
@@ -82,15 +84,15 @@ pub(crate) fn is_explicit_key_start(stream: &mut TokenStream) -> bool {
 pub(crate) fn parse_explicit_mapping_entry(
     stream: &mut TokenStream,
     directives: &crate::parser::directives::DirectiveContext,
-) -> Result<(Node, Node), String> {
+) -> ParseResult<(Node, Node)> {
     // Check for explicit key indicator
     if !is_explicit_key_start(stream) {
         // Use stream.current() for error context since TokenStream.lexer is private
         let cur = stream.current().cloned();
-        return Err(syntax_error(
+        return Err(crate::error::YamlError::from(syntax_error(
             stream.source_mut(),
             &format!("Expected '?' token for explicit key, got {:?}", cur),
-        ));
+        )));
     }
     stream.next()?;
     stream.skip_trivia()?;
@@ -152,7 +154,8 @@ pub(crate) fn collect_explicit_keys_block(
         if !matches!(stream.current(), Some(Token::QuestionMark)) {
             break;
         }
-        let (key, value) = parse_explicit_mapping_entry(stream, directives)?;
+        let (key, value) = parse_explicit_mapping_entry(stream, directives)
+            .map_err(|e| e.to_string())?;
         pairs.push((key, value));
         // Continue loop to fetch next explicit key at same level
     }

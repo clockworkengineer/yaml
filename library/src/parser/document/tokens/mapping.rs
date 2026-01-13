@@ -1,9 +1,7 @@
 use crate::nodes::node::Node;
 use crate::nodes::node::{BlockStyle, QuoteType};
 use crate::parser::directives::DirectiveContext;
-use crate::parser::document::error_builder::{
-    mapping_key_error_yaml, structure_error, to_string_error,
-};
+use crate::parser::document::error_builder::{mapping_key_error_yaml, to_string_error};
 use crate::parser::document::node_utils::force_key_to_string;
 use crate::parser::document::tokens::value::parse_value_with_tokens;
 use crate::parser::lexer::Token;

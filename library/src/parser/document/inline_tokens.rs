@@ -6,7 +6,7 @@ use crate::parser::document::node_utils::make_set_node;
 
 use crate::nodes::node::Node;
 use crate::parser::directives::DirectiveContext;
-use crate::parser::document::error_builder::{structure_error, syntax_error};
+use crate::parser::document::error_builder::syntax_error;
 use crate::parser::document::tokens::value::parse_value_with_tokens;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;

@@ -1,6 +1,7 @@
 use crate::error::YamlError;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
+use crate::parser::ParseResult;
 use crate::parser::directives::DirectiveContext;
 use crate::parser::document::context::{CollectionType, ParsingContext};
 use crate::parser::document::explicit_key::parse_multiple_explicit_keys;
@@ -8,7 +9,6 @@ use crate::parser::document::helpers;
 use crate::parser::document::helpers::BlockHeadKind;
 use crate::parser::document::mapping::parse_mapping;
 use crate::parser::document::value::parse_value;
-use crate::parser::ParseResult;
 
 /// Parse a top-level plain scalar spanning multiple non-empty lines, using
 /// YAML's plain line folding rules (spec example 7.12 / HS5T).
@@ -271,7 +271,12 @@ pub fn parse_document_contents(
                     indent_level, map_indent
                 )));
             }
-            if helpers::peek_ahead_for_mapping_key(source, directives) {
+            // Delegate to the block head classifier to decide whether
+            // this line begins a mapping key (e.g., plain/quoted key
+            // followed by ':' at the appropriate indentation) rather
+            // than re-running a separate token-based lookahead here.
+            // This keeps the decision centralized in `classify_block_head`.
+            if matches!(head_kind, BlockHeadKind::BlockMapping) {
                 Ok(parse_mapping(source, map_indent, directives)?)
             } else {
                 Ok(parse_value(source, directives)?)

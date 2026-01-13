@@ -5,7 +5,6 @@ use crate::nodes::node::QuoteType;
 use crate::parser::ParseResult;
 use crate::parser::directives::DirectiveContext;
 use crate::parser::document::contents::parse_document_contents;
-use crate::parser::document::error_builder::structure_error;
 use crate::parser::document::helpers::node_is_blank;
 
 /// Checks if the current position is at a document marker (--- or ...).
@@ -61,60 +60,11 @@ fn parse_document_main_loop(
         }
         match c {
             '#' => {
-                let mut stream =
-                    crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-
-                // Consume consecutive comment tokens starting at this position
-                while matches!(
-                    stream.current(),
-                    Some(crate::parser::lexer::Token::Comment(_))
-                ) {
-                    stream.next()?;
-                }
-
-                // If the comment is followed by a newline, inspect the indentation
-                // of the next line to catch patterns like 8XDJ where an indented
-                // scalar appears after a top-level comment with no enclosing
-                // block structure. In such cases, the official YAML test suite
-                // expects an error rather than silently treating the indented
-                // scalar as a separate top-level document node.
-                if let Some(crate::parser::lexer::Token::Newline) = stream.current() {
-                    // Move to the first token on the following line
-                    stream.next()?;
-                    match stream.current().cloned() {
-                        Some(crate::parser::lexer::Token::Indent(level))
-                            if level > indent_level =>
-                        {
-                            // Consume the Indent token, then skip any additional
-                            // newlines or comments to see what real content follows.
-                            stream.next()?;
-                            stream.skip_newlines_and_comments()?;
-                            match stream.current() {
-                                // If the next significant token is a value-like token
-                                // (plain scalar or the start of a flow collection),
-                                // report this as invalid indented content after a
-                                // top-level comment.
-                                Some(crate::parser::lexer::Token::Plain(_))
-                                | Some(crate::parser::lexer::Token::SingleQuoted(_))
-                                | Some(crate::parser::lexer::Token::DoubleQuoted(_))
-                                | Some(crate::parser::lexer::Token::FlowMappingStart)
-                                | Some(crate::parser::lexer::Token::FlowSequenceStart) => {
-                                    let msg = crate::parser::document::helpers::parse_error_token(
-                                        &stream,
-                                        "Unexpected indented content after top-level comment.",
-                                    );
-                                    return Err(crate::error::YamlError::from(msg));
-                                }
-                                _ => {}
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-
-                // Preserve existing behavior of skipping over the comment and
-                // any associated trivia before continuing the main loop.
-                stream.skip_trivia()?;
+                crate::parser::utils::comments::validate_top_level_comment_followed_by_indented_content(
+                    source,
+                    directives,
+                    indent_level,
+                )?;
                 continue;
             }
             '%' => {
@@ -186,7 +136,9 @@ pub fn parse_document(
             });
 
             if has_anchored_empty_value && has_top_level_map_tagged_key {
-                use crate::parser::document::error_builder::{mapping_key_error_yaml, to_string_error};
+                use crate::parser::document::error_builder::{
+                    mapping_key_error_yaml, to_string_error,
+                };
                 return Err(to_string_error(mapping_key_error_yaml(
                     source,
                     "Invalid anchored mapping value: node-anchor-not-indented (H7J7) where an anchor attaches only to an empty scalar and a separate !!map mapping appears at the same mapping level.",

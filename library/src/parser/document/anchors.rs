@@ -1,6 +1,7 @@
 // Module: parser/document/anchors.rs
 
 use crate::nodes::node::Node;
+use crate::parser::ParseResult;
 use std::collections::HashMap;
 
 /// Recursively collects all anchor definitions from a YAML document tree.
@@ -21,7 +22,7 @@ use std::collections::HashMap;
 pub(crate) fn collect_anchors(
     node: &Node,
     anchors: &mut HashMap<String, Node>,
-) -> Result<(), String> {
+) -> ParseResult<()> {
     let mut err: Option<String> = None;
     let mut collect = |n: &Node| {
         if let Node::Anchored(inner, name) = n {
@@ -34,7 +35,7 @@ pub(crate) fn collect_anchors(
         }
     };
     crate::parser::utils::visit::visit(node, &mut collect);
-    if let Some(e) = err { Err(e) } else { Ok(()) }
+    if let Some(e) = err { Err(crate::error::YamlError::from(e)) } else { Ok(()) }
 }
 
 /// Recursively replaces all alias references with their corresponding anchor values.
@@ -55,7 +56,7 @@ pub(crate) fn collect_anchors(
 pub(crate) fn replace_aliases(
     node: &mut Node,
     anchors: &HashMap<String, Node>,
-) -> Result<(), String> {
+) -> ParseResult<()> {
     let mut err: Option<String> = None;
     let mut replacer = |n: &mut Node| match n {
         Node::Alias(name) => {
@@ -76,7 +77,7 @@ pub(crate) fn replace_aliases(
         _ => {}
     };
     crate::parser::utils::visit::visit_mut(node, &mut replacer);
-    if let Some(e) = err { Err(e) } else { Ok(()) }
+    if let Some(e) = err { Err(crate::error::YamlError::from(e)) } else { Ok(()) }
 }
 
 /// Expands YAML merge keys (<<) by incorporating referenced mapping values.
@@ -97,7 +98,7 @@ pub(crate) fn replace_aliases(
 pub(crate) fn expand_merge_keys(
     node: &mut Node,
     anchors: &HashMap<String, Node>,
-) -> Result<(), String> {
+) -> ParseResult<()> {
     let mut err: Option<String> = None;
     let mut expander = |n: &mut Node| {
         if let Node::Mapping(pairs) = n {
@@ -250,5 +251,5 @@ pub(crate) fn expand_merge_keys(
         }
     };
     crate::parser::utils::visit::visit_mut(node, &mut expander);
-    if let Some(e) = err { Err(e) } else { Ok(()) }
+    if let Some(e) = err { Err(crate::error::YamlError::from(e)) } else { Ok(()) }
 }
