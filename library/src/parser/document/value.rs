@@ -2,6 +2,7 @@
 
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
+use crate::parser::ParseResult;
 
 /// Validates if a string is valid base64 format
 
@@ -20,11 +21,11 @@ use crate::nodes::node::Node;
 ///
 /// # Returns
 ///
-/// Result containing the parsed Node value or an error string
+/// Internal `ParseResult` containing the parsed Node value.
 pub(crate) fn parse_value(
     source: &mut dyn ISource,
     directives: &crate::parser::directives::DirectiveContext,
-) -> Result<Node, String> {
+) -> ParseResult<Node> {
     // Selectively route to token-based parser for patterns that benefit:
     // - Decorators on empty values (FH7J, PW8X)
     // - Flow collections (better token boundaries)
@@ -35,5 +36,6 @@ pub(crate) fn parse_value(
     use crate::parser::token_stream::TokenStream;
 
     let mut stream = TokenStream::new(source, directives, false)?;
-    return parse_value_with_tokens(&mut stream, directives, 0);
+    let node = parse_value_with_tokens(&mut stream, directives, 0)?;
+    Ok(node)
 }

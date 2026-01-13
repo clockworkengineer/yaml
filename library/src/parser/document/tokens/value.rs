@@ -5,7 +5,9 @@
 
 use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
 use crate::parser::directives::DirectiveContext;
-use crate::parser::document::error_builder::{structure_error, syntax_error};
+use crate::parser::document::error_builder::{
+    mapping_key_error_yaml, structure_error, syntax_error, to_string_error,
+};
 const MAX_NESTING_DEPTH: usize = 128;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
@@ -454,16 +456,16 @@ pub fn parse_value_with_tokens(
             // If the decorated value resolved to an alias, treat this as a
             // structural error rather than accepting an anchored alias.
             if matches!(result, Node::Alias(_)) {
-                return Err(structure_error(
+                return Err(to_string_error(mapping_key_error_yaml(
                     stream.source_mut(),
                     "Invalid anchored alias: anchors cannot be applied to alias nodes",
-                ));
+                )));
             }
             if matches!(result, Node::Anchored(_, _)) {
-                return Err(structure_error(
+                return Err(to_string_error(mapping_key_error_yaml(
                     stream.source_mut(),
                     "A node cannot have multiple anchors",
-                ));
+                )));
             }
             result = Node::Anchored(Box::new(result), anchor_name);
         }

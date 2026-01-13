@@ -1,7 +1,9 @@
 use crate::nodes::node::Node;
 use crate::nodes::node::{BlockStyle, QuoteType};
 use crate::parser::directives::DirectiveContext;
-use crate::parser::document::error_builder::structure_error;
+use crate::parser::document::error_builder::{
+    mapping_key_error_yaml, structure_error, to_string_error,
+};
 use crate::parser::document::node_utils::force_key_to_string;
 use crate::parser::document::tokens::value::parse_value_with_tokens;
 use crate::parser::lexer::Token;
@@ -233,10 +235,10 @@ pub fn parse_mapping_with_tokens(
                         .map(|(_, v)| matches!(v, Node::None))
                         .unwrap_or(false);
                     if !last_value_is_empty && saw_comment_between_entries {
-                        return Err(structure_error(
+                        return Err(to_string_error(mapping_key_error_yaml(
                             stream.source_mut(),
                             "Invalid indentation after comment: indented content cannot extend a completed scalar mapping value",
-                        ));
+                        )));
                     }
 
                     // New nested mapping: push to stack
@@ -315,10 +317,10 @@ pub fn parse_mapping_with_tokens(
                         .map(|(_, v)| matches!(v, Node::None))
                         .unwrap_or(false);
                     if !allow_nested {
-                        return Err(structure_error(
+                        return Err(to_string_error(mapping_key_error_yaml(
                             stream.source_mut(),
                             "Invalid indentation: nested mapping value is only allowed after a key with an empty value",
-                        ));
+                        )));
                     }
 
                     // New nested mapping: push to stack
@@ -509,16 +511,16 @@ fn parse_mapping_pair(
                     // structural errors rather than accepting an
                     // "anchored alias" key.
                     if matches!(key_node, Node::Alias(_)) {
-                        return Err(structure_error(
+                        return Err(to_string_error(mapping_key_error_yaml(
                             stream.source_mut(),
                             "Invalid anchored alias key: anchors cannot be applied to alias nodes",
-                        ));
+                        )));
                     }
                     if matches!(key_node, Node::Anchored(_, _)) {
-                        return Err(structure_error(
+                        return Err(to_string_error(mapping_key_error_yaml(
                             stream.source_mut(),
                             "A mapping key cannot have multiple anchors",
-                        ));
+                        )));
                     }
                     key_node = Node::Anchored(Box::new(key_node), anchor);
                 }

@@ -1,6 +1,7 @@
 /// Module: parser/document/sequence.rs
 // ...existing code...
 use crate::parser::token_stream::TokenStream;
+use crate::parser::ParseResult;
 
 /// Parses a YAML sequence (array) with the specified indentation level.
 ///
@@ -21,18 +22,19 @@ pub(crate) fn parse_sequence(
     source: &mut dyn ISource,
     indent_level: usize,
     directives: &crate::parser::directives::DirectiveContext,
-) -> Result<crate::nodes::node::Node, String> {
+) -> ParseResult<crate::nodes::node::Node> {
     let mut stream = TokenStream::new(source, directives, false)?;
     // NOTE: parse_sequence is only used in legacy paths, so we pass a default context
     let ctx = crate::parser::document::context::ParsingContext::default();
-    crate::parser::document::tokens::sequence::parse_sequence_with_tokens(
+    let node = crate::parser::document::tokens::sequence::parse_sequence_with_tokens(
         &mut stream,
         indent_level,
         indent_level.saturating_sub(1),
         directives,
         &ctx,
         0,
-    )
+    )?;
+    Ok(node)
 }
 
 // Helper for nested sequence parsing to avoid double mutable borrow

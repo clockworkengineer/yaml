@@ -1,3 +1,4 @@
+use crate::error::YamlError;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::parser::directives::DirectiveContext;
@@ -7,6 +8,7 @@ use crate::parser::document::helpers;
 use crate::parser::document::helpers::BlockHeadKind;
 use crate::parser::document::mapping::parse_mapping;
 use crate::parser::document::value::parse_value;
+use crate::parser::ParseResult;
 
 /// Parse a top-level plain scalar spanning multiple non-empty lines, using
 /// YAML's plain line folding rules (spec example 7.12 / HS5T).
@@ -92,7 +94,7 @@ fn token_dispatch(
     source: &mut dyn ISource,
     directives: &DirectiveContext,
     ctx: &ParsingContext,
-) -> Option<Result<Node, String>> {
+) -> Option<ParseResult<Node>> {
     let st = source.save_state();
     if let Ok(ts) = crate::parser::token_stream::TokenStream::new(source, directives, false) {
         match ts.current() {
@@ -108,7 +110,7 @@ fn token_dispatch(
                     directives,
                     0,
                 );
-                return Some(result);
+                return Some(result.map_err(YamlError::from));
             }
             Some(crate::parser::lexer::Token::Dash) => {
                 // Only treat dash as sequence start if not in flow context or explicit key context
@@ -130,7 +132,7 @@ fn token_dispatch(
                     &ctx_seq,
                     0,
                 );
-                return Some(result);
+                return Some(result.map_err(YamlError::from));
             }
             _ => {
                 source.restore_state(st);
@@ -143,7 +145,7 @@ fn token_dispatch(
 }
 
 /// Checks if the current position is at a document end marker (...).
-fn is_doc_end(source: &mut dyn ISource, directives: &DirectiveContext) -> Result<bool, String> {
+fn is_doc_end(source: &mut dyn ISource, directives: &DirectiveContext) -> ParseResult<bool> {
     let st = source.save_state();
     let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
     let res = matches!(ts.current(), Some(crate::parser::lexer::Token::DocumentEnd));
@@ -155,9 +157,9 @@ fn is_doc_end(source: &mut dyn ISource, directives: &DirectiveContext) -> Result
 fn handle_multiple_explicit_keys(
     source: &mut dyn ISource,
     current_indent: usize,
-) -> Result<Node, String> {
+) -> ParseResult<Node> {
     // Now collects (key, value) pairs for all explicit keys at this indent
-    Ok(parse_multiple_explicit_keys(source, current_indent)?)
+    Ok(parse_multiple_explicit_keys(source, current_indent).map_err(YamlError::from)?)
 }
 
 /// Parses the contents of a YAML document based on the current character and context.
@@ -180,7 +182,7 @@ pub fn parse_document_contents(
     indent_level: usize,
     directives: &DirectiveContext,
     ctx: &ParsingContext,
-) -> Result<Node, String> {
+) -> ParseResult<Node> {
     // Normalize position to the next significant token
     crate::utils::skip_whitespace_and_comments(source);
     // Central, context-aware indentation/whitespace validation hook.
@@ -233,10 +235,10 @@ pub fn parse_document_contents(
                 Some(crate::parser::lexer::Token::Dash) => {
                     // seq_indent already captured above
                     if seq_indent < indent_level {
-                        return Err(format!(
+                        return Err(YamlError::from(format!(
                             "Sequence item at invalid indentation: expected >= {}, got {}",
                             indent_level, seq_indent
-                        ));
+                        )));
                     }
                     let ctx_seq =
                         ctx.child_block_context(seq_indent, CollectionType::BlockSequence);
@@ -264,10 +266,10 @@ pub fn parse_document_contents(
                 return Ok(Node::None);
             }
             if map_indent < indent_level {
-                return Err(format!(
+                return Err(YamlError::from(format!(
                     "Mapping key at invalid indentation: expected >= {}, got {}",
                     indent_level, map_indent
-                ));
+                )));
             }
             if helpers::peek_ahead_for_mapping_key(source, directives) {
                 Ok(parse_mapping(source, map_indent, directives)?)
@@ -386,10 +388,10 @@ pub fn parse_document_contents(
                 if source.current() == Some('\t') {
                     let stream =
                         crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-                    return Err(helpers::parse_error_token(
+                    return Err(YamlError::from(helpers::parse_error_token(
                         &stream,
                         "Tabs cannot be used as separation after explicit value indicator",
-                    ));
+                    )));
                 }
                 crate::utils::skip_whitespace_and_comments(source);
 
@@ -487,14 +489,14 @@ pub fn parse_document_contents(
         }
         Some(c) => {
             let stream = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-            Err(helpers::parse_error_token(
+            Err(YamlError::from(helpers::parse_error_token(
                 &stream,
                 &format!(
                     "{}{}",
                     crate::error::messages::ERR_UNEXPECTED_CHAR_PREFIX,
                     c
                 ),
-            ))
+            )))
         }
         None => Ok(Node::None),
     }

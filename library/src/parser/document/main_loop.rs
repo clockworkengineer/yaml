@@ -2,6 +2,7 @@ use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::nodes::node::Node::Document;
 use crate::nodes::node::QuoteType;
+use crate::parser::ParseResult;
 use crate::parser::directives::DirectiveContext;
 use crate::parser::document::contents::parse_document_contents;
 use crate::parser::document::error_builder::structure_error;
@@ -11,7 +12,7 @@ use crate::parser::document::helpers::node_is_blank;
 fn is_document_marker(
     source: &mut dyn ISource,
     directives: &DirectiveContext,
-) -> Result<bool, String> {
+) -> ParseResult<bool> {
     let st = source.save_state();
     let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
     let res = matches!(
@@ -50,7 +51,7 @@ fn parse_document_main_loop(
     source: &mut dyn ISource,
     indent_level: usize,
     directives: &DirectiveContext,
-) -> Result<Vec<Node>, String> {
+) -> ParseResult<Vec<Node>> {
     use crate::parser::document::context::ParsingContext;
     let mut document_nodes = Vec::new();
     let root_ctx = ParsingContext::new(indent_level);
@@ -98,12 +99,11 @@ fn parse_document_main_loop(
                                 | Some(crate::parser::lexer::Token::DoubleQuoted(_))
                                 | Some(crate::parser::lexer::Token::FlowMappingStart)
                                 | Some(crate::parser::lexer::Token::FlowSequenceStart) => {
-                                    return Err(
-                                        crate::parser::document::helpers::parse_error_token(
-                                            &stream,
-                                            "Unexpected indented content after top-level comment.",
-                                        ),
+                                    let msg = crate::parser::document::helpers::parse_error_token(
+                                        &stream,
+                                        "Unexpected indented content after top-level comment.",
                                     );
+                                    return Err(crate::error::YamlError::from(msg));
                                 }
                                 _ => {}
                             }
@@ -154,7 +154,8 @@ pub fn parse_document(
     #[cfg(feature = "debug-trace")]
     log::debug!("parse_document: start at indent {}", indent_level);
     crate::utils::skip_whitespace_and_comments(source);
-    let document_nodes = parse_document_main_loop(source, indent_level, directives)?;
+    let document_nodes =
+        parse_document_main_loop(source, indent_level, directives).map_err(|e| e.to_string())?;
 
     // Mapping-value-specific validation for H7J7-style cases:
     // Detect a document shape where a mapping with an anchored empty
@@ -174,23 +175,22 @@ pub fn parse_document(
                 }
             });
 
-            let has_top_level_map_tagged_key = pairs.iter().any(|(k, v)| {
-                match (k, v) {
-                    (Node::Tagged(inner, tag), Node::None)
-                        if (tag.as_str() == "!!map" || tag.as_str() == "tag:yaml.org,2002:map")
-                            && matches!(**inner, Node::Str(_, QuoteType::Double, _)) =>
-                    {
-                        true
-                    }
-                    _ => false,
+            let has_top_level_map_tagged_key = pairs.iter().any(|(k, v)| match (k, v) {
+                (Node::Tagged(inner, tag), Node::None)
+                    if (tag.as_str() == "!!map" || tag.as_str() == "tag:yaml.org,2002:map")
+                        && matches!(**inner, Node::Str(_, QuoteType::Double, _)) =>
+                {
+                    true
                 }
+                _ => false,
             });
 
             if has_anchored_empty_value && has_top_level_map_tagged_key {
-                return Err(structure_error(
+                use crate::parser::document::error_builder::{mapping_key_error_yaml, to_string_error};
+                return Err(to_string_error(mapping_key_error_yaml(
                     source,
                     "Invalid anchored mapping value: node-anchor-not-indented (H7J7) where an anchor attaches only to an empty scalar and a separate !!map mapping appears at the same mapping level.",
-                ));
+                )));
             }
         }
     }

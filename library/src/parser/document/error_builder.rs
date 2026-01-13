@@ -2,10 +2,16 @@
 //!
 //! Provides centralized, consistent error message construction for parsing errors.
 //! This ensures all parsing errors have uniform formatting and include relevant context.
+//!
+//! This module currently builds string-based errors for legacy
+//! `Result<T, String>` call sites, but also exposes helpers that
+//! construct the library-wide `YamlError` type so parser code can
+//! gradually migrate to `ParseResult<T>`.
 
 // Allow dead code for infrastructure not yet fully utilized
 #![allow(dead_code)]
 
+use crate::error::{ErrorKind, YamlError};
 use crate::io::traits::ISource;
 
 /// Category of parsing error for consistent message formatting
@@ -86,9 +92,9 @@ impl ErrorBuilder {
         self
     }
 
-    /// Builds the final error string
+    /// Builds the final error string (legacy representation)
     pub fn build(self) -> String {
-        let mut result = self.message;
+        let mut result = self.message.clone();
 
         if let Some(ctx) = self.source_context {
             result.push_str(&format!(
@@ -102,6 +108,32 @@ impl ErrorBuilder {
         }
 
         result
+    }
+
+    /// Builds a structured `YamlError` for new parser code.
+    pub fn build_yaml(self) -> YamlError {
+        let kind = match self.category {
+            ErrorCategory::Syntax => ErrorKind::SyntaxError,
+            ErrorCategory::Indentation => ErrorKind::SyntaxError,
+            ErrorCategory::ResourceLimit => ErrorKind::ValidationError,
+            ErrorCategory::Structure => ErrorKind::ParseError,
+            ErrorCategory::UnexpectedEof => ErrorKind::UnexpectedEof,
+        };
+
+        let mut message = self.message.clone();
+
+        if let Some(ctx) = self.source_context {
+            message.push_str(&format!(
+                " (current: '{}', indent: {})",
+                ctx.current_char, ctx.indent_level
+            ));
+        }
+
+        if let Some(hint) = self.hint {
+            message.push_str(&format!(" [Hint: {}]", hint));
+        }
+
+        YamlError::new(kind, message)
     }
 }
 
@@ -211,6 +243,39 @@ pub fn forbidden_error(source: &mut dyn ISource, what: &str, where_forbidden: &s
         .build()
 }
 
+/// Structured indentation error when a tab is used for indentation in block context.
+pub fn tab_indentation_error_yaml(source: &mut dyn ISource) -> YamlError {
+    ErrorBuilder::new(ErrorCategory::Indentation)
+        .message("Tabs are not allowed as indentation in YAML")
+        .context(source)
+        .build_yaml()
+}
+
+/// Structured error for invalid comment placement (e.g., missing preceding whitespace).
+pub fn invalid_comment_spacing_error_yaml(source: &mut dyn ISource) -> YamlError {
+    ErrorBuilder::new(ErrorCategory::Syntax)
+        .message("Comment indicator (#) must be preceded by whitespace or newline")
+        .context(source)
+        .build_yaml()
+}
+
+/// Structured error for mapping key issues; `details` should describe the specific problem.
+pub fn mapping_key_error_yaml(source: &mut dyn ISource, details: &str) -> YamlError {
+    ErrorBuilder::new(ErrorCategory::Structure)
+        .message(details)
+        .context(source)
+        .build_yaml()
+}
+
+/// Thin adapter to convert a structured `YamlError` back into the
+/// legacy `String` representation used by older parser APIs.
+///
+/// This keeps the public API stable while allowing internal code to
+/// use `ParseResult<T>` and `YamlError`.
+pub fn to_string_error(err: YamlError) -> String {
+    err.to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -315,6 +380,18 @@ mod tests {
     }
 
     #[test]
+    fn test_error_builder_yaml_error() {
+        let mut source = Buffer::new(b":");
+        let err = ErrorBuilder::new(ErrorCategory::Syntax)
+            .message("Missing key before colon")
+            .context(&mut source)
+            .build_yaml();
+
+        assert_eq!(err.kind(), &ErrorKind::SyntaxError);
+        assert!(err.message().contains("Missing key before colon"));
+    }
+
+    #[test]
     fn test_error_builder_with_hint() {
         let mut source = Buffer::new(b":");
         let error = ErrorBuilder::new(ErrorCategory::Syntax)
@@ -326,6 +403,17 @@ mod tests {
         assert!(error.contains("Missing key before colon"));
         assert!(error.contains("Hint:"));
         assert!(error.contains("Add a key"));
+    }
+
+    #[test]
+    fn test_tab_indentation_error_yaml() {
+        let mut source = Buffer::new(b"\tkey: value");
+        let err = tab_indentation_error_yaml(&mut source);
+        assert_eq!(err.kind(), &ErrorKind::SyntaxError);
+        assert!(
+            err.message()
+                .contains("Tabs are not allowed as indentation in YAML")
+        );
     }
 
     #[test]

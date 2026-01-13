@@ -2,6 +2,7 @@
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::parser::document::tokens::mapping::parse_mapping_with_tokens;
+use crate::parser::ParseResult;
 // ...existing code...
 
 /// Parses a YAML mapping (dictionary) with the specified indentation level.
@@ -18,12 +19,12 @@ use crate::parser::document::tokens::mapping::parse_mapping_with_tokens;
 ///
 /// # Returns
 ///
-/// Result containing a Mapping Node or an error string
+/// Internal `ParseResult` containing a Mapping Node.
 pub(crate) fn parse_mapping(
     source: &mut dyn ISource,
     _indent_level: usize,
     directives: &crate::parser::directives::DirectiveContext,
-) -> Result<Node, String> {
+) -> ParseResult<Node> {
     // Refactored: Checks if a value token can be safely represented as plain (unquoted) YAML.
     // Uses token type and boundaries, not raw string checks.
     use crate::parser::lexer::Token;
@@ -67,6 +68,8 @@ pub(crate) fn parse_mapping(
 
     // Refactored: parse_mapping now uses tokens for all key/value safety checks
     // and does not perform manual char/string inspection.
-    // The parse_mapping_with_tokens function should be updated to use is_plain_safe_key_token and is_plain_safe_value_token
-    parse_mapping_with_tokens(&mut stream, _indent_level, directives, 0)
+    // The parse_mapping_with_tokens function should be updated to use
+    // is_plain_safe_key_token and is_plain_safe_value_token.
+    let node = parse_mapping_with_tokens(&mut stream, _indent_level, directives, 0)?;
+    Ok(node)
 }

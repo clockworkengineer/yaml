@@ -200,10 +200,11 @@ pub fn parse_inline_sequence_with_tokens(
     if items.len() == 2 {
         if let (Node::Str(s1, ..), Node::Str(s2, ..)) = (&items[0], &items[1]) {
             if s1 == "-" && s2 == "-" {
-                return Err(structure_error(
+                use crate::parser::document::error_builder::{mapping_key_error_yaml, to_string_error};
+                return Err(to_string_error(mapping_key_error_yaml(
                     stream.source_mut(),
                     "Invalid use of '-' indicators inside flow sequence",
-                ));
+                )));
             }
         }
     }

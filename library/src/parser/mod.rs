@@ -1,3 +1,10 @@
+/// Common result type for parser operations using the library-wide YamlError.
+///
+/// This is an internal alias to keep signatures concise while
+/// gradually migrating away from `Result<T, String>` in parser
+/// implementation code.
+pub type ParseResult<T> = crate::error::Result<T>;
+
 /// Module for parsing YAML documents
 #[path = "document/mod.rs"]
 /// document
