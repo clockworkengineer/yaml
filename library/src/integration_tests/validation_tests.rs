@@ -147,4 +147,15 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn test_g5u8_invalid_flow_dash_entries() {
+        let yaml = b"---\n- [-, -]\n";
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source);
+        assert!(
+            result.is_err(),
+            "Should reject flow sequence entries that are bare '-' indicators"
+        );
+    }
 }

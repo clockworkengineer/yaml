@@ -232,4 +232,16 @@ mod tests {
         let doc = parse_document(&mut source, 0, &directives).unwrap();
         println!("BU8L document shape: {:?}", doc);
     }
+    #[test]
+    fn debug_8xdj_document_shape() {
+        let yaml = b"key: word1\n#  xxx\n  word2\n";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let doc = parse_document(&mut source, 0, &directives);
+        assert!(
+            doc.is_err(),
+            "8XDJ should now be rejected as invalid at the document level, but got: {:?}",
+            doc
+        );
+    }
 }

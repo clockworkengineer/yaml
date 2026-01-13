@@ -23,6 +23,9 @@ pub struct TokenStream<'a> {
     position_counter: usize,
     // Track current flow collection nesting depth for instrumentation
     flow_depth: i32,
+    // Track the last token that was consumed; useful for distinguishing
+    // standalone comment lines from inline comments.
+    last_token: Option<Token>,
 }
 
 // Env-controlled logging for token stream internals
@@ -64,6 +67,7 @@ impl<'a> TokenStream<'a> {
             // Flow depth is tracked only for instrumentation; it starts at 0
             // and is updated as we consume tokens via `next()`.
             flow_depth: 0,
+            last_token: None,
         };
         #[cfg(feature = "debug-trace")]
         ts_log(format!("token_stream: new -> current = {:?}", ts.current()));
@@ -116,6 +120,10 @@ impl<'a> TokenStream<'a> {
         let out = self.lexer.next();
         if out.is_ok() {
             self.position_counter = self.position_counter.wrapping_add(1);
+            // Remember the token we just consumed so helpers like
+            // skip_newlines_and_comments_with_flag can inspect the
+            // context of comment tokens (standalone vs inline).
+            self.last_token = prev;
         }
         #[cfg(feature = "debug-trace")]
         if let Ok(ref _t) = out {
@@ -235,6 +243,53 @@ impl<'a> TokenStream<'a> {
             self.current()
         ));
         self.advance_while(|t| matches!(t, Token::Newline | Token::Comment(_)))
+    }
+
+    /// Skip newlines and comments, returning true if at least one
+    /// *standalone* comment token was encountered (i.e., a comment that
+    /// appears on its own line, not as an inline trailing comment).
+    ///
+    /// This is useful for callers (such as the block mapping parser) that
+    /// need to distinguish between a simple blank-line separation, an
+    /// inline comment at the end of a content line, and a comment line
+    /// appearing before an indented block (as in 8XDJ).
+    #[inline]
+    pub fn skip_newlines_and_comments_with_flag(&mut self) -> Result<bool, String> {
+        #[cfg(feature = "debug-trace")]
+        ts_log(format!(
+            "token_stream: skip_newlines_and_comments_with_flag at {:?}",
+            self.current()
+        ));
+        let mut saw_comment = false;
+        while let Some(tok) = self.current() {
+            match tok {
+                Token::Newline => {
+                    self.next()?;
+                }
+                Token::Comment(_) => {
+                    // Treat this as a standalone comment only if the
+                    // previous token was a line boundary or indent,
+                    // not regular content. This prevents inline
+                    // comments like `key: value # comment` from being
+                    // mistaken for the 8XDJ-style pattern where a
+                    // comment line sits between a scalar and an
+                    // indented block.
+                    match self.last_token {
+                        None
+                        | Some(Token::Newline)
+                        | Some(Token::Indent(_))
+                        | Some(Token::DocumentStart)
+                        | Some(Token::DocumentEnd) => {
+                            saw_comment = true;
+                        }
+                        _ => {}
+                    }
+                    self.next()?;
+                }
+                _ => break,
+            }
+        }
+        Ok(saw_comment)
     }
 
     #[inline]

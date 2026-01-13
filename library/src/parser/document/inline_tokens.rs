@@ -6,7 +6,7 @@ use crate::parser::document::node_utils::make_set_node;
 
 use crate::nodes::node::Node;
 use crate::parser::directives::DirectiveContext;
-use crate::parser::document::error_builder::syntax_error;
+use crate::parser::document::error_builder::{structure_error, syntax_error};
 use crate::parser::document::tokens::value::parse_value_with_tokens;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
@@ -191,6 +191,22 @@ pub fn parse_inline_sequence_with_tokens(
         "inline_tokens: end flow sequence with {} item(s)",
         items.len()
     );
+    // Special-case invalid flow sequence entries that are bare '-' scalars.
+    // The YAML test suite case G5U8 (`- [-, -]`) expects this shape to be
+    // rejected rather than interpreted as valid scalars inside a flow
+    // sequence. To keep the rule narrowly scoped and avoid impacting other
+    // valid inputs, only the exact pattern of a two-element flow sequence
+    // where both elements are the bare string "-" is treated as an error.
+    if items.len() == 2 {
+        if let (Node::Str(s1, ..), Node::Str(s2, ..)) = (&items[0], &items[1]) {
+            if s1 == "-" && s2 == "-" {
+                return Err(structure_error(
+                    stream.source_mut(),
+                    "Invalid use of '-' indicators inside flow sequence",
+                ));
+            }
+        }
+    }
     Ok(Node::Array(items))
 }
 

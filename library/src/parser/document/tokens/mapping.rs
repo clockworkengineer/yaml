@@ -84,8 +84,12 @@ pub fn parse_mapping_with_tokens(
     stream.skip_trivia()?;
 
     loop {
-        // Skip comments and newlines between entries; preserve Indent for dedent detection
-        stream.skip_newlines_and_comments()?;
+        // Skip comments and newlines between entries; preserve Indent for dedent
+        // detection. Track whether we saw a standalone comment so we can
+        // distinguish cases like 8XDJ where an indented line after a comment
+        // should *not* start a nested mapping when the preceding key already
+        // has a scalar value.
+        let saw_comment_between_entries = stream.skip_newlines_and_comments_with_flag()?;
 
         // Before parsing a new key, check for dedent and unwind stack if needed
         let mut _dedented = false;
@@ -200,7 +204,7 @@ pub fn parse_mapping_with_tokens(
                 let (_, pairs) = stack.pop().unwrap();
                 return Ok(Node::Mapping(pairs));
             }
-            // Newlines and comments are already skipped at loop start via skip_newlines_and_comments()
+            // Newlines and comments are already skipped at loop start
             Some(Token::Indent(level)) => {
                 #[cfg(feature = "debug-trace")]
                 mapping_log(format!(
@@ -218,6 +222,23 @@ pub fn parse_mapping_with_tokens(
                     stack.len()
                 ));
                 if level > current_indent {
+                    // If we are about to start a new nested mapping but the
+                    // last value at this indentation level is already a
+                    // non-empty scalar, and we just crossed a standalone
+                    // comment line, treat this as an 8XDJ-style structural
+                    // error instead of silently building a nested mapping.
+                    let last_value_is_empty = stack
+                        .last()
+                        .and_then(|(_, pairs)| pairs.last())
+                        .map(|(_, v)| matches!(v, Node::None))
+                        .unwrap_or(false);
+                    if !last_value_is_empty && saw_comment_between_entries {
+                        return Err(structure_error(
+                            stream.source_mut(),
+                            "Invalid indentation after comment: indented content cannot extend a completed scalar mapping value",
+                        ));
+                    }
+
                     // New nested mapping: push to stack
                     #[cfg(feature = "debug-trace")]
                     mapping_log(format!(
@@ -715,6 +736,22 @@ mod tests {
         } else {
             panic!("Expected Mapping node");
         }
+    }
+
+    #[test]
+    fn debug_8xdj_mapping_tokens() {
+        // 8XDJ: comment inside what should be a plain multiline value
+        let yaml = b"key: word1\n#  xxx\n  word2\n";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+
+        let result = parse_mapping_with_tokens(&mut stream, 0, &directives, 0);
+        assert!(
+            result.is_err(),
+            "8XDJ mapping via tokens should be rejected as invalid, but got: {:?}",
+            result
+        );
     }
 
     #[test]
