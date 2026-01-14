@@ -316,19 +316,6 @@ fn stringify_document_with_indent(
 /// # Returns
 ///
 /// true if the node is considered blank, false otherwise
-fn node_is_blank(node: &Node) -> bool {
-    match node {
-        Node::None => true,
-        Node::Comment(_) => true,
-        Node::Str(s, _, _) => s.is_empty(),
-        Node::Tagged(inner, _tag) => node_is_blank(inner),
-        Node::Array(items) => items.iter().all(node_is_blank),
-        Node::Set(items) => !items.is_empty() && items.iter().all(node_is_blank),
-        Node::Mapping(pairs) => pairs.is_empty(),
-        Node::Document(nodes) => nodes.iter().all(node_is_blank),
-        _ => false,
-    }
-}
 
 /// Stringifies a single YAML document to the destination.
 ///
@@ -367,7 +354,7 @@ pub fn stringify(node: &Node, destination: &mut dyn IDestination) -> Result<(), 
         Node::Documents(docs) => {
             for doc in docs {
                 if let Node::Document(nodes) = doc {
-                    if nodes.iter().all(node_is_blank) {
+                    if nodes.iter().all(|n| n.is_blank()) {
                         destination.add_bytes("---\n");
                         continue;
                     }

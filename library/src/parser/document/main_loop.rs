@@ -5,7 +5,6 @@ use crate::nodes::node::QuoteType;
 use crate::parser::ParseResult;
 use crate::parser::directives::DirectiveContext;
 use crate::parser::document::contents::parse_document_contents;
-use crate::parser::document::helpers::node_is_blank;
 
 /// Checks if the current position is at a document marker (--- or ...).
 fn is_document_marker(
@@ -72,7 +71,7 @@ fn parse_document_main_loop(
             }
             _ => {
                 let node = parse_document_contents(source, indent_level, directives, &root_ctx)?;
-                if !node_is_blank(&node) {
+                if !node.is_blank() {
                     document_nodes.push(node);
                 }
             }

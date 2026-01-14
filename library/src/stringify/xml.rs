@@ -62,6 +62,7 @@ fn stringify_node(node: &Node, destination: &mut dyn IDestination) -> Result<(),
             Numeric::Int16(i) => destination.add_bytes(&i.to_string()),
             Numeric::UInt16(u) => destination.add_bytes(&u.to_string()),
             Numeric::Int8(i) => destination.add_bytes(&i.to_string()),
+            Numeric::UInt8(u) => destination.add_bytes(&u.to_string()),
         },
         Node::Array(items) => {
             for item in items.iter() {
@@ -184,6 +185,7 @@ pub fn stringify_pretty(
                 Numeric::Int16(i) => dest.add_bytes(&i.to_string()),
                 Numeric::UInt16(u) => dest.add_bytes(&u.to_string()),
                 Numeric::Int8(i) => dest.add_bytes(&i.to_string()),
+                Numeric::UInt8(u) => dest.add_bytes(&u.to_string()),
             },
             Node::Array(items) => {
                 for item in items.iter() {

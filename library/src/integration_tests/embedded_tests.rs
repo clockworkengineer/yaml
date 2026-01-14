@@ -4,7 +4,8 @@
 mod tests {
     use crate::embedded::limits::{LimitError, NodeValidator};
     use crate::io::sources::buffer::Buffer as BufferSource;
-    use crate::nodes::node::{Node, Numeric, make_set};
+    use crate::nodes::node::{Node, Numeric};
+    use crate::nodes::util::make_set;
     use crate::parser::document::parse;
 
     #[test]

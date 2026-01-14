@@ -357,10 +357,10 @@ mod tests {
         let error = expected_error(&mut source, ":'");
         let err_str = error.to_string();
         assert!(
-            err_str.contains("Expected :'") ||
-            err_str.contains("Expected :") ||
-            err_str.contains("Missing") ||
-            err_str.contains("Syntax error"),
+            err_str.contains("Expected :'")
+                || err_str.contains("Expected :")
+                || err_str.contains("Missing")
+                || err_str.contains("Syntax error"),
             "Error message: {}",
             err_str
         );

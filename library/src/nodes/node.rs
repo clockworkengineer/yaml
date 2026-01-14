@@ -1,4 +1,6 @@
-//! Module: nodes/node.rs
+#[cfg(test)]
+use crate::nodes::util::{make_node, make_set};
+
 
 #[cfg(feature = "std")]
 use std::ops::{Index, IndexMut};
@@ -22,20 +24,23 @@ pub enum Numeric {
     Int16(i16),
     UInt16(u16),
     Int8(i8),
+    UInt8(u8),
 }
 
 /// Represents how a string was quoted in the source YAML
+
+#[cfg(feature = "alloc")]
 #[derive(Clone, Debug, PartialEq)]
-/// QuoteType
 pub enum QuoteType {
     Unquoted,
     Single,
     Double,
 }
 
-/// Represents whether a string originated from a block scalar and its style
+
+/// Represents block/folded style for YAML string nodes
+#[cfg(feature = "alloc")]
 #[derive(Clone, Debug, PartialEq)]
-/// BlockStyle
 pub enum BlockStyle {
     None,
     Literal,
@@ -43,9 +48,10 @@ pub enum BlockStyle {
 }
 
 /// A node in the YAML data structure that can represent different types of values.
-#[derive(Clone, Debug, PartialEq)]
-/// Node
+///
+/// This is the main enum for representing YAML data in memory.
 #[cfg(feature = "alloc")]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Node {
     /// Represents a boolean value (true/false)
     /// Used for YAML boolean values like true/false, yes/no, on/off
@@ -88,8 +94,8 @@ pub enum Node {
 }
 
 /// Minimal node for no-alloc environments (embedded only)
-#[derive(Clone, Debug, PartialEq)]
 #[cfg(not(feature = "alloc"))]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Node {
     Boolean(bool),
     Number(Numeric),
@@ -247,6 +253,7 @@ impl Numeric {
             Numeric::Int16(i) => i.to_string(),
             Numeric::UInt16(u) => u.to_string(),
             Numeric::Int8(i) => i.to_string(),
+            Numeric::UInt8(u) => u.to_string(),
         }
     }
 }
@@ -270,6 +277,7 @@ impl Numeric {
                     None
                 }
             }
+            #[cfg(feature = "alloc")]
             Numeric::UInteger(v) => i32::try_from(*v).ok(),
             Numeric::Byte(v) => Some(*v as i32),
             Numeric::Int32(v) => Some(*v),
@@ -277,6 +285,7 @@ impl Numeric {
             Numeric::Int16(v) => Some(*v as i32),
             Numeric::UInt16(v) => Some(*v as i32),
             Numeric::Int8(v) => Some(*v as i32),
+            Numeric::UInt8(v) => Some(*v as i32),
         }
     }
 
@@ -297,6 +306,7 @@ impl Numeric {
             Numeric::Int16(v) => *v as f32,
             Numeric::UInt16(v) => *v as f32,
             Numeric::Int8(v) => *v as f32,
+            Numeric::UInt8(v) => *v as f32,
         }
     }
 
@@ -321,6 +331,7 @@ impl Numeric {
             Numeric::Int16(_) => 2,
             Numeric::UInt16(_) => 2,
             Numeric::Int8(_) => 1,
+            Numeric::UInt8(_) => 1,
         }
     }
 }
@@ -410,6 +421,20 @@ impl From<alloc::string::String> for Node {
 /// These methods are recommended for production code and required for embedded systems.
 #[cfg(feature = "alloc")]
 impl Node {
+    /// Returns true if the node is considered blank (None, empty array, empty string, comment, or recursively blank document/anchored node)
+    pub fn is_blank(&self) -> bool {
+        match self {
+            Node::None => true,
+            Node::Array(items) => items.is_empty(),
+            Node::Mapping(_pairs) => false,
+            Node::Document(nodes) => nodes.iter().all(|n| n.is_blank()),
+            Node::Str(s, _, _) => s.is_empty(),
+            Node::Comment(_) => true,
+            Node::Anchored(inner, _name) => (**inner).is_blank(),
+            Node::Alias(_name) => false,
+            _ => false,
+        }
+    }
     /// Safely get an array element by index without panicking
     ///
     /// Returns None if the index is out of bounds or if the node is not an array/set.
@@ -1250,31 +1275,6 @@ impl<'a> Iterator for NodeChildIterator<'a> {
     }
 }
 
-/// Helper function to create a Set node from a vector, ensuring uniqueness
-#[cfg(feature = "alloc")]
-pub fn make_set<T>(values: alloc::vec::Vec<T>) -> Node
-where
-    T: Into<Node> + Clone,
-{
-    let mut unique_nodes = alloc::vec::Vec::new();
-
-    for value in values {
-        let node = value.into();
-        if !unique_nodes.contains(&node) {
-            unique_nodes.push(node);
-        }
-    }
-
-    Node::Set(unique_nodes)
-}
-
-/// Helper functions to create a Node from any value that can be converted into a Node
-pub fn make_node<T>(value: T) -> Node
-where
-    T: Into<Node>,
-{
-    value.into()
-}
 
 // ==================== Fluent Builder API ====================
 

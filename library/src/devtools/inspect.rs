@@ -80,7 +80,8 @@ pub fn node_type(node: &Node) -> NodeType {
             | Numeric::Int16(_)
             | Numeric::UInt16(_)
             | Numeric::Int8(_)
-            | Numeric::Byte(_),
+            | Numeric::Byte(_)
+            | Numeric::UInt8(_),
         ) => NodeType::Integer,
         Node::Number(Numeric::Float(_)) => NodeType::Float,
         Node::Str(_, _, _) => NodeType::String,
@@ -283,8 +284,7 @@ fn print_tree_impl(node: &Node, depth: usize, prefix: &str, output: &mut String)
 
 /// Find all nodes of a specific type using depth-first traversal
 pub fn find_by_type(node: &Node, target_type: NodeType) -> Vec<&Node> {
-    node
-        .iter_depth_first()
+    node.iter_depth_first()
         .filter(|n| node_type(n) == target_type)
         .collect()
 }

@@ -81,6 +81,10 @@ fn encode_node(node: &Node, destination: &mut dyn IDestination) -> Result<(), St
                 destination.add_bytes(&format!("i{}e", i));
                 Ok(())
             }
+            Numeric::UInt8(u) => {
+                destination.add_bytes(&format!("i{}e", u));
+                Ok(())
+            }
         },
         Node::Array(items) => {
             destination.add_bytes("l");

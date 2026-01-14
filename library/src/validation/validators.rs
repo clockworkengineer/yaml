@@ -272,6 +272,7 @@ impl EnumValidator {
                 Numeric::Int16(i) => i.to_string(),
                 Numeric::UInt16(u) => u.to_string(),
                 Numeric::Int8(i) => i.to_string(),
+                Numeric::UInt8(u) => u.to_string(),
             }),
             Node::Boolean(b) => Some(b.to_string()),
             Node::None => Some("null".to_string()),
@@ -336,6 +337,7 @@ impl Validator for RequiredValidator {
                             Numeric::Int16(i) => i.to_string(),
                             Numeric::UInt16(u) => u.to_string(),
                             Numeric::Int8(i) => i.to_string(),
+                            Numeric::UInt8(u) => u.to_string(),
                         };
                         key_str == self.field_name
                     }

@@ -2,7 +2,6 @@
 
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
-use crate::nodes::node::Node::Document;
 use crate::parser::ParseResult;
 use crate::parser::document::context::ParsingContext;
 
@@ -87,31 +86,7 @@ pub(crate) fn validate_no_tab_indentation_tokens(
     crate::parser::utils::indentation::validate_indentation_tokens(stream, ctx)
 }
 
-/// Determines if a node represents blank or empty content.
-///
-/// Checks various node types to determine if they should be considered
-/// blank (None, empty arrays, empty strings, comments, etc.).
-///
-/// # Arguments
-///
-/// * `node` - A reference to the Node to check
-///
-/// # Returns
-///
-/// true if the node is considered blank, false otherwise
-pub(crate) fn node_is_blank(node: &Node) -> bool {
-    match node {
-        Node::None => true,
-        Node::Array(items) => items.is_empty(),
-        Node::Mapping(_pairs) => false,
-        Document(nodes) => nodes.iter().all(node_is_blank),
-        Node::Str(s, _, _) => s.is_empty(),
-        Node::Comment(_) => true,
-        Node::Anchored(inner, _name) => node_is_blank(inner),
-        Node::Alias(_name) => false,
-        _ => false,
-    }
-}
+
 
 use crate::parser::directives::DirectiveContext;
 use crate::parser::lexer::Token;

@@ -121,9 +121,9 @@ pub use nodes::node::QuoteType;
 #[cfg(feature = "alloc")]
 pub use nodes::node::SetBuilder;
 /// Helper function to create a Node from any value that can be converted into a Node
-pub use nodes::node::make_node;
+pub use nodes::util::make_node;
 /// Helper function to create a Set node from a vector, ensuring uniqueness
-pub use nodes::node::make_set;
+pub use nodes::util::make_set;
 /// Parser configuration with builder pattern
 pub use parser::config::ParserConfig;
 /// Parser configuration builder

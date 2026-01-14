@@ -10,7 +10,8 @@
 #[cfg(test)]
 mod tests {
     use crate::nodes::node::QuoteType;
-    use crate::{BufferDestination, BufferSource, Node, Numeric, make_set, parse, stringify};
+    use crate::{BufferDestination, BufferSource, Node, Numeric, parse, stringify};
+    use crate::nodes::util::make_set;
 
     #[test]
     fn test_parse_set_from_mapping_with_nulls() {
