@@ -6,6 +6,7 @@ use crate::parser::directives::parse_directives;
 use crate::parser::document::helpers;
 use crate::parser::document::main_loop::parse_document;
 use crate::parser::ParseResult;
+use crate::{loop_guard_check, loop_guard_init};
 
 /// Checks for and processes the document start marker (---).
 /// Returns an error if invalid content is found after the marker.
@@ -214,7 +215,14 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
     // Print the input for debug
     #[cfg(debug_assertions)]
     eprintln!("DEBUG: Starting parse() with YAML input");
+    // Protect the top-level document loop against infinite iteration
+    loop_guard_init!(stream_loop_counter);
     while source.more() {
+        loop_guard_check!(
+            stream_loop_counter,
+            crate::parser::document::loop_guards::MAX_LOOP_ITERATIONS,
+            "Stream parsing"
+        );
         crate::utils::skip_whitespace_and_comments(source);
         // Always create a fresh DirectiveContext for each document
         let mut directives = crate::parser::directives::DirectiveContext::new();

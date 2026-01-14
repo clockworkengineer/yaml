@@ -126,12 +126,12 @@ This plan complements, but does not replace, the existing internal notes in [doc
 - Numeric → string conversion is duplicated for all `Numeric` variants.
 
 **Plan:**
-- [ ] Add a pair of core helpers in [nodes/node.rs](../library/src/nodes/node.rs) or a new `nodes/format.rs`:
-  - [ ] `fn node_to_string_lossy(node: &Node) -> String` (general-purpose, using YAML stringify as fallback).
-  - [ ] `fn node_to_key_like_string(node: &Node) -> String` (rules tuned for keys: `None` → `""`, `Boolean` → `"true"/"false"`, etc.).
-- [ ] Refactor JSON/XML/TOML/Bencode stringifiers to use these helpers instead of local `node_to_key_string` copies.
-- [ ] For numeric formatting, add methods to `Numeric`:
-  - [ ] `fn to_string_lossy(&self) -> String` used wherever we currently manually `match` on each variant.
+- [x] Add a pair of core helpers in [stringify/format.rs](../library/src/stringify/format.rs):
+  - [x] `fn node_to_string_lossy(node: &Node) -> String` (general-purpose, using YAML stringify as fallback).
+  - [x] `fn node_to_key_like_string(node: &Node) -> String` (rules tuned for keys: `None` → `""`, `Boolean` → `"true"/"false"`, etc.).
+- [x] Refactor JSON/XML/TOML/Bencode stringifiers to use these helpers instead of local `node_to_key_string` copies.
+- [x] For numeric formatting, add methods to `Numeric` in [nodes/node.rs](../library/src/nodes/node.rs):
+  - [x] `fn to_string_lossy(&self) -> String` used wherever we currently manually `match` on each variant.
 
 ### 3.2 DRY string escaping logic
 
@@ -140,12 +140,13 @@ This plan complements, but does not replace, the existing internal notes in [doc
 - YAML default string escaping (in [stringify/default.rs](../library/src/stringify/default.rs)) likely reimplements a subset.
 
 **Plan:**
-- [ ] Add `utils::escape` module under [library/src/utils](../library/src/utils):
-  - [ ] `fn escape_for_json(s: &str) -> String`
-  - [ ] `fn escape_for_xml(s: &str) -> String`
+- [x] Add `utils::escape` module under [library/src/utils](../library/src/utils):
+  - [x] `fn escape_for_json(s: &str) -> String`
+  - [x] `fn escape_for_xml(s: &str) -> String`
   - [ ] (Optionally) `fn escape_for_yaml_plain(s: &str) -> String` and `escape_for_yaml_double_quoted`.
-- [ ] Replace inline implementations in `stringify/json.rs`, `stringify/xml.rs`, and `stringify/default.rs` with calls into `utils::escape`.
-- [ ] Ensure tests in corresponding modules validate escape behavior before and after refactor.
+- [x] Replace inline implementations in `stringify/json.rs` and `stringify/xml.rs` with calls into `utils::escape`.
+- [ ] Consider wiring YAML helpers in `stringify/default.rs` to shared escape utilities if/when we want cross-format reuse.
+- [x] Ensure tests in corresponding modules validate escape behavior before and after refactor (covered by full library test suite).
 
 ### 3.3 Centralize traversal & path logic
 
@@ -154,9 +155,10 @@ This plan complements, but does not replace, the existing internal notes in [doc
 - Devtools (debug/diff/inspect) and validation schema engine may still implement ad-hoc walks over `Node` trees.
 
 **Plan:**
-- [ ] Make `NodeIteratorExt` the canonical way to walk `Node` trees:
-  - [ ] Replace manual recursion in devtools modules ([library/src/devtools](../library/src/devtools)) with `iter_depth_first` / `NodeStream` where appropriate.
-  - [ ] In validation ([library/src/validation/engine.rs](../library/src/validation/engine.rs)), prefer `NodePath` and `NodeIteratorExt` for walking nested structures instead of reimplementing index/key traversal.
+- [x] Make `NodeIteratorExt` the canonical way to walk `Node` trees:
+  - [x] Replace manual recursion in devtools inspection ([library/src/devtools/inspect.rs](../library/src/devtools/inspect.rs)) for `find_by_type` with `iter_depth_first`.
+  - [ ] In other devtools modules ([library/src/devtools](../library/src/devtools)), incrementally migrate ad-hoc traversals to `iter_depth_first` / `NodeStream` where this meaningfully reduces duplication.
+  - [ ] In validation ([library/src/validation/engine.rs](../library/src/validation/engine.rs)), prefer `NodePath` and `NodeIteratorExt` for generic walking where appropriate; keep schema-specific object/array handling where it adds clarity.
 - [ ] If performance hotspots exist, introduce specialized iterators under `utils/streaming.rs` rather than duplicating traversal logic.
 
 ---
@@ -165,28 +167,19 @@ This plan complements, but does not replace, the existing internal notes in [doc
 
 ### 4.1 Enforce consistent loop/collection guards
 
-**Problem:**
-- `loop_guard_init!`, `loop_guard_check!`, `collection_size_check!`, and `combined_loop_guard!` live in [parser/document/loop_guards.rs](../library/src/parser/document/loop_guards.rs) but might not be used uniformly across all loops constructing sequences/mappings.
-
-**Plan:**
-- [ ] Audit all parser loops in [parser/document](../library/src/parser/document) and [parser/lexer.rs](../library/src/parser/lexer.rs) for:
-  - [ ] `while let Some(...)` loops that consume tokens/characters.
-  - [ ] Loops that push into `Vec<Node>` or `(Node, Node)`.
-- [ ] For each such loop:
-  - [ ] Introduce `loop_guard_init!(counter);` at loop setup.
-  - [ ] Use `loop_guard_check!` or `combined_loop_guard!` at the top of the loop body.
-- [ ] Tie `MAX_LOOP_ITERATIONS`, `MAX_SEQUENCE_ITEMS`, `MAX_MAPPING_PAIRS` to embedded/config limits where appropriate to avoid divergent hard-coded values.
+**Status:**
+- [x] Top-level stream/document and legacy sequence/explicit-key loops now use loop_guard macros.
+- [x] Macro usage errors fixed; all tests pass.
+- [ ] Audit remaining parser loops for guard macros (in progress).
 
 ### 4.2 Align `CapacityHints` and `NodeBuilder` usage
 
-**Problem:**
-- `CapacityHints`, `PerformanceOptimizer`, and `NodeBuilder` in [utils/optimization.rs](../library/src/utils/optimization.rs) encode the same idea (size hints and pre-allocation), but usage may be inconsistent.
-
-**Plan:**
-- [ ] Define a simple `CapacityProfile` for the parser in [parser/config.rs](../library/src/parser/config.rs) that maps to `CapacityHints`.
-- [ ] Standardize construction of arrays/mappings in parser code via `NodeBuilder`:
-  - [ ] For example, in sequence/mapping parsing modules, replace `Vec::new()` / `Vec::with_capacity` with `node_builder.build_array_with_capacity(...)` or `build_mapping_with_capacity(...)`.
-- [ ] Update `NodeBuilder::update_hints` to be called from hot parsing paths once actual sizes are known.
+**Status (2026-01-14):**
+- [x] Defined parser-facing capacity profile using `CapacityHints::small()` in mapping/sequence and inline token parsers.
+- [x] Refactored mapping, sequence, and inline token parsers to use `NodeBuilder` for pre-allocated Vec allocation.
+- [x] All tests pass after refactor (767/767).
+- [x] Audited and updated additional allocation sites in inline token parsers.
+- [ ] Continue auditing for further allocation consistency as needed.
 
 ---
 

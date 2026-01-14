@@ -1,9 +1,8 @@
 //! Module: stringify/bencode.rs
 
-use crate::io::destinations::buffer::Buffer as BufferDestination;
 use crate::io::traits::IDestination;
 use crate::nodes::node::*;
-use crate::stringify::default::stringify as yaml_stringify;
+use crate::stringify::format::node_to_key_like_string;
 
 /// Recursively encodes a YAML node to Bencode format.
 ///
@@ -103,30 +102,8 @@ fn encode_node(node: &Node, destination: &mut dyn IDestination) -> Result<(), St
         Node::Mapping(pairs) => {
             let mut entries: Vec<(Vec<u8>, &Node)> = Vec::new();
             for (k, v) in pairs.iter() {
-                let key_bytes: Vec<u8> = match k {
-                    Node::Str(s, _, _) => s.as_bytes().to_vec(),
-                    Node::Number(n) => match n {
-                        Numeric::Integer(i) => i.to_string().as_bytes().to_vec(),
-                        Numeric::Float(f) => f.to_string().as_bytes().to_vec(),
-                        Numeric::UInteger(u) => u.to_string().as_bytes().to_vec(),
-                        Numeric::Byte(bv) => bv.to_string().as_bytes().to_vec(),
-                        Numeric::Int32(i) => i.to_string().as_bytes().to_vec(),
-                        Numeric::UInt32(u) => u.to_string().as_bytes().to_vec(),
-                        Numeric::Int16(i) => i.to_string().as_bytes().to_vec(),
-                        Numeric::UInt16(u) => u.to_string().as_bytes().to_vec(),
-                        Numeric::Int8(i) => i.to_string().as_bytes().to_vec(),
-                    },
-                    Node::Boolean(bv) => {
-                        let s = if *bv { "true" } else { "false" };
-                        s.as_bytes().to_vec()
-                    }
-                    Node::None => Vec::new(),
-                    _ => {
-                        let mut buf = BufferDestination::new();
-                        yaml_stringify(k, &mut buf)?;
-                        buf.to_string().into_bytes()
-                    }
-                };
+                let key_str = node_to_key_like_string(k);
+                let key_bytes: Vec<u8> = key_str.into_bytes();
                 entries.push((key_bytes, v));
             }
 

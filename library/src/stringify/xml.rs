@@ -1,23 +1,12 @@
 //! Module: stringify/xml.rs
 
-use crate::io::destinations::buffer::Buffer as BufferDestination;
 use crate::io::traits::IDestination;
 use crate::nodes::node::*;
-use crate::stringify::default::stringify as yaml_stringify;
+use crate::stringify::format::node_to_key_like_string;
+use crate::utils::escape::escape_for_xml;
 
 fn escape_xml_string(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for c in s.chars() {
-        match c {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '"' => out.push_str("&quot;"),
-            '\'' => out.push_str("&apos;"),
-            other => out.push(other),
-        }
-    }
-    out
+    escape_for_xml(s)
 }
 
 fn write_xml_text(s: &str, destination: &mut dyn IDestination) {
@@ -56,30 +45,6 @@ fn sanitize_tag(name: &str) -> String {
     }
 }
 
-fn node_to_key_string(key: &Node) -> Result<String, String> {
-    match key {
-        Node::Str(s, _, _) => Ok(s.clone()),
-        Node::Number(num) => match num {
-            Numeric::Integer(i) => Ok(i.to_string()),
-            Numeric::Float(f) => Ok(f.to_string()),
-            Numeric::UInteger(u) => Ok(u.to_string()),
-            Numeric::Byte(b) => Ok(b.to_string()),
-            Numeric::Int32(i) => Ok(i.to_string()),
-            Numeric::UInt32(u) => Ok(u.to_string()),
-            Numeric::Int16(i) => Ok(i.to_string()),
-            Numeric::UInt16(u) => Ok(u.to_string()),
-            Numeric::Int8(i) => Ok(i.to_string()),
-        },
-        Node::Boolean(b) => Ok((if *b { "true" } else { "false" }).to_string()),
-        Node::None => Ok("".to_string()),
-        _ => {
-            let mut buf = BufferDestination::new();
-            yaml_stringify(key, &mut buf).map_err(|e| e)?;
-            Ok(buf.to_string())
-        }
-    }
-}
-
 fn stringify_node(node: &Node, destination: &mut dyn IDestination) -> Result<(), String> {
     match node {
         Node::None => {
@@ -115,7 +80,7 @@ fn stringify_node(node: &Node, destination: &mut dyn IDestination) -> Result<(),
         }
         Node::Mapping(pairs) => {
             for (k, v) in pairs.iter() {
-                let key_str = node_to_key_string(k)?;
+                let key_str = node_to_key_like_string(k);
                 let tag = sanitize_tag(&key_str);
                 destination.add_bytes("<");
                 destination.add_bytes(&tag);
@@ -272,7 +237,7 @@ pub fn stringify_pretty(
             }
             Node::Mapping(pairs) => {
                 for (k, v) in pairs.iter() {
-                    let key_str = node_to_key_string(k)?;
+                    let key_str = node_to_key_like_string(k);
                     let tag = sanitize_tag(&key_str);
                     write_indent(dest, level, spaces);
                     dest.add_bytes("<");

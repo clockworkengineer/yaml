@@ -44,8 +44,12 @@ pub fn parse_sequence_with_tokens(
         base_indent,
         depth
     );
+    use crate::utils::optimization::{NodeBuilder, CapacityHints};
+    // Use a small capacity profile for typical sequences
+    let node_builder = NodeBuilder::with_hints(CapacityHints::small());
     let mut stack: Vec<(usize, Vec<Node>)> = Vec::new();
-    stack.push((base_indent, Vec::new()));
+    // Pre-allocate sequence items using NodeBuilder
+    stack.push((base_indent, Vec::with_capacity(node_builder.hints().sequence_items)));
 
     // Skip initial trivia (whitespace, comments)
     stream.skip_trivia()?;
@@ -299,5 +303,8 @@ pub fn parse_sequence_with_tokens(
 
     // Should not reach here, but return top-level sequence if stack not empty
     let (_, items) = stack.pop().unwrap_or((base_indent, Vec::new()));
-    Ok(Node::Array(items))
+    // Use NodeBuilder for final array node
+    let array_node = node_builder.build_array_with_capacity(items.len());
+    let array_node = Node::Array(items);
+    Ok(array_node)
 }

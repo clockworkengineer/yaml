@@ -1,7 +1,8 @@
+use crate::parser::ParseResult;
 /// Module: parser/document/sequence.rs
 // ...existing code...
 use crate::parser::token_stream::TokenStream;
-use crate::parser::ParseResult;
+use crate::{combined_loop_guard, loop_guard_init};
 
 /// Parses a YAML sequence (array) with the specified indentation level.
 ///
@@ -45,7 +46,16 @@ fn parse_sequence_inner(
     directives: &crate::parser::directives::DirectiveContext,
 ) -> Result<crate::nodes::node::Node, String> {
     let mut items = Vec::new();
+    // Guard sequence item count and iteration count using combined loop guard
+    loop_guard_init!(sequence_counter);
     while stream.current().is_some() {
+        combined_loop_guard!(
+            sequence_counter,
+            items,
+            crate::parser::document::loop_guards::MAX_LOOP_ITERATIONS,
+            crate::parser::document::loop_guards::MAX_SEQUENCE_ITEMS,
+            "Sequence parsing"
+        );
         // DRY: skip consecutive newlines and comments upfront
         stream.skip_newlines_and_comments()?;
         match stream.current() {

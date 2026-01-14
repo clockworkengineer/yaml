@@ -7,6 +7,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use crate::nodes::node::{Node, Numeric};
+use crate::utils::streaming::NodeIteratorExt;
 
 /// Node type information
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -280,49 +281,12 @@ fn print_tree_impl(node: &Node, depth: usize, prefix: &str, output: &mut String)
     }
 }
 
-/// Find all nodes of a specific type
+/// Find all nodes of a specific type using depth-first traversal
 pub fn find_by_type(node: &Node, target_type: NodeType) -> Vec<&Node> {
-    let mut results = Vec::new();
-    find_by_type_impl(node, target_type, &mut results);
-    results
-}
-
-fn find_by_type_impl<'a>(node: &'a Node, target_type: NodeType, results: &mut Vec<&'a Node>) {
-    if node_type(node) == target_type {
-        results.push(node);
-    }
-
-    match node {
-        Node::Array(items) => {
-            for item in items {
-                find_by_type_impl(item, target_type, results);
-            }
-        }
-        Node::Mapping(pairs) => {
-            for (k, v) in pairs {
-                find_by_type_impl(k, target_type, results);
-                find_by_type_impl(v, target_type, results);
-            }
-        }
-        Node::Set(items) => {
-            for item in items {
-                find_by_type_impl(item, target_type, results);
-            }
-        }
-        Node::Document(items) => {
-            for item in items {
-                find_by_type_impl(item, target_type, results);
-            }
-        }
-        Node::Documents(docs) => {
-            for doc in docs {
-                find_by_type_impl(doc, target_type, results);
-            }
-        }
-        Node::Tagged(inner, _) => find_by_type_impl(inner, target_type, results),
-        Node::Anchored(inner, _) => find_by_type_impl(inner, target_type, results),
-        _ => {}
-    }
+    node
+        .iter_depth_first()
+        .filter(|n| node_type(n) == target_type)
+        .collect()
 }
 
 #[cfg(test)]

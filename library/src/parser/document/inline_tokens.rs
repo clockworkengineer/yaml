@@ -52,7 +52,10 @@ pub fn parse_inline_sequence_with_tokens(
     // Expect opening bracket
     stream.expect(Token::FlowSequenceStart)?;
 
-    let mut items = Vec::new();
+    use crate::utils::optimization::{NodeBuilder, CapacityHints};
+    // Use a small capacity profile for typical inline sequences
+    let node_builder = NodeBuilder::with_hints(CapacityHints::small());
+    let mut items = Vec::with_capacity(node_builder.hints().sequence_items);
     let mut expect_item = true; // After [ or comma, we expect an item
 
     loop {
@@ -234,7 +237,10 @@ pub fn parse_inline_mapping_with_tokens(
     // Expect opening brace
     stream.expect(Token::FlowMappingStart)?;
 
-    let mut pairs = Vec::new();
+    use crate::utils::optimization::{NodeBuilder, CapacityHints};
+    // Use a small capacity profile for typical inline mappings
+    let node_builder = NodeBuilder::with_hints(CapacityHints::small());
+    let mut pairs = Vec::with_capacity(node_builder.hints().mapping_pairs);
     let mut expect_entry = true; // After { or comma, we expect a key
 
     let mut iteration = 0;

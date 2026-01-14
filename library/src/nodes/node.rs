@@ -230,6 +230,27 @@ impl From<i8> for Numeric {
     }
 }
 
+#[cfg(feature = "alloc")]
+impl Numeric {
+    /// Lossy string conversion for all numeric variants.
+    ///
+    /// This is intended for formatting and key generation where
+    /// a human-readable representation is sufficient.
+    pub fn to_string_lossy(&self) -> alloc::string::String {
+        match self {
+            Numeric::Integer(i) => i.to_string(),
+            Numeric::Float(f) => f.to_string(),
+            Numeric::UInteger(u) => u.to_string(),
+            Numeric::Byte(b) => b.to_string(),
+            Numeric::Int32(i) => i.to_string(),
+            Numeric::UInt32(u) => u.to_string(),
+            Numeric::Int16(i) => i.to_string(),
+            Numeric::UInt16(u) => u.to_string(),
+            Numeric::Int8(i) => i.to_string(),
+        }
+    }
+}
+
 /// Embedded systems helper methods for Numeric
 #[cfg(feature = "embedded")]
 impl Numeric {

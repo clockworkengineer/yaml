@@ -14,6 +14,7 @@ pub mod optimization;
 /// Streaming and iterator support for efficient YAML processing
 #[cfg(feature = "alloc")]
 pub mod streaming;
+pub mod escape;
 
 use crate::constants::{CHAR_HASH, CHAR_NEWLINE, CHAR_TAB};
 use crate::io::traits::ISource;

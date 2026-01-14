@@ -5,6 +5,10 @@
 
 use alloc::string::String;
 
+use crate::io::destinations::buffer::Buffer as BufferDestination;
+use crate::nodes::node::{Node, Numeric};
+use crate::stringify::default::stringify as yaml_stringify;
+
 /// YAML output formatting options
 #[derive(Debug, Clone)]
 pub struct FormatOptions {
@@ -240,6 +244,59 @@ impl FormatContext {
 impl Default for FormatContext {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Convert a `Numeric` value to a human-readable string.
+///
+/// This is a thin wrapper around `Numeric::to_string_lossy` so that
+/// callers outside of `nodes` can depend on a stable helper in the
+/// stringify layer.
+pub fn numeric_to_string_lossy(num: &Numeric) -> String {
+    num.to_string_lossy()
+}
+
+/// Convert a `Node` into a general-purpose string representation.
+///
+/// This is intended for diagnostics, devtools, and non-critical
+/// formatting paths. Complex structures fall back to YAML stringify;
+/// if that fails, a `Debug` representation is used as a last resort.
+pub fn node_to_string_lossy(node: &Node) -> String {
+    match node {
+        Node::Str(s, _, _) => s.clone(),
+        Node::Number(num) => numeric_to_string_lossy(num),
+        Node::Boolean(b) => {
+            if *b {
+                "true".to_string()
+            } else {
+                "false".to_string()
+            }
+        }
+        Node::None => "null".to_string(),
+        Node::Comment(c) => c.clone(),
+        Node::Alias(name) => name.clone(),
+        // For all structural/container forms, fall back to YAML
+        // stringify to get a stable textual view.
+        _ => {
+            let mut buf = BufferDestination::new();
+            if yaml_stringify(node, &mut buf).is_ok() {
+                buf.to_string()
+            } else {
+                format!("{:?}", node)
+            }
+        }
+    }
+}
+
+/// Convert a `Node` into a string suitable for use as a mapping key.
+///
+/// Key-specific tweaks over `node_to_string_lossy`:
+/// - `None` is rendered as an empty string.
+/// - Other types reuse the lossy representation.
+pub fn node_to_key_like_string(node: &Node) -> String {
+    match node {
+        Node::None => String::new(),
+        _ => node_to_string_lossy(node),
     }
 }
 

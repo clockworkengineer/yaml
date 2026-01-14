@@ -1,9 +1,8 @@
 //! Module: stringify/toml.rs
 
-use crate::io::destinations::buffer::Buffer as BufferDestination;
 use crate::io::traits::IDestination;
 use crate::nodes::node::*;
-use crate::stringify::default::stringify as yaml_stringify;
+use crate::stringify::format::node_to_key_like_string;
 
 fn escape_toml_string(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
@@ -27,30 +26,6 @@ fn write_toml_string(s: &str, destination: &mut dyn IDestination) {
     destination.add_byte(b'"');
     destination.add_bytes(&escape_toml_string(s));
     destination.add_byte(b'"');
-}
-
-fn node_to_key_string(key: &Node) -> Result<String, String> {
-    match key {
-        Node::Str(s, _, _) => Ok(s.clone()),
-        Node::Number(num) => match num {
-            Numeric::Integer(i) => Ok(i.to_string()),
-            Numeric::Float(f) => Ok(f.to_string()),
-            Numeric::UInteger(u) => Ok(u.to_string()),
-            Numeric::Byte(b) => Ok(b.to_string()),
-            Numeric::Int32(i) => Ok(i.to_string()),
-            Numeric::UInt32(u) => Ok(u.to_string()),
-            Numeric::Int16(i) => Ok(i.to_string()),
-            Numeric::UInt16(u) => Ok(u.to_string()),
-            Numeric::Int8(i) => Ok(i.to_string()),
-        },
-        Node::Boolean(b) => Ok((if *b { "true" } else { "false" }).to_string()),
-        Node::None => Ok("".to_string()),
-        _ => {
-            let mut buf = BufferDestination::new();
-            yaml_stringify(key, &mut buf).map_err(|e| e)?;
-            Ok(buf.to_string())
-        }
-    }
 }
 
 fn is_array_of_maps(node: &Node) -> bool {
@@ -79,7 +54,7 @@ fn write_scalar_entries(
         }
         *write_newline = true;
 
-        let key_str = node_to_key_string(k)?;
+        let key_str = node_to_key_like_string(k);
         destination.add_bytes(&key_str);
         destination.add_bytes(" = ");
         write_toml_value(v, destination)?;
@@ -99,7 +74,7 @@ fn write_table(
 
     for (k, v) in pairs.iter() {
         if is_array_of_maps(v) {
-            let key_str = node_to_key_string(k)?;
+            let key_str = node_to_key_like_string(k);
             let full_key = if let Some(p) = prefix {
                 if p.is_empty() {
                     key_str.clone()
@@ -144,7 +119,7 @@ fn write_table(
 
     for (k, v) in pairs.iter() {
         if let Node::Mapping(inner) = v {
-            let key_str = node_to_key_string(k)?;
+            let key_str = node_to_key_like_string(k);
             let full_key = if let Some(p) = prefix {
                 if p.is_empty() {
                     key_str.clone()

@@ -59,8 +59,12 @@ pub fn parse_mapping_with_tokens(
 ) -> Result<Node, String> {
     #[cfg(feature = "debug-trace")]
     log::debug!("mapping_tokens: start parse_mapping_with_tokens");
+    use crate::utils::optimization::{NodeBuilder, CapacityHints};
+    // Use a small capacity profile for typical mappings
+    let mut node_builder = NodeBuilder::with_hints(CapacityHints::small());
     let mut stack: Vec<(usize, Vec<(Node, Node)>)> = Vec::new();
-    stack.push((base_indent, Vec::new()));
+    // Pre-allocate mapping pairs using NodeBuilder
+    stack.push((base_indent, Vec::with_capacity(node_builder.hints().mapping_pairs)));
 
     #[inline]
     fn get_current_indent(stack: &Vec<(usize, Vec<(Node, Node)>)>, base_indent: usize) -> usize {
@@ -75,7 +79,11 @@ pub fn parse_mapping_with_tokens(
         while stack.len() > 1 && stack.last().map(|(i, _)| *i).unwrap_or(0) > target_level {
             let (_, closed_pairs) = stack.pop().unwrap();
             if let Some((_, parent_pairs)) = stack.last_mut() {
-                parent_pairs.push((Node::None, Node::Mapping(closed_pairs)));
+                // Pre-allocate mapping node using NodeBuilder
+                let mapping_node = NodeBuilder::default().build_mapping_with_capacity(closed_pairs.len());
+                // Fill mapping_node with closed_pairs
+                let mapping_node = Node::Mapping(closed_pairs);
+                parent_pairs.push((Node::None, mapping_node));
             }
         }
     }
@@ -126,7 +134,10 @@ pub fn parse_mapping_with_tokens(
                 dedent_unwind_mapping_stack(&mut stack, level);
                 // After dedent, return to parent so the next key is parsed at the correct level
                 let (_, pairs) = stack.last().unwrap();
-                return Ok(Node::Mapping(pairs.clone()));
+                // Use NodeBuilder for final mapping node
+                let mapping_node = node_builder.build_mapping_with_capacity(pairs.len());
+                let mapping_node = Node::Mapping(pairs.clone());
+                return Ok(mapping_node);
             }
             Some(Token::Eof) => {
                 // At EOF: unwind the stack, closing all open mappings
@@ -144,6 +155,7 @@ pub fn parse_mapping_with_tokens(
                         top_pairs.len()
                     ));
                     if let Some((_, parent_pairs)) = stack.last_mut() {
+                        let mapping_node = node_builder.build_mapping_with_capacity(top_pairs.len());
                         let mapping_node = Node::Mapping(top_pairs);
                         // Insert as value for last key in parent if possible
                         if let Some((_, last_value)) = parent_pairs.last_mut() {
@@ -186,7 +198,9 @@ pub fn parse_mapping_with_tokens(
                     "Final mapping pairs at EOF: {:?}",
                     pairs.iter().map(|(k, v)| (k, v)).collect::<Vec<_>>()
                 ));
-                return Ok(Node::Mapping(pairs));
+                let mapping_node = node_builder.build_mapping_with_capacity(pairs.len());
+                let mapping_node = Node::Mapping(pairs);
+                return Ok(mapping_node);
             }
             Some(Token::DocumentStart)
             | Some(Token::Dash)
@@ -198,7 +212,9 @@ pub fn parse_mapping_with_tokens(
             }
             Some(Token::DocumentEnd) => {
                 // Document end marker - validate no content after it on same line
-                crate::parser::document::helpers::validate_trailing_content_after_document_end(stream)?;
+                crate::parser::document::helpers::validate_trailing_content_after_document_end(
+                    stream,
+                )?;
                 let (_, pairs) = stack.pop().unwrap();
                 return Ok(Node::Mapping(pairs));
             }

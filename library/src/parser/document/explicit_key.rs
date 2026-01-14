@@ -3,6 +3,7 @@ use crate::nodes::node::Node;
 use crate::parser::ParseResult;
 use crate::parser::document::error_builder::syntax_error;
 use crate::parser::document::node_utils::normalize_node_to_str;
+use crate::{combined_loop_guard, loop_guard_check, loop_guard_init};
 
 /// Parses a single explicit key from the source and normalizes it to a string node.
 #[allow(dead_code)]
@@ -45,10 +46,17 @@ pub fn parse_multiple_explicit_keys(
     let mut pairs: Vec<(Node, Node)> = Vec::new();
     let directives_local = DirectiveContext::new();
     let mut stream = TokenStream::new(source, &directives_local, false)?;
+    // Guard against pathological numbers of explicit-key entries
+    loop_guard_init!(explicit_key_counter);
     while matches!(
         stream.current(),
         Some(crate::parser::lexer::Token::QuestionMark)
     ) {
+        loop_guard_check!(
+            explicit_key_counter,
+            crate::parser::document::loop_guards::MAX_LOOP_ITERATIONS,
+            "Explicit key parsing"
+        );
         // Parse explicit mapping entry (? key : value)
         let (key, value) = crate::parser::document::explicit_key::parse_explicit_mapping_entry(
             &mut stream,
@@ -148,7 +156,16 @@ pub(crate) fn collect_explicit_keys_block(
     directives: &crate::parser::directives::DirectiveContext,
 ) -> Result<Vec<(Node, Node)>, String> {
     let mut pairs: Vec<(Node, Node)> = Vec::new();
+    // Combined guard on iterations and number of collected pairs
+    loop_guard_init!(explicit_block_counter);
     loop {
+        combined_loop_guard!(
+            explicit_block_counter,
+            pairs,
+            crate::parser::document::loop_guards::MAX_LOOP_ITERATIONS,
+            crate::parser::document::loop_guards::MAX_MAPPING_PAIRS,
+            "Explicit key block"
+        );
         // Skip trivia before checking for next explicit key
         stream.skip_trivia()?;
         if !matches!(stream.current(), Some(Token::QuestionMark)) {

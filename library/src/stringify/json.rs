@@ -1,9 +1,9 @@
 //! Module: stringify/json.rs
 
-use crate::io::destinations::buffer::Buffer as BufferDestination;
 use crate::io::traits::IDestination;
 use crate::nodes::node::*;
-use crate::stringify::default::stringify as yaml_stringify;
+use crate::stringify::format::node_to_key_like_string;
+use crate::utils::escape::escape_for_json;
 
 /// Escapes special characters in a string for JSON representation.
 ///
@@ -19,21 +19,7 @@ use crate::stringify::default::stringify as yaml_stringify;
 ///
 /// A new String with proper JSON escape sequences
 fn escape_json_string(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for c in s.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            c if (c as u32) < 0x20 => {
-                out.push_str(&format!("\\u{:04x}", c as u32));
-            }
-            other => out.push(other),
-        }
-    }
-    out
+    escape_for_json(s)
 }
 
 /// Writes a JSON-escaped string to the destination with surrounding quotes.
@@ -48,42 +34,6 @@ fn write_json_string(s: &str, destination: &mut dyn IDestination) {
     destination.add_byte(b'"');
     destination.add_bytes(&escape_json_string(s));
     destination.add_byte(b'"');
-}
-
-/// Converts a YAML node to a string representation suitable for use as a JSON key.
-///
-/// JSON keys must be strings, so this function converts various node types
-/// to appropriate string representations for use as object keys.
-///
-/// # Arguments
-///
-/// * `key` - The Node to convert to a key string
-///
-/// # Returns
-///
-/// Result containing the key string or an error for invalid key types
-fn node_to_key_string(key: &Node) -> Result<String, String> {
-    match key {
-        Node::Str(s, _, _) => Ok(s.clone()),
-        Node::Number(num) => match num {
-            Numeric::Integer(i) => Ok(i.to_string()),
-            Numeric::Float(f) => Ok(f.to_string()),
-            Numeric::UInteger(u) => Ok(u.to_string()),
-            Numeric::Byte(b) => Ok(b.to_string()),
-            Numeric::Int32(i) => Ok(i.to_string()),
-            Numeric::UInt32(u) => Ok(u.to_string()),
-            Numeric::Int16(i) => Ok(i.to_string()),
-            Numeric::UInt16(u) => Ok(u.to_string()),
-            Numeric::Int8(i) => Ok(i.to_string()),
-        },
-        Node::Boolean(b) => Ok((if *b { "true" } else { "false" }).to_string()),
-        Node::None => Ok("".to_string()),
-        _ => {
-            let mut buf = BufferDestination::new();
-            yaml_stringify(key, &mut buf).map_err(|e| e)?;
-            Ok(buf.to_string())
-        }
-    }
 }
 
 /// Recursively stringifies a YAML node to JSON format.
@@ -140,7 +90,7 @@ fn stringify_node(node: &Node, destination: &mut dyn IDestination) -> Result<(),
             destination.add_byte(b'{');
             let mut first = true;
             for (k, v) in pairs.iter() {
-                let key_str = node_to_key_string(k)?;
+                let key_str = node_to_key_like_string(k);
                 if !first {
                     destination.add_byte(b',');
                 }
@@ -295,7 +245,7 @@ pub fn stringify_pretty(
                 for (i, (k, v)) in pairs.iter().enumerate() {
                     let indent = " ".repeat(spaces * (level + 1));
                     destination.add_bytes(&indent);
-                    let key_str = node_to_key_string(k)?;
+                    let key_str = node_to_key_like_string(k);
                     write_json_string(&key_str, destination);
                     destination.add_bytes(": ");
                     helper(v, destination, spaces, level + 1)?;
