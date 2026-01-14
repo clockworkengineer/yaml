@@ -190,51 +190,48 @@ pub type ZeroCopyStr<'a> = Cow<'a, str>;
 ///
 /// This is similar to string interning but specifically for parsing performance.
 #[cfg(feature = "std")]
+
+use crate::utils::string_interner::{StringInterner, InternedString};
+
 #[derive(Debug)]
 pub struct StringPool {
-    pool: std::collections::HashMap<String, std::sync::Arc<String>>,
+    interner: StringInterner,
 }
 
 #[cfg(feature = "std")]
 impl StringPool {
-    /// Create a new string pool
+    /// Create a new string pool (adapter over StringInterner)
     pub fn new() -> Self {
         Self {
-            pool: std::collections::HashMap::new(),
+            interner: StringInterner::new(),
         }
     }
 
     /// Create a string pool with pre-allocated capacity
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            pool: std::collections::HashMap::with_capacity(capacity),
+            interner: StringInterner::with_capacity(capacity),
         }
     }
 
-    /// Get or insert a string into the pool
-    pub fn get_or_insert(&mut self, s: &str) -> std::sync::Arc<String> {
-        if let Some(existing) = self.pool.get(s) {
-            std::sync::Arc::clone(existing)
-        } else {
-            let arc = std::sync::Arc::new(s.to_string());
-            self.pool.insert(s.to_string(), std::sync::Arc::clone(&arc));
-            arc
-        }
+    /// Get or insert a string into the pool (returns InternedString)
+    pub fn get_or_insert(&self, s: &str) -> InternedString {
+        self.interner.intern(s)
     }
 
     /// Get the number of unique strings in the pool
     pub fn len(&self) -> usize {
-        self.pool.len()
+        self.interner.len()
     }
 
     /// Check if the pool is empty
     pub fn is_empty(&self) -> bool {
-        self.pool.is_empty()
+        self.interner.is_empty()
     }
 
     /// Clear the pool
-    pub fn clear(&mut self) {
-        self.pool.clear();
+    pub fn clear(&self) {
+        self.interner.clear();
     }
 }
 
@@ -471,12 +468,12 @@ mod tests {
     #[test]
     #[cfg(feature = "std")]
     fn test_string_pool() {
-        let mut pool = StringPool::new();
+        let pool = StringPool::new();
 
         let s1 = pool.get_or_insert("test");
         let s2 = pool.get_or_insert("test");
 
-        assert_eq!(*s1, *s2);
+        assert_eq!(s1.as_str(), s2.as_str());
         assert_eq!(pool.len(), 1);
     }
 

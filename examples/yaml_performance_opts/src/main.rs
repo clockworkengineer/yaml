@@ -101,7 +101,7 @@ fn demo_string_pool() {
     println!("  Unique strings: {}", pool.len());
     println!(
         "  'name' references share same memory: {}",
-        std::sync::Arc::ptr_eq(&s1, &s3)
+        s1.as_str().as_ptr() == s3.as_str().as_ptr()
     );
 
     // Simulate parsing 100 objects with repeated keys

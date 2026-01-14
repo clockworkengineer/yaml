@@ -59,12 +59,15 @@ pub fn parse_mapping_with_tokens(
 ) -> Result<Node, String> {
     #[cfg(feature = "debug-trace")]
     log::debug!("mapping_tokens: start parse_mapping_with_tokens");
-    use crate::utils::optimization::{NodeBuilder, CapacityHints};
+    use crate::utils::optimization::{CapacityHints, NodeBuilder};
     // Use a small capacity profile for typical mappings
-    let mut node_builder = NodeBuilder::with_hints(CapacityHints::small());
+    let node_builder = NodeBuilder::with_hints(CapacityHints::small());
     let mut stack: Vec<(usize, Vec<(Node, Node)>)> = Vec::new();
     // Pre-allocate mapping pairs using NodeBuilder
-    stack.push((base_indent, Vec::with_capacity(node_builder.hints().mapping_pairs)));
+    stack.push((
+        base_indent,
+        Vec::with_capacity(node_builder.hints().mapping_pairs),
+    ));
 
     #[inline]
     fn get_current_indent(stack: &Vec<(usize, Vec<(Node, Node)>)>, base_indent: usize) -> usize {
@@ -80,10 +83,7 @@ pub fn parse_mapping_with_tokens(
             let (_, closed_pairs) = stack.pop().unwrap();
             if let Some((_, parent_pairs)) = stack.last_mut() {
                 // Pre-allocate mapping node using NodeBuilder
-                let mapping_node = NodeBuilder::default().build_mapping_with_capacity(closed_pairs.len());
-                // Fill mapping_node with closed_pairs
-                let mapping_node = Node::Mapping(closed_pairs);
-                parent_pairs.push((Node::None, mapping_node));
+                parent_pairs.push((Node::None, Node::Mapping(closed_pairs)));
             }
         }
     }
@@ -135,9 +135,7 @@ pub fn parse_mapping_with_tokens(
                 // After dedent, return to parent so the next key is parsed at the correct level
                 let (_, pairs) = stack.last().unwrap();
                 // Use NodeBuilder for final mapping node
-                let mapping_node = node_builder.build_mapping_with_capacity(pairs.len());
-                let mapping_node = Node::Mapping(pairs.clone());
-                return Ok(mapping_node);
+                return Ok(Node::Mapping(pairs.clone()));
             }
             Some(Token::Eof) => {
                 // At EOF: unwind the stack, closing all open mappings
@@ -155,8 +153,6 @@ pub fn parse_mapping_with_tokens(
                         top_pairs.len()
                     ));
                     if let Some((_, parent_pairs)) = stack.last_mut() {
-                        let mapping_node = node_builder.build_mapping_with_capacity(top_pairs.len());
-                        let mapping_node = Node::Mapping(top_pairs);
                         // Insert as value for last key in parent if possible
                         if let Some((_, last_value)) = parent_pairs.last_mut() {
                             #[cfg(feature = "debug-trace")]
@@ -164,7 +160,7 @@ pub fn parse_mapping_with_tokens(
                                 "EOF unwind: inserting mapping_node as last_value in parent"
                                     .to_string(),
                             );
-                            *last_value = mapping_node;
+                            *last_value = Node::Mapping(top_pairs);
                         } else {
                             // If no key, push as orphan (should not happen in valid YAML)
                             #[cfg(feature = "debug-trace")]
@@ -177,7 +173,7 @@ pub fn parse_mapping_with_tokens(
                                     QuoteType::Unquoted,
                                     BlockStyle::None,
                                 )),
-                                mapping_node,
+                                Node::Mapping(top_pairs),
                             ));
                         }
                         #[cfg(feature = "debug-trace")]
@@ -198,9 +194,7 @@ pub fn parse_mapping_with_tokens(
                     "Final mapping pairs at EOF: {:?}",
                     pairs.iter().map(|(k, v)| (k, v)).collect::<Vec<_>>()
                 ));
-                let mapping_node = node_builder.build_mapping_with_capacity(pairs.len());
-                let mapping_node = Node::Mapping(pairs);
-                return Ok(mapping_node);
+                return Ok(Node::Mapping(pairs));
             }
             Some(Token::DocumentStart)
             | Some(Token::Dash)

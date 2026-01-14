@@ -304,7 +304,5 @@ pub fn parse_sequence_with_tokens(
     // Should not reach here, but return top-level sequence if stack not empty
     let (_, items) = stack.pop().unwrap_or((base_indent, Vec::new()));
     // Use NodeBuilder for final array node
-    let array_node = node_builder.build_array_with_capacity(items.len());
-    let array_node = Node::Array(items);
-    Ok(array_node)
+    Ok(Node::Array(items))
 }
