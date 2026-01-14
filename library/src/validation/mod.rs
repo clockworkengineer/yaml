@@ -11,7 +11,8 @@ pub mod error;
 pub mod schema;
 pub mod validators;
 
-pub use engine::{SchemaValidator, ValidationContext, ValidationError};
+pub use engine::{SchemaValidator, ValidationContext};
+pub use error::ValidationError;
 pub use schema::{ArraySchema, ObjectSchema, PropertySchema, Schema, SchemaType};
 pub use validators::{
     CustomValidator, EnumValidator, LengthValidator, PatternValidator, RangeValidator,

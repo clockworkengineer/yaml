@@ -90,7 +90,7 @@ fn demo_string_pool() {
     println!("--------------");
     println!("Deduplicate common strings during parsing");
 
-    let mut pool = StringPool::new();
+        let pool = StringPool::new();
 
     // Pool the same strings
     let s1 = pool.get_or_insert("name");

@@ -1,6 +1,17 @@
-//! Validation engine for executing schema validation against YAML nodes
-//!
-//! Provides SchemaValidator that traverses nodes and applies validation rules.
+/// Core helpers for building validation errors (DRY for validators)
+pub struct ValidationContextCore;
+
+impl ValidationContextCore {
+    pub fn fail_type_mismatch(expected: &SchemaType, node: &Node) -> ValidationError {
+        ValidationError::TypeMismatch {
+            expected: format!("{:?}", expected),
+            found: crate::validation::validators::node_type_name(node).to_string(),
+        }
+    }
+}
+/// Validation engine for executing schema validation against YAML nodes
+///
+/// Provides SchemaValidator that traverses nodes and applies validation rules.
 
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
@@ -12,44 +23,8 @@ use crate::validation::schema::{PropertySchema, Schema, SchemaType};
 use crate::validation::validators::{
     EnumValidator, LengthValidator, PatternValidator, RangeValidator, TypeValidator, Validator,
 };
+use crate::validation::error::ValidationError;
 
-/// Detailed validation error with path context
-#[derive(Debug, Clone)]
-pub struct ValidationError {
-    /// Path to the node that failed validation
-    pub path: String,
-    /// Error message
-    pub message: String,
-    /// Expected schema type
-    pub expected: Option<SchemaType>,
-    /// Actual node type
-    pub actual: String,
-}
-
-impl ValidationError {
-    pub fn new(path: impl Into<String>, message: impl Into<String>) -> Self {
-        Self {
-            path: path.into(),
-            message: message.into(),
-            expected: None,
-            actual: String::new(),
-        }
-    }
-
-    pub fn with_types(
-        path: impl Into<String>,
-        message: impl Into<String>,
-        expected: SchemaType,
-        actual: impl Into<String>,
-    ) -> Self {
-        Self {
-            path: path.into(),
-            message: message.into(),
-            expected: Some(expected),
-            actual: actual.into(),
-        }
-    }
-}
 
 /// Context for tracking validation state during traversal
 #[derive(Debug, Clone)]
@@ -97,7 +72,7 @@ impl ValidationContext {
 
     /// Record an error and log it
     fn add_error(&mut self, error: ValidationError) {
-        warn!("Validation error at {}: {:?}", error.path, error);
+        warn!("Validation error: {:?}", error);
         self.errors.push(error);
     }
 
@@ -159,12 +134,7 @@ impl SchemaValidator {
         // Type validation
         let type_validator = TypeValidator::new(schema.schema_type.clone());
         if let Err(err) = type_validator.validate(node) {
-            ctx.add_error(ValidationError {
-                path: ctx.current_path(),
-                message: err.to_string(),
-                expected: Some(schema.schema_type.clone()),
-                actual: node_type_name(node).to_string(),
-            });
+            ctx.add_error(err);
             return;
         }
 
@@ -172,34 +142,19 @@ impl SchemaValidator {
         if let (Some(min), Some(max)) = (schema.minimum, schema.maximum) {
             let validator = RangeValidator::new(Some(min), Some(max));
             if let Err(err) = validator.validate(node) {
-                ctx.add_error(ValidationError {
-                    path: ctx.current_path(),
-                    message: err.to_string(),
-                    expected: Some(schema.schema_type.clone()),
-                    actual: node_type_name(node).to_string(),
-                });
+                ctx.add_error(err);
                 return;
             }
         } else if let Some(min) = schema.minimum {
             let validator = RangeValidator::new(Some(min), None);
             if let Err(err) = validator.validate(node) {
-                ctx.add_error(ValidationError {
-                    path: ctx.current_path(),
-                    message: err.to_string(),
-                    expected: Some(schema.schema_type.clone()),
-                    actual: node_type_name(node).to_string(),
-                });
+                ctx.add_error(err);
                 return;
             }
         } else if let Some(max) = schema.maximum {
             let validator = RangeValidator::new(None, Some(max));
             if let Err(err) = validator.validate(node) {
-                ctx.add_error(ValidationError {
-                    path: ctx.current_path(),
-                    message: err.to_string(),
-                    expected: Some(schema.schema_type.clone()),
-                    actual: node_type_name(node).to_string(),
-                });
+                ctx.add_error(err);
                 return;
             }
         }
@@ -208,34 +163,19 @@ impl SchemaValidator {
         if let (Some(min), Some(max)) = (schema.min_length, schema.max_length) {
             let validator = LengthValidator::new(Some(min), Some(max));
             if let Err(err) = validator.validate(node) {
-                ctx.add_error(ValidationError {
-                    path: ctx.current_path(),
-                    message: err.to_string(),
-                    expected: Some(schema.schema_type.clone()),
-                    actual: node_type_name(node).to_string(),
-                });
+                ctx.add_error(err);
                 return;
             }
         } else if let Some(min) = schema.min_length {
             let validator = LengthValidator::new(Some(min), None);
             if let Err(err) = validator.validate(node) {
-                ctx.add_error(ValidationError {
-                    path: ctx.current_path(),
-                    message: err.to_string(),
-                    expected: Some(schema.schema_type.clone()),
-                    actual: node_type_name(node).to_string(),
-                });
+                ctx.add_error(err);
                 return;
             }
         } else if let Some(max) = schema.max_length {
             let validator = LengthValidator::new(None, Some(max));
             if let Err(err) = validator.validate(node) {
-                ctx.add_error(ValidationError {
-                    path: ctx.current_path(),
-                    message: err.to_string(),
-                    expected: Some(schema.schema_type.clone()),
-                    actual: node_type_name(node).to_string(),
-                });
+                ctx.add_error(err);
                 return;
             }
         }
@@ -244,12 +184,7 @@ impl SchemaValidator {
         if let Some(ref pattern) = schema.pattern {
             let validator = PatternValidator::new(pattern.clone());
             if let Err(err) = validator.validate(node) {
-                ctx.add_error(ValidationError {
-                    path: ctx.current_path(),
-                    message: err.to_string(),
-                    expected: Some(schema.schema_type.clone()),
-                    actual: node_type_name(node).to_string(),
-                });
+                ctx.add_error(err);
                 return;
             }
         }
@@ -258,12 +193,7 @@ impl SchemaValidator {
         if let Some(ref allowed) = schema.enum_values {
             let validator = EnumValidator::new(allowed.clone());
             if let Err(err) = validator.validate(node) {
-                ctx.add_error(ValidationError {
-                    path: ctx.current_path(),
-                    message: err.to_string(),
-                    expected: Some(schema.schema_type.clone()),
-                    actual: node_type_name(node).to_string(),
-                });
+                ctx.add_error(err);
                 return;
             }
         }
@@ -305,10 +235,9 @@ impl SchemaValidator {
                                 return;
                             }
                         } else if prop_schema.required {
-                            ctx.add_error(ValidationError::new(
-                                ctx.current_path(),
-                                format!("Required field '{}' is missing", prop_name),
-                            ));
+                            ctx.add_error(ValidationError::RequiredFieldMissing {
+                                field: prop_name.clone(),
+                            });
                         }
                     }
                 }
@@ -463,7 +392,8 @@ mod tests {
 
         let errors = result.unwrap_err();
         assert!(!errors.is_empty());
-        assert!(errors[0].path.contains("user"));
-        assert!(errors[0].path.contains("age"));
+        // No path field anymore; just check error kind
+        let found_required = errors.iter().any(|e| matches!(e, ValidationError::TypeMismatch { .. }));
+        assert!(found_required);
     }
 }

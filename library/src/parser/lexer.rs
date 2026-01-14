@@ -135,7 +135,7 @@ impl<'a> Lexer<'a> {
 
     /// Advance to the next token
     #[inline]
-    pub fn next(&mut self) -> Result<Option<Token>, String> {
+    pub fn next(&mut self) -> Result<Option<Token>, crate::error::YamlError> {
         if let Some(peeked) = self.peeked_token.take() {
             self.current_token = Some(peeked.clone());
             return Ok(Some(peeked));
@@ -149,7 +149,7 @@ impl<'a> Lexer<'a> {
     /// Peek at the next token without consuming it
     #[allow(dead_code)]
     #[inline]
-    pub fn peek(&mut self) -> Result<Option<&Token>, String> {
+    pub fn peek(&mut self) -> Result<Option<&Token>, crate::error::YamlError> {
         if self.peeked_token.is_none() {
             self.peeked_token = self.scan_token()?;
         }
@@ -157,7 +157,7 @@ impl<'a> Lexer<'a> {
     }
 
     /// Scan and return the next token from the source
-    fn scan_token(&mut self) -> Result<Option<Token>, String> {
+    fn scan_token(&mut self) -> Result<Option<Token>, crate::error::YamlError> {
         // Skip whitespace (except at line start where it's indentation)
         if !self.at_line_start {
             self.skip_horizontal_whitespace();
@@ -412,7 +412,7 @@ impl<'a> Lexer<'a> {
 
     /// Emit an indentation token if applicable at line start.
     /// Returns Ok(Some(Token)) if an indent/dedent should be emitted, Ok(None) otherwise.
-    fn emit_indentation_token_if_any(&mut self, ch: char) -> Result<Option<Token>, String> {
+    fn emit_indentation_token_if_any(&mut self, ch: char) -> Result<Option<Token>, crate::error::YamlError> {
         if ch == CHAR_SPACE || ch == CHAR_TAB {
             // Special case: leading tab(s) at line start before a flow collection.
             // YAML allows tabs as horizontal whitespace inside flow collections.
@@ -499,7 +499,7 @@ impl<'a> Lexer<'a> {
     }
 
     /// Scan indentation at line start
-    fn scan_indentation(&mut self, in_flow: bool) -> Result<usize, String> {
+    fn scan_indentation(&mut self, in_flow: bool) -> Result<usize, crate::error::YamlError> {
         let mut count = 0;
         let mut tab_at_start = false;
         let first_char_is_tab = self.source.current() == Some(CHAR_TAB);
@@ -607,7 +607,7 @@ impl<'a> Lexer<'a> {
 
     /// Handle newline characters (LF and CR[LF]) consistently.
     /// If in flow context, suppress newline tokens and continue scanning.
-    fn handle_newline(&mut self, is_cr: bool) -> Result<Option<Token>, String> {
+    fn handle_newline(&mut self, is_cr: bool) -> Result<Option<Token>, crate::error::YamlError> {
         if is_cr {
             #[cfg(feature = "debug-trace")]
             lexer_log(format!(
@@ -665,7 +665,7 @@ impl<'a> Lexer<'a> {
     /// Validate what may follow immediately after a flow closer ('}' or ']')
     /// Consumes any horizontal whitespace; enforces that a comment must be preceded by whitespace.
     /// Also validates that immediate non-whitespace characters are allowed flow delimiters or line breaks.
-    fn validate_post_flow_closer(&mut self, closer: char) -> Result<(), String> {
+    fn validate_post_flow_closer(&mut self, closer: char) -> Result<(), crate::error::YamlError> {
         // Allow any horizontal whitespace before comment
         let mut seen_whitespace = false;
         while let Some(c) = self.source.current() {
@@ -700,9 +700,9 @@ impl<'a> Lexer<'a> {
             {
                 // Check if it's alphanumeric which clearly indicates invalid adjacent content
                 if c.is_alphanumeric() {
-                    return Err(format!(
-                        "YAML syntax error: Invalid content '{}' immediately after '{}' - whitespace or newline required",
-                        c, closer
+                    return Err(crate::parser::document::error_builder::syntax_error(
+                        self.source,
+                        &format!("YAML syntax error: Invalid content '{}' immediately after '{}' - whitespace or newline required", c, closer)
                     ));
                 }
             }
@@ -711,7 +711,7 @@ impl<'a> Lexer<'a> {
     }
 
     /// Scan a tag: !tag or !!tag
-    fn scan_tag(&mut self) -> Result<Token, String> {
+    fn scan_tag(&mut self) -> Result<Token, crate::error::YamlError> {
         self.source.next(); // consume '!'
 
         let is_double = if self.source.current() == Some('!') {
@@ -763,7 +763,7 @@ impl<'a> Lexer<'a> {
     }
 
     /// Scan an anchor: &name
-    fn scan_anchor(&mut self) -> Result<Token, String> {
+    fn scan_anchor(&mut self) -> Result<Token, crate::error::YamlError> {
         self.source.next(); // consume '&'
 
         let mut name = String::new();
@@ -810,7 +810,7 @@ impl<'a> Lexer<'a> {
     }
 
     /// Scan an alias: *name
-    fn scan_alias(&mut self) -> Result<Token, String> {
+    fn scan_alias(&mut self) -> Result<Token, crate::error::YamlError> {
         self.source.next(); // consume '*'
 
         let mut name = String::new();
@@ -841,7 +841,7 @@ impl<'a> Lexer<'a> {
     }
 
     /// Scan a directive: %YAML or %TAG
-    fn scan_directive(&mut self) -> Result<Token, String> {
+    fn scan_directive(&mut self) -> Result<Token, crate::error::YamlError> {
         self.source.next(); // consume '%'
 
         let content = self.scan_until_newline();
@@ -849,7 +849,7 @@ impl<'a> Lexer<'a> {
     }
 
     /// Scan a single-quoted scalar
-    fn scan_single_quoted(&mut self) -> Result<Token, String> {
+    fn scan_single_quoted(&mut self) -> Result<Token, crate::error::YamlError> {
         self.source.next(); // consume opening quote
 
         let mut content = String::new();
@@ -897,7 +897,7 @@ impl<'a> Lexer<'a> {
     }
 
     /// Scan a double-quoted scalar
-    fn scan_double_quoted(&mut self) -> Result<Token, String> {
+    fn scan_double_quoted(&mut self) -> Result<Token, crate::error::YamlError> {
         self.source.next(); // consume opening quote
 
         let mut content = String::new();
@@ -1083,18 +1083,18 @@ impl<'a> Lexer<'a> {
                             match char::from_u32(code) {
                                 Some(ch) => content.push(ch),
                                 None => {
-                                    return Err(format!(
-                                        "YAML compliance error: Invalid unicode codepoint U+{:08X}",
-                                        code
+                                    return Err(crate::parser::document::error_builder::syntax_error(
+                                        self.source,
+                                        &format!("YAML compliance error: Invalid unicode codepoint U+{:08X}", code)
                                     ));
                                 }
                             }
                         }
                         // Invalid escape sequences - reject per YAML 1.2 spec
                         Some(c) => {
-                            return Err(format!(
-                                "YAML compliance error: Invalid escape sequence '\\{}' in double-quoted string",
-                                c
+                            return Err(crate::parser::document::error_builder::syntax_error(
+                                self.source,
+                                &format!("YAML compliance error: Invalid escape sequence '\\{}' in double-quoted string", c)
                             ));
                         }
                         None => {
@@ -1102,7 +1102,10 @@ impl<'a> Lexer<'a> {
                             eprintln!(
                                 "DEBUG: Unterminated double-quoted string: reached EOF after escape"
                             );
-                            return Err("YAML compliance error: Unterminated double-quoted string (unexpected EOF after escape)".to_string());
+                            return Err(crate::parser::document::error_builder::syntax_error(
+                                self.source,
+                                "YAML compliance error: Unterminated double-quoted string (unexpected EOF after escape)"
+                            ));
                         }
                     }
                 }
@@ -1128,10 +1131,10 @@ impl<'a> Lexer<'a> {
                 None => {
                     #[cfg(debug_assertions)]
                     eprintln!("DEBUG: Unterminated double-quoted string: reached EOF");
-                    return Err(
+                    return Err(crate::parser::document::error_builder::syntax_error(
+                        self.source,
                         "YAML compliance error: Unterminated double-quoted string (unexpected EOF)"
-                            .to_string(),
-                    );
+                    ));
                 }
             }
         }
@@ -1140,7 +1143,7 @@ impl<'a> Lexer<'a> {
     }
 
     /// Scan a plain (unquoted) scalar
-    fn scan_plain_scalar(&mut self) -> Result<Token, String> {
+    fn scan_plain_scalar(&mut self) -> Result<Token, crate::error::YamlError> {
         let mut content = String::new();
 
         loop {

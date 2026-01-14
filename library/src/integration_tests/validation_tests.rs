@@ -18,10 +18,11 @@ mod tests {
             "Should reject content after document end marker"
         );
         if let Err(e) = result {
+            let e_str = e.to_string();
             assert!(
-                e.contains("Invalid content") || e.contains("document end"),
+                e_str.contains("Invalid content") || e_str.contains("document end"),
                 "Error: {}",
-                e
+                e_str
             );
         }
     }
@@ -38,10 +39,11 @@ mod tests {
             result
         );
         if let Err(e) = result {
+            let e_str = e.to_string().to_lowercase();
             assert!(
-                e.to_lowercase().contains("tab"),
+                e_str.contains("tab"),
                 "Error should mention tabs: {}",
-                e
+                e_str
             );
         }
     }
@@ -83,10 +85,11 @@ mod tests {
             "Should reject tabs as indentation in flow collections"
         );
         if let Err(e) = result {
+            let e_str = e.to_string().to_lowercase();
             assert!(
-                e.to_lowercase().contains("tab"),
+                e_str.contains("tab"),
                 "Error should mention tabs: {}",
-                e
+                e_str
             );
         }
     }
@@ -122,10 +125,11 @@ mod tests {
             "Should reject block scalar with indentation indicator 0"
         );
         if let Err(e) = result {
+            let e_str = e.to_string();
             assert!(
-                e.contains("indentation indicator") && e.contains("1-9"),
+                e_str.contains("indentation indicator") && e_str.contains("1-9"),
                 "Error: {}",
-                e
+                e_str
             );
         }
     }
@@ -140,10 +144,11 @@ mod tests {
             "Should reject block scalar with indentation indicator 10"
         );
         if let Err(e) = result {
+            let e_str = e.to_string();
             assert!(
-                e.contains("single digit") && e.contains("1-9"),
+                e_str.contains("single digit") && e_str.contains("1-9"),
                 "Error: {}",
-                e
+                e_str
             );
         }
     }

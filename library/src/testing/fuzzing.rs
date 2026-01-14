@@ -242,8 +242,8 @@ pub fn fuzz_parse(yaml: &str) -> FuzzResult {
         Ok(_) => FuzzResult::Pass,
         Err(e) => {
             // Parser returned error - this is fine
-            if e.contains("panic") || e.contains("overflow") {
-                FuzzResult::Crash(e)
+            if e.message().contains("panic") || e.message().contains("overflow") {
+                FuzzResult::Crash(e.to_string())
             } else {
                 FuzzResult::Pass
             }

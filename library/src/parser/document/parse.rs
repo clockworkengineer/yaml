@@ -175,11 +175,9 @@ fn check_explicit_directives(
             | None => {
                 source.restore_state(st);
                 let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-                return Err(crate::error::YamlError::from(
-                    helpers::parse_error_token(
-                        &ts,
-                        "Directive must be followed by a document",
-                    ),
+                return Err(helpers::parse_error_token(
+                    &ts,
+                    "Directive must be followed by a document",
                 ));
             }
             _ => {}
@@ -205,7 +203,7 @@ fn check_explicit_directives(
 ///
 /// Result containing a Documents Node with all parsed documents or an error string
 
-pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
+pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
     #[cfg(feature = "debug-trace")]
     log::debug!("parse: begin stream");
     let mut docs: Vec<Node> = Vec::new();
@@ -233,7 +231,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
         directives
             .tag_prefixes
             .extend(parsed_directives.tag_prefixes);
-        check_explicit_directives(source, &directives).map_err(|e| e.to_string())?;
+        check_explicit_directives(source, &directives)?;
 
         // Detect if there is a document start marker (---) at the current position
         let has_document_start = {
@@ -247,7 +245,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
             res
         };
 
-        let marker_res = parse_document_markers(source, &directives).map_err(|e| e.to_string());
+        let marker_res = parse_document_markers(source, &directives);
         #[cfg(feature = "debug-trace")]
         log::debug!("parse: parse_document_markers result: {:?}", marker_res);
         if let Err(err) = marker_res {
@@ -282,7 +280,7 @@ pub fn parse(source: &mut dyn ISource) -> Result<Node, String> {
         let document = parse_document(source, 0, &directives);
 
         // After parsing document, check for invalid trailing content before doc end
-        if document.is_ok() {
+        if let Ok(_) = document {
             crate::utils::skip_whitespace_and_comments(source);
             let st = source.save_state();
             if let Ok(mut ts) =

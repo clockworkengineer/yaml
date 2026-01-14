@@ -139,7 +139,7 @@ mod tests {
                         // If parsing fails, ensure it's a proper error
                         let err = result.unwrap_err();
                         assert!(
-                            !err.is_empty(),
+                            !err.to_string().is_empty(),
                             "Error message should not be empty for {}",
                             file_path
                         );
@@ -336,7 +336,7 @@ mod tests {
                         Err(e) => {
                             // If parsing fails, ensure error is descriptive
                             assert!(
-                                !e.is_empty(),
+                                !e.to_string().is_empty(),
                                 "Error message should be descriptive for {}",
                                 file_path
                             );

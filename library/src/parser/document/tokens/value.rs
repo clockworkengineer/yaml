@@ -6,8 +6,9 @@
 use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
 use crate::parser::directives::DirectiveContext;
 use crate::parser::document::error_builder::{
-    mapping_key_error_yaml, syntax_error, to_string_error,
+    mapping_key_error_yaml, syntax_error,
 };
+use crate::error::{YamlError, ErrorKind};
 const MAX_NESTING_DEPTH: usize = 128;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
@@ -210,9 +211,12 @@ pub fn parse_value_with_tokens(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
     depth: usize,
-) -> Result<Node, String> {
+) -> crate::parser::ParseResult<Node> {
     if depth > MAX_NESTING_DEPTH {
-        return Err("Nesting too deep: possible malicious or malformed YAML".to_string());
+        return Err(YamlError::new(
+            ErrorKind::ValidationError,
+            "Nesting too deep: possible malicious or malformed YAML",
+        ));
     }
     #[cfg(feature = "debug-trace")]
     log::debug!(
@@ -456,16 +460,16 @@ pub fn parse_value_with_tokens(
             // If the decorated value resolved to an alias, treat this as a
             // structural error rather than accepting an anchored alias.
             if matches!(result, Node::Alias(_)) {
-                return Err(to_string_error(mapping_key_error_yaml(
+                return Err(mapping_key_error_yaml(
                     stream.source_mut(),
                     "Invalid anchored alias: anchors cannot be applied to alias nodes",
-                )));
+                ));
             }
             if matches!(result, Node::Anchored(_, _)) {
-                return Err(to_string_error(mapping_key_error_yaml(
+                return Err(mapping_key_error_yaml(
                     stream.source_mut(),
                     "A node cannot have multiple anchors",
-                )));
+                ));
             }
             result = Node::Anchored(Box::new(result), anchor_name);
         }
@@ -489,7 +493,7 @@ fn parse_value_content(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
     depth: usize,
-) -> Result<Node, String> {
+) -> crate::parser::ParseResult<Node> {
     #[cfg(feature = "debug-trace")]
     log::debug!(
         "value_tokens: parse_value_content at token = {:?}",
@@ -715,9 +719,10 @@ mod tests {
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
         let err = parse_value_with_tokens(&mut stream, &directives, 0).unwrap_err();
+        let err_str = err.to_string().to_ascii_lowercase();
         assert!(
-            err.to_ascii_lowercase().contains("duplicate anchor")
-                || err.to_ascii_lowercase().contains("multiple anchors")
+            err_str.contains("duplicate anchor")
+                || err_str.contains("multiple anchors")
         );
     }
 

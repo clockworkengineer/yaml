@@ -13,7 +13,7 @@ mod test_comma_validation {
             "Should reject leading comma in flow sequence"
         );
         if let Err(e) = result {
-            assert!(e.contains("comma"), "Error should mention comma: {}", e);
+            assert!(e.to_string().contains("comma"), "Error should mention comma: {}", e);
         }
     }
 
@@ -28,10 +28,11 @@ mod test_comma_validation {
             "Should reject double comma in flow sequence"
         );
         if let Err(e) = result {
+            let e_str = e.to_string();
             assert!(
-                e.contains("comma") || e.contains("consecutive"),
+                e_str.contains("comma") || e_str.contains("consecutive"),
                 "Error should mention comma: {}",
-                e
+                e_str
             );
         }
     }

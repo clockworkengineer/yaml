@@ -32,7 +32,7 @@ pub fn parse_sequence_with_tokens(
     directives: &DirectiveContext,
     ctx: &ParsingContext,
     depth: usize,
-) -> Result<Node, String> {
+) -> crate::parser::ParseResult<Node> {
     #[cfg(feature = "debug-trace")]
     log::debug!(
         "sequence_tokens: start parse_sequence_with_tokens at indent {}",

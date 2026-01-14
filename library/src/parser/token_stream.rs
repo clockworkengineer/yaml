@@ -56,7 +56,7 @@ impl<'a> TokenStream<'a> {
         source: &'a mut dyn ISource,
         directives: &'a DirectiveContext,
         in_flow: bool,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, crate::error::YamlError> {
         let mut lexer = Lexer::new(source, in_flow);
         // Load the first token - propagate errors
         lexer.next()?;
@@ -89,7 +89,7 @@ impl<'a> TokenStream<'a> {
 
     /// Advance to the next token
     #[inline]
-    pub fn next(&mut self) -> Result<Option<Token>, String> {
+    pub fn next(&mut self) -> Result<Option<Token>, crate::error::YamlError> {
         // Capture the token we are about to consume so we can update
         // flow depth *before* lexing the next token. This ensures that
         // the lexer sees the correct `in_flow` context when scanning
@@ -143,7 +143,7 @@ impl<'a> TokenStream<'a> {
 
     /// Peek at the next token without consuming it
     #[inline]
-    pub fn peek(&mut self) -> Result<Option<&Token>, String> {
+    pub fn peek(&mut self) -> Result<Option<&Token>, crate::error::YamlError> {
         let res = self.lexer.peek();
         #[cfg(feature = "debug-trace")]
         if let Ok(tok) = res {
@@ -163,20 +163,20 @@ impl<'a> TokenStream<'a> {
 
     /// Expect a specific token and consume it
     #[inline]
-    pub fn expect(&mut self, expected: Token) -> Result<(), String> {
+    pub fn expect(&mut self, expected: Token) -> Result<(), crate::error::YamlError> {
         match self.current() {
             Some(token) if token == &expected => {
                 self.next()?;
                 Ok(())
             }
-            Some(token) => Err(format!("Expected token {:?}, got {:?}", expected, token)),
-            None => Err(format!("Expected token {:?}, got EOF", expected)),
+            Some(_token) => Err(crate::parser::document::error_builder::expected_error(self.source_mut(), &format!("token {:?}", expected))),
+            None => Err(crate::parser::document::error_builder::expected_error(self.source_mut(), &format!("token {:?}", expected))),
         }
     }
 
     /// If the current token matches `expected`, consume it and return true; otherwise return false.
     #[inline]
-    pub fn consume_if(&mut self, expected: Token) -> Result<bool, String> {
+    pub fn consume_if(&mut self, expected: Token) -> Result<bool, crate::error::YamlError> {
         match self.current() {
             Some(token) if token == &expected => {
                 self.next()?;
@@ -188,7 +188,7 @@ impl<'a> TokenStream<'a> {
 
     /// Internal DRY helper: advance while predicate matches current token
     #[inline]
-    fn advance_while(&mut self, mut predicate: impl FnMut(&Token) -> bool) -> Result<(), String> {
+    fn advance_while(&mut self, mut predicate: impl FnMut(&Token) -> bool) -> Result<(), crate::error::YamlError> {
         while self.current().map_or(false, |t| predicate(t)) {
             self.next()?;
         }
@@ -197,7 +197,7 @@ impl<'a> TokenStream<'a> {
 
     /// Skip whitespace tokens (newlines, indents)
     #[inline]
-    pub fn skip_whitespace(&mut self) -> Result<(), String> {
+    pub fn skip_whitespace(&mut self) -> Result<(), crate::error::YamlError> {
         #[cfg(feature = "debug-trace")]
         ts_log(format!(
             "token_stream: skip_whitespace at {:?}",
@@ -208,7 +208,7 @@ impl<'a> TokenStream<'a> {
 
     /// Skip comments
     #[inline]
-    pub fn skip_comments(&mut self) -> Result<(), String> {
+    pub fn skip_comments(&mut self) -> Result<(), crate::error::YamlError> {
         #[cfg(feature = "debug-trace")]
         ts_log(format!(
             "token_stream: skip_comments at {:?}",
@@ -219,7 +219,7 @@ impl<'a> TokenStream<'a> {
 
     /// Skip whitespace and comments
     #[inline]
-    pub fn skip_whitespace_and_comments(&mut self) -> Result<(), String> {
+    pub fn skip_whitespace_and_comments(&mut self) -> Result<(), crate::error::YamlError> {
         #[cfg(feature = "debug-trace")]
         ts_log(format!(
             "token_stream: skip_whitespace_and_comments at {:?}",
@@ -230,13 +230,13 @@ impl<'a> TokenStream<'a> {
 
     /// Alias for skipping all trivia (whitespace + comments) to encourage DRY usage
     #[inline]
-    pub fn skip_trivia(&mut self) -> Result<(), String> {
+    pub fn skip_trivia(&mut self) -> Result<(), crate::error::YamlError> {
         self.skip_whitespace_and_comments()
     }
 
     /// Skip only newlines and comments, preserving `Indent` tokens for dedent detection.
     #[inline]
-    pub fn skip_newlines_and_comments(&mut self) -> Result<(), String> {
+    pub fn skip_newlines_and_comments(&mut self) -> Result<(), crate::error::YamlError> {
         #[cfg(feature = "debug-trace")]
         ts_log(format!(
             "token_stream: skip_newlines_and_comments at {:?}",
@@ -254,7 +254,7 @@ impl<'a> TokenStream<'a> {
     /// inline comment at the end of a content line, and a comment line
     /// appearing before an indented block (as in 8XDJ).
     #[inline]
-    pub fn skip_newlines_and_comments_with_flag(&mut self) -> Result<bool, String> {
+    pub fn skip_newlines_and_comments_with_flag(&mut self) -> Result<bool, crate::error::YamlError> {
         #[cfg(feature = "debug-trace")]
         ts_log(format!(
             "token_stream: skip_newlines_and_comments_with_flag at {:?}",
@@ -304,7 +304,7 @@ impl<'a> TokenStream<'a> {
     /// - anchor then tag: `&name !!str`
     ///
     /// Returns the decorators without resolving tag handles.
-    pub fn consume_decorators(&mut self) -> Result<Decorators, String> {
+    pub fn consume_decorators(&mut self) -> Result<Decorators, crate::error::YamlError> {
         let mut decorators = Decorators::default();
 
         // Allow up to 2 passes to handle both tag and anchor
@@ -371,14 +371,14 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Consume a plain scalar token
-    pub fn consume_plain_scalar(&mut self) -> Result<String, String> {
+    pub fn consume_plain_scalar(&mut self) -> Result<String, crate::error::YamlError> {
         match self.current() {
             Some(Token::Plain(s)) => {
                 let result = s.clone();
                 self.next()?;
                 Ok(result)
             }
-            Some(token) => Err(format!("Expected plain scalar, got {:?}", token)),
+            Some(_token) => Err(crate::parser::document::error_builder::expected_error(self.source_mut(), "plain scalar")),
             None => Err(crate::parser::document::error_builder::syntax_error(
                 self.source_mut(),
                 "Expected plain scalar, got EOF",
@@ -387,14 +387,14 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Consume a quoted scalar token (single or double quoted)
-    pub fn consume_quoted_scalar(&mut self) -> Result<String, String> {
+    pub fn consume_quoted_scalar(&mut self) -> Result<String, crate::error::YamlError> {
         match self.current() {
             Some(Token::SingleQuoted(s)) | Some(Token::DoubleQuoted(s)) => {
                 let result = s.clone();
                 self.next()?;
                 Ok(result)
             }
-            Some(token) => Err(format!("Expected quoted scalar, got {:?}", token)),
+            Some(_token) => Err(crate::parser::document::error_builder::expected_error(self.source_mut(), "quoted scalar")),
             None => Err(crate::parser::document::error_builder::syntax_error(
                 self.source_mut(),
                 "Expected quoted scalar, got EOF",
@@ -403,7 +403,7 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Consume any scalar token (plain, single quoted, or double quoted)
-    pub fn consume_scalar(&mut self) -> Result<(String, ScalarType), String> {
+    pub fn consume_scalar(&mut self) -> Result<(String, ScalarType), crate::error::YamlError> {
         match self.current() {
             Some(Token::Plain(s)) => {
                 let result = s.clone();
@@ -420,7 +420,7 @@ impl<'a> TokenStream<'a> {
                 self.next()?;
                 Ok((result, ScalarType::DoubleQuoted))
             }
-            Some(token) => Err(format!("Expected scalar, got {:?}", token)),
+            Some(_token) => Err(crate::parser::document::error_builder::expected_error(self.source_mut(), "scalar")),
             None => Err(crate::parser::document::error_builder::syntax_error(
                 self.source_mut(),
                 "Expected scalar, got EOF",
@@ -434,7 +434,7 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Check if the next token (after whitespace) is a colon
-    pub fn has_colon_ahead(&mut self) -> Result<bool, String> {
+    pub fn has_colon_ahead(&mut self) -> Result<bool, crate::error::YamlError> {
         // Save position
         let _current_state = self.current().cloned();
 
@@ -460,22 +460,22 @@ impl<'a> TokenStream<'a> {
     /// This enforces YAML 1.2 compliance for key-value separators in flow mappings,
     /// rejecting a double-colon sequence (::) without intervening trivia.
     /// Returns true if a colon was consumed, false if current token is not a colon.
-    pub fn consume_single_colon(&mut self) -> Result<bool, String> {
+    pub fn consume_single_colon(&mut self) -> Result<bool, crate::error::YamlError> {
         match self.current() {
             Some(Token::Colon) => {
                 let _ = self.consume_if(Token::Colon)?;
                 Ok(true)
             }
-            _ => Err("Expected ':' in flow mapping".to_string()),
+            _ => Err(crate::parser::document::error_builder::expected_error(self.source_mut(), ": in flow mapping")),
         }
     }
-    pub fn consume_flow_sequence_end(&mut self) -> Result<bool, String> {
+    pub fn consume_flow_sequence_end(&mut self) -> Result<bool, crate::error::YamlError> {
         self.consume_if(Token::FlowSequenceEnd)
     }
 
     /// DRY helper: consume a flow mapping end ('}') if present.
     #[inline]
-    pub fn consume_flow_mapping_end(&mut self) -> Result<bool, String> {
+    pub fn consume_flow_mapping_end(&mut self) -> Result<bool, crate::error::YamlError> {
         self.consume_if(Token::FlowMappingEnd)
     }
 
@@ -605,7 +605,7 @@ mod tests {
         let mut stream2 = TokenStream::new(&mut source2, &directives, false).unwrap();
         assert!(matches!(stream2.current(), Some(Token::Plain(_))));
         let err = stream2.consume_single_colon().unwrap_err();
-        assert!(err.contains(":"));
+        assert!(err.to_string().contains(":"));
     }
 
     #[test]

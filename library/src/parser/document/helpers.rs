@@ -6,6 +6,7 @@ use crate::nodes::node::Node::Document;
 use crate::parser::ParseResult;
 use crate::parser::document::context::ParsingContext;
 
+use crate::error::YamlError;
 /// Creates a formatted error message with current token context information (TokenStream-based).
 ///
 /// Generates an error message that includes the current token and stream position for debugging.
@@ -18,16 +19,20 @@ use crate::parser::document::context::ParsingContext;
 /// # Returns
 ///
 /// A formatted error string with token context information
+use crate::parser::document::error_builder::{ErrorBuilder, ErrorCategory};
+
 pub(crate) fn parse_error_token(
     stream: &crate::parser::token_stream::TokenStream,
     msg: &str,
-) -> String {
+) -> YamlError {
     let current = match stream.current() {
         Some(tok) => format!("{:?}", tok),
         None => "<EOF>".to_string(),
     };
     let pos = stream.stream_position();
-    format!("{} (token: {}, pos: {})", msg, current, pos)
+    ErrorBuilder::new(ErrorCategory::Syntax)
+        .message(&format!("{} (token: {}, pos: {})", msg, current, pos))
+        .build_yaml()
 }
 
 /// Unified indentation and whitespace validation entry point.
@@ -78,11 +83,8 @@ pub(crate) fn validate_indentation_and_whitespace(
 pub(crate) fn validate_no_tab_indentation_tokens(
     stream: &TokenStream,
     ctx: &ParsingContext,
-) -> Result<(), String> {
-    // Legacy wrapper: keep String-based result for older call sites by
-    // mapping the internal YamlError back to String.
+) -> crate::parser::ParseResult<()> {
     crate::parser::utils::indentation::validate_indentation_tokens(stream, ctx)
-        .map_err(|e| e.to_string())
 }
 
 /// Determines if a node represents blank or empty content.
@@ -267,7 +269,7 @@ pub(crate) fn classify_block_head(
 /// content is encountered before the newline.
 pub(crate) fn validate_no_inline_content_after_document_end(
     stream: &mut TokenStream,
-) -> Result<(), String> {
+) -> crate::parser::ParseResult<()> {
     loop {
         match stream.source_mut().current() {
             Some(' ') | Some('\t') => {
@@ -302,7 +304,7 @@ pub(crate) fn validate_no_inline_content_after_document_end(
 /// higher-level callers have a single, self-documenting API to use.
 pub(crate) fn validate_trailing_content_after_document_end(
     stream: &mut TokenStream,
-) -> Result<(), String> {
+) -> crate::parser::ParseResult<()> {
     validate_no_inline_content_after_document_end(stream)
 }
 
@@ -340,7 +342,7 @@ pub(crate) fn parse_comment_token(stream: &mut crate::parser::token_stream::Toke
 #[allow(dead_code)]
 pub(crate) fn validate_comment_spacing_token(
     stream: &crate::parser::token_stream::TokenStream,
-) -> Result<(), String> {
+) -> crate::parser::ParseResult<()> {
     use crate::parser::lexer::Token;
     // Only validate if current token is a Comment
     if let Some(Token::Comment(_)) = stream.current() {
@@ -402,10 +404,11 @@ mod tests {
             "TokenStream should error on tabs in block context"
         );
         if let Err(ref err) = ts_result {
+            let err_str = err.to_string();
             assert!(
-                err.contains("Tabs") && err.contains("not allowed"),
+                err_str.contains("Tabs") && err_str.contains("not allowed"),
                 "Error: {}",
-                err
+                err_str
             );
             return;
         }
@@ -536,10 +539,11 @@ mod tests {
             "TokenStream should error on tabs in block context"
         );
         if let Err(ref err) = ts_result {
+            let err_str = err.to_string();
             assert!(
-                err.contains("Tabs") && err.contains("not allowed"),
+                err_str.contains("Tabs") && err_str.contains("not allowed"),
                 "Error: {}",
-                err
+                err_str
             );
             return;
         }
@@ -590,10 +594,11 @@ mod tests {
             "TokenStream should error on tabs in block context"
         );
         if let Err(ref err) = ts_result {
+            let err_str = err.to_string();
             assert!(
-                err.contains("Tabs") && err.contains("not allowed"),
+                err_str.contains("Tabs") && err_str.contains("not allowed"),
                 "Error: {}",
-                err
+                err_str
             );
             return;
         }

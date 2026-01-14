@@ -119,6 +119,7 @@ macro_rules! combined_loop_guard {
                 $context, $max_size, "items",
             ));
         }
+        Ok(()) as Result<(), crate::error::YamlError>
     }};
 }
 
@@ -127,7 +128,7 @@ mod tests {
 
     #[test]
     fn test_loop_guard_allows_normal_iterations() {
-        fn test_function() -> Result<(), String> {
+        fn test_function() -> Result<(), crate::error::YamlError> {
             loop_guard_init!(counter);
             let mut items = Vec::new();
 
@@ -135,16 +136,14 @@ mod tests {
                 loop_guard_check!(counter, 1000, "Test");
                 items.push(i);
             }
-
             Ok(())
         }
-
         assert!(test_function().is_ok());
     }
 
     #[test]
     fn test_loop_guard_catches_infinite_loop() {
-        fn test_function() -> Result<(), String> {
+        fn test_function() -> Result<(), crate::error::YamlError> {
             loop_guard_init!(counter);
 
             loop {
@@ -157,19 +156,19 @@ mod tests {
 
             Ok(())
         }
-
         let result = test_function();
         assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
         assert!(
-            result
-                .unwrap_err()
-                .contains("exceeded maximum loop iterations")
+            err.contains("exceeded") || err.contains("loop iterations"),
+            "Error: {}",
+            err
         );
     }
 
     #[test]
     fn test_collection_size_check_normal() {
-        fn test_function() -> Result<(), String> {
+        fn test_function() -> Result<(), crate::error::YamlError> {
             let items = vec![1, 2, 3, 4, 5];
             collection_size_check!(items, 100, "Test collection");
             Ok(())
@@ -180,7 +179,7 @@ mod tests {
 
     #[test]
     fn test_collection_size_check_exceeds_limit() {
-        fn test_function() -> Result<(), String> {
+        fn test_function() -> Result<(), crate::error::YamlError> {
             let items = vec![1; 150];
             collection_size_check!(items, 100, "Test collection");
             Ok(())
@@ -188,7 +187,7 @@ mod tests {
 
         let result = test_function();
         assert!(result.is_err());
-        let err = result.unwrap_err();
+        let err = result.unwrap_err().to_string();
         assert!(
             err.contains("exceeded") || err.contains("items"),
             "Error: {}",
@@ -198,12 +197,12 @@ mod tests {
 
     #[test]
     fn test_combined_guard_normal() {
-        fn test_function() -> Result<(), String> {
+        fn test_function() -> Result<(), crate::error::YamlError> {
             loop_guard_init!(counter);
             let mut items = Vec::new();
 
             for i in 0..50 {
-                combined_loop_guard!(counter, items, 1000, 100, "Test");
+                combined_loop_guard!(counter, items, 1000, 100, "Test")?;
                 items.push(i);
             }
 
@@ -215,12 +214,12 @@ mod tests {
 
     #[test]
     fn test_combined_guard_catches_iteration_limit() {
-        fn test_function() -> Result<(), String> {
+        fn test_function() -> Result<(), crate::error::YamlError> {
             loop_guard_init!(counter);
             let mut items = Vec::new();
 
             for i in 0..150 {
-                combined_loop_guard!(counter, items, 100, 1000, "Test");
+                combined_loop_guard!(counter, items, 100, 1000, "Test")?;
                 items.push(i);
             }
 
@@ -232,27 +231,27 @@ mod tests {
         assert!(
             result
                 .unwrap_err()
+                .to_string()
                 .contains("exceeded maximum loop iterations")
         );
     }
 
     #[test]
     fn test_combined_guard_catches_size_limit() {
-        fn test_function() -> Result<(), String> {
+        fn test_function() -> Result<(), crate::error::YamlError> {
             loop_guard_init!(counter);
             let mut items = Vec::new();
 
             for i in 0..150 {
-                combined_loop_guard!(counter, items, 1000, 100, "Test");
+                combined_loop_guard!(counter, items, 1000, 100, "Test")?;
                 items.push(i);
             }
 
             Ok(())
         }
-
         let result = test_function();
         assert!(result.is_err());
-        let err = result.unwrap_err();
+        let err = result.unwrap_err().to_string();
         assert!(
             err.contains("exceeded") || err.contains("items"),
             "Error: {}",

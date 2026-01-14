@@ -100,12 +100,11 @@ pub fn parse_document(
     source: &mut dyn ISource,
     indent_level: usize,
     directives: &DirectiveContext,
-) -> Result<Node, String> {
+) -> ParseResult<Node> {
     #[cfg(feature = "debug-trace")]
     log::debug!("parse_document: start at indent {}", indent_level);
     crate::utils::skip_whitespace_and_comments(source);
-    let document_nodes =
-        parse_document_main_loop(source, indent_level, directives).map_err(|e| e.to_string())?;
+    let document_nodes = parse_document_main_loop(source, indent_level, directives)?;
 
     // Mapping-value-specific validation for H7J7-style cases:
     // Detect a document shape where a mapping with an anchored empty
@@ -136,13 +135,11 @@ pub fn parse_document(
             });
 
             if has_anchored_empty_value && has_top_level_map_tagged_key {
-                use crate::parser::document::error_builder::{
-                    mapping_key_error_yaml, to_string_error,
-                };
-                return Err(to_string_error(mapping_key_error_yaml(
+                use crate::parser::document::error_builder::mapping_key_error_yaml;
+                return Err(mapping_key_error_yaml(
                     source,
                     "Invalid anchored mapping value: node-anchor-not-indented (H7J7) where an anchor attaches only to an empty scalar and a separate !!map mapping appears at the same mapping level.",
-                )));
+                ));
             }
         }
     }

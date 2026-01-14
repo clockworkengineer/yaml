@@ -26,7 +26,7 @@ fn test_b63p_directive_with_only_end_marker() {
         Err(e) => {
             println!("Error (expected): {}", e);
             assert!(
-                e.contains("Directive must be followed by a document"),
+                e.message().contains("Directive must be followed by a document"),
                 "Error message should mention directive requirement"
             );
         }

@@ -51,7 +51,7 @@ mod tests {
         fn parse_one(
             input: &str,
             directives: &crate::parser::directives::DirectiveContext,
-        ) -> Result<Node, String> {
+        ) -> crate::parser::ParseResult<Node> {
             let mut src = Buffer::new(input.as_bytes());
             let mut stream =
                 crate::parser::token_stream::TokenStream::new(&mut src, directives, false)?;

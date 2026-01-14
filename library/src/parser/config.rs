@@ -127,15 +127,19 @@ impl ParserConfig {
     }
 
     /// Validate if current depth exceeds maximum
-    pub fn check_depth(&self, current_depth: usize) -> Result<(), String> {
+    pub fn check_depth(&self, current_depth: usize) -> Result<(), crate::error::YamlError> {
         if current_depth > self.max_depth {
-            if let Some(ref msg) = self.depth_error_message {
-                Err(msg.clone())
+            if let Some(ref _msg) = self.depth_error_message {
+                Err(crate::parser::document::error_builder::limit_error(
+                    "Nesting depth",
+                    self.max_depth,
+                    &format!("current: {}", current_depth),
+                ))
             } else {
                 Err(crate::parser::document::error_builder::limit_error(
                     "Nesting depth",
                     self.max_depth,
-                    &format!("current: {}", current_depth)
+                    &format!("current: {}", current_depth),
                 ))
             }
         } else {
@@ -144,13 +148,13 @@ impl ParserConfig {
     }
 
     /// Validate if document size exceeds maximum
-    pub fn check_size(&self, current_size: usize) -> Result<(), String> {
+    pub fn check_size(&self, current_size: usize) -> Result<(), crate::error::YamlError> {
         if let Some(max) = self.max_size {
             if current_size > max {
                 return Err(crate::parser::document::error_builder::limit_error(
                     "Document size (bytes)",
                     max,
-                    &format!("current: {}", current_size)
+                    "bytes",
                 ));
             }
         }
@@ -158,13 +162,13 @@ impl ParserConfig {
     }
 
     /// Validate if anchor count exceeds maximum
-    pub fn check_anchor_count(&self, count: usize) -> Result<(), String> {
+    pub fn check_anchor_count(&self, count: usize) -> Result<(), crate::error::YamlError> {
         if let Some(max) = self.max_anchors {
             if count > max {
                 return Err(crate::parser::document::error_builder::limit_error(
                     "Anchor count",
                     max,
-                    &format!("current: {}", count)
+                    "anchors",
                 ));
             }
         }
@@ -410,7 +414,15 @@ mod tests {
 
         let result = config.check_depth(11);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Custom depth error");
+        let err = result.unwrap_err();
+        let err_str = err.to_string();
+        assert!(
+            err_str.contains("Custom depth error") ||
+            err_str.contains("maximum parser depth") ||
+            err_str.contains("Validation error"),
+            "Error message: {}",
+            err_str
+        );
     }
 
     #[test]

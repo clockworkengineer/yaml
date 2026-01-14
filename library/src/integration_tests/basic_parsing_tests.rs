@@ -67,7 +67,7 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(
-            err.contains("Unexpected character: @"),
+            err.to_string().contains("Unexpected character: @"),
             "unexpected error: {}",
             err
         );

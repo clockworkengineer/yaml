@@ -9,11 +9,12 @@ pub(crate) fn parse_scalar_with_tokens(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
     _depth: usize,
-) -> Result<Node, String> {
+) -> crate::parser::ParseResult<Node> {
     // Recursion guard removed
-    // Clone the current token to avoid holding an immutable borrow while advancing the stream.
-    let current = stream.current().cloned();
-    match current {
+    // Capture the current token to avoid borrow checker issues in error path.
+    let current_token = stream.current().cloned();
+    let current_token_str = format!("{:?}", current_token);
+    match current_token {
         Some(Token::SingleQuoted(s)) => {
             stream.next()?;
             Ok(Node::Str(s, QuoteType::Single, BlockStyle::None))
@@ -302,10 +303,12 @@ pub(crate) fn parse_scalar_with_tokens(
                 }
             }
         }
-        _ => Err(format!(
-            "Expected a scalar token, got {:?}",
-            stream.current()
-        )),
+        _ => {
+            Err(syntax_error(
+                stream.source_mut(),
+                &format!("Expected a scalar token, got {}", current_token_str),
+            ))
+        },
     }
 }
 // Module: parser/document/scalar.rs
@@ -390,6 +393,7 @@ mod tests {
         let res = parse_scalar_with_tokens(&mut stream, &directives, 0);
         assert!(res.is_err());
         let err = res.unwrap_err();
-        assert!(err.contains("indentation"));
+        // Check error kind or message from YamlError
+        assert!(err.to_string().contains("indentation"));
     }
 }

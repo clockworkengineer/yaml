@@ -220,7 +220,7 @@ pub use utils::string_interner::StringInterner;
 // Validation API
 /// Validation engine and error types
 #[cfg(feature = "alloc")]
-pub use validation::engine::{SchemaValidator, ValidationContext, ValidationError};
+pub use validation::engine::{SchemaValidator, ValidationContext};
 /// Schema types for defining validation rules
 #[cfg(feature = "alloc")]
 pub use validation::schema::{ArraySchema, ObjectSchema, PropertySchema, Schema, SchemaType};

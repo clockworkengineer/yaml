@@ -40,7 +40,7 @@ fn parse_and_normalize_explicit_key(source: &mut dyn ISource) -> ParseResult<Nod
 pub fn parse_multiple_explicit_keys(
     source: &mut dyn ISource,
     _indent_level: usize,
-) -> Result<Node, String> {
+) -> crate::parser::ParseResult<Node> {
     use crate::parser::directives::DirectiveContext;
     use crate::parser::token_stream::TokenStream;
     let mut pairs: Vec<(Node, Node)> = Vec::new();
@@ -154,7 +154,7 @@ pub(crate) fn parse_explicit_mapping_entry(
 pub(crate) fn collect_explicit_keys_block(
     stream: &mut TokenStream,
     directives: &crate::parser::directives::DirectiveContext,
-) -> Result<Vec<(Node, Node)>, String> {
+) -> Result<Vec<(Node, Node)>, crate::error::YamlError> {
     let mut pairs: Vec<(Node, Node)> = Vec::new();
     // Combined guard on iterations and number of collected pairs
     loop_guard_init!(explicit_block_counter);
@@ -165,14 +165,13 @@ pub(crate) fn collect_explicit_keys_block(
             crate::parser::document::loop_guards::MAX_LOOP_ITERATIONS,
             crate::parser::document::loop_guards::MAX_MAPPING_PAIRS,
             "Explicit key block"
-        );
+        )?;
         // Skip trivia before checking for next explicit key
         stream.skip_trivia()?;
         if !matches!(stream.current(), Some(Token::QuestionMark)) {
             break;
         }
-        let (key, value) =
-            parse_explicit_mapping_entry(stream, directives).map_err(|e| e.to_string())?;
+        let (key, value) = parse_explicit_mapping_entry(stream, directives)?;
         pairs.push((key, value));
         // Continue loop to fetch next explicit key at same level
     }

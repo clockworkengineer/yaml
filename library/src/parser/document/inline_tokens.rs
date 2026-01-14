@@ -43,7 +43,7 @@ pub fn parse_inline_sequence_with_tokens(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
     depth: usize,
-) -> Result<Node, String> {
+) -> crate::parser::ParseResult<Node> {
     #[cfg(feature = "debug-trace")]
     log::debug!(
         "inline_tokens: start flow sequence at token = {:?}",
@@ -203,11 +203,11 @@ pub fn parse_inline_sequence_with_tokens(
     if items.len() == 2 {
         if let (Node::Str(s1, ..), Node::Str(s2, ..)) = (&items[0], &items[1]) {
             if s1 == "-" && s2 == "-" {
-                use crate::parser::document::error_builder::{mapping_key_error_yaml, to_string_error};
-                return Err(to_string_error(mapping_key_error_yaml(
+                use crate::parser::document::error_builder::mapping_key_error_yaml;
+                return Err(mapping_key_error_yaml(
                     stream.source_mut(),
                     "Invalid use of '-' indicators inside flow sequence",
-                )));
+                ));
             }
         }
     }
@@ -228,7 +228,7 @@ pub fn parse_inline_mapping_with_tokens(
     directives: &DirectiveContext,
     depth: usize,
     is_set: bool,
-) -> Result<Node, String> {
+) -> crate::parser::ParseResult<Node> {
     #[cfg(feature = "debug-trace")]
     inline_log(format!(
         "ENTER parse_inline_mapping_with_tokens, current token: {:?}",
@@ -443,7 +443,7 @@ fn ensure_progress(
     before: usize,
     after: usize,
     context: &str,
-) -> Result<(), String> {
+) -> crate::parser::ParseResult<()> {
     if before == after {
         return Err(syntax_error(
             stream.source_mut(),

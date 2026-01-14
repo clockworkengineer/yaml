@@ -54,14 +54,15 @@ impl Validator for TypeValidator {
             (SchemaType::Any, _) => true,
             _ => false,
         };
-
         if matches {
             Ok(())
         } else {
-            Err(ValidationError::TypeMismatch {
-                expected: format!("{:?}", self.expected_type),
-                found: node_type_name(node).to_string(),
-            })
+            Err(
+                crate::validation::engine::ValidationContextCore::fail_type_mismatch(
+                    &self.expected_type,
+                    node,
+                ),
+            )
         }
     }
 
@@ -392,7 +393,7 @@ impl Validator for CustomValidator {
 }
 
 /// Get human-readable name for node type
-fn node_type_name(node: &Node) -> &'static str {
+pub fn node_type_name(node: &Node) -> &'static str {
     match node {
         Node::Boolean(_) => "Boolean",
         Node::Number(_) => "Number",

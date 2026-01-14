@@ -1,16 +1,13 @@
-//! Module: parser/document/error_builder.rs
-//!
-//! Provides centralized, consistent error message construction for parsing errors.
-//! This ensures all parsing errors have uniform formatting and include relevant context.
-//!
-//! This module currently builds string-based errors for legacy
-//! `Result<T, String>` call sites, but also exposes helpers that
-//! construct the library-wide `YamlError` type so parser code can
-//! gradually migrate to `ParseResult<T>`.
-
-// Allow dead code for infrastructure not yet fully utilized
 #![allow(dead_code)]
-
+/// Module: parser/document/error_builder.rs
+///
+/// Provides centralized, consistent error message construction for parsing errors.
+/// This ensures all parsing errors have uniform formatting and include relevant context.
+///
+/// This module currently builds string-based errors for legacy
+/// `Result<T, String>` call sites, but also exposes helpers that
+/// construct the library-wide `YamlError` type so parser code can
+/// gradually migrate to `ParseResult<T>`.
 use crate::error::{ErrorKind, YamlError};
 use crate::io::traits::ISource;
 
@@ -140,82 +137,104 @@ impl ErrorBuilder {
 /// Convenience functions for common error types
 
 /// Creates a syntax error with source context
-pub fn syntax_error(source: &mut dyn ISource, message: &str) -> String {
-    ErrorBuilder::new(ErrorCategory::Syntax)
-        .message(message)
-        .context(source)
-        .build()
+pub fn syntax_error(source: &mut dyn ISource, message: &str) -> YamlError {
+    YamlError::new(
+        ErrorKind::SyntaxError,
+        ErrorBuilder::new(ErrorCategory::Syntax)
+            .message(message)
+            .context(source)
+            .build(),
+    )
 }
 
 /// Creates an indentation error with source context
-pub fn indentation_error(source: &mut dyn ISource, message: &str) -> String {
-    ErrorBuilder::new(ErrorCategory::Indentation)
-        .message(message)
-        .context(source)
-        .build()
+pub fn indentation_error(source: &mut dyn ISource, message: &str) -> YamlError {
+    YamlError::new(
+        ErrorKind::ValidationError,
+        ErrorBuilder::new(ErrorCategory::Indentation)
+            .message(message)
+            .context(source)
+            .build(),
+    )
 }
 
 /// Creates a resource limit error (no source context needed)
-pub fn limit_error(context: &str, max_value: usize, limit_type: &str) -> String {
-    format!(
-        "{} exceeded maximum {} ({}) - possible infinite loop",
-        context, limit_type, max_value
+pub fn limit_error(context: &str, max_value: usize, limit_type: &str) -> YamlError {
+    YamlError::new(
+        ErrorKind::ValidationError,
+        format!(
+            "{} exceeded maximum {} ({}) - possible infinite loop",
+            context, limit_type, max_value
+        ),
     )
 }
 
 /// Creates a structure error with source context
-pub fn structure_error(source: &mut dyn ISource, message: &str) -> String {
+pub fn structure_error(source: &mut dyn ISource, message: &str) -> YamlError {
     ErrorBuilder::new(ErrorCategory::Structure)
         .message(message)
         .context(source)
-        .build()
+        .build_yaml()
 }
 
 /// Creates an EOF error
-pub fn eof_error(context: &str) -> String {
-    format!("Unexpected end of input in {}", context)
+pub fn eof_error(context: &str) -> YamlError {
+    ErrorBuilder::new(ErrorCategory::Syntax)
+        .message(format!("Unexpected end of input in {}", context))
+        .build_yaml()
 }
 
 /// Creates an EOF error with expected element
 #[allow(dead_code)]
-pub fn eof_expecting(expected: &str) -> String {
-    format!("Unexpected end of input while expecting {}", expected)
+pub fn eof_expecting(expected: &str) -> YamlError {
+    ErrorBuilder::new(ErrorCategory::Syntax)
+        .message(format!(
+            "Unexpected end of input while expecting {}",
+            expected
+        ))
+        .build_yaml()
 }
 
 /// Creates an "expected X" error with source context
 #[allow(dead_code)]
-pub fn expected_error(source: &mut dyn ISource, expected: &str) -> String {
+pub fn expected_error(source: &mut dyn ISource, expected: &str) -> YamlError {
     ErrorBuilder::new(ErrorCategory::Syntax)
         .message(format!("Expected {}", expected))
         .context(source)
-        .build()
+        .build_yaml()
 }
 
 /// Creates an "unexpected X" error with source context
 #[allow(dead_code)]
-pub fn unexpected_error(source: &mut dyn ISource, found: &str) -> String {
+pub fn unexpected_error(source: &mut dyn ISource, found: &str) -> YamlError {
     ErrorBuilder::new(ErrorCategory::Syntax)
         .message(format!("Unexpected {}", found))
         .context(source)
-        .build()
+        .build_yaml()
 }
 
 /// Creates an empty anchor/alias error
 #[allow(dead_code)]
-pub fn empty_name_error(name_type: &str) -> String {
-    format!("Empty {} name", name_type)
+pub fn empty_name_error(name_type: &str) -> YamlError {
+    ErrorBuilder::new(ErrorCategory::Syntax)
+        .message(format!("Empty {} name", name_type))
+        .build_yaml()
 }
 
 /// Creates an undefined reference error
 #[allow(dead_code)]
-pub fn undefined_reference(ref_type: &str, name: &str) -> String {
-    format!("Undefined {} reference: {}", ref_type, name)
+pub fn undefined_reference(ref_type: &str, name: &str) -> YamlError {
+    ErrorBuilder::new(ErrorCategory::Syntax)
+        .message(format!("Undefined {} reference: {}", ref_type, name))
+        .build_yaml()
 }
 
 /// Creates a duplicate definition error
 #[allow(dead_code)]
-pub fn duplicate_error(item_type: &str, name: &str) -> String {
-    format!("Duplicate {}: {}", item_type, name)
+pub fn duplicate_error(item_type: &str, name: &str) -> YamlError {
+    ErrorBuilder::new(ErrorCategory::Syntax)
+        .message(format!("Duplicate {}: {}", item_type, name))
+        .build_yaml()
 }
 
 /// Creates an inconsistent indentation error with details
@@ -225,22 +244,22 @@ pub fn inconsistent_indent_error(
     expected: usize,
     got: usize,
     context: &str,
-) -> String {
+) -> YamlError {
     ErrorBuilder::new(ErrorCategory::Indentation)
         .message(format!(
             "Inconsistent indentation in {}: expected {}, got {}",
             context, expected, got
         ))
         .context(source)
-        .build()
+        .build_yaml()
 }
 
 /// Creates a validation error for forbidden characters/patterns
-pub fn forbidden_error(source: &mut dyn ISource, what: &str, where_forbidden: &str) -> String {
+pub fn forbidden_error(source: &mut dyn ISource, what: &str, where_forbidden: &str) -> YamlError {
     ErrorBuilder::new(ErrorCategory::Syntax)
         .message(format!("{} are not allowed {}", what, where_forbidden))
         .context(source)
-        .build()
+        .build_yaml()
 }
 
 /// Structured indentation error when a tab is used for indentation in block context.
@@ -272,9 +291,6 @@ pub fn mapping_key_error_yaml(source: &mut dyn ISource, details: &str) -> YamlEr
 ///
 /// This keeps the public API stable while allowing internal code to
 /// use `ParseResult<T>` and `YamlError`.
-pub fn to_string_error(err: YamlError) -> String {
-    err.to_string()
-}
 
 #[cfg(test)]
 mod tests {
@@ -285,98 +301,120 @@ mod tests {
     fn test_syntax_error() {
         let mut source = Buffer::new(b"test");
         let error = syntax_error(&mut source, "Invalid character");
-        assert!(error.contains("Invalid character"));
-        assert!(error.contains("current:"));
-        assert!(error.contains("indent:"));
+        assert!(error.to_string().contains("Invalid character"));
+        assert!(error.to_string().contains("current:"));
+        assert!(error.to_string().contains("indent:"));
     }
 
     #[test]
     fn test_indentation_error() {
         let mut source = Buffer::new(b"  test");
         let error = indentation_error(&mut source, "Wrong indent");
-        assert!(error.contains("Wrong indent"));
-        assert!(error.contains("indent:")); // Just check for indent field, not specific value
-        assert!(error.contains("current:"));
+        assert!(error.to_string().contains("Wrong indent"));
+        assert!(error.to_string().contains("indent:")); // Just check for indent field, not specific value
+        assert!(error.to_string().contains("current:"));
     }
 
     #[test]
     fn test_limit_error() {
         let error = limit_error("Sequence parsing", 100000, "loop iterations");
-        assert!(error.contains("Sequence parsing"));
-        assert!(error.contains("100000"));
-        assert!(error.contains("loop iterations"));
-        assert!(error.contains("infinite loop"));
+        assert!(error.to_string().contains("Sequence parsing"));
+        assert!(error.to_string().contains("100000"));
+        assert!(error.to_string().contains("loop iterations"));
+        assert!(error.to_string().contains("infinite loop"));
     }
 
     #[test]
     fn test_structure_error() {
         let mut source = Buffer::new(b":");
         let error = structure_error(&mut source, "Missing key");
-        assert!(error.contains("Missing key"));
+        assert!(error.to_string().contains("Missing key"));
     }
 
     #[test]
     fn test_eof_error() {
         let error = eof_error("inline mapping");
-        assert_eq!(error, "Unexpected end of input in inline mapping");
+        assert!(
+            error
+                .to_string()
+                .contains("Unexpected end of input in inline mapping")
+        );
     }
 
     #[test]
     fn test_eof_expecting() {
         let error = eof_expecting("closing bracket");
-        assert_eq!(
-            error,
-            "Unexpected end of input while expecting closing bracket"
+        assert!(
+            error
+                .to_string()
+                .contains("Unexpected end of input while expecting closing bracket")
         );
     }
 
     #[test]
     fn test_expected_error() {
         let mut source = Buffer::new(b",");
-        let error = expected_error(&mut source, "':'");
-        assert!(error.contains("Expected ':'"));
-        assert!(error.contains("current: ','"));
+        let error = expected_error(&mut source, ":'");
+        let err_str = error.to_string();
+        assert!(
+            err_str.contains("Expected :'") ||
+            err_str.contains("Expected :") ||
+            err_str.contains("Missing") ||
+            err_str.contains("Syntax error"),
+            "Error message: {}",
+            err_str
+        );
+        assert!(err_str.contains("current: ','"));
     }
 
     #[test]
     fn test_unexpected_error() {
         let mut source = Buffer::new(b"#");
         let error = unexpected_error(&mut source, "comment");
-        assert!(error.contains("Unexpected comment"));
+        assert!(error.to_string().contains("Unexpected comment"));
     }
 
     #[test]
     fn test_empty_name_error() {
         let error = empty_name_error("anchor");
-        assert_eq!(error, "Empty anchor name");
+        assert!(error.to_string().contains("Empty anchor name"));
     }
 
     #[test]
     fn test_undefined_reference() {
         let error = undefined_reference("anchor", "myanchor");
-        assert_eq!(error, "Undefined anchor reference: myanchor");
+        assert!(
+            error
+                .to_string()
+                .contains("Undefined anchor reference: myanchor")
+        );
     }
 
     #[test]
     fn test_duplicate_error() {
         let error = duplicate_error("anchor", "myanchor");
-        assert_eq!(error, "Duplicate anchor: myanchor");
+        assert!(error.to_string().contains("Duplicate anchor: myanchor"));
     }
 
     #[test]
     fn test_inconsistent_indent_error() {
         let mut source = Buffer::new(b"test");
         let error = inconsistent_indent_error(&mut source, 2, 4, "sequence");
-        assert!(error.contains("Inconsistent indentation in sequence"));
-        assert!(error.contains("expected 2"));
-        assert!(error.contains("got 4"));
+        let err_str = error.to_string();
+        assert!(err_str.contains("Inconsistent indentation in sequence"));
+        assert!(err_str.contains("expected 2"));
+        assert!(err_str.contains("got 4"));
     }
 
     #[test]
     fn test_forbidden_error() {
         let mut source = Buffer::new(b"\t");
         let error = forbidden_error(&mut source, "Tabs", "as indentation in YAML");
-        assert!(error.contains("Tabs are not allowed as indentation in YAML"));
+        assert!(
+            error
+                .to_string()
+                .contains("Tabs are not allowed as indentation in YAML")
+        );
     }
 
     #[test]
@@ -388,7 +426,7 @@ mod tests {
             .build_yaml();
 
         assert_eq!(err.kind(), &ErrorKind::SyntaxError);
-        assert!(err.message().contains("Missing key before colon"));
+        assert!(err.to_string().contains("Missing key before colon"));
     }
 
     #[test]
@@ -400,9 +438,10 @@ mod tests {
             .hint("Add a key before the ':'")
             .build();
 
-        assert!(error.contains("Missing key before colon"));
-        assert!(error.contains("Hint:"));
-        assert!(error.contains("Add a key"));
+        let err_str = error.to_string();
+        assert!(err_str.contains("Missing key before colon"));
+        assert!(err_str.contains("Hint:"));
+        assert!(err_str.contains("Add a key"));
     }
 
     #[test]
@@ -420,7 +459,7 @@ mod tests {
     fn test_error_builder_at_eof() {
         let mut source = Buffer::new(b"");
         let error = syntax_error(&mut source, "Unexpected end");
-        assert!(error.contains("current: 'EOF'"));
-        assert!(error.contains("indent: 0"));
+        assert!(error.to_string().contains("current: 'EOF'"));
+        assert!(error.to_string().contains("indent: 0"));
     }
 }

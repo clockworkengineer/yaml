@@ -34,7 +34,7 @@ fn read_sequence(file_path: &Path) -> Result<Node, String> {
                     Err("Invalid file format: expected a document".to_string())
                 }
             }
-            Err(e) => Err(e),
+            Err(e) => Err(e.to_string()),
             _ => Err("Invalid file format: expected a document".to_string()),
         },
         Err(e) => Err(format!("Failed to open file: {}", e)),

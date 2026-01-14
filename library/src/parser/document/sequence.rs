@@ -44,7 +44,7 @@ fn parse_sequence_inner(
     stream: &mut TokenStream,
     indent_level: usize,
     directives: &crate::parser::directives::DirectiveContext,
-) -> Result<crate::nodes::node::Node, String> {
+) -> crate::parser::ParseResult<crate::nodes::node::Node> {
     let mut items = Vec::new();
     // Guard sequence item count and iteration count using combined loop guard
     loop_guard_init!(sequence_counter);
@@ -55,7 +55,7 @@ fn parse_sequence_inner(
             crate::parser::document::loop_guards::MAX_LOOP_ITERATIONS,
             crate::parser::document::loop_guards::MAX_SEQUENCE_ITEMS,
             "Sequence parsing"
-        );
+        )?;
         // DRY: skip consecutive newlines and comments upfront
         stream.skip_newlines_and_comments()?;
         match stream.current() {
