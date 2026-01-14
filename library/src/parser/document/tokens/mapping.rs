@@ -198,9 +198,7 @@ pub fn parse_mapping_with_tokens(
             }
             Some(Token::DocumentEnd) => {
                 // Document end marker - validate no content after it on same line
-                crate::parser::document::helpers::validate_no_inline_content_after_document_end(
-                    stream,
-                )?;
+                crate::parser::document::helpers::validate_trailing_content_after_document_end(stream)?;
                 let (_, pairs) = stack.pop().unwrap();
                 return Ok(Node::Mapping(pairs));
             }

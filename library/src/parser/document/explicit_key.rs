@@ -1,8 +1,8 @@
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
+use crate::parser::ParseResult;
 use crate::parser::document::error_builder::syntax_error;
 use crate::parser::document::node_utils::normalize_node_to_str;
-use crate::parser::ParseResult;
 
 /// Parses a single explicit key from the source and normalizes it to a string node.
 #[allow(dead_code)]
@@ -154,8 +154,8 @@ pub(crate) fn collect_explicit_keys_block(
         if !matches!(stream.current(), Some(Token::QuestionMark)) {
             break;
         }
-        let (key, value) = parse_explicit_mapping_entry(stream, directives)
-            .map_err(|e| e.to_string())?;
+        let (key, value) =
+            parse_explicit_mapping_entry(stream, directives).map_err(|e| e.to_string())?;
         pairs.push((key, value));
         // Continue loop to fetch next explicit key at same level
     }

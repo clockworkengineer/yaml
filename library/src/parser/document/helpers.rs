@@ -3,8 +3,8 @@
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::nodes::node::Node::Document;
-use crate::parser::document::context::ParsingContext;
 use crate::parser::ParseResult;
+use crate::parser::document::context::ParsingContext;
 
 /// Creates a formatted error message with current token context information (TokenStream-based).
 ///
@@ -293,6 +293,17 @@ pub(crate) fn validate_no_inline_content_after_document_end(
         }
     }
     Ok(())
+}
+
+/// Standardized entry point for validating that no non-trivia content
+/// appears after a document end marker (`...`) on the same line.
+///
+/// This wraps `validate_no_inline_content_after_document_end` so that
+/// higher-level callers have a single, self-documenting API to use.
+pub(crate) fn validate_trailing_content_after_document_end(
+    stream: &mut TokenStream,
+) -> Result<(), String> {
+    validate_no_inline_content_after_document_end(stream)
 }
 
 /// Parses a comment line from the source.

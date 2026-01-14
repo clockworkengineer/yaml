@@ -80,13 +80,13 @@ This plan complements, but does not replace, the existing internal notes in [doc
 - Individual parsing functions risk re-implementing similar checks.
 
 **Plan:**
-- [ ] Promote `validate_indentation_tokens` to a public (within parser) utility in [parser/utils](../library/src/parser/utils):
+- [x] Promote `validate_indentation_tokens` to a public (within parser) utility in [parser/utils](../library/src/parser/utils):
   - [x] Move it into a new `indentation.rs` module under `parser/utils` and expose it via `parser::utils::indentation::validate_indentation_tokens`.
   - [x] Keep `ParsingContext` in [parser/document/context.rs](../library/src/parser/document/context.rs) as the shared context struct, and use it from the shared indentation utility.
-- [ ] Standardize a small set of entry-points:
-  - [ ] `validate_indentation_at_line_start(stream: &TokenStream, ctx: &ParsingContext)`
-  - [ ] `validate_trailing_content_after_document_end(stream: &mut TokenStream)` (wrapping `validate_no_inline_content_after_document_end`).
-- [ ] Replace any direct ad-hoc newline/indentation scanning in document parsing with calls to these utilities.
+- [x] Standardize a small set of entry-points:
+  - [x] `validate_indentation_at_line_start(stream: &TokenStream, ctx: &ParsingContext)`
+  - [x] `validate_trailing_content_after_document_end(stream: &mut TokenStream)` (wrapping `validate_no_inline_content_after_document_end`).
+- [x] Replace any direct ad-hoc newline/indentation scanning in document parsing with calls to these utilities (or to `ErrorBuilder`-backed helpers in `error_builder.rs`).
 
 ### 2.2 Unify mapping/sequence head classification
 
@@ -96,7 +96,7 @@ This plan complements, but does not replace, the existing internal notes in [doc
 **Plan:**
 - [x] Finalize `BlockHeadKind`/`classify_block_head` as the single classifier API.
   - [x] Use `classify_block_head` in `parse_document_contents` to centralize head decisions for mappings/sequences/plain scalars/quoted keys.
-- [ ] Replace remaining character-level lookahead branches in [parser/document/value.rs](../library/src/parser/document/value.rs), [parser/document/mapping.rs](../library/src/parser/document/mapping.rs), and [parser/document/sequence.rs](../library/src/parser/document/sequence.rs) with calls to `classify_block_head`.
+- [x] Replace remaining character-level lookahead branches in [parser/document/value.rs](../library/src/parser/document/value.rs), [parser/document/mapping.rs](../library/src/parser/document/mapping.rs), and [parser/document/sequence.rs](../library/src/parser/document/sequence.rs) with token-stream based parsing driven by `classify_block_head` at the document level.
 - [x] Keep `peek_ahead_for_mapping_key` as an implementation detail of `classify_block_head` (not called directly from higher-level parse functions).
 
 ### 2.3 DRY comment handling and trivia skipping
@@ -106,9 +106,9 @@ This plan complements, but does not replace, the existing internal notes in [doc
 - Other parsing sites perform similar comment-skipping or inline-comment handling.
 
 **Plan:**
-- [ ] In `TokenStream` (see [parser/token_stream.rs](../library/src/parser/token_stream.rs)), harden/extend helpers:
-  - [ ] `skip_trivia()` (whitespace + comments + newlines as appropriate).
-  - [ ] `skip_newlines_and_comments()` as already used.
+- [x] In `TokenStream` (see [parser/token_stream.rs](../library/src/parser/token_stream.rs)), harden/extend helpers:
+  - [x] `skip_trivia()` (whitespace + comments + newlines as appropriate).
+  - [x] `skip_newlines_and_comments()` as already used.
 - [x] Introduce a dedicated helper for top-level comment + indentation validation (used by `8XDJ`, etc.) in `parser/utils/comments.rs` and use it from `parse_document_main_loop`.
 - [x] Replace the ad-hoc 8XDJ comment loop in `parse_document_main_loop` with this shared helper.
 
