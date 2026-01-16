@@ -1,3 +1,30 @@
+## Goals
+## Phase 0 – Inventory & Guardrails
+## Phase 1 – Error Handling & Result Types
+### 1.1 Unify parser error representation
+### 1.2 Centralize structure/indentation/limit error text
+### 2.1 Centralize token-based indentation validation
+### 2.2 Unify mapping/sequence head classification
+### 2.3 DRY comment handling and trivia skipping
+### 3.1 Consolidate `Node` → key/string helpers
+### 3.2 DRY string escaping logic
+### 3.3 Centralize traversal & path logic
+### 4.1 Enforce consistent loop/collection guards
+### 4.2 Align `CapacityHints` and `NodeBuilder` usage
+### 5.1 Reconcile `StringPool` and `StringInterner`
+### 5.2 DRY stats & reporting
+### 6.1 Validation engine & validators
+### 6.2 Devtools traversal & formatting
+### 6.3 Embedded types & conversions
+### 6.4 IO abstractions
+### 7.1 Granular refactor steps
+### 7.2 Test coverage checkpoints
+### 7.3 Backward compatibility
+### 8.1 Prioritization
+### 8.2 High impact / low risk (start here)
+### 8.3 Medium impact
+### 8.4 Higher impact / optional
+This plan should be treated as a living document; as refactors land, update sections with concrete status, links to PRs, and any additional DRY opportunities discovered during implementation.
 # YAML Library DRY Refactor Plan
 
 _Last updated: 2026-01-13_

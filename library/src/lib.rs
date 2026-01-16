@@ -168,7 +168,6 @@ pub use utils::optimization::NodeBuilder;
 pub use utils::optimization::PerformanceOptimizer;
 /// String pool for deduplicating common strings during parsing
 #[cfg(all(feature = "std", feature = "alloc"))]
-pub use utils::optimization::StringPool;
 /// Zero-copy string wrapper
 #[cfg(feature = "alloc")]
 pub use utils::optimization::ZeroCopyStr;

@@ -86,19 +86,19 @@ fn demo_capacity_hints() {
 
 /// Demonstrate string pooling
 fn demo_string_pool() {
-    println!("3. String Pool");
-    println!("--------------");
+    println!("3. String Interning");
+    println!("-------------------");
     println!("Deduplicate common strings during parsing");
 
-        let pool = StringPool::new();
+    let interner = StringInterner::new();
 
-    // Pool the same strings
-    let s1 = pool.get_or_insert("name");
-    let _s2 = pool.get_or_insert("type");
-    let s3 = pool.get_or_insert("name"); // Reuses existing
+    // Intern the same strings
+    let s1 = interner.intern("name");
+    let _s2 = interner.intern("type");
+    let s3 = interner.intern("name"); // Reuses existing
 
-    println!("Added 'name', 'type', 'name' to pool");
-    println!("  Unique strings: {}", pool.len());
+    println!("Added 'name', 'type', 'name' to interner");
+    println!("  Unique strings: {}", interner.len());
     println!(
         "  'name' references share same memory: {}",
         s1.as_str().as_ptr() == s3.as_str().as_ptr()
@@ -106,16 +106,16 @@ fn demo_string_pool() {
 
     // Simulate parsing 100 objects with repeated keys
     for _ in 0..100 {
-        let _name = pool.get_or_insert("name");
-        let _type = pool.get_or_insert("type");
-        let _value = pool.get_or_insert("value");
-        let _id = pool.get_or_insert("id");
+        let _name = interner.intern("name");
+        let _type = interner.intern("type");
+        let _value = interner.intern("value");
+        let _id = interner.intern("id");
     }
 
     println!("\nAfter processing 100 objects:");
     println!(
         "  Unique strings: {} (only 4 allocations for 400 strings!)",
-        pool.len()
+        interner.len()
     );
 }
 
@@ -197,26 +197,26 @@ fn demo_performance_optimizer() {
     println!("Default optimizer:");
     println!("  Lazy tags:  {}", default_opt.lazy_tags);
     println!("  Zero copy:  {}", default_opt.zero_copy);
-    println!("  String pool: {}", default_opt.string_pool.is_some());
+    println!("  String interner: {}", default_opt.string_interner.is_some());
 
     // Aggressive optimizer
     let aggressive = PerformanceOptimizer::aggressive();
     println!("\nAggressive optimizer:");
     println!("  Lazy tags:  {}", aggressive.lazy_tags);
     println!("  Zero copy:  {}", aggressive.zero_copy);
-    println!("  String pool: {}", aggressive.string_pool.is_some());
+    println!("  String interner: {}", aggressive.string_interner.is_some());
     println!("  Mapping capacity: {}", aggressive.hints.mapping_pairs);
 
     // Custom optimizer
     let mut custom = PerformanceOptimizer::new();
     custom.enable_lazy_tags();
     custom.enable_zero_copy();
-    custom.enable_string_pool(128);
+    custom.enable_string_interning(128);
 
     println!("\nCustom optimizer:");
     println!("  Lazy tags:  {}", custom.lazy_tags);
     println!("  Zero copy:  {}", custom.zero_copy);
-    println!("  String pool: {}", custom.string_pool.is_some());
+    println!("  String interner: {}", custom.string_interner.is_some());
 
     // Use optimizer to allocate collections
     let _vec = custom.alloc_vec::<Node>();

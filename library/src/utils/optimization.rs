@@ -191,65 +191,18 @@ pub type ZeroCopyStr<'a> = Cow<'a, str>;
 /// This is similar to string interning but specifically for parsing performance.
 #[cfg(feature = "std")]
 
-use crate::utils::string_interner::{StringInterner, InternedString};
+use crate::utils::string_interner::StringInterner;
 
-#[derive(Debug)]
-pub struct StringPool {
-    interner: StringInterner,
-}
 
-#[cfg(feature = "std")]
-impl StringPool {
-    /// Create a new string pool (adapter over StringInterner)
-    pub fn new() -> Self {
-        Self {
-            interner: StringInterner::new(),
-        }
-    }
-
-    /// Create a string pool with pre-allocated capacity
-    pub fn with_capacity(capacity: usize) -> Self {
-        Self {
-            interner: StringInterner::with_capacity(capacity),
-        }
-    }
-
-    /// Get or insert a string into the pool (returns InternedString)
-    pub fn get_or_insert(&self, s: &str) -> InternedString {
-        self.interner.intern(s)
-    }
-
-    /// Get the number of unique strings in the pool
-    pub fn len(&self) -> usize {
-        self.interner.len()
-    }
-
-    /// Check if the pool is empty
-    pub fn is_empty(&self) -> bool {
-        self.interner.is_empty()
-    }
-
-    /// Clear the pool
-    pub fn clear(&self) {
-        self.interner.clear();
-    }
-}
-
-#[cfg(feature = "std")]
-impl Default for StringPool {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 /// Performance optimizer that combines multiple optimization strategies
 #[derive(Debug)]
 pub struct PerformanceOptimizer {
     /// Capacity hints for allocation
     pub hints: CapacityHints,
-    /// String pool for deduplication
+    /// String interner for deduplication
     #[cfg(feature = "std")]
-    pub string_pool: Option<StringPool>,
+    pub string_interner: Option<StringInterner>,
     /// Whether to use lazy tag coercion
     pub lazy_tags: bool,
     /// Whether to use zero-copy strings where possible
@@ -262,7 +215,7 @@ impl PerformanceOptimizer {
         Self {
             hints: CapacityHints::new(),
             #[cfg(feature = "std")]
-            string_pool: None,
+            string_interner: None,
             lazy_tags: false,
             zero_copy: false,
         }
@@ -273,7 +226,7 @@ impl PerformanceOptimizer {
         Self {
             hints: CapacityHints::large(),
             #[cfg(feature = "std")]
-            string_pool: Some(StringPool::with_capacity(256)),
+            string_interner: Some(StringInterner::with_capacity(256)),
             lazy_tags: true,
             zero_copy: true,
         }
@@ -281,8 +234,8 @@ impl PerformanceOptimizer {
 
     /// Enable string pooling
     #[cfg(feature = "std")]
-    pub fn enable_string_pool(&mut self, capacity: usize) {
-        self.string_pool = Some(StringPool::with_capacity(capacity));
+    pub fn enable_string_interning(&mut self, capacity: usize) {
+        self.string_interner = Some(StringInterner::with_capacity(capacity));
     }
 
     /// Enable lazy tag coercion
@@ -467,14 +420,14 @@ mod tests {
 
     #[test]
     #[cfg(feature = "std")]
-    fn test_string_pool() {
-        let pool = StringPool::new();
+    fn test_string_interning() {
+        let interner = StringInterner::new();
 
-        let s1 = pool.get_or_insert("test");
-        let s2 = pool.get_or_insert("test");
+        let s1 = interner.intern("test");
+        let s2 = interner.intern("test");
 
         assert_eq!(s1.as_str(), s2.as_str());
-        assert_eq!(pool.len(), 1);
+        assert_eq!(interner.len(), 1);
     }
 
     #[test]

@@ -1,7 +1,6 @@
 #[cfg(test)]
 use crate::nodes::util::{make_node, make_set};
 
-
 #[cfg(feature = "std")]
 use std::ops::{Index, IndexMut};
 
@@ -36,7 +35,6 @@ pub enum QuoteType {
     Single,
     Double,
 }
-
 
 /// Represents block/folded style for YAML string nodes
 #[cfg(feature = "alloc")]
@@ -1274,7 +1272,6 @@ impl<'a> Iterator for NodeChildIterator<'a> {
         }
     }
 }
-
 
 // ==================== Fluent Builder API ====================
 
