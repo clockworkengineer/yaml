@@ -59,10 +59,10 @@ fn main() {
         None
     };
 
-    // Open output file for writing
-    let output_file =
-        File::create("yaml_suite_quiet_output.txt").expect("Failed to create output file");
+    // Open output file for writing and also prepare stdout
+    let output_file = File::create("yaml_suite_quiet_output.txt").expect("Failed to create output file");
     let mut out = BufWriter::new(output_file);
+    let mut stdout = std::io::stdout();
 
     let possible_paths = vec![Path::new("c:/Projects/yaml/yaml-test-suite")];
     let suite_dir = possible_paths.iter().find(|p| p.exists()).cloned();
@@ -220,25 +220,36 @@ fn main() {
             ));
         }
     }
-    writeln!(out, "\n=== YAML Test Suite Results (Quiet) ===").unwrap();
-    writeln!(out, "Passed:  {}", passed).unwrap();
-    writeln!(out, "Failed:  {}", failed).unwrap();
-    writeln!(out, "Skipped: {}", skipped).unwrap();
-    writeln!(out, "Total:   {}", passed + failed + skipped).unwrap();
+    for line in [
+        format!("\n=== YAML Test Suite Results (Quiet) ==="),
+        format!("Passed:  {}", passed),
+        format!("Failed:  {}", failed),
+        format!("Skipped: {}", skipped),
+        format!("Total:   {}", passed + failed + skipped),
+    ] {
+        writeln!(out, "{}", line).unwrap();
+        writeln!(stdout, "{}", line).unwrap();
+    }
     if !failures.is_empty() {
         writeln!(out, "\n=== Failures ===").unwrap();
+        writeln!(stdout, "\n=== Failures ===").unwrap();
         for (i, failure) in failures.iter().enumerate() {
             writeln!(out, "{}. {}", i + 1, failure).unwrap();
+            writeln!(stdout, "{}. {}", i + 1, failure).unwrap();
         }
     }
     let total_tests = passed + failed;
     if total_tests > 0 {
         let pass_rate = (passed as f64 / total_tests as f64) * 100.0;
-        writeln!(out, "\nPass Rate: {:.1}%", pass_rate).unwrap();
+        let rate_line = format!("\nPass Rate: {:.1}%", pass_rate);
+        writeln!(out, "{}", rate_line).unwrap();
+        writeln!(stdout, "{}", rate_line).unwrap();
         if pass_rate < 85.0 {
             out.flush().unwrap();
+            stdout.flush().unwrap();
             std::process::exit(2);
         }
     }
     out.flush().unwrap();
+    stdout.flush().unwrap();
 }
