@@ -1,3 +1,4 @@
+pub mod util;
 /// Module containing destination implementations for writing YAML data to different outputs
 pub mod destinations;
 /// Module containing source implementations for reading YAML data from different inputs

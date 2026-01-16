@@ -218,11 +218,10 @@ This plan complements, but does not replace, the existing internal notes in [doc
 - `StringPool` in [utils/optimization.rs](../library/src/utils/optimization.rs) and `StringInterner` / `SimpleInterner` in [utils/string_interner.rs](../library/src/utils/string_interner.rs) offer overlapping capabilities and separate stats.
 
 **Plan:**
-- [ ] Choose one primary abstraction for general-purpose deduplication:
-  - [ ] Likely `StringInterner` (thread-safe) for `std`, `SimpleInterner` for `no_std + alloc`.
-- [ ] Re-implement `StringPool` as a thin adapter over `StringInterner`:
-  - [ ] Or deprecate `StringPool` and migrate callers to `StringInterner` directly.
-- [ ] Ensure `PerformanceOptimizer` exposes a single, coherent configuration for string deduplication.
+- [x] Choose one primary abstraction for general-purpose deduplication:
+  - [x] Use `StringInterner` (thread-safe) for `std`, `SimpleInterner` for `no_std + alloc`.
+- [x] Deprecate `StringPool` and migrate callers to `StringInterner` directly.
+- [x] Ensure `PerformanceOptimizer` exposes a single, coherent configuration for string deduplication.
 
 ### 5.2 DRY stats & reporting
 
@@ -230,12 +229,12 @@ This plan complements, but does not replace, the existing internal notes in [doc
 - `InternerStats` (hits/misses/unique) and `memory_savings` logic exist only in `StringInterner`.
 
 **Plan:**
-- [ ] Expose a small, shared stats struct used by both interner variants (thread-safe and simple).
-- [ ] Add a utility function for human-readable summaries that devtools can reuse (e.g., `format_interner_stats(stats: &InternerStats) -> String`).
+- [x] Expose a small, shared stats struct used by both interner variants (thread-safe and simple).
+- [x] Add a utility function for human-readable summaries that devtools can reuse (e.g., `format_interner_stats(stats: &InternerStats) -> String`).
 
 ---
 
-## Phase 6 – Validation, Devtools, Embedded, IO
+## Phase 6 – Validation, Devtools, Embedded, IO (in progress)
 
 ### 6.1 Validation engine & validators
 

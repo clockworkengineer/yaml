@@ -1,8 +1,37 @@
-//! Module: embedded/lightweight_node.rs
-//!
-//! Lightweight node representation for embedded systems with fixed-size buffers
-//! and reduced memory footprint. Uses indices instead of Box pointers and
-//! provides bounded collections.
+use crate::nodes::node::{Node, Numeric};
+use core::convert::TryFrom;
+impl TryFrom<&Node> for LightNode {
+    type Error = &'static str;
+    fn try_from(node: &Node) -> Result<Self, Self::Error> {
+        match node {
+            Node::Boolean(b) => Ok(LightNode::Boolean(*b)),
+            Node::Number(n) => Ok(LightNode::Number(LightNumeric::try_from(n)?)),
+            Node::Str(s, q, b) => {
+                let fs = FixedString::from_str(s)?;
+                Ok(LightNode::Str(fs, q.clone(), b.clone()))
+            }
+            Node::None => Ok(LightNode::None),
+            // For collections, conversion requires arena context, so skip here
+            _ => Err("Unsupported node type for lightweight conversion"),
+        }
+    }
+}
+
+impl TryFrom<&Numeric> for LightNumeric {
+    type Error = &'static str;
+    fn try_from(num: &Numeric) -> Result<Self, Self::Error> {
+        match num {
+            Numeric::Integer(i) => Ok(LightNumeric::Integer(*i as i32)),
+            Numeric::Float(f) => Ok(LightNumeric::Float(*f as f32)),
+            Numeric::Byte(b) => Ok(LightNumeric::Byte(*b)),
+            Numeric::Int16(i) => Ok(LightNumeric::Short(*i)),
+            Numeric::UInt8(u) => Ok(LightNumeric::Byte(*u)),
+            // Add more mappings as needed
+            _ => Err("Unsupported numeric type for lightweight conversion"),
+        }
+    }
+}
+
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;

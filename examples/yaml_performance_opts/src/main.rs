@@ -197,14 +197,20 @@ fn demo_performance_optimizer() {
     println!("Default optimizer:");
     println!("  Lazy tags:  {}", default_opt.lazy_tags);
     println!("  Zero copy:  {}", default_opt.zero_copy);
-    println!("  String interner: {}", default_opt.string_interner.is_some());
+    println!(
+        "  String interner: {}",
+        default_opt.string_interner.is_some()
+    );
 
     // Aggressive optimizer
     let aggressive = PerformanceOptimizer::aggressive();
     println!("\nAggressive optimizer:");
     println!("  Lazy tags:  {}", aggressive.lazy_tags);
     println!("  Zero copy:  {}", aggressive.zero_copy);
-    println!("  String interner: {}", aggressive.string_interner.is_some());
+    println!(
+        "  String interner: {}",
+        aggressive.string_interner.is_some()
+    );
     println!("  Mapping capacity: {}", aggressive.hints.mapping_pairs);
 
     // Custom optimizer

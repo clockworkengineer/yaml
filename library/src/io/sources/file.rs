@@ -3,6 +3,7 @@
 use crate::io::traits::ISource;
 use std::fs::File as StdFile;
 use std::io::{Read, Seek, SeekFrom};
+use crate::io::util::read_all;
 
 /// File
 
@@ -11,6 +12,12 @@ pub struct File {
     current_byte: Option<u8>,
     column: usize,
     line: usize,
+}
+impl File {
+    /// Reads the entire file into a Vec<u8> using shared helper
+    pub fn read_all_bytes(&mut self) -> std::io::Result<Vec<u8>> {
+        read_all(&mut self.file)
+    }
 }
 
 impl File {

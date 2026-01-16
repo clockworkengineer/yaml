@@ -8,6 +8,20 @@ impl ValidationContextCore {
             found: crate::validation::validators::node_type_name(node).to_string(),
         }
     }
+
+    pub fn fail_range(value: f64, min: Option<f64>, max: Option<f64>) -> ValidationError {
+        ValidationError::RangeError {
+            value,
+            min,
+            max,
+        }
+    }
+
+    pub fn fail_required(field: &str) -> ValidationError {
+        ValidationError::RequiredFieldMissing {
+            field: field.to_string(),
+        }
+    }
 }
 /// Validation engine for executing schema validation against YAML nodes
 ///

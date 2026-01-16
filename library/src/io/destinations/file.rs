@@ -3,6 +3,7 @@
 use crate::io::traits::IDestination;
 use std::fs::File as StdFile;
 use std::io::{Read, Seek, Write};
+use crate::io::util::{write_all, write_str};
 
 /// A file-based destination for writing JSON data to disk.
 /// Implements file operations for storing and manipulating encoded data.
@@ -31,6 +32,14 @@ impl File {
         })
     }
 
+    /// Writes all bytes to the file using shared helper
+    pub fn write_all_bytes(&mut self, data: &[u8]) -> std::io::Result<()> {
+        write_all(&mut self.file, data)
+    }
+    /// Writes a string to the file using shared helper
+    pub fn write_str(&mut self, data: &str) -> std::io::Result<()> {
+        write_str(&mut self.file, data)
+    }
     /// Returns the current length of the file in bytes.
     pub fn file_length(&self) -> usize {
         self.file_length

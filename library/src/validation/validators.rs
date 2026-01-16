@@ -106,21 +106,17 @@ impl Validator for RangeValidator {
 
         if let Some(min) = self.min {
             if value < min {
-                return Err(ValidationError::RangeError {
-                    value,
-                    min: self.min,
-                    max: self.max,
-                });
+                return Err(crate::validation::engine::ValidationContextCore::fail_range(
+                    value, self.min, self.max,
+                ));
             }
         }
 
         if let Some(max) = self.max {
             if value > max {
-                return Err(ValidationError::RangeError {
-                    value,
-                    min: self.min,
-                    max: self.max,
-                });
+                return Err(crate::validation::engine::ValidationContextCore::fail_range(
+                    value, self.min, self.max,
+                ));
             }
         }
 
@@ -349,9 +345,7 @@ impl Validator for RequiredValidator {
                 if found {
                     Ok(())
                 } else {
-                    Err(ValidationError::RequiredFieldMissing {
-                        field: self.field_name.clone(),
-                    })
+                    Err(crate::validation::engine::ValidationContextCore::fail_required(&self.field_name))
                 }
             }
             _ => Err(ValidationError::InvalidNodeType {

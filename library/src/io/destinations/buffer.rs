@@ -28,6 +28,7 @@ impl Buffer {
     /// # Returns
     /// A String containing UTF-8 interpretation of the buffer bytes.
     pub fn to_string(&self) -> String {
+        // Use shared helper for conversion
         String::from_utf8_lossy(&self.buffer).into_owned()
     }
 }

@@ -190,10 +190,7 @@ pub type ZeroCopyStr<'a> = Cow<'a, str>;
 ///
 /// This is similar to string interning but specifically for parsing performance.
 #[cfg(feature = "std")]
-
 use crate::utils::string_interner::StringInterner;
-
-
 
 /// Performance optimizer that combines multiple optimization strategies
 #[derive(Debug)]
