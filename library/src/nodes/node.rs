@@ -635,6 +635,7 @@ impl Node {
                 Numeric::Int16(v) => Some(*v as i32),
                 Numeric::UInt16(v) => Some(*v as i32),
                 Numeric::Int8(v) => Some(*v as i32),
+                Numeric::UInt8(v) => Some(*v as i32),
             },
             _ => None,
         }
@@ -667,6 +668,7 @@ impl Node {
                 Numeric::Int16(v) => *v as f32,
                 Numeric::UInt16(v) => *v as f32,
                 Numeric::Int8(v) => *v as f32,
+                Numeric::UInt8(v) => *v as f32,
             }),
             _ => None,
         }

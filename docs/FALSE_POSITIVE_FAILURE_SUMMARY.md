@@ -4,7 +4,7 @@
 |-----------|------------------------------|--------------------------------------------|
 | 236B      | Indentation/structure        | Invalid mapping/sequence structure         |
 | 2CMS      | Indentation                  | Misaligned sequence item                   |
-| 4H7K      | Structure                    | Extra closing bracket in flow sequence     |
+| 4H7K      |fStructure                    | Extra closing bracket in flow sequence     |
 | 4HVU      | Indentation                  | Misaligned sequence item                   |
 | 5TRB      | Structure                    | Unterminated/invalid quoted scalar         |
 | 5U3A      | Indentation                  | Sequence under mapping key misaligned      |
@@ -124,27 +124,36 @@ Based on the failure categorization and strategy proposals, the following priori
 
 ## Implementation Plan for Top Issues
 
+
 ### Phase 1: Indentation and Structure Enforcement
 - Audit and refactor TokenStream and parser logic for strict indentation validation.
 - Add checks for misaligned keys, sequence items, and mapping entries.
 - Update error reporting for indentation/structure failures with precise line/column info.
 - Write targeted tests for known indentation/structure false positives.
+- **After all changes in this phase, run full test suite and verify all tests pass (no regressions).**
+- **Run a full build (cargo check/test) to ensure no compilation errors are introduced.**
 
 ### Phase 2: Flow Collection Syntax
 - Refactor flow sequence and mapping parsing to catch extra/missing brackets and invalid line breaks.
 - Add error handling for unterminated/malformed flow collections.
 - Expand test coverage for flow collection edge cases.
+- **After all changes in this phase, rerun the full test suite to check for regressions.**
+- **Run a full build to ensure no compilation errors.**
 
 ### Phase 3: Scalar, Directive, Tag, and Anchor Handling
 - Harden scalar and key formatting validation (multi-line, quoted, plain).
 - Validate placement/syntax of directives, tags, and anchors.
 - Map parser errors to test suite expectations for these cases.
+- **After all changes in this phase, rerun the full test suite to check for regressions.**
+- **Run a full build to ensure no compilation errors.**
 
 ### Phase 4: Error Reporting and Harness Improvements
 - Improve error builder to categorize and report all parse errors.
 - Update test harness to assert error type/location for each failure.
 - Document any spec ambiguities or intentional parser differences.
+- **After all changes in this phase, rerun the full test suite to check for regressions.**
+- **Run a full build to ensure no compilation errors.**
 
 **Milestones:**
-- Complete Phase 1 and rerun test suite to measure reduction in false positives.
-- Iterate through Phases 2-4, updating summary and plan as failures are eliminated.
+- Complete Phase 1 and rerun test suite and build to measure reduction in false positives and ensure no regressions or build errors.
+- Iterate through Phases 2-4, updating summary and plan as failures are eliminated, always checking for regressions and compilation errors after each phase.

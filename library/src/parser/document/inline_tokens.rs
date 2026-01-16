@@ -52,7 +52,7 @@ pub fn parse_inline_sequence_with_tokens(
     // Expect opening bracket
     stream.expect(Token::FlowSequenceStart)?;
 
-    use crate::utils::optimization::{NodeBuilder, CapacityHints};
+    use crate::utils::optimization::{CapacityHints, NodeBuilder};
     // Use a small capacity profile for typical inline sequences
     let node_builder = NodeBuilder::with_hints(CapacityHints::small());
     let mut items = Vec::with_capacity(node_builder.hints().sequence_items);
@@ -66,6 +66,16 @@ pub fn parse_inline_sequence_with_tokens(
             Some(Token::FlowSequenceEnd) => {
                 // Closing bracket - done
                 let _ = stream.consume_flow_sequence_end()?;
+                // If at top-level (depth == 0), check for extra closing bracket (4H7K)
+                if depth == 0 {
+                    stream.skip_trivia()?;
+                    if matches!(stream.current(), Some(Token::FlowSequenceEnd)) {
+                        return Err(syntax_error(
+                            stream.source_mut(),
+                            "Unexpected extra closing bracket ']' in flow sequence",
+                        ));
+                    }
+                }
                 break;
             }
             Some(Token::Comma) => {
@@ -113,16 +123,12 @@ pub fn parse_inline_sequence_with_tokens(
 
                         // Consume the following scalar and prepend "::".
                         match stream.consume_scalar() {
-                            Ok((s, _)) => Node::Str(
-                                format!("::{}", s),
-                                QuoteType::Unquoted,
-                                BlockStyle::None,
-                            ),
-                            Err(_) => Node::Str(
-                                "::".to_string(),
-                                QuoteType::Unquoted,
-                                BlockStyle::None,
-                            ),
+                            Ok((s, _)) => {
+                                Node::Str(format!("::{}", s), QuoteType::Unquoted, BlockStyle::None)
+                            }
+                            Err(_) => {
+                                Node::Str("::".to_string(), QuoteType::Unquoted, BlockStyle::None)
+                            }
                         }
                     } else {
                         parse_value_with_tokens(stream, directives, depth + 1)?
@@ -237,7 +243,7 @@ pub fn parse_inline_mapping_with_tokens(
     // Expect opening brace
     stream.expect(Token::FlowMappingStart)?;
 
-    use crate::utils::optimization::{NodeBuilder, CapacityHints};
+    use crate::utils::optimization::{CapacityHints, NodeBuilder};
     // Use a small capacity profile for typical inline mappings
     let node_builder = NodeBuilder::with_hints(CapacityHints::small());
     let mut pairs = Vec::with_capacity(node_builder.hints().mapping_pairs);

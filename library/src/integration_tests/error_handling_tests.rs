@@ -4,6 +4,20 @@
 
 #[cfg(test)]
 mod tests {
+        #[test]
+        fn test_4h7k_extra_closing_bracket_in_flow_sequence() {
+            // 4H7K: Should error on extra closing bracket in flow sequence
+            let yaml = b"[ a, b, c ] ]\n";
+            let mut source = BufferSource::new(yaml);
+            let res = parse(&mut source);
+            assert!(res.is_err(), "4H7K: Should error on extra closing bracket in flow sequence");
+            let err = res.unwrap_err().to_string();
+            assert!(
+                err.contains("Unexpected") || err.contains("]") || err.contains("bracket"),
+                "4H7K error message should mention unexpected bracket, got: {}",
+                err
+            );
+        }
     use crate::{BufferSource, Node, parse};
 
     #[test]
