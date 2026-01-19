@@ -3,6 +3,29 @@
 ///
 #[cfg(test)]
 mod tests {
+        #[test]
+        fn test_literal_block_with_inline_comment() {
+            // Test parsing a literal block scalar with an inline comment in the first line
+            let mut source = BufferSource::new(b"literal: |\n  word1   #comment\n  word2\n");
+            let result = parse(&mut source).unwrap();
+
+            if let Node::Documents(docs) = result {
+                if let Node::Document(nodes) = &docs[0] {
+                    if let Node::Mapping(pairs) = &nodes[0] {
+                        assert_eq!(pairs.len(), 1);
+                        if let Node::Str(content, _, block_style) = &pairs[0].1 {
+                            // The comment should be ignored, and the content should be "word1   \nword2\n"
+                            assert!(matches!(block_style, BlockStyle::Literal));
+                            assert!(content.contains("word1"));
+                            assert!(content.contains("word2"));
+                            assert!(!content.contains("#comment"), "Comment should not be part of the content");
+                        } else {
+                            panic!("Expected a literal block string node, got: {:?}", pairs[0].1);
+                        }
+                    }
+                }
+            }
+        }
     use crate::nodes::node::{BlockStyle, QuoteType};
     use crate::{BufferSource, Node, Node::Document, Numeric, parse};
 

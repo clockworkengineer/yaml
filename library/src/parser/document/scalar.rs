@@ -101,27 +101,40 @@ pub(crate) fn parse_scalar_with_tokens(
                             pending_indent_for_line = Some(*level);
                             stream.next()?;
                         }
-                        Some(Token::Plain(_)) => {
-                            // Do not treat a mapping key as block scalar content.
-                            // If this plain token is immediately followed by a colon,
-                            // it's the start of a mapping key/value pair, so we should
-                            // stop collecting block scalar lines and let the caller
-                            // handle the mapping instead of misinterpreting it as
-                            // scalar content (see yaml-test-suite case Y79Y/001).
-                            if matches!(stream.peek()?, Some(Token::Colon)) {
-                                break;
-                            }
-
+                        Some(Token::Plain(line)) => {
                             let indent = pending_indent_for_line.unwrap_or(0);
                             if first_content_indent.is_none() {
                                 first_content_indent = Some(indent);
                             }
-                            if let Some(Token::Plain(line)) = stream.current().cloned() {
-                                block_lines.push(line);
+                            // Only collect if indented at least as much as the first content line (or if first line)
+                            if first_content_indent.is_some() && indent >= first_content_indent.unwrap() {
+                                // Strip comments from block scalar lines unless # is inside quotes
+                                let mut line_stripped = String::new();
+                                let mut chars = line.chars().peekable();
+                                let mut in_single = false;
+                                let mut in_double = false;
+                                while let Some(c) = chars.next() {
+                                    match c {
+                                        '\'' if !in_double => in_single = !in_single,
+                                        '"' if !in_single => in_double = !in_double,
+                                        '#' if !in_single && !in_double => {
+                                            // Stop at # for comment
+                                            break;
+                                        }
+                                        _ => {}
+                                    }
+                                    line_stripped.push(c);
+                                }
+                                // Remove trailing whitespace (YAML spec: comments must be separated by whitespace)
+                                let line_stripped = line_stripped.trim_end().to_string();
+                                block_lines.push(line_stripped);
+                                trailing_newlines = 0; // reset when we see content
+                                saw_plain_current_line = true;
+                                stream.next()?;
+                            } else {
+                                // Indentation dropped, end block scalar
+                                break;
                             }
-                            trailing_newlines = 0; // reset when we see content
-                            saw_plain_current_line = true;
-                            stream.next()?;
                         }
                         Some(Token::Newline) => {
                             // If we haven't seen content on this line yet and we are still
@@ -145,6 +158,13 @@ pub(crate) fn parse_scalar_with_tokens(
                             // Reset per-line state
                             pending_indent_for_line = None;
                             saw_plain_current_line = false;
+                        }
+                        Some(Token::Comment(_)) => {
+                            // Skip comment tokens in block scalars
+                            stream.next()?;
+                        }
+                        Some(Token::Eof) => {
+                            break;
                         }
                         _ => break,
                     }
