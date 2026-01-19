@@ -10,11 +10,7 @@ impl ValidationContextCore {
     }
 
     pub fn fail_range(value: f64, min: Option<f64>, max: Option<f64>) -> ValidationError {
-        ValidationError::RangeError {
-            value,
-            min,
-            max,
-        }
+        ValidationError::RangeError { value, min, max }
     }
 
     pub fn fail_required(field: &str) -> ValidationError {
@@ -26,19 +22,17 @@ impl ValidationContextCore {
 /// Validation engine for executing schema validation against YAML nodes
 ///
 /// Provides SchemaValidator that traverses nodes and applies validation rules.
-
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use log::warn;
 
 use crate::nodes::node::{Node, Numeric};
+use crate::validation::error::ValidationError;
 use crate::validation::schema::{PropertySchema, Schema, SchemaType};
 use crate::validation::validators::{
     EnumValidator, LengthValidator, PatternValidator, RangeValidator, TypeValidator, Validator,
 };
-use crate::validation::error::ValidationError;
-
 
 /// Context for tracking validation state during traversal
 #[derive(Debug, Clone)]
@@ -409,7 +403,9 @@ mod tests {
         let errors = result.unwrap_err();
         assert!(!errors.is_empty());
         // No path field anymore; just check error kind
-        let found_required = errors.iter().any(|e| matches!(e, ValidationError::TypeMismatch { .. }));
+        let found_required = errors
+            .iter()
+            .any(|e| matches!(e, ValidationError::TypeMismatch { .. }));
         assert!(found_required);
     }
 }

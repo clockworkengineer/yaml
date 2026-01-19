@@ -413,7 +413,10 @@ impl<'a> Lexer<'a> {
 
     /// Emit an indentation token if applicable at line start.
     /// Returns Ok(Some(Token)) if an indent/dedent should be emitted, Ok(None) otherwise.
-    fn emit_indentation_token_if_any(&mut self, ch: char) -> Result<Option<Token>, crate::error::YamlError> {
+    fn emit_indentation_token_if_any(
+        &mut self,
+        ch: char,
+    ) -> Result<Option<Token>, crate::error::YamlError> {
         if ch == CHAR_SPACE || ch == CHAR_TAB {
             // Special case: leading tab(s) at line start before a flow collection.
             // YAML allows tabs as horizontal whitespace inside flow collections.
@@ -577,7 +580,7 @@ impl<'a> Lexer<'a> {
                     }
                     let next_non_ws = self.source.current();
                     self.source.restore_state(state);
-                    
+
                     // If the line is blank (only whitespace before newline/EOF),
                     // allow the tabs. Otherwise, reject them as indentation.
                     if !matches!(
@@ -703,7 +706,10 @@ impl<'a> Lexer<'a> {
                 if c.is_alphanumeric() {
                     return Err(crate::parser::document::error_builder::syntax_error(
                         self.source,
-                        &format!("YAML syntax error: Invalid content '{}' immediately after '{}' - whitespace or newline required", c, closer)
+                        &format!(
+                            "YAML syntax error: Invalid content '{}' immediately after '{}' - whitespace or newline required",
+                            c, closer
+                        ),
                     ));
                 }
             }
@@ -1085,10 +1091,15 @@ impl<'a> Lexer<'a> {
                             match char::from_u32(code) {
                                 Some(ch) => content.push(ch),
                                 None => {
-                                    return Err(crate::parser::document::error_builder::syntax_error(
-                                        self.source,
-                                        &format!("YAML compliance error: Invalid unicode codepoint U+{:08X}", code)
-                                    ));
+                                    return Err(
+                                        crate::parser::document::error_builder::syntax_error(
+                                            self.source,
+                                            &format!(
+                                                "YAML compliance error: Invalid unicode codepoint U+{:08X}",
+                                                code
+                                            ),
+                                        ),
+                                    );
                                 }
                             }
                         }
@@ -1096,7 +1107,10 @@ impl<'a> Lexer<'a> {
                         Some(c) => {
                             return Err(crate::parser::document::error_builder::syntax_error(
                                 self.source,
-                                &format!("YAML compliance error: Invalid escape sequence '\\{}' in double-quoted string", c)
+                                &format!(
+                                    "YAML compliance error: Invalid escape sequence '\\{}' in double-quoted string",
+                                    c
+                                ),
                             ));
                         }
                         None => {
@@ -1106,7 +1120,7 @@ impl<'a> Lexer<'a> {
                             );
                             return Err(crate::parser::document::error_builder::syntax_error(
                                 self.source,
-                                "YAML compliance error: Unterminated double-quoted string (unexpected EOF after escape)"
+                                "YAML compliance error: Unterminated double-quoted string (unexpected EOF after escape)",
                             ));
                         }
                     }
@@ -1135,7 +1149,7 @@ impl<'a> Lexer<'a> {
                     eprintln!("DEBUG: Unterminated double-quoted string: reached EOF");
                     return Err(crate::parser::document::error_builder::syntax_error(
                         self.source,
-                        "YAML compliance error: Unterminated double-quoted string (unexpected EOF)"
+                        "YAML compliance error: Unterminated double-quoted string (unexpected EOF)",
                     ));
                 }
             }
