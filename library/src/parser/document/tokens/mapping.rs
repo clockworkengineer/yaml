@@ -624,14 +624,10 @@ fn parse_mapping_pair(
         | Some(Token::Eof)
         | Some(Token::DocumentStart)
         | Some(Token::DocumentEnd) => {
-            // After colon and newline, skip any intervening comments/newlines,
-            // then check for indent and dash for block sequence/mapping value.
             if matches!(stream.current(), Some(Token::Newline)) {
                 stream.next()?;
             }
-            // Allow comments and blank lines immediately after the colon
             stream.skip_newlines_and_comments()?;
-            // Check for indent starting the nested value
             let indent_level = if let Some(Token::Indent(level)) = stream.current() {
                 if *level > cur_indent {
                     let _lvl = *level;
@@ -644,18 +640,9 @@ fn parse_mapping_pair(
                 None
             };
             if let Some(level) = indent_level {
-                // After indent, skip newlines/comments before checking for dash
                 stream.skip_newlines_and_comments()?;
-                #[cfg(feature = "debug-trace")]
-                mapping_log(format!(
-                    "parse_mapping_pair: after value indent/newline, token = {:?}",
-                    stream.current()
-                ));
                 if matches!(stream.current(), Some(Token::Dash)) {
-                    // Parse block sequence as value
                     use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
-                    #[cfg(feature = "debug-trace")]
-                    log::debug!("mapping_pair: parsing sequence as value for key {:?}", key);
                     let ctx_seq = crate::parser::document::context::ParsingContext::new(level)
                         .child_block_context(
                             level,
@@ -669,18 +656,18 @@ fn parse_mapping_pair(
                         &ctx_seq,
                         depth + 1,
                     )?;
-                    #[cfg(feature = "debug-trace")]
-                    log::debug!("mapping_pair: sequence node for key {:?}: {:?}", key, seq);
                     return Ok((key, seq));
                 } else {
-                    // Parse nested mapping as value
-                    #[cfg(feature = "debug-trace")]
-                    log::debug!("mapping_pair: parsing mapping as value for key {:?}", key);
                     let map = parse_mapping_with_tokens(stream, level, directives, depth + 1)?;
-                    #[cfg(feature = "debug-trace")]
-                    log::debug!("mapping_pair: mapping node for key {:?}: {:?}", key, map);
                     return Ok((key, map));
                 }
+            }
+            // If not explicit key, error only if next token is EOF (no value, no newline, no indentation)
+            if !explicit_key && matches!(stream.current(), Some(Token::Eof) | None) {
+                return Err(crate::parser::document::error_builder::syntax_error(
+                    stream.source_mut(),
+                    "YAML compliance error: Mapping key without value (expected value after colon)",
+                ));
             }
             Node::None
         }
