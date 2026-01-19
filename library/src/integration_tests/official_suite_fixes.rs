@@ -7,6 +7,24 @@ use crate::{BufferSource, Node, parse};
 
 #[cfg(test)]
 mod tests {
+    // Test 5TRB - Unterminated/invalid quoted scalar
+    #[test]
+    fn test_5trb_unterminated_quoted_scalar() {
+        // This YAML has an invalid quoted scalar (unterminated)
+        let yaml = b"key: \"unterminated quoted scalar\n";
+        let mut source = BufferSource::new(yaml);
+        let result = parse(&mut source);
+
+        #[cfg(feature = "debug-trace")]
+        println!("5TRB Result: {:?}", result);
+
+        // Fail the test if parsing does NOT return an error
+        assert!(
+            result.is_err(),
+            "5TRB should fail to parse, but succeeded: {:?}",
+            result
+        );
+    }
     use super::*;
 
     // Test 229Q - Spec Example 2.4. Sequence of Mappings
