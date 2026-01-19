@@ -43,6 +43,7 @@ pub(crate) fn validate_indentation_tokens(
 /// a `TokenStream` positioned at a logical line start. It currently
 /// delegates directly to `validate_indentation_tokens`, but exists as a
 /// stable, self-documenting API for future indentation rule tweaks.
+#[allow(dead_code)]
 pub(crate) fn validate_indentation_at_line_start(
     stream: &TokenStream,
     ctx: &ParsingContext,

@@ -76,6 +76,7 @@ impl ValidationContext {
     }
 
     /// Get current path as string
+    #[allow(dead_code)]
     fn current_path(&self) -> String {
         if self.path.is_empty() {
             "$".to_string()
@@ -262,6 +263,7 @@ impl SchemaValidator {
 }
 
 /// Get human-readable name for node type
+#[allow(dead_code)]
 fn node_type_name(node: &Node) -> &'static str {
     match node {
         Node::Boolean(_) => "Boolean",

@@ -55,6 +55,7 @@ pub fn escape_for_xml(s: &str) -> String {
 /// stringify/default.rs to make it available to other modules without
 /// duplicating behavior. For now, callers in YAML formatter continue to
 /// use their local helper; this API exists for potential future reuse.
+#[allow(dead_code)]
 pub fn escape_yaml_double<F>(s: &str, escape_impl: F) -> String
 where
     F: Fn(&str) -> String,
@@ -63,6 +64,7 @@ where
 }
 
 /// Escapes single quotes in a string for single-quoted YAML representation.
+#[allow(dead_code)]
 pub fn escape_yaml_single<F>(s: &str, escape_impl: F) -> String
 where
     F: Fn(&str) -> String,

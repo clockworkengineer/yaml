@@ -86,6 +86,7 @@ pub enum Token {
     DocumentEnd,
 
     /// Directive: %YAML or %TAG
+    #[allow(dead_code)]
     Directive(String),
 
     /// End of stream
@@ -841,6 +842,7 @@ impl<'a> Lexer<'a> {
     }
 
     /// Scan a directive: %YAML or %TAG
+    #[allow(dead_code)]
     fn scan_directive(&mut self) -> Result<Token, crate::error::YamlError> {
         self.source.next(); // consume '%'
 

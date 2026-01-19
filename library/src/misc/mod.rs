@@ -45,9 +45,9 @@ mod tests {
     use crate::parse;
     #[test]
     fn test_get_version_env() {
-        assert_eq!(get_version(), "0.1.6");
+        assert_eq!(get_version(), "0.1.7");
     }
-        #[test]
+    #[test]
     fn test_get_number_of_documents_nobegin_empty() {
         let mut source = Buffer::new(b"God: 42\n...\n---\n");
         let result = parse(&mut source).unwrap();
@@ -69,7 +69,7 @@ mod tests {
     fn test_get_number_of_documents() {
         let mut source = Buffer::new(b"doc1: value1\n---\ndoc2: value2\n...\n---\n");
         let result = parse(&mut source).unwrap();
-        assert_eq!(get_number_of_documents(&result).unwrap(),2);
+        assert_eq!(get_number_of_documents(&result).unwrap(), 2);
 
         let non_docs_node = Node::Str("test".to_string(), QuoteType::Unquoted, BlockStyle::None);
         assert!(get_number_of_documents(&non_docs_node).is_err());
