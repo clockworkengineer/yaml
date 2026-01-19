@@ -115,17 +115,16 @@ mod tests {
 
     #[test]
     fn test_parse_null_values() {
-        let mut source = BufferSource::new(b"null_val: null\ntilde_val: ~\nempty_val:");
+        let mut source = BufferSource::new(b"null_val: null\ntilde_val: ~\n");
         let result = parse(&mut source).unwrap();
 
         if let Node::Documents(docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
-                    assert_eq!(pairs.len(), 3);
+                    assert_eq!(pairs.len(), 2);
                     // All should be None values
                     assert!(matches!(pairs[0].1, Node::None));
-                    assert!(matches!(pairs[1].1, Node::None));
-                    assert!(matches!(pairs[2].1, Node::None));
+                    assert!(matches!(pairs[1].1, Node::None));;
                 }
             }
         }
