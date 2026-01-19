@@ -1,6 +1,7 @@
 //! Module: stringify/default.rs
 
 use crate::constants::*;
+use crate::error::YamlError;
 use crate::io::traits::IDestination;
 use crate::nodes::node::*;
 
@@ -121,7 +122,7 @@ fn stringify_document_with_indent(
     node: &Node,
     destination: &mut dyn IDestination,
     indent: usize,
-) -> Result<(), String> {
+) -> Result<(), YamlError> {
     let indent_str = "  ".repeat(indent);
     match node {
         Node::None => destination.add_bytes(&format!("{indent_str}null")),
@@ -298,7 +299,9 @@ fn stringify_document_with_indent(
             destination.add_bytes(&format!("{CHAR_ASTERISK}{name}"));
         }
         _ => {
-            return Err(crate::error::messages::ERR_UNSUPPORTED_NODE_TYPE.to_string());
+            return Err(crate::error::messages::ERR_UNSUPPORTED_NODE_TYPE
+                .to_string()
+                .into());
         }
     }
     Ok(())
@@ -331,7 +334,10 @@ fn stringify_document_with_indent(
 /// # Returns
 ///
 /// Result indicating success or an error string
-pub fn stringify_document(node: &Node, destination: &mut dyn IDestination) -> Result<(), String> {
+pub fn stringify_document(
+    node: &Node,
+    destination: &mut dyn IDestination,
+) -> Result<(), YamlError> {
     stringify_document_with_indent(node, destination, 0)
 }
 
@@ -349,7 +355,7 @@ pub fn stringify_document(node: &Node, destination: &mut dyn IDestination) -> Re
 /// # Returns
 ///
 /// Result indicating success or an error string
-pub fn stringify(node: &Node, destination: &mut dyn IDestination) -> Result<(), String> {
+pub fn stringify(node: &Node, destination: &mut dyn IDestination) -> Result<(), YamlError> {
     match node {
         Node::Documents(docs) => {
             for doc in docs {

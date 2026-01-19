@@ -62,7 +62,7 @@ fn example_1_simple_type_validation() {
     let count_node = Node::from(42);
     match validator.validate(&count_node) {
         Ok(_) => println!("✗ Should have rejected number"),
-        Err(errors) => println!("✓ Correctly rejected number: {}", errors[0]),
+        Err(e) => println!("✓ Correctly rejected number: {}", e),
     }
 
     println!();
@@ -110,7 +110,7 @@ age: 25
     let invalid_doc = parse_yaml(invalid_yaml);
     match validator.validate(&invalid_doc) {
         Ok(_) => println!("✗ Should have rejected missing required field"),
-        Err(errors) => println!("✓ Correctly rejected: {}", errors[0]),
+        Err(e) => println!("✓ Correctly rejected: {}", e),
     }
 
     println!();
@@ -138,7 +138,7 @@ fn example_3_array_validation() {
     let invalid_doc = parse_yaml(invalid_yaml);
     match validator.validate(&invalid_doc["mixed"]) {
         Ok(_) => println!("✗ Should have rejected mixed types"),
-        Err(errors) => println!("✓ Correctly rejected mixed types: {}", errors[0]),
+        Err(e) => println!("✓ Correctly rejected mixed types: {}", e),
     }
 
     println!();
@@ -204,8 +204,8 @@ address:
     let invalid_doc = parse_yaml(invalid_yaml);
     match validator.validate(&invalid_doc) {
         Ok(_) => println!("✗ Should have rejected missing nested field"),
-        Err(errors) => {
-            println!("✓ Correctly rejected: {}", errors[0]);
+        Err(e) => {
+            println!("✓ Correctly rejected: {}", e);
         }
     }
 
@@ -264,7 +264,7 @@ age: 30
     let invalid_doc = parse_yaml(invalid_yaml);
     match validator.validate(&invalid_doc) {
         Ok(_) => println!("✗ Should have rejected short password"),
-        Err(errors) => println!("✓ Correctly rejected: {}", errors[0]),
+        Err(e) => println!("✓ Correctly rejected: {}", e),
     }
 
     // Invalid: age out of range
@@ -276,7 +276,7 @@ age: 15
     let invalid_age_doc = parse_yaml(invalid_age_yaml);
     match validator.validate(&invalid_age_doc) {
         Ok(_) => println!("✗ Should have rejected underage"),
-        Err(errors) => println!("✓ Correctly rejected age: {}", errors[0]),
+        Err(e) => println!("✓ Correctly rejected age: {}", e),
     }
 
     println!();
@@ -327,7 +327,7 @@ role: user
     let invalid_email_doc = parse_yaml(invalid_email_yaml);
     match validator.validate(&invalid_email_doc) {
         Ok(_) => println!("✗ Should have rejected invalid email"),
-        Err(errors) => println!("✓ Correctly rejected email: {}", errors[0]),
+        Err(e) => println!("✓ Correctly rejected email: {}", e),
     }
 
     // Invalid: bad role
@@ -338,7 +338,7 @@ role: superadmin
     let invalid_role_doc = parse_yaml(invalid_role_yaml);
     match validator.validate(&invalid_role_doc) {
         Ok(_) => println!("✗ Should have rejected invalid role"),
-        Err(errors) => println!("✓ Correctly rejected role: {}", errors[0]),
+        Err(e) => println!("✓ Correctly rejected role: {}", e),
     }
 
     println!();
@@ -356,10 +356,9 @@ fn example_7_custom_validators() {
             Node::Number(Numeric::Integer(port)) => Err(ValidationError::Custom(format!(
                 "Port {} is reserved (must be > 1024)",
                 port
-            ))),
-            _ => Err(ValidationError::Custom(
-                "Port must be an integer".to_string(),
-            )),
+            ))
+            .into()),
+            _ => Err(ValidationError::Custom("Port must be an integer".to_string()).into()),
         });
 
     // Test valid port
@@ -489,11 +488,8 @@ database:
     let invalid_doc = parse_yaml(invalid_config);
     match validator.validate(&invalid_doc) {
         Ok(_) => println!("✗ Should have rejected incomplete config"),
-        Err(errors) => {
-            println!("✓ Found {} validation error(s):", errors.len());
-            for error in errors {
-                println!("  - {}", error);
-            }
+        Err(e) => {
+            println!("✓ Validation error: {}", e);
         }
     }
 
@@ -511,9 +507,8 @@ database:
     let invalid_port_doc = parse_yaml(invalid_port_config);
     match validator.validate(&invalid_port_doc) {
         Ok(_) => println!("✗ Should have rejected invalid port"),
-        Err(errors) => {
-            println!("✓ Correctly rejected invalid port:");
-            println!("  - {}", errors[0]);
+        Err(e) => {
+            println!("✓ Correctly rejected invalid port: {}", e);
         }
     }
 

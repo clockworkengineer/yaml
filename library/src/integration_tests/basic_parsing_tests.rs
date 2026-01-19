@@ -147,7 +147,7 @@ mod tests {
                     assert_eq!(pairs.len(), 2);
                     // All should be None values
                     assert!(matches!(pairs[0].1, Node::None));
-                    assert!(matches!(pairs[1].1, Node::None));;
+                    assert!(matches!(pairs[1].1, Node::None));
                 }
             }
         }

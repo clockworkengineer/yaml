@@ -1,3 +1,4 @@
+use crate::error::{YamlError, ErrorKind};
 /// Parses YAML directives (%YAML, %TAG) at the start of a document.
 /// Returns a DirectiveContext or error string.
 /// YAML directive parsing (%YAML and %TAG)
@@ -8,7 +9,7 @@
 /// - %RESERVED - Reserved directives (ignored with warning)
 pub fn parse_directives(
     source: &mut dyn crate::io::traits::ISource,
-) -> Result<DirectiveContext, String> {
+) -> Result<DirectiveContext, YamlError> {
     // Inline parse_line since helpers is private
     fn parse_line(source: &mut dyn crate::io::traits::ISource) -> String {
         let mut line = String::new();
@@ -38,18 +39,18 @@ pub fn parse_directives(
         match parts[0] {
             "%YAML" => {
                 if parts.len() < 2 {
-                    return Err("Missing YAML version after %YAML directive".to_string());
+                    return Err(YamlError::new(ErrorKind::ParseError, "Missing YAML version after %YAML directive"));
                 }
                 let version = parts[1];
                 let mut split = version.split('.');
                 let major = split
                     .next()
                     .and_then(|s| s.parse::<u8>().ok())
-                    .ok_or("Invalid YAML major version")?;
+                    .ok_or_else(|| YamlError::new(ErrorKind::ParseError, "Invalid YAML major version"))?;
                 let minor = split
                     .next()
                     .and_then(|s| s.parse::<u8>().ok())
-                    .ok_or("Invalid YAML minor version")?;
+                    .ok_or_else(|| YamlError::new(ErrorKind::ParseError, "Invalid YAML minor version"))?;
                 directives.set_version(major, minor)?;
             }
             "%TAG" => {
@@ -57,7 +58,7 @@ pub fn parse_directives(
                     // Debug trace for malformed %TAG directive
                     #[cfg(debug_assertions)]
                     eprintln!("DEBUG: Malformed %TAG directive: parts = {:?}", parts);
-                    return Err("YAML compliance error: Malformed %TAG directive. Expected format: %TAG <handle> <prefix>".to_string());
+                    return Err(YamlError::new(ErrorKind::ParseError, "YAML compliance error: Malformed %TAG directive. Expected format: %TAG <handle> <prefix>"));
                 }
                 let handle = parts[1].to_string();
                 let prefix = parts[2].to_string();
@@ -113,15 +114,15 @@ impl DirectiveContext {
     }
 
     /// Set the YAML version
-    pub fn set_version(&mut self, major: u8, minor: u8) -> Result<(), String> {
+    pub fn set_version(&mut self, major: u8, minor: u8) -> Result<(), YamlError> {
         // Check for duplicate YAML directive
         if self.yaml_version.is_some() {
-            return Err("Duplicate YAML directive".to_string());
+            return Err(YamlError::new(ErrorKind::ParseError, "Duplicate YAML directive"));
         }
 
         // Validate version (only 1.1 and 1.2 are standard)
         if major != 1 {
-            return Err(alloc::format!("Invalid YAML major version: {}", major));
+            return Err(YamlError::new(ErrorKind::ParseError, alloc::format!("Invalid YAML major version: {}", major)));
         }
         // Per YAML spec, parsers should accept future minor versions
         // We support 1.1 and 1.2, but don't error on higher minor versions

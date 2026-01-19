@@ -27,6 +27,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use log::warn;
 
+use crate::error::YamlError;
 use crate::nodes::node::{Node, Numeric};
 use crate::validation::error::ValidationError;
 use crate::validation::schema::{PropertySchema, Schema, SchemaType};
@@ -80,7 +81,8 @@ impl ValidationContext {
     }
 
     /// Record an error and log it
-    fn add_error(&mut self, error: ValidationError) {
+    fn add_error(&mut self, error: impl std::fmt::Display) {
+        let error = ValidationError::Custom(error.to_string());
         warn!("Validation error: {:?}", error);
         self.errors.push(error);
     }
@@ -118,14 +120,24 @@ impl SchemaValidator {
     }
 
     /// Validate a node against the schema
-    pub fn validate(&self, node: &Node) -> Result<(), Vec<ValidationError>> {
+    pub fn validate(&self, node: &Node) -> Result<(), YamlError> {
         let mut ctx = ValidationContext::new();
         self.validate_with_context(node, &mut ctx);
 
         if ctx.is_valid() {
             Ok(())
         } else {
-            Err(ctx.errors)
+            // Convert Vec<ValidationError> to a single YamlError with details
+            let msg = ctx
+                .errors
+                .iter()
+                .map(|e| e.to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+            Err(YamlError::new(
+                crate::error::ErrorKind::ValidationError,
+                msg,
+            ))
         }
     }
 
@@ -400,12 +412,9 @@ mod tests {
         let result = validator.validate(&obj);
         assert!(result.is_err());
 
-        let errors = result.unwrap_err();
-        assert!(!errors.is_empty());
-        // No path field anymore; just check error kind
-        let found_required = errors
-            .iter()
-            .any(|e| matches!(e, ValidationError::TypeMismatch { .. }));
-        assert!(found_required);
+        let error = result.unwrap_err();
+        let msg = error.to_string();
+        // Check that the error message contains the expected type mismatch
+        assert!(msg.contains("Type mismatch"));
     }
 }

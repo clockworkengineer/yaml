@@ -11,19 +11,17 @@ use yaml_utility_lib::get_yaml_file_list;
 ///
 /// # Returns
 /// * `Result<(), String>` - Ok(()) if successful, Err with an error message if failed
-fn process_yaml_file(file_path: &str) -> Result<(), String> {
-    let mut source = FileSource::new(file_path).map_err(|e| e.to_string())?;
+use yaml_lib::YamlError;
 
-    let node = parse(&mut source).map_err(|e| e.to_string())?;
-
+fn process_yaml_file(file_path: &str) -> Result<(), YamlError> {
+    let mut source = FileSource::new(file_path).map_err(|e| YamlError::new(yaml_lib::ErrorKind::IoError, e.to_string()))?;
+    let node = parse(&mut source)?;
     let mut destination = FileDestination::new(
         Path::new(file_path)
             .with_extension("yaml.stringify")
             .to_string_lossy()
             .as_ref(),
-    )
-    .map_err(|e| e.to_string())?;
-
+    ).map_err(|e| YamlError::new(yaml_lib::ErrorKind::IoError, e.to_string()))?;
     stringify(&node, &mut destination)?;
     Ok(())
 }

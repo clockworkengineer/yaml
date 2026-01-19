@@ -5,6 +5,7 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
+use crate::error::{Result, YamlError};
 use crate::io::traits::IDestination;
 use crate::nodes::node::Node;
 use crate::stringify::format::{FormatContext, FormatOptions};
@@ -45,7 +46,7 @@ impl<'a> StreamingSerializer<'a> {
     }
 
     /// Write string to stream
-    fn write_str(&mut self, s: &str) -> Result<(), String> {
+    fn write_str(&mut self, s: &str) -> Result<()> {
         self.buffer.extend_from_slice(s.as_bytes());
 
         // Flush if buffer is large enough
@@ -57,7 +58,7 @@ impl<'a> StreamingSerializer<'a> {
     }
 
     /// Flush buffer to destination
-    pub fn flush(&mut self) -> Result<(), String> {
+    pub fn flush(&mut self) -> Result<()> {
         if !self.buffer.is_empty() {
             let s = String::from_utf8_lossy(&self.buffer);
             self.destination.add_bytes(&s);
@@ -67,18 +68,14 @@ impl<'a> StreamingSerializer<'a> {
     }
 
     /// Serialize a node to the stream
-    pub fn serialize_node(&mut self, node: &Node) -> Result<(), String> {
+    pub fn serialize_node(&mut self, node: &Node) -> Result<()> {
         let mut context = FormatContext::new();
         self.serialize_node_impl(node, &mut context)?;
         self.flush()
     }
 
     /// Internal serialization implementation
-    fn serialize_node_impl(
-        &mut self,
-        node: &Node,
-        context: &mut FormatContext,
-    ) -> Result<(), String> {
+    fn serialize_node_impl(&mut self, node: &Node, context: &mut FormatContext) -> Result<()> {
         match node {
             Node::Str(s, _, _) => {
                 self.write_str(&self.format_string(s))?;
@@ -132,7 +129,8 @@ impl<'a> StreamingSerializer<'a> {
             _ => {
                 // Handle other node types with default stringify
                 let mut buffer = crate::io::destinations::buffer::Buffer::new();
-                crate::stringify::default::stringify(node, &mut buffer)?;
+                crate::stringify::default::stringify(node, &mut buffer)
+                    .map_err(|e| YamlError::from(e.to_string()))?;
                 self.write_str(&buffer.to_string())?;
             }
         }
@@ -141,11 +139,7 @@ impl<'a> StreamingSerializer<'a> {
     }
 
     /// Serialize array
-    fn serialize_array(
-        &mut self,
-        items: &[Node],
-        context: &mut FormatContext,
-    ) -> Result<(), String> {
+    fn serialize_array(&mut self, items: &[Node], context: &mut FormatContext) -> Result<()> {
         if items.is_empty() && self.options.flow_empty_collections {
             self.write_str("[]")?;
             return Ok(());
@@ -183,7 +177,7 @@ impl<'a> StreamingSerializer<'a> {
         &mut self,
         pairs: &[(Node, Node)],
         context: &mut FormatContext,
-    ) -> Result<(), String> {
+    ) -> Result<()> {
         if pairs.is_empty() && self.options.flow_empty_collections {
             self.write_str("{}")?;
             return Ok(());
@@ -233,7 +227,7 @@ impl<'a> StreamingSerializer<'a> {
     }
 
     /// Serialize set
-    fn serialize_set(&mut self, items: &[Node], context: &mut FormatContext) -> Result<(), String> {
+    fn serialize_set(&mut self, items: &[Node], context: &mut FormatContext) -> Result<()> {
         // Sets are serialized as arrays in YAML
         self.serialize_array(items, context)
     }

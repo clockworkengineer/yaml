@@ -1,7 +1,14 @@
-//! Error types for YAML parsing and operations
-//!
-//! This module provides structured error handling with detailed context
-//! about where and why errors occurred.
+/// Allow conversion from ValidationError to YamlError for unified error handling
+#[cfg(feature = "alloc")]
+impl From<crate::validation::error::ValidationError> for YamlError {
+    fn from(e: crate::validation::error::ValidationError) -> Self {
+        YamlError::new(ErrorKind::ValidationError, e.to_string())
+    }
+}
+/// Error types for YAML parsing and operations
+///
+/// This module provides structured error handling with detailed context
+/// about where and why errors occurred.
 
 /// Error message constants
 pub mod messages;

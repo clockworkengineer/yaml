@@ -1,5 +1,6 @@
 //! Module: stringify/json.rs
 
+use crate::error::YamlError;
 use crate::io::traits::IDestination;
 use crate::nodes::node::*;
 use crate::stringify::format::node_to_key_like_string;
@@ -49,7 +50,7 @@ fn write_json_string(s: &str, destination: &mut dyn IDestination) {
 /// # Returns
 ///
 /// Result indicating success or an error string
-fn stringify_node(node: &Node, destination: &mut dyn IDestination) -> Result<(), String> {
+fn stringify_node(node: &Node, destination: &mut dyn IDestination) -> Result<(), YamlError> {
     match node {
         Node::None => destination.add_bytes("null"),
         Node::Boolean(b) => destination.add_bytes(if *b { "true" } else { "false" }),
@@ -151,7 +152,7 @@ fn stringify_node(node: &Node, destination: &mut dyn IDestination) -> Result<(),
 /// # Returns
 ///
 /// Result indicating success or an error string
-pub fn stringify(node: &Node, destination: &mut dyn IDestination) -> Result<(), String> {
+pub fn stringify(node: &Node, destination: &mut dyn IDestination) -> Result<(), YamlError> {
     stringify_node(node, destination)
 }
 
@@ -173,13 +174,13 @@ pub fn stringify_pretty(
     node: &Node,
     destination: &mut dyn IDestination,
     spaces_per_indent: usize,
-) -> Result<(), String> {
+) -> Result<(), YamlError> {
     fn helper(
         node: &Node,
         destination: &mut dyn IDestination,
         spaces: usize,
         level: usize,
-    ) -> Result<(), String> {
+    ) -> Result<(), YamlError> {
         match node {
             Node::None => destination.add_bytes("null"),
             Node::Boolean(b) => destination.add_bytes(if *b { "true" } else { "false" }),
