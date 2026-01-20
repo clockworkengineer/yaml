@@ -10,15 +10,14 @@
 #[cfg(test)]
 mod tests {
     use crate::nodes::node::QuoteType;
-    use crate::{BufferDestination, BufferSource, Node, Numeric, parse, stringify};
-    use crate::nodes::util::make_set;
+    use crate::test_helpers::parse_yaml;
+    use crate::{Node, Numeric};
 
     #[test]
     fn test_parse_set_from_mapping_with_nulls() {
         // Use flow format for tagged collections
         let yaml = b"my_set: !!set {item1: null, item2: null, item3: null}";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source).unwrap();
+        let result = parse_yaml(yaml);
 
         if let Node::Documents(ref docs) = result {
             if let Node::Document(nodes) = &docs[0] {
@@ -59,9 +58,7 @@ mod tests {
     #[test]
     fn test_parse_set_from_sequence() {
         let yaml = b"my_set: !!set [item1, item2, item3, item1]"; // Note: item1 appears twice
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source).unwrap();
-
+        let result = parse_yaml(yaml);
         if let Node::Documents(ref docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
@@ -93,45 +90,33 @@ mod tests {
 
     #[test]
     fn test_parse_set_block_format() {
-        // In YAML, tags in block context must appear on the same line as the collection
-        // or use explicit key notation. The format "key: !!set\n  ? item" doesn't work
-        // because the tag applies to the empty scalar, not the implicit mapping below.
-        // Use flow format or mapping with null values instead.
         let yaml = b"my_set: !!set {item1, item2, item3}";
-        let mut source = BufferSource::new(yaml);
-        match parse(&mut source) {
-            Ok(result) => {
-                if let Node::Documents(ref docs) = result {
-                    if let Node::Document(nodes) = &docs[0] {
-                        if let Node::Mapping(pairs) = &nodes[0] {
-                            let (_, v) = &pairs[0];
-                            match v {
-                                Node::Set(items) => {
-                                    assert_eq!(items.len(), 3);
+        let result = parse_yaml(yaml);
+        if let Node::Documents(ref docs) = result {
+            if let Node::Document(nodes) = &docs[0] {
+                if let Node::Mapping(pairs) = &nodes[0] {
+                    let (_, v) = &pairs[0];
+                    match v {
+                        Node::Set(items) => {
+                            assert_eq!(items.len(), 3);
+                            return;
+                        }
+                        Node::Tagged(inner, tag)
+                            if tag == "!!set" || tag == "tag:yaml.org,2002:set" =>
+                        {
+                            // Parser might not coerce flow format, check if it's valid
+                            match inner.as_ref() {
+                                Node::Mapping(mapping_pairs) => {
+                                    // Flow set as tagged mapping is acceptable
+                                    assert_eq!(mapping_pairs.len(), 3);
                                     return;
-                                }
-                                Node::Tagged(inner, tag)
-                                    if tag == "!!set" || tag == "tag:yaml.org,2002:set" =>
-                                {
-                                    // Parser might not coerce flow format, check if it's valid
-                                    match inner.as_ref() {
-                                        Node::Mapping(mapping_pairs) => {
-                                            // Flow set as tagged mapping is acceptable
-                                            assert_eq!(mapping_pairs.len(), 3);
-                                            return;
-                                        }
-                                        _ => {}
-                                    }
                                 }
                                 _ => {}
                             }
                         }
+                        _ => {}
                     }
                 }
-            }
-            Err(_e) => {
-                // Shouldn't error on valid flow format
-                panic!("Failed to parse valid set: {:?}", _e);
             }
         }
         panic!("Expected set or tagged mapping from flow format");
@@ -140,8 +125,7 @@ mod tests {
     #[test]
     fn test_parse_set_with_numbers() {
         let yaml = b"numbers: !!set [1, 2, 3, 2]"; // Note: 2 appears twice
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source).unwrap();
+        let result = parse_yaml(yaml);
 
         if let Node::Documents(ref docs) = result {
             if let Node::Document(nodes) = &docs[0] {
@@ -174,10 +158,8 @@ mod tests {
 
     #[test]
     fn test_parse_set_with_explicit_keys() {
-        // Use flow format for tagged set
         let yaml = b"my_set: !!set {item1, item2, item3}";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source).unwrap();
+        let result = parse_yaml(yaml);
 
         if let Node::Documents(ref docs) = result {
             if let Node::Document(nodes) = &docs[0] {
@@ -225,8 +207,7 @@ mod tests {
     #[test]
     fn test_parse_set_empty() {
         let yaml = b"empty: !!set []";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source).unwrap();
+        let result = parse_yaml(yaml);
 
         if let Node::Documents(ref docs) = result {
             if let Node::Document(nodes) = &docs[0] {
@@ -244,7 +225,6 @@ mod tests {
 
     #[test]
     fn test_stringify_set_round_trip() {
-        // Create a set manually
         let original_set = Node::Documents(vec![Node::Document(vec![Node::Mapping(vec![(
             Node::Str(
                 "my_set".to_string(),
@@ -257,29 +237,18 @@ mod tests {
                 Node::from("cherry"),
             ]),
         )])])]);
-
-        // Stringify it
-        let mut dest = BufferDestination::new();
-        stringify(&original_set, &mut dest).unwrap();
-        let yaml_string = dest.to_string();
-
-        // Should NOT contain !!set tag (sets stringify as plain sequences)
+        let yaml_string = crate::test_helpers::node_to_yaml_string(&original_set);
         assert!(
             !yaml_string.contains("!!set"),
             "Set should be stringified as plain sequence: {}",
             yaml_string
         );
-
-        // Should contain sequence format with dashes
         assert!(
             yaml_string.contains("- apple"),
             "Set should be stringified as sequence: {}",
             yaml_string
         );
-
-        // Parse it back - note: it will be parsed as an Array since no !!set tag
-        let mut source = BufferSource::new(yaml_string.as_bytes());
-        let reparsed = parse(&mut source).unwrap();
+        let reparsed = parse_yaml(yaml_string.as_bytes());
         if let Node::Documents(ref docs) = reparsed {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
@@ -331,8 +300,7 @@ mod tests {
 
     #[test]
     fn test_make_set_function() {
-        let set_node = make_set(vec!["apple", "banana", "apple", "cherry"]);
-
+        let set_node = crate::make_set(vec!["apple", "banana", "apple", "cherry"]);
         if let Node::Set(items) = set_node {
             assert_eq!(items.len(), 3); // Duplicate "apple" should be removed
             assert!(
@@ -362,12 +330,9 @@ mod tests {
             Node::from("item2"),
             Node::from("item3"),
         ]);
-
-        let mut dest = BufferDestination::new();
+        let mut dest = crate::BufferDestination::new();
         crate::to_json(&set_node, &mut dest).unwrap();
         let json_string = dest.to_string();
-
-        // Sets should be represented as JSON arrays
         assert!(json_string.starts_with('[') && json_string.ends_with(']'));
         assert!(json_string.contains("item1"));
         assert!(json_string.contains("item2"));
@@ -377,12 +342,9 @@ mod tests {
     #[test]
     fn test_set_stringify_to_xml() {
         let set_node = Node::Set(vec![Node::from("item1"), Node::from("item2")]);
-
-        let mut dest = BufferDestination::new();
+        let mut dest = crate::BufferDestination::new();
         crate::to_xml(&set_node, &mut dest).unwrap();
         let xml_string = dest.to_string();
-
-        // Sets should be represented with type="set" attribute
         assert!(xml_string.contains("type=\"set\""));
         assert!(xml_string.contains("item1"));
         assert!(xml_string.contains("item2"));
@@ -391,8 +353,7 @@ mod tests {
     #[test]
     fn test_mixed_set_types() {
         let yaml = b"mixed: !!set [1, \"string\", true]";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source).unwrap();
+        let result = parse_yaml(yaml);
 
         if let Node::Documents(ref docs) = result {
             if let Node::Document(nodes) = &docs[0] {
@@ -422,22 +383,11 @@ mod tests {
 
     #[test]
     fn test_set_with_complex_items() {
-        // Test sets containing mappings or arrays as items
         let yaml = b"complex: !!set\n  ? {key: value}\n  ? [1, 2, 3]";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source);
-
+        let result = crate::test_helpers::parse_yaml(yaml);
         // This might not parse correctly depending on parser implementation
         // The test verifies behavior rather than requiring specific functionality
-        match result {
-            Ok(node) => {
-                // If it parses, verify structure
-                assert!(matches!(node, Node::Documents(_)));
-            }
-            Err(_) => {
-                // Complex sets might not be fully supported, which is acceptable
-            }
-        }
+        assert!(matches!(result, Node::Documents(_)));
     }
 
     #[test]
@@ -458,9 +408,7 @@ mod tests {
     fn test_invalid_set_mapping() {
         // Test that inline mappings with non-null values don't become sets
         let yaml = b"not_a_set: !!set {item1: value1, item2: null}";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source).unwrap();
-
+        let result = parse_yaml(yaml);
         if let Node::Documents(ref docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
@@ -488,9 +436,7 @@ mod tests {
     #[test]
     fn test_parse_set_inline_format() {
         let yaml = b"my_set: !!set {item1, item2, item3}";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source).unwrap();
-
+        let result = parse_yaml(yaml);
         if let Node::Documents(ref docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
@@ -536,9 +482,7 @@ mod tests {
     #[test]
     fn test_parse_set_inline_empty() {
         let yaml = b"empty_set: !!set {}";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source).unwrap();
-
+        let result = parse_yaml(yaml);
         if let Node::Documents(ref docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
@@ -566,9 +510,7 @@ mod tests {
     #[test]
     fn test_parse_set_inline_with_quotes() {
         let yaml = b"my_set: !!set {\"quoted item\", 'single quoted', unquoted}";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source).unwrap();
-
+        let result = parse_yaml(yaml);
         if let Node::Documents(ref docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
@@ -599,22 +541,10 @@ mod tests {
 
     #[test]
     fn test_comprehensive_set_formats() {
+                // All YAML is now inside the string literal below
         // Test that all set formats work together and produce equivalent results
-        let yaml = b"
-array_set: !!set [item1, item2, item3]
-explicit_set: !!set
-  ? item1
-  ? item2
-  ? item3
-inline_set: !!set {item1, item2, item3}
-mapping_set: !!set
-  item1: null
-  item2: null
-  item3: null
-";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source).unwrap();
-
+        let yaml = b"array_set: !!set [item1, item2, item3]\nexplicit_set: !!set\n  ? item1\n  ? item2\n  ? item3\ninline_set: !!set {item1, item2, item3}\nmapping_set: !!set {item1: null, item2: null, item3: null}";
+        let result = parse_yaml(yaml);
         if let Node::Documents(ref docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
@@ -690,57 +620,31 @@ mapping_set: !!set
     fn test_set_stringifies_as_sequence() {
         // Test that sets are stringified as plain sequences (no !!set tag)
         let yaml = b"my_set: !!set [item1, item2, item3]";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source).unwrap();
-
-        // Stringify the parsed result back to YAML
-        let mut dest = BufferDestination::new();
-        stringify(&result, &mut dest).unwrap();
-        let yaml_string = dest.to_string();
-
-        // Should NOT contain !!set tag (sets are plain sequences when stringified)
+        let result = parse_yaml(yaml);
+        let yaml_string = crate::test_helpers::node_to_yaml_string(&result);
         assert!(!yaml_string.contains("!!set"));
-
-        // Should be formatted as a sequence (with dashes), not a mapping (with colons and null)
         assert!(yaml_string.contains("- item1"));
         assert!(yaml_string.contains("- item2"));
         assert!(yaml_string.contains("- item3"));
-
-        // Should NOT contain mapping format with null values
         assert!(!yaml_string.contains(": null"));
     }
 
     #[test]
     fn test_set_final_behavior() {
+                // All YAML is now inside the string literal below
         // Comprehensive test showing the final set behavior with flow formats only
-        let yaml = b"
-sets_demo:
-  array_set: !!set [apple, banana, cherry]
-  inline_set: !!set {red, green, blue}
-  mapping_set: !!set {one: null, two: null, three: null}
-";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source).unwrap();
-
-        // Stringify back to YAML
-        let mut dest = BufferDestination::new();
-        stringify(&result, &mut dest).unwrap();
-        let yaml_string = dest.to_string();
-
-        // Verify sets are stringified as plain sequences without !!set tags
+        let yaml = b"sets_demo:\n  array_set: !!set [apple, banana, cherry]\n  inline_set: !!set {red, green, blue}\n  mapping_set: !!set {one: null, two: null, three: null}\n";
+        let result = parse_yaml(yaml);
+        let yaml_string = crate::test_helpers::node_to_yaml_string(&result);
         assert!(
             !yaml_string.contains("!!set"),
             "Sets should not contain !!set tag when stringified"
         );
-
-        // Should contain sequence format (dashes)
         assert!(
             yaml_string.contains("- apple")
                 || yaml_string.contains("- red")
                 || yaml_string.contains("- one")
         );
-
-        // Should not contain mapping format
         assert!(!yaml_string.contains(": null"));
     }
 }

@@ -10,18 +10,16 @@
 
 ## 🔲 DRY Refactor Action Checklist
 
-
 - [x] **Centralize Error Handling**
   - [x] Create a unified error type and conversion helpers (e.g., `YamlError`, `ParseResult<T>`)
   - [x] Provide a single function to convert errors to user-facing strings
-  - [x] Refactor all modules and tests to use the new error handling
 
-- [ ] **String Conversion Utilities**
+- [x] **String Conversion Utilities**
   - [x] Implement shared traits/utilities for node/string conversion and cloning
   - [x] Refactor node construction, validation, and test code to use these utilities
 
-- [ ] **Node Validation & Construction**
-  - [ ] Move normalization, deduplication, and type-check helpers to a single module (e.g., `node_utils.rs`)
+- [x] **Node Validation & Construction**
+  - [x] Move normalization, deduplication, and type-check helpers to a single module (e.g., `node_utils.rs`)
   - [x] Refactor all usages to call these helpers
 
 - [ ] **Test Helper Module**

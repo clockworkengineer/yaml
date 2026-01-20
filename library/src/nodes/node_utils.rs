@@ -1,3 +1,34 @@
+use super::node::{BlockStyle, QuoteType};
+
+/// Construct a tagged node from an inner node and tag string.
+pub fn make_tagged_node(inner: Node, tag: String) -> Node {
+    Node::Tagged(Box::new(inner), tag)
+}
+
+/// Construct an anchored node from an inner node and anchor name.
+pub fn make_anchored_node(inner: Node, name: String) -> Node {
+    Node::Anchored(Box::new(inner), name)
+}
+
+/// Construct a mapping node from key-value pairs.
+pub fn make_mapping_node(pairs: Vec<(Node, Node)>) -> Node {
+    Node::Mapping(pairs)
+}
+
+/// Construct an array node from items.
+pub fn make_array_node(items: Vec<Node>) -> Node {
+    Node::Array(items)
+}
+
+/// Construct a block scalar node (literal | or folded >)
+pub fn make_block_scalar_node(content: String, is_folded: bool) -> Node {
+    let style = if is_folded {
+        BlockStyle::Folded
+    } else {
+        BlockStyle::Literal
+    };
+    Node::Str(content, QuoteType::Unquoted, style)
+}
 /// Check if node is a string node
 pub fn is_string_node(node: &Node) -> bool {
     matches!(node, Node::Str(_, _, _))

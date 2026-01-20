@@ -757,7 +757,7 @@ impl Node {
     /// assert!(!number.is_string());
     /// ```
     pub fn is_string(&self) -> bool {
-        super::node_utils::is_string_node(self)
+        crate::nodes::node_utils::is_string_node(self)
     }
 
     /// Check if this node is a number
@@ -773,7 +773,7 @@ impl Node {
     /// assert!(!string.is_number());
     /// ```
     pub fn is_number(&self) -> bool {
-        super::node_utils::is_number_node(self)
+        crate::nodes::node_utils::is_number_node(self)
     }
 
     /// Check if this node is a boolean
@@ -789,7 +789,7 @@ impl Node {
     /// assert!(!number.is_boolean());
     /// ```
     pub fn is_boolean(&self) -> bool {
-        super::node_utils::is_boolean_node(self)
+        crate::nodes::node_utils::is_boolean_node(self)
     }
 
     /// Alias for is_string() for consistency with as_str()

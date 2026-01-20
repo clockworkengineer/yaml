@@ -58,10 +58,13 @@ impl Validator for TypeValidator {
         if matches {
             Ok(())
         } else {
-            Err(crate::validation::engine::ValidationContextCore::fail_type_mismatch(
-                &self.expected_type,
-                node,
-            ).into())
+            Err(
+                crate::validation::engine::ValidationContextCore::fail_type_mismatch(
+                    &self.expected_type,
+                    node,
+                )
+                .into(),
+            )
         }
     }
 
@@ -99,23 +102,30 @@ impl Validator for RangeValidator {
                 return Err(ValidationError::InvalidNodeType {
                     validator: "RangeValidator".to_string(),
                     found: node_type_name(node).to_string(),
-                }.into());
+                }
+                .into());
             }
         };
 
         if let Some(min) = self.min {
             if value < min {
-                return Err(crate::validation::engine::ValidationContextCore::fail_range(
-                    value, self.min, self.max,
-                ).into());
+                return Err(
+                    crate::validation::engine::ValidationContextCore::fail_range(
+                        value, self.min, self.max,
+                    )
+                    .into(),
+                );
             }
         }
 
         if let Some(max) = self.max {
             if value > max {
-                return Err(crate::validation::engine::ValidationContextCore::fail_range(
-                    value, self.min, self.max,
-                ).into());
+                return Err(
+                    crate::validation::engine::ValidationContextCore::fail_range(
+                        value, self.min, self.max,
+                    )
+                    .into(),
+                );
             }
         }
 
@@ -155,7 +165,8 @@ impl Validator for LengthValidator {
                 return Err(ValidationError::InvalidNodeType {
                     validator: "LengthValidator".to_string(),
                     found: node_type_name(node).to_string(),
-                }.into());
+                }
+                .into());
             }
         };
 
@@ -165,7 +176,8 @@ impl Validator for LengthValidator {
                     length,
                     min: self.min,
                     max: self.max,
-                }.into());
+                }
+                .into());
             }
         }
 
@@ -175,7 +187,8 @@ impl Validator for LengthValidator {
                     length,
                     min: self.min,
                     max: self.max,
-                }.into());
+                }
+                .into());
             }
         }
 
@@ -225,13 +238,15 @@ impl Validator for PatternValidator {
                 Err(ValidationError::PatternMismatch {
                     pattern: self.pattern.clone(),
                     value: s.to_string(),
-                }.into())
+                }
+                .into())
             }
         } else {
             Err(ValidationError::InvalidNodeType {
                 validator: "PatternValidator".to_string(),
                 found: node_type_name(node).to_string(),
-            }.into())
+            }
+            .into())
         }
     }
 
@@ -285,13 +300,15 @@ impl Validator for EnumValidator {
                     Err(ValidationError::EnumMismatch {
                         allowed: self.allowed.clone(),
                         value,
-                    }.into())
+                    }
+                    .into())
                 }
             }
             None => Err(ValidationError::InvalidNodeType {
                 validator: "EnumValidator".to_string(),
                 found: node_type_name(node).to_string(),
-            }.into()),
+            }
+            .into()),
         }
     }
 
@@ -343,13 +360,19 @@ impl Validator for RequiredValidator {
                 if found {
                     Ok(())
                 } else {
-                    Err(crate::validation::engine::ValidationContextCore::fail_required(&self.field_name).into())
+                    Err(
+                        crate::validation::engine::ValidationContextCore::fail_required(
+                            &self.field_name,
+                        )
+                        .into(),
+                    )
                 }
             }
             _ => Err(ValidationError::InvalidNodeType {
                 validator: "RequiredValidator".to_string(),
                 found: node_type_name(node).to_string(),
-            }.into()),
+            }
+            .into()),
         }
     }
 
@@ -556,9 +579,9 @@ mod tests {
     fn test_custom_validator() {
         let validator = CustomValidator::new("Must be positive", |node| match node {
             Node::Number(Numeric::Integer(i)) if *i > 0 => Ok(()),
-            Node::Number(Numeric::Integer(_)) => Err(ValidationError::Custom(
-                "Number must be positive".to_string(),
-            ).into()),
+            Node::Number(Numeric::Integer(_)) => {
+                Err(ValidationError::Custom("Number must be positive".to_string()).into())
+            }
             _ => Err(ValidationError::Custom("Not a number".to_string()).into()),
         });
 

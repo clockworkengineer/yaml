@@ -3,65 +3,55 @@
 ///
 #[cfg(test)]
 mod tests {
-        #[test]
-        fn test_literal_block_with_inline_comment() {
-            // Test parsing a literal block scalar with an inline comment in the first line
-            let mut source = BufferSource::new(b"literal: |\n  word1   #comment\n  word2\n");
-            let result = parse(&mut source).unwrap();
+    use crate::nodes::node::{BlockStyle, QuoteType};
+    use crate::{Node, Node::Document, Numeric};
+    use crate::test_helpers::{parse_yaml, assert_nodes_eq};
 
-            if let Node::Documents(docs) = result {
-                if let Node::Document(nodes) = &docs[0] {
-                    if let Node::Mapping(pairs) = &nodes[0] {
-                        assert_eq!(pairs.len(), 1);
-                        if let Node::Str(content, _, block_style) = &pairs[0].1 {
-                            // The comment should be ignored, and the content should be "word1   \nword2\n"
-                            assert!(matches!(block_style, BlockStyle::Literal));
-                            assert!(content.contains("word1"));
-                            assert!(content.contains("word2"));
-                            assert!(!content.contains("#comment"), "Comment should not be part of the content");
-                        } else {
-                            panic!("Expected a literal block string node, got: {:?}", pairs[0].1);
-                        }
+    #[test]
+    fn test_literal_block_with_inline_comment() {
+        let result = parse_yaml(b"literal: |\n  word1   #comment\n  word2\n");
+        if let Node::Documents(docs) = result {
+            if let Node::Document(nodes) = &docs[0] {
+                if let Node::Mapping(pairs) = &nodes[0] {
+                    assert_eq!(pairs.len(), 1);
+                    if let Node::Str(content, _, block_style) = &pairs[0].1 {
+                        // The comment should be ignored, and the content should be "word1   \nword2\n"
+                        assert!(matches!(block_style, BlockStyle::Literal));
+                        assert!(content.contains("word1"));
+                        assert!(content.contains("word2"));
+                        assert!(!content.contains("#comment"), "Comment should not be part of the content");
+                    } else {
+                        panic!("Expected a literal block string node, got: {:?}", pairs[0].1);
                     }
                 }
             }
         }
-    use crate::nodes::node::{BlockStyle, QuoteType};
-    use crate::{BufferSource, Node, Node::Document, Numeric, parse};
+    }
 
     #[test]
     fn test_parse_sequence() {
-        let mut source = BufferSource::new(b"- 1\n- 2\n- 3");
-        let result = parse(&mut source).unwrap();
-
-        assert_eq!(
-            result,
-            Node::Documents(vec![Document(vec![Node::Array(vec![
-                Node::Number(Numeric::Integer(1)),
-                Node::Number(Numeric::Integer(2)),
-                Node::Number(Numeric::Integer(3))
-            ])])])
-        );
+        let result = parse_yaml(b"- 1\n- 2\n- 3");
+        let expected = Node::Documents(vec![Document(vec![Node::Array(vec![
+            Node::Number(Numeric::Integer(1)),
+            Node::Number(Numeric::Integer(2)),
+            Node::Number(Numeric::Integer(3))
+        ])])]);
+        assert_nodes_eq(&expected, &result);
     }
 
     #[test]
     fn test_parse_sequence_with_comments() {
-        let mut source = BufferSource::new(b"- 1\n# Comment 1\n- 2\n# Comment 2");
-        let result = parse(&mut source).unwrap();
-
-        assert_eq!(
-            result,
-            Node::Documents(vec![Document(vec![Node::Array(vec![
-                Node::Number(Numeric::Integer(1)),
-                Node::Number(Numeric::Integer(2))
-            ])])])
-        );
+        let result = parse_yaml(b"- 1\n# Comment 1\n- 2\n# Comment 2");
+        let expected = Node::Documents(vec![Document(vec![Node::Array(vec![
+            Node::Number(Numeric::Integer(1)),
+            Node::Number(Numeric::Integer(2))
+        ])])]);
+        assert_nodes_eq(&expected, &result);
     }
 
     #[test]
     fn test_parse_mapping() {
-        let mut source = BufferSource::new(b"key1: value1\nkey2: 42");
-        let result = parse(&mut source).unwrap();
+        let result = parse_yaml(b"key1: value1\nkey2: 42");
         let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![
             (
                 Node::Str("key1".to_string(), QuoteType::Unquoted, BlockStyle::None),
@@ -72,58 +62,40 @@ mod tests {
                 Node::Number(Numeric::Integer(42)),
             ),
         ])])]);
-
         assert_eq!(result, expected);
     }
 
     #[test]
     fn test_parse_empty() {
-        let mut source = BufferSource::new(b"");
-        let result = parse(&mut source).unwrap();
+        let result = parse_yaml(b"");
         assert_eq!(result, Node::Documents(vec![Document(vec![])]));
     }
 
     #[test]
     fn test_parse_invalid_char() {
-        let mut source = BufferSource::new(b"@invalid");
-        let result = parse(&mut source);
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert!(
-            err.to_string().contains("Unexpected character: @"),
-            "unexpected error: {}",
-            err
-        );
+        // Use test_helpers::assert_parse_error for error assertion
+        crate::test_helpers::assert_parse_error(b"@invalid", "Unexpected character: @");
     }
 
     #[test]
     fn test_parse_comment_only() {
-        let mut source = BufferSource::new(b"# Just a comment");
-        let result = parse(&mut source).unwrap();
-
+        let result = parse_yaml(b"# Just a comment");
         assert_eq!(result, Node::Documents(vec![Document(vec![])]));
     }
 
     #[test]
     fn test_parse_mapping_with_comments() {
-        let mut source =
-            BufferSource::new(b"# Comment before\nkey1: value1  # Inline comment\n# Comment after");
-        let result = parse(&mut source).unwrap();
-
+        let result = parse_yaml(b"# Comment before\nkey1: value1  # Inline comment\n# Comment after");
         let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![(
             Node::Str("key1".to_string(), QuoteType::Unquoted, BlockStyle::None),
             Node::Str("value1".to_string(), QuoteType::Unquoted, BlockStyle::None),
         )])])]);
-
         assert_eq!(result, expected);
     }
 
     #[test]
     fn test_parse_boolean_values() {
-        let mut source =
-            BufferSource::new(b"true_val: true\nfalse_val: false\nyes_val: yes\nno_val: no");
-        let result = parse(&mut source).unwrap();
-
+        let result = parse_yaml(b"true_val: true\nfalse_val: false\nyes_val: yes\nno_val: no");
         if let Node::Documents(docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
@@ -138,9 +110,7 @@ mod tests {
 
     #[test]
     fn test_parse_null_values() {
-        let mut source = BufferSource::new(b"null_val: null\ntilde_val: ~\n");
-        let result = parse(&mut source).unwrap();
-
+        let result = parse_yaml(b"null_val: null\ntilde_val: ~\n");
         if let Node::Documents(docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
@@ -155,11 +125,7 @@ mod tests {
 
     #[test]
     fn test_parse_numeric_formats() {
-        let mut source = BufferSource::new(
-            b"int: 42\nfloat: 3.14\nnegative: -123\nzero: 0\nscientific: 1.23e10",
-        );
-        let result = parse(&mut source).unwrap();
-
+        let result = parse_yaml(b"int: 42\nfloat: 3.14\nnegative: -123\nzero: 0\nscientific: 1.23e10");
         if let Node::Documents(docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
@@ -175,16 +141,11 @@ mod tests {
 
     #[test]
     fn test_parse_quoted_strings() {
-        let mut source = BufferSource::new(
-            b"single: 'single quoted'\ndouble: \"double quoted\"\nunquoted: unquoted",
-        );
-        let result = parse(&mut source).unwrap();
-
+        let result = parse_yaml(b"single: 'single quoted'\ndouble: \"double quoted\"\nunquoted: unquoted");
         if let Node::Documents(docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
                     assert_eq!(pairs.len(), 3);
-
                     // Check that different string values are parsed correctly using as_str()
                     assert_eq!(pairs[0].1.as_str(), Some("single quoted"));
                     assert_eq!(pairs[1].1.as_str(), Some("double quoted"));
@@ -196,10 +157,7 @@ mod tests {
 
     #[test]
     fn test_parse_multiline_strings() {
-        let mut source =
-            BufferSource::new(b"multiline: >\n  This is a\n  folded string\n  with multiple lines");
-        let result = parse(&mut source).unwrap();
-
+        let result = parse_yaml(b"multiline: >\n  This is a\n  folded string\n  with multiple lines");
         if let Node::Documents(docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
@@ -214,9 +172,7 @@ mod tests {
 
     #[test]
     fn test_parse_literal_strings() {
-        let mut source = BufferSource::new(b"literal: |\n  Line 1\n  Line 2\n  Line 3");
-        let result = parse(&mut source).unwrap();
-
+        let result = parse_yaml(b"literal: |\n  Line 1\n  Line 2\n  Line 3");
         if let Node::Documents(docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
@@ -232,9 +188,7 @@ mod tests {
 
     #[test]
     fn test_parse_nested_sequences() {
-        let mut source = BufferSource::new(b"- [1, 2, 3]\n- [a, b, c]\n- [true, false, null]");
-        let result = parse(&mut source).unwrap();
-
+        let result = parse_yaml(b"- [1, 2, 3]\n- [a, b, c]\n- [true, false, null]");
         if let Node::Documents(docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Array(items) = &nodes[0] {
@@ -250,9 +204,7 @@ mod tests {
 
     #[test]
     fn test_parse_nested_mappings() {
-        let mut source = BufferSource::new(b"outer:\n  inner1: value1\n  inner2: value2");
-        let result = parse(&mut source).unwrap();
-
+        let result = parse_yaml(b"outer:\n  inner1: value1\n  inner2: value2");
         if let Node::Documents(docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
@@ -267,9 +219,7 @@ mod tests {
 
     #[test]
     fn test_parse_sequence_of_mappings() {
-        let mut source = BufferSource::new(b"- name: John\n  age: 30\n- name: Jane\n  age: 25");
-        let result = parse(&mut source).unwrap();
-
+        let result = parse_yaml(b"- name: John\n  age: 30\n- name: Jane\n  age: 25");
         if let Node::Documents(docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Array(items) = &nodes[0] {
@@ -283,11 +233,7 @@ mod tests {
 
     #[test]
     fn test_parse_mixed_data_types() {
-        let mut source = BufferSource::new(
-            b"string: hello\nnumber: 42\nboolean: true\nnull_val: null\narray: [1, 2, 3]",
-        );
-        let result = parse(&mut source).unwrap();
-
+        let result = parse_yaml(b"string: hello\nnumber: 42\nboolean: true\nnull_val: null\narray: [1, 2, 3]");
         if let Node::Documents(docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
@@ -304,14 +250,11 @@ mod tests {
 
     #[test]
     fn test_parse_empty_collections() {
-        let mut source = BufferSource::new(b"empty_array: []\nempty_object: {}");
-        let result = parse(&mut source).unwrap();
-
+        let result = parse_yaml(b"empty_array: []\nempty_object: {}");
         if let Node::Documents(docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
                     assert_eq!(pairs.len(), 2);
-
                     if let Node::Array(arr) = &pairs[0].1 {
                         assert!(arr.is_empty());
                     }
@@ -327,45 +270,28 @@ mod tests {
     fn test_parse_7zz5_nested_with_empty_collections() {
         // Test case from 7ZZ5 - Empty flow collections with deeply nested sequences
         let yaml = b"---\nnested sequences:\n- - - []\n- - - {}\nkey1: []\nkey2: {}";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source);
-        if let Err(_e) = &result {
-            #[cfg(feature = "debug-trace")]
-            println!("7ZZ5 Error: {}", _e);
-        }
-        assert!(
-            result.is_ok(),
-            "Should parse nested sequences with empty flow collections"
-        );
+            let result = std::panic::catch_unwind(|| parse_yaml(yaml));
+            assert!(
+                result.is_ok(),
+                "Should parse nested sequences with empty flow collections"
+            );
     }
 
     #[test]
     fn test_parse_5c5m_trailing_comma_in_flow_mapping() {
         // Test case from 5C5M - Trailing commas in flow mappings should be allowed
         let yaml = b"- { one : two , three: four , }\n- {five: six,seven : eight}";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source);
-
-        match &result {
-            Ok(_) => {}
-            Err(_e) => {
-                #[cfg(feature = "debug-trace")]
-                println!("5C5M Error: {}", _e)
-            }
-        }
-
-        assert!(
-            result.is_ok(),
-            "Should parse flow mappings with trailing commas"
-        );
+            let result = std::panic::catch_unwind(|| parse_yaml(yaml));
+            assert!(
+                result.is_ok(),
+                "Should parse flow mappings with trailing commas"
+            );
     }
 
     #[test]
     fn test_parse_unicode_content() {
-        let mut source = BufferSource::new("name: José\ncity: 北京\nemoji: 🚀".as_bytes());
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = result {
+           let result = parse_yaml("name: José\ncity: 北京\nemoji: 🚀".as_bytes());
+           if let Node::Documents(docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
                     assert_eq!(pairs.len(), 3);
@@ -386,10 +312,8 @@ mod tests {
     }
     #[test]
     fn test_parse_escape_sequences() {
-        let mut source = BufferSource::new(b"escaped: \"Line 1\\nLine 2\\tTabbed\"");
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = result {
+           let result = parse_yaml(b"escaped: \"Line 1\\nLine 2\\tTabbed\"");
+           if let Node::Documents(docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
                     if let Node::Str(content, _, _) = &pairs[0].1 {
@@ -411,11 +335,8 @@ mod tests {
 
     #[test]
     fn test_parse_special_characters_in_keys() {
-        let mut source =
-            BufferSource::new(b"\"key with spaces\": value1\n'key-with-dashes': value2");
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = result {
+            let result = parse_yaml(b"\"key with spaces\": value1\n'key-with-dashes': value2");
+            if let Node::Documents(docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
                     assert_eq!(pairs.len(), 2);
@@ -433,10 +354,8 @@ mod tests {
 
     #[test]
     fn test_parse_indentation_variations() {
-        let mut source = BufferSource::new(b"level1:\n  level2:\n    level3: value");
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = result {
+           let result = parse_yaml(b"level1:\n  level2:\n    level3: value");
+           if let Node::Documents(docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
                     // Should handle nested indentation correctly
@@ -452,10 +371,8 @@ mod tests {
 
     #[test]
     fn test_parse_trailing_spaces() {
-        let mut source = BufferSource::new(b"key: value   \nother: data  \n");
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = result {
+           let result = parse_yaml(b"key: value   \nother: data  \n");
+           if let Node::Documents(docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
                     assert_eq!(pairs.len(), 2);
@@ -470,10 +387,8 @@ mod tests {
 
     #[test]
     fn test_parse_multiple_consecutive_spaces() {
-        let mut source = BufferSource::new(b"key:     value\nother:  data");
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = result {
+           let result = parse_yaml(b"key:     value\nother:  data");
+           if let Node::Documents(docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
                     assert_eq!(pairs.len(), 2);
@@ -488,10 +403,8 @@ mod tests {
 
     #[test]
     fn test_parse_comments_in_various_positions() {
-        let mut source = BufferSource::new(b"# Header comment\nkey1: value1 # End of line\n# Mid comment\nkey2: value2\n# Footer comment");
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = result {
+           let result = parse_yaml(b"# Header comment\nkey1: value1 # End of line\n# Mid comment\nkey2: value2\n# Footer comment");
+           if let Node::Documents(docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
                     // Comments should be ignored, only data remains
@@ -503,10 +416,8 @@ mod tests {
 
     #[test]
     fn test_parse_inline_arrays_with_mixed_types() {
-        let mut source = BufferSource::new(b"mixed: [42, 'string', true, null, 3.14]");
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = result {
+           let result = parse_yaml(b"mixed: [42, 'string', true, null, 3.14]");
+           if let Node::Documents(docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
                     if let Node::Array(items) = &pairs[0].1 {
@@ -524,12 +435,8 @@ mod tests {
 
     #[test]
     fn test_parse_inline_objects_with_various_keys() {
-        let mut source = BufferSource::new(
-            b"inline: {simple: value, 'quoted key': data, \"double quoted\": info}",
-        );
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = result {
+            let result = parse_yaml(b"inline: {simple: value, 'quoted key': data, \"double quoted\": info}");
+            if let Node::Documents(docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
                     if let Node::Mapping(inline_pairs) = &pairs[0].1 {
@@ -543,11 +450,8 @@ mod tests {
 
     #[test]
     fn test_parse_newlines_in_content() {
-        let mut source =
-            BufferSource::new(b"content: |\n  Line one\n  Line two\n  Line three\nother: value");
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = result {
+            let result = parse_yaml(b"content: |\n  Line one\n  Line two\n  Line three\nother: value");
+            if let Node::Documents(docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
                     assert_eq!(pairs.len(), 2);
@@ -575,10 +479,8 @@ mod tests {
       age: 25
       active: false";
 
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = result {
+                let result = parse_yaml(yaml);
+                if let Node::Documents(docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
                     assert_eq!(pairs.len(), 1);
@@ -595,10 +497,8 @@ mod tests {
 
     #[test]
     fn test_parse_zero_values() {
-        let mut source = BufferSource::new(b"zero_int: 0\nzero_float: 0.0\nfalse_bool: false");
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = result {
+           let result = parse_yaml(b"zero_int: 0\nzero_float: 0.0\nfalse_bool: false");
+           if let Node::Documents(docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
                     assert_eq!(pairs.len(), 3);
@@ -612,10 +512,8 @@ mod tests {
 
     #[test]
     fn test_parse_whitespace_only_values() {
-        let mut source = BufferSource::new(b"spaces: '   '\ntabs: '\t\t'\nmixed: ' \t '");
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = result {
+           let result = parse_yaml(b"spaces: '   '\ntabs: '\t\t'\nmixed: ' \t '");
+           if let Node::Documents(docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
                     assert_eq!(pairs.len(), 3);
@@ -634,10 +532,8 @@ mod tests {
         let long_value = "b".repeat(1000);
         let yaml = format!("{}: {}", long_key, long_value);
 
-        let mut source = BufferSource::new(yaml.as_bytes());
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = result {
+            let result = parse_yaml(yaml.as_bytes());
+            if let Node::Documents(docs) = result {
             if let Node::Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
                     assert_eq!(pairs.len(), 1);

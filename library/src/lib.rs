@@ -1,3 +1,4 @@
+
 //! YAML_lib - A lightweight, modular YAML toolkit for Rust
 //!
 //! This library provides a flexible YAML implementation with:
@@ -20,7 +21,10 @@
 //! - `format-converters`: Enable JSON, XML, TOML, Bencode converters
 //! - `file-io`: Enable file I/O operations (requires `std`)
 
-#![cfg_attr(not(feature = "std"), no_std)]
+#[cfg_attr(not(feature = "std"), no_std)]
+
+/// Common test helpers for integration/unit tests
+pub mod test_helpers;
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
