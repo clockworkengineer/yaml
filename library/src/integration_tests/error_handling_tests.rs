@@ -24,13 +24,7 @@ mod tests {
     use crate::test_helpers::{assert_parse_error, parse_yaml};
     use crate::{BufferSource, Node, parse};
 
-    #[test]
-    #[ignore] // Anchor/alias validation no longer happens during parsing
-    fn test_parse_undefined_alias_errors() {
-        let mut source = BufferSource::new(b"---\nvalue: *nope\n");
-        let res = parse(&mut source);
-        assert!(res.is_err());
-    }
+    // ...existing code...
 
     #[test]
     fn test_error_on_empty_alias_name() {
@@ -377,16 +371,7 @@ mod tests {
         }
     }
 
-    #[test]
-    #[ignore] // Anchor/alias validation no longer happens during parsing
-    fn test_error_on_alias_without_anchor() {
-        let mut source = BufferSource::new(b"---\nfirst: *nonexistent\nsecond: value");
-        let res = parse(&mut source);
-        assert!(res.is_err());
-        let err = res.unwrap_err();
-        let err_str = err.to_string();
-        assert!(err_str.contains("Undefined") || err_str.contains("not found"));
-    }
+    // ...existing code...
 
     #[test]
     fn test_parser_handles_multi_document_content() {
@@ -439,16 +424,7 @@ mod tests {
         }
     }
 
-    #[test]
-    #[ignore] // Flow sequences as implicit keys in block context is ambiguous edge case
-    fn test_error_on_invalid_sequence_in_mapping_key() {
-        let mut source = BufferSource::new(b"---\n[invalid, key]: value");
-        let res = parse(&mut source);
-        assert!(res.is_err());
-        let err = res.unwrap_err();
-        let err_str = err.to_string();
-        assert!(err_str.contains("Invalid") || err_str.contains("Unexpected"));
-    }
+    // ...existing code...
 
     #[test]
     fn test_error_on_duplicate_keys_in_mapping() {

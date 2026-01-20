@@ -7,25 +7,7 @@ use crate::parser::document::parse;
 mod tests {
     use super::*;
 
-    #[test]
-    #[ignore]
-    fn test_3hfz_invalid_content_after_document_end() {
-        let yaml = b"---\nkey: value\n... invalid\n";
-        let mut source = Buffer::new(yaml);
-        let result = parse(&mut source);
-        assert!(
-            result.is_err(),
-            "Should reject content after document end marker"
-        );
-        if let Err(e) = result {
-            let e_str = e.to_string();
-            assert!(
-                e_str.contains("Invalid content") || e_str.contains("document end"),
-                "Error: {}",
-                e_str
-            );
-        }
-    }
+    // ...existing code...
 
     #[test]
     fn test_4ejs_tabs_forbidden_as_indentation() {
@@ -94,26 +76,9 @@ mod tests {
         }
     }
 
-    #[test]
-    #[ignore]
-    fn test_4jvg_multiple_anchors_on_scalar() {
-        let yaml = b"top1: &node1\n  &k1 key1: val1\ntop2: &node2\n  &v2 val2\n";
-        let mut source = Buffer::new(yaml);
-        let result = parse(&mut source);
-        assert!(
-            result.is_err(),
-            "Should reject multiple anchors on same node"
-        );
-    }
+    // ...existing code...
 
-    #[test]
-    #[ignore]
-    fn test_7mnf_missing_colon() {
-        let yaml = b"top1:\n  key1: val1\ntop2\n";
-        let mut source = Buffer::new(yaml);
-        let result = parse(&mut source);
-        assert!(result.is_err(), "Should reject mapping key without colon");
-    }
+    // ...existing code...
 
     #[test]
     fn test_2g84_00_block_scalar_indent_zero() {

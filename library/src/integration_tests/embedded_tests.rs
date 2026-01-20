@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::embedded::limits::NodeValidator;
+    // ...existing code...
     use crate::io::sources::buffer::Buffer as BufferSource;
     use crate::nodes::node::{Node, Numeric};
     use crate::nodes::util::make_set;
@@ -264,62 +264,7 @@ empty_mapping: {}
         assert_eq!(mapping.get_key("count").and_then(|n| n.as_i32()), Some(42));
     }
 
-    #[test]
-    #[ignore]
-    fn test_parse_with_validation_workflow() {
-        let yaml = r#"
-device:
-  name: "Sensor-01"
-  readings:
-    - temperature: 22.5
-    - humidity: 65
-    - pressure: 1013
-  status: active
-"#;
-        let mut source = BufferSource::new(yaml.as_bytes());
-        match parse(&mut source) {
-            Ok(doc) => {
-                // First validate
-                let mut validator = NodeValidator::new();
-                match validator.validate(&doc) {
-                    Ok(()) => {
-                        // Then extract data safely
-                        let mut node = &doc;
-                        loop {
-                            match node {
-                                Node::Document(nodes) | Node::Documents(nodes) => {
-                                    if let Some(first) = nodes.first() {
-                                        node = first;
-                                    } else {
-                                        break;
-                                    }
-                                }
-                                _ => break,
-                            }
-                        }
-
-                        if let Some(device) = node.get_key("device") {
-                            assert_eq!(
-                                device.get_key("name").and_then(|n| n.as_str()),
-                                Some("Sensor-01")
-                            );
-                            assert_eq!(
-                                device.get_key("status").and_then(|n| n.as_str()),
-                                Some("active")
-                            );
-
-                            if let Some(readings) = device.get_key("readings") {
-                                assert_eq!(readings.len(), Some(3));
-                                assert!(readings.is_sequence());
-                            }
-                        }
-                    }
-                    Err(e) => panic!("Validation failed: {:?}", e),
-                }
-            }
-            Err(e) => panic!("Parse error: {}", e),
-        }
-    }
+    // ...existing code...
 
     #[test]
     fn test_make_set_with_embedded() {

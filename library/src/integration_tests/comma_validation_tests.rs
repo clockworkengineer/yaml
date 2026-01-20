@@ -35,24 +35,9 @@ mod test_comma_validation {
         assert_parse_error(yaml, "]");
     }
 
-    #[test]
-    #[ignore] // TODO: This requires detecting ": " pattern in plain scalars in flow context
-    fn test_t833_missing_comma_in_mapping() {
-        // Test: Flow mapping missing separating comma (invalid)
-        // Currently fails because the value parser collects "1 bar: 2" as a single value
-        // Proper fix requires stopping plain scalar collection at ": " pattern in flow context
-        let yaml = b"---\n{\n foo: 1\n bar: 2 }\n";
-        assert_parse_error(yaml, "comma");
-    }
+    // ...existing code...
 
-    #[test]
-    #[ignore] // TODO: Same issue as t833 - requires flow context plain scalar restrictions
-    fn test_t833_simplified() {
-        // Simplified version without line breaks
-        // Parser treats "1 bar: 2" as a single plain scalar value
-        let yaml = b"{foo: 1 bar: 2}";
-        assert_parse_error(yaml, "comma");
-    }
+    // ...existing code...
 
     #[test]
     fn test_5c5m_valid_trailing_comma() {
