@@ -126,7 +126,6 @@ fn run_yaml_test_suite() {
             if test.has_error_file {
                 // Should error
                 let mut errored = false;
-                let mut error_msg = String::new();
                 let parse_result = std::panic::catch_unwind(|| {
                     parse_yaml(&test.yaml);
                 });
