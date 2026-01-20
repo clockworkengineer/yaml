@@ -9,7 +9,7 @@ use std::fs;
 use std::panic;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
-use yaml_lib::{BufferSource, parse};
+use yaml_lib::test_helpers::parse_yaml;
 
 #[derive(Debug)]
 struct TestCase {
@@ -61,7 +61,10 @@ fn get_all_test_dirs(suite_dir: &Path) -> Vec<PathBuf> {
 #[test]
 fn run_yaml_test_suite() {
     // Try multiple possible paths for the test suite
-    let possible_paths = vec![Path::new("c:/Projects/yaml/yaml-test-suite"), Path::new("../yaml-test-suite")];
+    let possible_paths = vec![
+        Path::new("c:/Projects/yaml/yaml-test-suite"),
+        Path::new("../yaml-test-suite"),
+    ];
 
     let suite_dir = possible_paths.iter().find(|p| p.exists()).cloned();
     let suite_dir = match suite_dir {
@@ -71,7 +74,9 @@ fn run_yaml_test_suite() {
             for path in &possible_paths {
                 println!("  - {:?}", path);
             }
-            println!("Please clone https://github.com/yaml/yaml-test-suite.git to one of these locations.");
+            println!(
+                "Please clone https://github.com/yaml/yaml-test-suite.git to one of these locations."
+            );
             return;
         }
     };
@@ -95,7 +100,10 @@ fn run_yaml_test_suite() {
     let test_limit = 402;
     for (idx, test_dir) in test_dirs.iter().enumerate() {
         if idx >= test_limit {
-            println!("\n--- Stopping at {} tests (limit reached) ---\n", test_limit);
+            println!(
+                "\n--- Stopping at {} tests (limit reached) ---\n",
+                test_limit
+            );
             break;
         }
         let test_dir = test_dir.clone();
@@ -115,8 +123,22 @@ fn run_yaml_test_suite() {
         std::io::Write::flush(&mut std::io::stdout()).unwrap();
         let start_time = Instant::now();
         let result = panic::catch_unwind(|| {
-            let mut source = BufferSource::new(test.yaml.as_bytes());
-            parse(&mut source)
+            if test.has_error_file {
+                // Should error
+                let mut errored = false;
+                let mut error_msg = String::new();
+                let parse_result = std::panic::catch_unwind(|| {
+                    parse_yaml(&test.yaml);
+                });
+                if parse_result.is_err() {
+                    errored = true;
+                }
+                if errored { Err(()) } else { Ok(()) }
+            } else {
+                // Should succeed
+                let _ = parse_yaml(&test.yaml);
+                Ok(())
+            }
         });
         let elapsed = start_time.elapsed();
         print!("  Result: ");
@@ -126,17 +148,9 @@ fn run_yaml_test_suite() {
             println!("TIMEOUT (took {:?})", elapsed);
             continue;
         }
-        let parse_result = match result {
-            Ok(r) => r,
-            Err(_) => {
-                skipped += 1;
-                println!("PANIC");
-                continue;
-            }
-        };
-        let test_passed = match (parse_result.is_ok(), test.has_error_file) {
-            (true, false) => true,
-            (false, true) => true,
+        let test_passed = match result {
+            Ok(Ok(())) if !test.has_error_file => true,
+            Ok(Err(())) if test.has_error_file => true,
             _ => false,
         };
         if test_passed {
@@ -144,10 +158,21 @@ fn run_yaml_test_suite() {
             println!("PASS");
         } else {
             failed += 1;
-            let expected = if test.has_error_file { "error" } else { "success" };
-            let got = if parse_result.is_ok() { "success" } else { "error" };
+            let expected = if test.has_error_file {
+                "error"
+            } else {
+                "success"
+            };
+            let got = match result {
+                Ok(Ok(())) => "success",
+                Ok(Err(())) => "error",
+                _ => "error",
+            };
             println!("FAIL (expected: {}, got: {})", expected, got);
-            failures.push(format!("{} (expected: {}, got: {})", test.id, expected, got));
+            failures.push(format!(
+                "{} (expected: {}, got: {})",
+                test.id, expected, got
+            ));
         }
     }
     println!("\n=== YAML Test Suite Results (All Tests) ===");
@@ -165,7 +190,11 @@ fn run_yaml_test_suite() {
     if total_tests > 0 {
         let pass_rate = (passed as f64 / total_tests as f64) * 100.0;
         println!("\nPass Rate: {:.1}%", pass_rate);
-        assert!(pass_rate >= 85.0, "YAML test suite pass rate is below 85%: {:.1}%", pass_rate);
+        assert!(
+            pass_rate >= 85.0,
+            "YAML test suite pass rate is below 85%: {:.1}%",
+            pass_rate
+        );
     }
 }
 

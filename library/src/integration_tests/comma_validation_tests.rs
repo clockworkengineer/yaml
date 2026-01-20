@@ -1,39 +1,22 @@
 #[cfg(test)]
 mod test_comma_validation {
-    use crate::{BufferSource, parse};
+    use crate::test_helpers::{assert_parse_error, parse_yaml};
 
     #[test]
     fn test_9mag_leading_comma_in_sequence() {
         // Test: Leading comma in flow sequence (invalid)
         let yaml = b"---\n[ , a, b, c ]\n";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source);
-        assert!(
-            result.is_err(),
-            "Should reject leading comma in flow sequence"
-        );
-        if let Err(e) = result {
-            assert!(e.to_string().contains("comma"), "Error should mention comma: {}", e);
-        }
+        assert_parse_error(yaml, "comma");
     }
 
     #[test]
     fn test_ctn5_double_comma_in_sequence() {
         // Test: Double comma in flow sequence (invalid)
         let yaml = b"---\n[ a, b, c, , ]\n";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source);
-        assert!(
-            result.is_err(),
-            "Should reject double comma in flow sequence"
-        );
-        if let Err(e) = result {
-            let e_str = e.to_string();
-            assert!(
-                e_str.contains("comma") || e_str.contains("consecutive"),
-                "Error should mention comma: {}",
-                e_str
-            );
+        // Accept either "comma" or "consecutive" in error message
+        let result = std::panic::catch_unwind(|| assert_parse_error(yaml, "comma"));
+        if result.is_err() {
+            assert_parse_error(yaml, "consecutive");
         }
     }
 
@@ -42,35 +25,14 @@ mod test_comma_validation {
         // Test: Comment directly after comma with no space (invalid)
         // YAML spec requires whitespace before #
         let yaml = b"---\n[ a, b, c,#invalid\n]\n";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source);
-        if let Err(ref _e) = result {
-            #[cfg(feature = "debug-trace")]
-            println!("Error (correct): {}", _e);
-        }
-        assert!(
-            result.is_err(),
-            "Should reject comment without whitespace after comma"
-        );
+        assert_parse_error(yaml, "comment");
     }
 
     #[test]
     fn test_9jba_comment_without_space_after_bracket() {
         // Test: Comment directly after ] with no space (invalid)
         let yaml = b"---\n[ a, b, c, ]#invalid\n";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source);
-        if let Err(ref _e) = result {
-            #[cfg(feature = "debug-trace")]
-            println!("Error (correct): {}", _e);
-        } else {
-            #[cfg(feature = "debug-trace")]
-            println!("Parsed (should be error): {:?}", result);
-        }
-        assert!(
-            result.is_err(),
-            "Should reject comment without whitespace after ]"
-        );
+        assert_parse_error(yaml, "]");
     }
 
     #[test]
@@ -80,16 +42,7 @@ mod test_comma_validation {
         // Currently fails because the value parser collects "1 bar: 2" as a single value
         // Proper fix requires stopping plain scalar collection at ": " pattern in flow context
         let yaml = b"---\n{\n foo: 1\n bar: 2 }\n";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source);
-        if result.is_ok() {
-            #[cfg(feature = "debug-trace")]
-            println!("Result: {:?}", result);
-        }
-        assert!(
-            result.is_err(),
-            "Should reject flow mapping missing comma between pairs"
-        );
+        assert_parse_error(yaml, "comma");
     }
 
     #[test]
@@ -98,23 +51,16 @@ mod test_comma_validation {
         // Simplified version without line breaks
         // Parser treats "1 bar: 2" as a single plain scalar value
         let yaml = b"{foo: 1 bar: 2}";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source);
-        if result.is_ok() {
-            #[cfg(feature = "debug-trace")]
-            println!("Simplified result: {:?}", result);
-        }
-        assert!(result.is_err(), "Should reject flow mapping missing comma");
+        assert_parse_error(yaml, "comma");
     }
 
     #[test]
     fn test_5c5m_valid_trailing_comma() {
         // Test: Trailing comma (valid - should pass)
         let yaml = b"- { one : two , three: four , }\n- {five: six,seven : eight}";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source);
+        let result = parse_yaml(yaml);
         assert!(
-            result.is_ok(),
+            matches!(result, crate::Node::Documents(_)),
             "Should accept trailing comma in flow mapping"
         );
     }
@@ -123,10 +69,9 @@ mod test_comma_validation {
     fn test_valid_sequence_trailing_comma() {
         // Test: Trailing comma in sequence (valid - should pass)
         let yaml = b"[1, 2, 3,]";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source);
+        let result = parse_yaml(yaml);
         assert!(
-            result.is_ok(),
+            matches!(result, crate::Node::Documents(_)),
             "Should accept trailing comma in flow sequence"
         );
     }

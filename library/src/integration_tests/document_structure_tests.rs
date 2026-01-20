@@ -5,6 +5,7 @@
 mod tests {
     use crate::nodes::node::{BlockStyle, QuoteType};
     use crate::{BufferSource, Node, Node::Document, Numeric, parse};
+        use crate::test_helpers::{parse_yaml, assert_nodes_eq, assert_parse_error};
     use std::collections::HashMap;
 
     #[test]
@@ -66,385 +67,278 @@ mod tests {
     }
 
     #[test]
+    #[test]
     fn test_parse_document_end_marker() {
-        let mut source = BufferSource::new(b"key: value\n---");
-        let result = parse(&mut source).unwrap();
-        let mut expected = HashMap::new();
-        expected.insert(
-            "key".to_string(),
+        let input = b"key: value\n---";
+        let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![(
+            Node::Str("key".to_string(), QuoteType::Unquoted, BlockStyle::None),
             Node::Str("value".to_string(), QuoteType::Unquoted, BlockStyle::None),
-        );
-        assert_eq!(
-            result,
-            Node::Documents(vec![Document(vec![{
-                let mut pairs = Vec::new();
-                for (k, v) in expected.into_iter() {
-                    let value = match v {
-                        Node::Mapping(p) => Node::Mapping(p),
-                        other => other,
-                    };
-                    pairs.push((Node::Str(k, QuoteType::Unquoted, BlockStyle::None), value));
-                }
-                Node::Mapping(pairs)
-            }])])
-        );
+        )])])]);
+        let actual = parse_yaml(input);
+        assert_nodes_eq(&actual, &expected);
     }
 
     #[test]
     fn test_parse_document_end_marker_with_trailing_content() {
-        let mut source = BufferSource::new(b"key: value\n---\nother: 123");
-        let result = parse(&mut source).unwrap();
-        // Parser may merge mappings into a single document, so expect at least one document with both mappings
-        if let Node::Documents(docs) = &result {
-            assert!(!docs.is_empty(), "Should have at least one document");
-            let mut found_key = false;
-            let mut found_other = false;
-            for doc in docs {
-                if let Document(nodes) = doc {
-                    for node in nodes {
-                        if let Node::Mapping(pairs) = node {
-                            for (k, v) in pairs {
-                                if let Node::Str(s, _, _) = k {
-                                    if s == "key" {
-                                        if let Node::Str(val, _, _) = v {
-                                            if val == "value" {
-                                                found_key = true;
-                                            }
-                                        }
-                                    }
-                                    if s == "other" {
-                                        if let Node::Number(Numeric::Integer(i)) = v {
-                                            if *i == 123 {
-                                                found_other = true;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            assert!(found_key, "Should find mapping for key: value");
-            assert!(found_other, "Should find mapping for other: 123");
-        } else {
-            panic!("Expected Documents node");
-        }
+        let input = b"key: value\n---\nother: 123";
+        let expected = Node::Documents(vec![
+            Document(vec![Node::Mapping(vec![(
+                Node::Str("key".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Str("value".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            )])]),
+            Document(vec![Node::Mapping(vec![(
+                Node::Str("other".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Number(Numeric::Integer(123)),
+            )])]),
+        ]);
+        let actual = parse_yaml(input);
+        assert_nodes_eq(&actual, &expected);
     }
 
     #[test]
     fn test_parse_document_end_marker_with_comments() {
-        let mut source = BufferSource::new(b"# Comment before\nkey: value\n# Comment after\n---\n# Comment in between\nother: 123\n# Final comment");
-        let result = parse(&mut source).unwrap();
-
-        // Parser may merge empty/comment-only documents, so expect at least 1 document with content
-        if let Node::Documents(docs) = &result {
-            assert!(!docs.is_empty(), "Should have at least one document");
-            let mut found_content = false;
-            for doc in docs {
-                if let Document(nodes) = doc {
-                    if !nodes.is_empty() {
-                        found_content = true;
-                        break;
-                    }
-                }
-            }
-            assert!(found_content, "Should have at least one document with content");
-        } else {
-            panic!("Expected Documents node");
-        }
+        let input = b"# Comment before\nkey: value\n# Comment after\n---\n# Comment in between\nother: 123\n# Final comment";
+        let expected = Node::Documents(vec![
+            Document(vec![Node::Mapping(vec![(
+                Node::Str("key".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Str("value".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            )])]),
+            Document(vec![Node::Mapping(vec![(
+                Node::Str("other".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Number(Numeric::Integer(123)),
+            )])]),
+        ]);
+        let actual = parse_yaml(input);
+        assert_nodes_eq(&actual, &expected);
     }
 
     #[test]
     fn test_parse_document_end_marker_only() {
-        let mut source = BufferSource::new(b"---");
-        let result = parse(&mut source).unwrap();
-        assert_eq!(result, Node::Documents(vec![Document(vec![])]));
+        let input = b"---";
+        let expected = Node::Documents(vec![Document(vec![])]);
+        let actual = parse_yaml(input);
+        assert_nodes_eq(&actual, &expected);
     }
 
     #[test]
     fn test_parse_multiple_document_end_markers() {
-        let mut source = BufferSource::new(b"key: value\n---\n---\nother: 1");
-        let result = parse(&mut source).unwrap();
-        let mut doc1 = HashMap::new();
-        doc1.insert(
-            "key".to_string(),
-            Node::Str("value".to_string(), QuoteType::Unquoted, BlockStyle::None),
-        );
-        let mut doc3 = HashMap::new();
-        doc3.insert("other".to_string(), Node::Number(Numeric::Integer(1)));
-        assert_eq!(
-            result,
-            Node::Documents(vec![
-                Document(vec![{
-                    let mut pairs = Vec::new();
-                    for (k, v) in doc1.into_iter() {
-                        let value = match v {
-                            Node::Mapping(p) => Node::Mapping(p),
-                            other => other,
-                        };
-                        pairs.push((Node::Str(k, QuoteType::Unquoted, BlockStyle::None), value));
-                    }
-                    Node::Mapping(pairs)
-                }]),
-                Document(vec![{
-                    let mut pairs = Vec::new();
-                    for (k, v) in doc3.into_iter() {
-                        let value = match v {
-                            Node::Mapping(p) => Node::Mapping(p),
-                            other => other,
-                        };
-                        pairs.push((Node::Str(k, QuoteType::Unquoted, BlockStyle::None), value));
-                    }
-
-                    Node::Mapping(pairs)
-                }])
-            ])
-        );
+        let input = b"key: value\n---\n---\nother: 1";
+        // The parser merges empty documents, so only non-empty documents are present
+        let expected = Node::Documents(vec![
+            Document(vec![Node::Mapping(vec![
+                (
+                    Node::Str("key".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                    Node::Str("value".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                ),
+            ])]),
+            Document(vec![Node::Mapping(vec![
+                (
+                    Node::Str("other".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                    Node::Number(Numeric::Integer(1)),
+                ),
+            ])]),
+        ]);
+        let actual = parse_yaml(input);
+        assert_nodes_eq(&actual, &expected);
     }
 
     #[test]
     fn test_parse_empty_document_end_marker() {
-        let mut source = BufferSource::new(b"...");
-        let result = parse(&mut source).unwrap();
-        assert_eq!(result, Node::Documents(vec![Document(vec![])]));
+        let input = b"...";
+        let expected = Node::Documents(vec![Document(vec![])]);
+        let actual = parse_yaml(input);
+        assert_nodes_eq(&actual, &expected);
     }
 
     #[test]
     fn test_parse_document_start_marker() {
-        let mut source = BufferSource::new(b"---\nkey: value");
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = &result {
-            assert_eq!(docs.len(), 1);
-            if let Document(nodes) = &docs[0] {
-                assert!(!nodes.is_empty());
-            }
-        }
+        let input = b"---\nkey: value";
+        let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![(
+            Node::Str("key".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            Node::Str("value".to_string(), QuoteType::Unquoted, BlockStyle::None),
+        )])])]);
+        let actual = parse_yaml(input);
+        assert_nodes_eq(&actual, &expected);
     }
 
     #[test]
     fn test_parse_document_start_and_end_markers() {
-        let mut source = BufferSource::new(b"---\nkey: value\n...");
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = &result {
-            assert_eq!(docs.len(), 1);
-            if let Document(nodes) = &docs[0] {
-                assert!(!nodes.is_empty());
-            }
-        }
+        let input = b"---\nkey: value\n...";
+        let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![(
+            Node::Str("key".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            Node::Str("value".to_string(), QuoteType::Unquoted, BlockStyle::None),
+        )])])]);
+        let actual = parse_yaml(input);
+        assert_nodes_eq(&actual, &expected);
     }
 
     #[test]
     fn test_parse_multiple_documents_with_start_markers() {
-        let mut source = BufferSource::new(b"---\nfirst: 1\n---\nsecond: 2\n---\nthird: 3");
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = &result {
-            assert_eq!(docs.len(), 3);
-        }
+        let input = b"---\nfirst: 1\n---\nsecond: 2\n---\nthird: 3";
+        let expected = Node::Documents(vec![
+            Document(vec![Node::Mapping(vec![(
+                Node::Str("first".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Number(Numeric::Integer(1)),
+            )])]),
+            Document(vec![Node::Mapping(vec![(
+                Node::Str("second".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Number(Numeric::Integer(2)),
+            )])]),
+            Document(vec![Node::Mapping(vec![(
+                Node::Str("third".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Number(Numeric::Integer(3)),
+            )])]),
+        ]);
+        let actual = parse_yaml(input);
+        assert_nodes_eq(&actual, &expected);
     }
 
     #[test]
     fn test_parse_documents_with_mixed_markers() {
-        let mut source =
-            BufferSource::new(b"---\nfirst: 1\n...\n---\nsecond: 2\n---\nthird: 3\n...");
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = &result {
-            assert_eq!(docs.len(), 3);
-        }
+        let input = b"---\nfirst: 1\n...\n---\nsecond: 2\n---\nthird: 3\n...";
+        let expected = Node::Documents(vec![
+            Document(vec![Node::Mapping(vec![(
+                Node::Str("first".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Number(Numeric::Integer(1)),
+            )])]),
+            Document(vec![Node::Mapping(vec![(
+                Node::Str("second".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Number(Numeric::Integer(2)),
+            )])]),
+            Document(vec![Node::Mapping(vec![(
+                Node::Str("third".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Number(Numeric::Integer(3)),
+            )])]),
+        ]);
+        let actual = parse_yaml(input);
+        assert_nodes_eq(&actual, &expected);
     }
 
     #[test]
     fn test_parse_empty_documents_between_markers() {
-        let mut source = BufferSource::new(b"---\n---\nkey: value\n---");
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = &result {
-            // Parser may merge empty documents, so expect at least 1 document with content
-            assert!(!docs.is_empty());
-
-            // Find the document with content
-            let mut found_content = false;
-            for doc in docs {
-                if let Document(nodes) = doc {
-                    if !nodes.is_empty() {
-                        found_content = true;
-                        break;
-                    }
-                }
-            }
-            assert!(
-                found_content,
-                "Should have at least one document with content"
-            );
-        }
+        let input = b"---\n---\nkey: value\n---";
+        // The parser merges empty documents, so only the non-empty document is present
+        let expected = Node::Documents(vec![
+            Document(vec![Node::Mapping(vec![
+                (
+                    Node::Str("key".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                    Node::Str("value".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                ),
+            ])]),
+        ]);
+        let actual = parse_yaml(input);
+        assert_nodes_eq(&actual, &expected);
     }
 
     #[test]
     fn test_parse_document_with_yaml_version_directive() {
-        // Note: YAML directives are not supported by this parser, so we test without them
-        let mut source =
-            BufferSource::new(b"# YAML version would be %YAML 1.2 here\n---\nkey: value");
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = &result {
-            assert_eq!(docs.len(), 1);
-            if let Document(nodes) = &docs[0] {
-                assert!(!nodes.is_empty());
-            }
-        }
+        let input = b"# YAML version would be %YAML 1.2 here\n---\nkey: value";
+        let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![(
+            Node::Str("key".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            Node::Str("value".to_string(), QuoteType::Unquoted, BlockStyle::None),
+        )])])]);
+        let actual = parse_yaml(input);
+        assert_nodes_eq(&actual, &expected);
     }
 
     #[test]
     fn test_parse_document_with_tag_directive() {
-        // Note: TAG directives are not supported by this parser, so we test without them
-        let mut source = BufferSource::new(
-            b"# TAG directive would be %TAG ! tag:example.com,2000:app/ here\n---\nkey: value",
-        );
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = &result {
-            assert_eq!(docs.len(), 1);
-            if let Document(nodes) = &docs[0] {
-                assert!(!nodes.is_empty());
-            }
-        }
+        let input =
+            b"# TAG directive would be %TAG ! tag:example.com,2000:app/ here\n---\nkey: value";
+        let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![(
+            Node::Str("key".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            Node::Str("value".to_string(), QuoteType::Unquoted, BlockStyle::None),
+        )])])]);
+        let actual = parse_yaml(input);
+        assert_nodes_eq(&actual, &expected);
     }
 
     #[test]
     fn test_parse_document_with_multiple_directives() {
-        // Note: Directives are not supported by this parser, so we test with comments instead
-        let mut source = BufferSource::new(
-            b"# Would have %YAML 1.2 and %TAG ! tag:example.com,2000:app/ directives here\n---\nkey: value"
-        );
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = &result {
-            assert_eq!(docs.len(), 1);
-            if let Document(nodes) = &docs[0] {
-                assert!(!nodes.is_empty());
-            }
-        }
+        let input = b"# Would have %YAML 1.2 and %TAG ! tag:example.com,2000:app/ directives here\n---\nkey: value";
+        let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![(
+            Node::Str("key".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            Node::Str("value".to_string(), QuoteType::Unquoted, BlockStyle::None),
+        )])])]);
+        let actual = parse_yaml(input);
+        assert_nodes_eq(&actual, &expected);
     }
 
     #[test]
     fn test_parse_document_with_comments_around_markers() {
-        let mut source = BufferSource::new(b"# Before first marker\n---\n# After first marker\nkey: value\n# Before end marker\n...\n# After end marker");
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = &result {
-            assert_eq!(docs.len(), 1);
-            if let Document(nodes) = &docs[0] {
-                assert!(!nodes.is_empty());
-            }
-        }
+        let input = b"# Before first marker\n---\n# After first marker\nkey: value\n# Before end marker\n...\n# After end marker";
+        let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![(
+            Node::Str("key".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            Node::Str("value".to_string(), QuoteType::Unquoted, BlockStyle::None),
+        )])])]);
+        let actual = parse_yaml(input);
+        assert_nodes_eq(&actual, &expected);
     }
 
     #[test]
     fn test_parse_documents_with_different_content_types() {
-        let mut source = BufferSource::new(b"---\n\"scalar document\"\n---\n- item1\n- item2\n---\nkey: value");
-        let result = parse(&mut source).unwrap();
-
-        fn find_types(node: &Node, found_scalar: &mut bool, found_sequence: &mut bool, found_mapping: &mut bool) {
-            match node {
-                Node::Str(_, _, _) => *found_scalar = true,
-                Node::Array(arr) => {
-                    *found_sequence = true;
-                    for n in arr {
-                        find_types(n, found_scalar, found_sequence, found_mapping);
-                    }
-                },
-                Node::Mapping(pairs) => {
-                    *found_mapping = true;
-                    for (k, v) in pairs {
-                        find_types(k, found_scalar, found_sequence, found_mapping);
-                        find_types(v, found_scalar, found_sequence, found_mapping);
-                    }
-                },
-                Node::Document(nodes) | Node::Documents(nodes) => {
-                    for n in nodes {
-                        find_types(n, found_scalar, found_sequence, found_mapping);
-                    }
-                },
-                _ => {}
-            }
-        }
-        if let Node::Documents(docs) = &result {
-            let mut found_scalar = false;
-            let mut found_sequence = false;
-            let mut found_mapping = false;
-            for doc in docs {
-                if let Document(nodes) = doc {
-                    for node in nodes {
-                        find_types(node, &mut found_scalar, &mut found_sequence, &mut found_mapping);
-                    }
-                }
-            }
-            assert!(found_scalar, "Should find a scalar document");
-            assert!(found_sequence, "Should find a sequence document");
-            assert!(found_mapping, "Should find a mapping document");
-        }
+        let input = b"---\n\"scalar document\"\n---\n- item1\n- item2\n---\nkey: value";
+        let expected = Node::Documents(vec![
+            Document(vec![Node::Str(
+                "scalar document".to_string(),
+                QuoteType::Double,
+                BlockStyle::None,
+            )]),
+            Document(vec![Node::Array(vec![
+                Node::Str("item1".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Str("item2".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            ])]),
+            Document(vec![Node::Mapping(vec![(
+                Node::Str("key".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Str("value".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            )])]),
+        ]);
+        let actual = parse_yaml(input);
+        assert_nodes_eq(&actual, &expected);
     }
 
     #[test]
     fn test_parse_document_with_whitespace_only_content() {
-        let mut source = BufferSource::new(b"---\n   \n  \n  \n---\nkey: value");
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = &result {
-            // Allow empty/whitespace-only documents, but require at least one non-empty document
-            assert!(docs.len() >= 1, "Should have at least one document");
-            let mut found_nonempty = false;
-            for doc in docs {
-                if let Document(nodes) = doc {
-                    if !nodes.is_empty() {
-                        found_nonempty = true;
-                        break;
-                    }
-                }
-            }
-            assert!(found_nonempty, "Should have at least one non-empty document");
-        }
+        let input = b"---\n   \n  \n  \n---\nkey: value";
+        let expected = Node::Documents(vec![
+            Document(vec![]),
+            Document(vec![Node::Mapping(vec![(
+                Node::Str("key".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Str("value".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            )])]),
+        ]);
+        let actual = parse_yaml(input);
+        assert_nodes_eq(&actual, &expected);
     }
 
     #[test]
     fn test_parse_document_with_trailing_spaces_on_markers() {
-        let mut source = BufferSource::new(b"---   \nkey: value\n...   ");
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = &result {
-            assert_eq!(docs.len(), 1);
-            if let Document(nodes) = &docs[0] {
-                assert!(!nodes.is_empty());
-            }
-        }
+        let input = b"---   \nkey: value\n...   ";
+        let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![(
+            Node::Str("key".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            Node::Str("value".to_string(), QuoteType::Unquoted, BlockStyle::None),
+        )])])]);
+        let actual = parse_yaml(input);
+        assert_nodes_eq(&actual, &expected);
     }
 
     #[test]
     fn test_parse_document_markers_with_comments_inline() {
-        let mut source =
-            BufferSource::new(b"--- # Start of document\nkey: value\n# End of document");
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = &result {
-            assert_eq!(docs.len(), 1);
-            if let Document(nodes) = &docs[0] {
-                assert!(!nodes.is_empty());
-            }
-        }
+        let input = b"--- # Start of document\nkey: value\n# End of document";
+        let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![(
+            Node::Str("key".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            Node::Str("value".to_string(), QuoteType::Unquoted, BlockStyle::None),
+        )])])]);
+        let actual = parse_yaml(input);
+        assert_nodes_eq(&actual, &expected);
     }
 
     #[test]
     fn test_parse_documents_with_complex_nested_content() {
-        let mut source = BufferSource::new(
-            b"---\nusers:\n  - name: alice\n    roles: [admin, user]\n  - name: bob\n    roles: [user]\nconfig:\n  database:\n    host: localhost\n    port: 5432\n---\nservers:\n  web:\n    - host: web1.example.com\n    - host: web2.example.com"
-        );
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = &result {
+        let input = b"---\nusers:\n  - name: alice\n    roles: [admin, user]\n  - name: bob\n    roles: [user]\nconfig:\n  database:\n    host: localhost\n    port: 5432\n---\nservers:\n  web:\n    - host: web1.example.com\n    - host: web2.example.com";
+        // Only check that the parse succeeds and the structure is as expected
+        let actual = parse_yaml(input);
+        if let Node::Documents(docs) = &actual {
             assert!(!docs.is_empty(), "Should have at least one document");
             let mut found_users = false;
             let mut found_servers = false;
@@ -468,6 +362,8 @@ mod tests {
             }
             assert!(found_users, "Should find 'users' mapping");
             assert!(found_servers, "Should find 'servers' mapping");
+        } else {
+            panic!("Expected Documents node");
         }
     }
 
@@ -478,7 +374,11 @@ mod tests {
         let result = parse(&mut source).unwrap();
 
         if let Node::Documents(docs) = &result {
-            assert_eq!(docs.len(), 2, "Expected two documents including trailing empty one");
+            assert_eq!(
+                docs.len(),
+                2,
+                "Expected two documents including trailing empty one"
+            );
             if let Document(nodes) = &docs[1] {
                 assert!(nodes.is_empty(), "Second document should be empty");
             } else {
@@ -491,8 +391,7 @@ mod tests {
 
     #[test]
     fn test_parse_document_with_boolean_and_null_values() {
-        let mut source = BufferSource::new(
-            b"---\n\
+        let input = b"---\n\
             enabled: true\n\
             disabled: false\n\
             empty: null\n\
@@ -501,11 +400,9 @@ mod tests {
             yes: yes\n\
             no: no\n\
             on: on\n\
-            off: off",
-        );
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = &result {
+            off: off";
+        let actual = parse_yaml(input);
+        if let Node::Documents(docs) = &actual {
             assert!(!docs.is_empty(), "Should have at least one document");
             let mut found_enabled = false;
             let mut found_disabled = false;
@@ -522,14 +419,54 @@ mod tests {
                             for (k, v) in pairs {
                                 if let Node::Str(s, _, _) = k {
                                     match s.as_str() {
-                                        "enabled" => if let Node::Boolean(true) = v { found_enabled = true; },
-                                        "disabled" => if let Node::Boolean(false) = v { found_disabled = true; },
-                                        "empty" => if let Node::None = v { found_empty = true; },
-                                        "missing" => if let Node::None = v { found_missing = true; },
-                                        "yes" => if let Node::Str(val, _, _) = v { if val == "yes" { found_yes = true; } },
-                                        "no" => if let Node::Str(val, _, _) = v { if val == "no" { found_no = true; } },
-                                        "on" => if let Node::Str(val, _, _) = v { if val == "on" { found_on = true; } },
-                                        "off" => if let Node::Str(val, _, _) = v { if val == "off" { found_off = true; } },
+                                        "enabled" => {
+                                            if let Node::Boolean(true) = v {
+                                                found_enabled = true;
+                                            }
+                                        }
+                                        "disabled" => {
+                                            if let Node::Boolean(false) = v {
+                                                found_disabled = true;
+                                            }
+                                        }
+                                        "empty" => {
+                                            if let Node::None = v {
+                                                found_empty = true;
+                                            }
+                                        }
+                                        "missing" => {
+                                            if let Node::None = v {
+                                                found_missing = true;
+                                            }
+                                        }
+                                        "yes" => {
+                                            if let Node::Str(val, _, _) = v {
+                                                if val == "yes" {
+                                                    found_yes = true;
+                                                }
+                                            }
+                                        }
+                                        "no" => {
+                                            if let Node::Str(val, _, _) = v {
+                                                if val == "no" {
+                                                    found_no = true;
+                                                }
+                                            }
+                                        }
+                                        "on" => {
+                                            if let Node::Str(val, _, _) = v {
+                                                if val == "on" {
+                                                    found_on = true;
+                                                }
+                                            }
+                                        }
+                                        "off" => {
+                                            if let Node::Str(val, _, _) = v {
+                                                if val == "off" {
+                                                    found_off = true;
+                                                }
+                                            }
+                                        }
                                         _ => {}
                                     }
                                 }
@@ -546,106 +483,103 @@ mod tests {
             assert!(found_no, "Should find no: no");
             assert!(found_on, "Should find on: on");
             assert!(found_off, "Should find off: off");
+        } else {
+            panic!("Expected Documents node");
         }
     }
 
     #[test]
     fn test_parse_document_with_numeric_values() {
-        let mut source = BufferSource::new(
-            b"---\n\
+        let input = b"---\n\
             integer: 42\n\
             negative: -123\n\
             float: 3.14159\n\
             scientific: 1.23e+4\n\
             binary: 0b1010\n\
             octal: 0o755\n\
-            hex: 0xFF",
-        );
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = &result {
+            hex: 0xFF";
+        let actual = parse_yaml(input);
+        if let Node::Documents(docs) = &actual {
             assert_eq!(docs.len(), 1);
             if let Document(nodes) = &docs[0] {
                 assert!(!nodes.is_empty());
             }
+        } else {
+            panic!("Expected Documents node");
         }
     }
 
     #[test]
     fn test_parse_document_with_anchor_and_alias() {
-        let mut source = BufferSource::new(
-            b"---\n\
-            default: &default\n\
-              host: localhost\n\
-              port: 8080\n\
-            development:\n\
-              config: *default\n\
-              debug: true\n\
-            production:\n\
-              config: *default\n\
-              debug: false",
-        );
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = &result {
+        let input = b"---\n\
+                        default: &default\n\
+                            host: localhost\n\
+                            port: 8080\n\
+                        development:\n\
+                            config: *default\n\
+                            debug: true\n\
+                        production:\n\
+                            config: *default\n\
+                            debug: false";
+        let actual = parse_yaml(input);
+        if let Node::Documents(docs) = &actual {
             assert_eq!(docs.len(), 1);
             if let Document(nodes) = &docs[0] {
                 assert!(!nodes.is_empty());
             }
+        } else {
+            panic!("Expected Documents node");
         }
     }
 
     #[test]
     fn test_parse_document_with_literal_and_folded_strings() {
-        let mut source = BufferSource::new(
-            b"---\n\
-            literal: |\n\
-              Line 1\n\
-              Line 2\n\
-              Line 3\n\
-            folded: >\n\
-              This is a very long\n\
-              line that will be\n\
-              folded into a single\n\
-              paragraph.\n\
-            mixed:\n\
-              - |\n\
-                Literal in array\n\
-              - >\n\
-                Folded in array",
-        );
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = &result {
+        let input = b"---\n\
+                        literal: |\n\
+                            Line 1\n\
+                            Line 2\n\
+                            Line 3\n\
+                        folded: >\n\
+                            This is a very long\n\
+                            line that will be\n\
+                            folded into a single\n\
+                            paragraph.\n\
+                        mixed:\n\
+                            - |\n\
+                                Literal in array\n\
+                            - >\n\
+                                Folded in array";
+        let actual = parse_yaml(input);
+        if let Node::Documents(docs) = &actual {
             assert_eq!(docs.len(), 1);
             if let Document(nodes) = &docs[0] {
                 assert!(!nodes.is_empty());
             }
+        } else {
+            panic!("Expected Documents node");
         }
     }
 
     #[test]
     fn test_parse_document_with_unicode_content() {
-        let mut source = BufferSource::new(
-            b"---\n\
+        let input = b"---\n\
             greeting: \"\xE4\xBD\xA0\xE5\xA5\xBD\"  # Hello in Chinese\n\
             emoji: \"\xF0\x9F\x91\x8B\"  # Wave emoji\n\
-            mixed: [\"\xC2\xA1Hola!\", \"world\", \"\xF0\x9F\x8C\x8D\"]  # Spanish + world emoji",
-        );
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = &result {
+            mixed: [\"\xC2\xA1Hola!\", \"world\", \"\xF0\x9F\x8C\x8D\"]  # Spanish + world emoji";
+        let actual = parse_yaml(input);
+        if let Node::Documents(docs) = &actual {
             assert_eq!(docs.len(), 1);
             if let Document(nodes) = &docs[0] {
                 assert!(!nodes.is_empty());
             }
+        } else {
+            panic!("Expected Documents node");
         }
     }
 
     #[test]
     fn test_parse_document_with_tags() {
-        let mut source = BufferSource::new(
-            b"---\n\
+        let input = b"---\n\
             timestamp: !!timestamp 2001-12-14t21:59:43.10-05:00\n\
             integer: !!int \"123\"\n\
             float: !!float \"456.789\"\n\
@@ -653,29 +587,25 @@ mod tests {
               R0lGODlhDAAMAIQAAP//9/X17unp5WZmZgAAAOfn515eXvPz7Y6OjuDg4J+fn5\n\
               OTk6enp56enmlpaWNjY6Ojo4SEhP/++f/++f/++f/++f/++f/++f/++f/++f/+\n\
               +f/++f/++f/++f/++f/++SH+Dk1hZGUgd2l0aCBHSU1QACwAAAAADAAMAAAFLC\n\
-              AgjoEwnuNAFOhpEMTRiggcz4BNJHrv/zCFcLiwMWYNG84BwwEeECcgggoBADs=",
-        );
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = &result {
+              AgjoEwnuNAFOhpEMTRiggcz4BNJHrv/zCFcLiwMWYNG84BwwEeECcgggoBADs=";
+        let actual = parse_yaml(input);
+        if let Node::Documents(docs) = &actual {
             assert_eq!(docs.len(), 1);
             if let Document(nodes) = &docs[0] {
                 assert!(!nodes.is_empty());
             }
+        } else {
+            panic!("Expected Documents node");
         }
     }
 
     #[test]
     fn test_parse_document_with_tag_directives() {
-        // Test tag prefix resolution
-        let mut source = BufferSource::new(
-            b"%TAG !e! tag:example.com,2000:app/\n\
+        let input = b"%TAG !e! tag:example.com,2000:app/\n\
             ---\n\
-            item: !e!custom value",
-        );
-        let result = parse(&mut source).unwrap();
-
-        if let Node::Documents(docs) = &result {
+            item: !e!custom value";
+        let actual = parse_yaml(input);
+        if let Node::Documents(docs) = &actual {
             assert_eq!(docs.len(), 1);
             if let Document(nodes) = &docs[0] {
                 assert!(!nodes.is_empty());
@@ -689,37 +619,36 @@ mod tests {
                     }
                 }
             }
+        } else {
+            panic!("Expected Documents node");
         }
     }
 
     #[test]
     fn test_parse_document_with_yaml_version() {
-        // Test YAML version directive
-        let mut source = BufferSource::new(
-            b"%YAML 1.2\n\
+        let input = b"%YAML 1.2\n\
             ---\n\
-            key: value",
-        );
-        let result = parse(&mut source);
-        assert!(result.is_ok());
+            key: value";
+        let actual = parse_yaml(input);
+        // Accept parse success as pass
+        if let Node::Documents(docs) = &actual {
+            assert!(!docs.is_empty());
+        } else {
+            panic!("Expected Documents node");
+        }
     }
 
     #[test]
     fn test_yaml_11_boolean_values() {
-        // YAML 1.1 should accept yes/no/on/off as booleans
-        let mut source = BufferSource::new(
-            b"%YAML 1.1\n\
+        let input = b"%YAML 1.1\n\
             ---\n\
             yes_value: yes\n\
             no_value: no\n\
             on_value: on\n\
-            off_value: off",
-        );
-        let result = parse(&mut source);
-        assert!(result.is_ok());
-
-        if let Ok(Node::Documents(docs)) = result {
-            if let Node::Document(nodes) = &docs[0] {
+            off_value: off";
+        let actual = parse_yaml(input);
+        if let Node::Documents(docs) = &actual {
+            if let Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
                     // Check yes -> true
                     if let Some((_, Node::Boolean(true))) = pairs
@@ -762,25 +691,22 @@ mod tests {
                     }
                 }
             }
+        } else {
+            panic!("Expected Documents node");
         }
     }
 
     #[test]
     fn test_yaml_12_boolean_values_strict() {
-        // YAML 1.2 should NOT accept yes/no/on/off as booleans (they remain strings)
-        let mut source = BufferSource::new(
-            b"%YAML 1.2\n\
+        let input = b"%YAML 1.2\n\
             ---\n\
             yes_value: yes\n\
             no_value: no\n\
             true_value: true\n\
-            false_value: false",
-        );
-        let result = parse(&mut source);
-        assert!(result.is_ok());
-
-        if let Ok(Node::Documents(docs)) = result {
-            if let Node::Document(nodes) = &docs[0] {
+            false_value: false";
+        let actual = parse_yaml(input);
+        if let Node::Documents(docs) = &actual {
+            if let Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
                     // Check yes remains string
                     if let Some((_, Node::Str(s, _, _))) = pairs
@@ -822,22 +748,19 @@ mod tests {
                     }
                 }
             }
+        } else {
+            panic!("Expected Documents node");
         }
     }
 
     #[test]
     fn test_yaml_11_octal_numbers() {
-        // YAML 1.1 accepts octal with plain 0 prefix (e.g., 0755)
-        let mut source = BufferSource::new(
-            b"%YAML 1.1\n\
+        let input = b"%YAML 1.1\n\
             ---\n\
-            permissions: 0755",
-        );
-        let result = parse(&mut source);
-        assert!(result.is_ok());
-
-        if let Ok(Node::Documents(docs)) = result {
-            if let Node::Document(nodes) = &docs[0] {
+            permissions: 0755";
+        let actual = parse_yaml(input);
+        if let Node::Documents(docs) = &actual {
+            if let Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
                     if let Some((_, Node::Number(Numeric::Integer(i)))) = pairs
                         .iter()
@@ -852,22 +775,19 @@ mod tests {
                     }
                 }
             }
+        } else {
+            panic!("Expected Documents node");
         }
     }
 
     #[test]
     fn test_yaml_12_octal_numbers_require_0o_prefix() {
-        // YAML 1.2 requires 0o prefix for octal
-        let mut source = BufferSource::new(
-            b"%YAML 1.2\n\
+        let input = b"%YAML 1.2\n\
             ---\n\
-            permissions: 0o755",
-        );
-        let result = parse(&mut source);
-        assert!(result.is_ok());
-
-        if let Ok(Node::Documents(docs)) = result {
-            if let Node::Document(nodes) = &docs[0] {
+            permissions: 0o755";
+        let actual = parse_yaml(input);
+        if let Node::Documents(docs) = &actual {
+            if let Document(nodes) = &docs[0] {
                 if let Node::Mapping(pairs) = &nodes[0] {
                     if let Some((_, Node::Number(Numeric::Integer(i)))) = pairs
                         .iter()
@@ -882,6 +802,8 @@ mod tests {
                     }
                 }
             }
+        } else {
+            panic!("Expected Documents node");
         }
     }
 }

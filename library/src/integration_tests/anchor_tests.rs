@@ -1,8 +1,7 @@
 //! Tests for anchor and alias parsing edge cases
 
 use crate::Node;
-use crate::io::sources::buffer::Buffer as BufferSource;
-use crate::parse;
+use crate::test_helpers::parse_yaml;
 
 #[cfg(test)]
 mod tests {
@@ -11,15 +10,7 @@ mod tests {
     #[test]
     fn test_anchor_name_with_colon() {
         // Test from 2SXE: anchor name containing a colon
-        let mut source = BufferSource::new(b"&a: key: &a value");
-        let result = parse(&mut source);
-
-        #[cfg(feature = "debug-trace")]
-        println!("Result: {:?}", result);
-
-        assert!(result.is_ok(), "Should parse anchor with colon in name");
-        let doc = result.unwrap();
-
+        let doc = parse_yaml(b"&a: key: &a value");
         // Should create an anchored node with name "a:"
         match &doc {
             Node::Documents(docs) => {
@@ -32,24 +23,14 @@ mod tests {
     #[test]
     fn test_empty_anchor_value() {
         // Test from 6KGN: anchor for empty node
-        let mut source = BufferSource::new(b"a: &anchor\nb: *anchor");
-        let result = parse(&mut source);
-
-        #[cfg(feature = "debug-trace")]
-        println!("Result: {:?}", result);
-
-        assert!(result.is_ok(), "Should parse anchor with empty/null value");
+        let _ = parse_yaml(b"a: &anchor\nb: *anchor");
+        // If parse_yaml does not panic, test passes
     }
 
     #[test]
     fn test_anchor_on_sequence() {
         // Test from 3R3P: anchor on a sequence
-        let mut source = BufferSource::new(b"&sequence\n- a");
-        let result = parse(&mut source);
-
-        #[cfg(feature = "debug-trace")]
-        println!("Result: {:?}", result);
-
-        assert!(result.is_ok(), "Should parse anchor on sequence");
+        let _ = parse_yaml(b"&sequence\n- a");
+        // If parse_yaml does not panic, test passes
     }
 }
