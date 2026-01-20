@@ -4,8 +4,8 @@
 #[cfg(test)]
 mod tests {
     use crate::nodes::node::{BlockStyle, QuoteType};
+    use crate::test_helpers::{assert_nodes_eq, parse_yaml};
     use crate::{BufferSource, Node, Node::Document, Numeric, parse};
-        use crate::test_helpers::{parse_yaml, assert_nodes_eq, assert_parse_error};
     use std::collections::HashMap;
 
     #[test]
@@ -67,7 +67,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn test_parse_document_end_marker() {
         let input = b"key: value\n---";
         let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![(
@@ -125,18 +124,14 @@ mod tests {
         let input = b"key: value\n---\n---\nother: 1";
         // The parser merges empty documents, so only non-empty documents are present
         let expected = Node::Documents(vec![
-            Document(vec![Node::Mapping(vec![
-                (
-                    Node::Str("key".to_string(), QuoteType::Unquoted, BlockStyle::None),
-                    Node::Str("value".to_string(), QuoteType::Unquoted, BlockStyle::None),
-                ),
-            ])]),
-            Document(vec![Node::Mapping(vec![
-                (
-                    Node::Str("other".to_string(), QuoteType::Unquoted, BlockStyle::None),
-                    Node::Number(Numeric::Integer(1)),
-                ),
-            ])]),
+            Document(vec![Node::Mapping(vec![(
+                Node::Str("key".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Str("value".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            )])]),
+            Document(vec![Node::Mapping(vec![(
+                Node::Str("other".to_string(), QuoteType::Unquoted, BlockStyle::None),
+                Node::Number(Numeric::Integer(1)),
+            )])]),
         ]);
         let actual = parse_yaml(input);
         assert_nodes_eq(&actual, &expected);
@@ -218,14 +213,10 @@ mod tests {
     fn test_parse_empty_documents_between_markers() {
         let input = b"---\n---\nkey: value\n---";
         // The parser merges empty documents, so only the non-empty document is present
-        let expected = Node::Documents(vec![
-            Document(vec![Node::Mapping(vec![
-                (
-                    Node::Str("key".to_string(), QuoteType::Unquoted, BlockStyle::None),
-                    Node::Str("value".to_string(), QuoteType::Unquoted, BlockStyle::None),
-                ),
-            ])]),
-        ]);
+        let expected = Node::Documents(vec![Document(vec![Node::Mapping(vec![(
+            Node::Str("key".to_string(), QuoteType::Unquoted, BlockStyle::None),
+            Node::Str("value".to_string(), QuoteType::Unquoted, BlockStyle::None),
+        )])])]);
         let actual = parse_yaml(input);
         assert_nodes_eq(&actual, &expected);
     }

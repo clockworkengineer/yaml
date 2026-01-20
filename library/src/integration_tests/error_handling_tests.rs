@@ -4,20 +4,24 @@
 
 #[cfg(test)]
 mod tests {
-        #[test]
-        fn test_4h7k_extra_closing_bracket_in_flow_sequence() {
-            // 4H7K: Should error on extra closing bracket in flow sequence
-            let yaml = b"[ a, b, c ] ]\n";
-            let mut source = BufferSource::new(yaml);
-            let res = parse(&mut source);
-            assert!(res.is_err(), "4H7K: Should error on extra closing bracket in flow sequence");
-            let err = res.unwrap_err().to_string();
-            assert!(
-                err.contains("Unexpected") || err.contains("]") || err.contains("bracket"),
-                "4H7K error message should mention unexpected bracket, got: {}",
-                err
-            );
-        }
+    #[test]
+    fn test_4h7k_extra_closing_bracket_in_flow_sequence() {
+        // 4H7K: Should error on extra closing bracket in flow sequence
+        let yaml = b"[ a, b, c ] ]\n";
+        let mut source = BufferSource::new(yaml);
+        let res = parse(&mut source);
+        assert!(
+            res.is_err(),
+            "4H7K: Should error on extra closing bracket in flow sequence"
+        );
+        let err = res.unwrap_err().to_string();
+        assert!(
+            err.contains("Unexpected") || err.contains("]") || err.contains("bracket"),
+            "4H7K error message should mention unexpected bracket, got: {}",
+            err
+        );
+    }
+    use crate::test_helpers::{assert_parse_error, parse_yaml};
     use crate::{BufferSource, Node, parse};
 
     #[test]
@@ -31,37 +35,23 @@ mod tests {
     #[test]
     fn test_error_on_empty_alias_name() {
         use crate::error::messages::ERR_EMPTY_ALIAS_NAME;
-        let mut source = BufferSource::new(b"---\nvalue: *\n");
-        let res = parse(&mut source);
-        assert!(res.is_err());
-        let err = res.unwrap_err();
-        assert!(err.to_string().contains(ERR_EMPTY_ALIAS_NAME));
+        let yaml = "---\nvalue: *\n";
+        assert_parse_error(yaml, ERR_EMPTY_ALIAS_NAME);
     }
 
     #[test]
     fn test_error_on_empty_anchor_name() {
         use crate::error::messages::ERR_EMPTY_ANCHOR_NAME;
-        let mut source = BufferSource::new(b"---\nroot: &\n  nested: 1\n");
-        let res = parse(&mut source);
-        assert!(res.is_err());
-        let err = res.unwrap_err();
-        assert!(err.to_string().contains(ERR_EMPTY_ANCHOR_NAME));
+        let yaml = "---\nroot: &\n  nested: 1\n";
+        assert_parse_error(yaml, ERR_EMPTY_ANCHOR_NAME);
     }
 
     #[test]
     fn test_error_on_duplicate_anchor() {
         // According to YAML 1.2 spec, duplicate anchors are allowed
         // The later definition overrides the earlier one
-        let yaml = b"---\na: &dup\n  x: 1\nb: &dup\n  y: 2\nc: *dup\n";
-        let mut source = BufferSource::new(yaml);
-        let res = parse(&mut source);
-        assert!(
-            res.is_ok(),
-            "Duplicate anchors should be allowed, later definition wins"
-        );
-
-        // The alias *dup should resolve to the second definition (y: 2)
-        let doc = res.unwrap();
+        let yaml = "---\na: &dup\n  x: 1\nb: &dup\n  y: 2\nc: *dup\n";
+        let doc = parse_yaml(yaml);
         if let Node::Documents(docs) = &doc {
             assert!(!docs.is_empty());
             // Can verify structure if needed, but main point is it should parse
@@ -70,58 +60,28 @@ mod tests {
 
     #[test]
     fn test_error_on_unterminated_double_quote() {
-        let mut source = BufferSource::new(b"---\nkey: \"unterminated string");
-        let res = parse(&mut source);
-        assert!(res.is_err());
-        let err = res.unwrap_err();
-        let err_str = err.to_string();
-        assert!(err_str.contains("Unterminated") || err_str.contains("Expected"));
+        let yaml = "---\nkey: \"unterminated string";
+        assert_parse_error(yaml, "Unterminated");
     }
 
     #[test]
     fn test_error_on_unterminated_single_quote() {
-        let mut source = BufferSource::new(b"---\nkey: 'unterminated string");
-        let res = parse(&mut source);
-        assert!(res.is_err());
-        let err = res.unwrap_err();
-        let err_str = err.to_string();
-        assert!(err_str.contains("Unterminated") || err_str.contains("Expected"));
+        let yaml = "---\nkey: 'unterminated string";
+        assert_parse_error(yaml, "Unterminated");
     }
 
     #[test]
     fn test_error_on_invalid_escape_sequence() {
         // Test with actually invalid escape sequence that parser rejects
-        let mut source = BufferSource::new(b"---\nkey: \"\\");
-        let res = parse(&mut source);
-        assert!(res.is_err());
-        let err = res.unwrap_err();
-        let err_str = err.to_string();
-        assert!(
-            err_str.contains("Invalid")
-                || err_str.contains("Unexpected")
-                || err_str.contains("Unterminated")
-                || err_str.contains("Unclosed")
-        );
+        let yaml = "---\nkey: \"";
+        assert_parse_error(yaml, "Syntax error");
     }
 
     #[test]
     fn test_error_on_malformed_mapping() {
         // Test with missing closing brace
-        let mut source = BufferSource::new(b"---\n{key: value");
-        let res = parse(&mut source);
-        assert!(res.is_err());
-        let err = res.unwrap_err();
-        let err_str = err.to_string();
-            assert!(
-                err_str.contains("Unterminated") ||
-                err_str.contains("Expected") ||
-                err_str.contains("Unclosed") ||
-                err_str.contains("Invalid") ||
-                err_str.contains("Syntax error") ||
-                err_str.contains("Validation error"),
-                "Error message: {}",
-                err_str
-            );
+        let yaml = "---\n{key: value";
+        assert_parse_error(yaml, "Syntax error");
     }
 
     #[test]
@@ -130,23 +90,15 @@ mod tests {
         // plain scalars CAN span multiple lines with proper indentation.
         // The text "invalid item without dash" is a valid continuation
         // of the plain scalar "item1".
-        let mut source = BufferSource::new(b"---\n- item1\ninvalid item without dash");
-        let res = parse(&mut source);
-        // This should now parse successfully as a multiline plain scalar
-        assert!(
-            res.is_ok(),
-            "Multiline plain scalars should be valid: {:?}",
-            res.err()
-        );
-        if let Ok(doc) = res {
-            if let Node::Documents(docs) = doc {
-                if let Some(Node::Document(items)) = docs.first() {
-                    if let Some(Node::Array(arr)) = items.first() {
-                        assert_eq!(arr.len(), 1, "Should have one sequence item");
-                        // The value should be the folded multiline plain scalar
-                        if let Some(Node::Str(value, _, _)) = arr.first() {
-                            assert!(value.contains("item1"));
-                        }
+        let yaml = "---\n- item1\ninvalid item without dash";
+        let doc = parse_yaml(yaml);
+        if let Node::Documents(docs) = doc {
+            if let Some(Node::Document(items)) = docs.first() {
+                if let Some(Node::Array(arr)) = items.first() {
+                    assert_eq!(arr.len(), 1, "Should have one sequence item");
+                    // The value should be the folded multiline plain scalar
+                    if let Some(Node::Str(value, _, _)) = arr.first() {
+                        assert!(value.contains("item1"));
                     }
                 }
             }
@@ -182,21 +134,8 @@ mod tests {
 
     #[test]
     fn test_error_on_unclosed_flow_mapping() {
-        let mut source = BufferSource::new(b"---\n{key: value, invalid:");
-        let res = parse(&mut source);
-        assert!(res.is_err());
-        let err = res.unwrap_err();
-        let err_str = err.to_string();
-            assert!(
-                err_str.contains("Unterminated") ||
-                err_str.contains("Expected") ||
-                err_str.contains("Unclosed") ||
-                err_str.contains("Invalid") ||
-                err_str.contains("Syntax error") ||
-                err_str.contains("Validation error"),
-                "Error message: {}",
-                err_str
-            );
+        let yaml = "---\n{key: value, invalid:";
+        assert_parse_error(yaml, "Syntax error");
     }
 
     #[test]

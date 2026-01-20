@@ -32,8 +32,8 @@ mod flow_trailing_comma_tests;
 // Official YAML test suite failing cases
 mod official_suite_fixes;
 
-// Phase 1 validation improvements
-mod phase1_validation_tests;
+// comment improvements
+mod comment_and_indentation_validation_tests;
 
 // Block-format tag tests
 mod block_tag_tests;
