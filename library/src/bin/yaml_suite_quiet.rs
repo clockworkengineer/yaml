@@ -60,7 +60,8 @@ fn main() {
     };
 
     // Open output file for writing and also prepare stdout
-    let output_file = File::create("yaml_suite_quiet_output.txt").expect("Failed to create output file");
+    let output_file =
+        File::create("yaml_suite_quiet_output.txt").expect("Failed to create output file");
     let mut out = BufWriter::new(output_file);
     let mut stdout = std::io::stdout();
 
@@ -223,8 +224,16 @@ fn main() {
             } else {
                 String::new()
             };
-            println!("SUITE_RESULT: {} FAIL expected={} got={} {}", test.id, expected, got, err_msg);
-            writeln!(out, "SUITE_RESULT: {} FAIL expected={} got={} {}", test.id, expected, got, err_msg).unwrap();
+            println!(
+                "SUITE_RESULT: {} FAIL expected={} got={} {}",
+                test.id, expected, got, err_msg
+            );
+            writeln!(
+                out,
+                "SUITE_RESULT: {} FAIL expected={} got={} {}",
+                test.id, expected, got, err_msg
+            )
+            .unwrap();
             failures.push(format!(
                 "{} (expected: {}, got: {})",
                 test.id, expected, got

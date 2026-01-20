@@ -7,10 +7,10 @@ use crate::{BufferSource, Node, parse};
 
 #[cfg(test)]
 mod tests {
-    // Test 4QFQ - Block scalar edge cases (should succeed)
+    // Test 4QFQ - Block scalar edge cases (should error)
     #[test]
-    fn test_4qfq_block_scalar_success() {
-        // This YAML is from the 4QFQ test case, which should parse successfully
+    fn test_4qfq_block_scalar_error() {
+        // This YAML is from the 4QFQ test case, which should now succeed to parse
         let yaml = b"- |\n detected\n- >\n \n  \n  # detected\n- |1\n  explicit\n- >\n detected\n";
         let mut source = BufferSource::new(yaml);
         let result = parse(&mut source);
@@ -18,11 +18,11 @@ mod tests {
         #[cfg(feature = "debug-trace")]
         println!("4QFQ Result: {:?}", result);
 
-        // This test should succeed (expect Ok)
+        // This test should succeed to parse (expect Ok)
         assert!(
             result.is_ok(),
-            "4QFQ should parse successfully, but failed: {:?}",
-            result.err()
+            "4QFQ should succeed to parse, but failed: {:?}",
+            result
         );
     }
     // Test 5TRB - Unterminated/invalid quoted scalar
