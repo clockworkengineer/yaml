@@ -192,6 +192,8 @@ fn main() {
             Ok(r) => r,
             Err(_) => {
                 skipped += 1;
+                println!("SUITE_RESULT: {} SKIPPED panic", test.id);
+                writeln!(out, "SUITE_RESULT: {} SKIPPED panic", test.id).unwrap();
                 continue;
             }
         };
@@ -202,6 +204,8 @@ fn main() {
         };
         if test_passed {
             passed += 1;
+            println!("SUITE_RESULT: {} PASS", test.id);
+            writeln!(out, "SUITE_RESULT: {} PASS", test.id).unwrap();
         } else {
             failed += 1;
             let expected = if test.has_error_file {
@@ -214,6 +218,13 @@ fn main() {
             } else {
                 "error"
             };
+            let err_msg = if let Err(e) = parse_result {
+                format!("{}", e)
+            } else {
+                String::new()
+            };
+            println!("SUITE_RESULT: {} FAIL expected={} got={} {}", test.id, expected, got, err_msg);
+            writeln!(out, "SUITE_RESULT: {} FAIL expected={} got={} {}", test.id, expected, got, err_msg).unwrap();
             failures.push(format!(
                 "{} (expected: {}, got: {})",
                 test.id, expected, got
