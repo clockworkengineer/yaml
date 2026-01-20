@@ -1,3 +1,33 @@
+/// Shared trait for node/string conversion and cloning
+pub trait NodeStringConvert {
+    /// Convert node to string (lossy)
+    fn to_string_lossy(&self) -> alloc::string::String;
+    /// Get string value if node is a string
+    fn as_str(&self) -> Option<&str>;
+    /// Clone node as a string node
+    fn clone_as_string(&self) -> Option<Node>;
+}
+
+impl NodeStringConvert for Node {
+    fn to_string_lossy(&self) -> alloc::string::String {
+        match self {
+            Node::Str(s, _, _) => s.clone(),
+            Node::Number(n) => n.to_string_lossy(),
+            Node::Boolean(b) => b.to_string(),
+            Node::None => "null".to_string(),
+            _ => format!("{:?}", self),
+        }
+    }
+    fn as_str(&self) -> Option<&str> {
+        match self {
+            Node::Str(s, _, _) => Some(s.as_str()),
+            _ => None,
+        }
+    }
+    fn clone_as_string(&self) -> Option<Node> {
+        self.as_str().map(|s| Node::from(s))
+    }
+}
 #[cfg(test)]
 use crate::nodes::util::{make_node, make_set};
 
@@ -725,7 +755,7 @@ impl Node {
     /// assert!(!number.is_string());
     /// ```
     pub fn is_string(&self) -> bool {
-        matches!(self, Node::Str(_, _, _))
+        super::node_utils::is_string_node(self)
     }
 
     /// Check if this node is a number
@@ -741,7 +771,7 @@ impl Node {
     /// assert!(!string.is_number());
     /// ```
     pub fn is_number(&self) -> bool {
-        matches!(self, Node::Number(_))
+        super::node_utils::is_number_node(self)
     }
 
     /// Check if this node is a boolean
@@ -757,7 +787,7 @@ impl Node {
     /// assert!(!number.is_boolean());
     /// ```
     pub fn is_boolean(&self) -> bool {
-        matches!(self, Node::Boolean(_))
+        super::node_utils::is_boolean_node(self)
     }
 
     /// Alias for is_string() for consistency with as_str()

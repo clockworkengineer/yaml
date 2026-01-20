@@ -5,7 +5,7 @@ impl ValidationContextCore {
     pub fn fail_type_mismatch(expected: &SchemaType, node: &Node) -> ValidationError {
         ValidationError::TypeMismatch {
             expected: format!("{:?}", expected),
-            found: crate::validation::validators::node_type_name(node).to_string(),
+            found: node.to_string_lossy(),
         }
     }
 
@@ -28,7 +28,8 @@ use alloc::vec::Vec;
 use log::warn;
 
 use crate::error::YamlError;
-use crate::nodes::node::{Node, Numeric};
+use crate::nodes::node::{Node};
+use crate::nodes::node::NodeStringConvert;
 use crate::validation::error::ValidationError;
 use crate::validation::schema::{PropertySchema, Schema, SchemaType};
 use crate::validation::validators::{
@@ -291,27 +292,14 @@ fn node_type_name(node: &Node) -> &'static str {
 /// Convert node to string representation for uniqueness checking
 #[allow(dead_code)]
 fn node_to_string(node: &Node) -> String {
-    match node {
-        Node::Boolean(b) => b.to_string(),
-        Node::Number(Numeric::Integer(i)) => i.to_string(),
-        Node::Number(Numeric::Float(f)) => f.to_string(),
-        Node::Number(Numeric::UInteger(u)) => u.to_string(),
-        Node::Number(Numeric::Int32(i)) => i.to_string(),
-        Node::Number(Numeric::UInt32(u)) => u.to_string(),
-        Node::Number(Numeric::Int16(i)) => i.to_string(),
-        Node::Number(Numeric::UInt16(u)) => u.to_string(),
-        Node::Number(Numeric::Int8(i)) => i.to_string(),
-        Node::Number(Numeric::Byte(b)) => b.to_string(),
-        Node::Str(s, _, _) => s.clone(),
-        Node::None => "null".to_string(),
-        _ => format!("{:?}", node),
-    }
+    node.to_string_lossy()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::validation::schema::Schema;
+    use crate::nodes::node::Numeric;
 
     #[test]
     fn test_simple_validation() {

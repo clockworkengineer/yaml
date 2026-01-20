@@ -17,12 +17,12 @@
   - [x] Refactor all modules and tests to use the new error handling
 
 - [ ] **String Conversion Utilities**
-  - [ ] Implement shared traits/utilities for node/string conversion and cloning
-  - [ ] Refactor node construction, validation, and test code to use these utilities
+  - [x] Implement shared traits/utilities for node/string conversion and cloning
+  - [x] Refactor node construction, validation, and test code to use these utilities
 
 - [ ] **Node Validation & Construction**
   - [ ] Move normalization, deduplication, and type-check helpers to a single module (e.g., `node_utils.rs`)
-  - [ ] Refactor all usages to call these helpers
+  - [x] Refactor all usages to call these helpers
 
 - [ ] **Test Helper Module**
   - [ ] Create `test_helpers.rs` with common functions for parsing, stringifying, error assertions, and node comparison

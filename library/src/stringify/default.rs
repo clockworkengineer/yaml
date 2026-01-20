@@ -99,7 +99,12 @@ fn escape_single(s: &str) -> String {
 /// # Returns
 ///
 /// A new String with normalized line endings
+use crate::nodes::node_utils::normalize_node;
+
+use crate::nodes::node::{Node, QuoteType, BlockStyle};
+
 fn normalize_newlines(s: &str) -> String {
+    // Restore original CR removal logic for test compatibility
     s.replace(CHAR_CARRIAGE_RETURN, "")
 }
 

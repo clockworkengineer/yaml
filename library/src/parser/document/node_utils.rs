@@ -41,18 +41,17 @@ use crate::parser::document::helpers::node_to_inline_string;
 
 /// Normalize a Node to a double-quoted Node::Str for use as a mapping key.
 pub fn normalize_node_to_str(node: &Node) -> Node {
-    match node {
-        Node::Array(_) | Node::Mapping(_) => {
-            let inline = node_to_inline_string(node);
+    use crate::nodes::node_utils::{is_string_node, is_number_node, is_boolean_node, normalize_node};
+    let normalized = normalize_node(node);
+    match &normalized {
+        n if is_string_node(n) => n.clone(),
+        n if is_number_node(n) || is_boolean_node(n) => {
+            let inline = node_to_inline_string(n);
             Node::Str(inline, QuoteType::Double, BlockStyle::None)
         }
-        Node::Str(s, _qt, style) => {
-            let key_string = if matches!(style, BlockStyle::Literal) {
-                format!("{}\n", s)
-            } else {
-                s.clone()
-            };
-            Node::Str(key_string, QuoteType::Double, BlockStyle::None)
+        Node::Array(_) | Node::Mapping(_) => {
+            let inline = node_to_inline_string(&normalized);
+            Node::Str(inline, QuoteType::Double, BlockStyle::None)
         }
         other => {
             let inline = node_to_inline_string(other);
@@ -63,40 +62,42 @@ pub fn normalize_node_to_str(node: &Node) -> Node {
 
 /// Forcibly convert any mapping key to a string node (double quoted)
 pub fn force_key_to_string(key: Node) -> Node {
-    match key {
-        Node::Str(_, _, _) => key,
-        Node::Array(items) => {
-            let mut s = String::from("[");
-            for (i, item) in items.iter().enumerate() {
-                if i > 0 {
-                    s.push_str(", ");
-                }
-                match item {
-                    Node::Str(val, _, _) => s.push_str(val),
-                    Node::Number(n) => s.push_str(&format!("{:?}", n)),
-                    Node::Boolean(b) => s.push_str(&format!("{}", b)),
-                    _ => s.push_str(&format!("{:?}", item)),
-                }
+    use crate::nodes::node_utils::{is_string_node, is_number_node, is_boolean_node, normalize_node};
+    let normalized = normalize_node(&key);
+    if is_string_node(&normalized) {
+        normalized
+    } else if is_number_node(&normalized) || is_boolean_node(&normalized) {
+        let inline = crate::parser::document::helpers::node_to_inline_string(&normalized);
+        Node::Str(inline, QuoteType::Double, BlockStyle::None)
+    } else if let Node::Array(items) = &normalized {
+        let mut s = String::from("[");
+        for (i, item) in items.iter().enumerate() {
+            if i > 0 {
+                s.push_str(", ");
             }
-            s.push(']');
-            Node::Str(s, QuoteType::Double, BlockStyle::None)
+            let inline = crate::parser::document::helpers::node_to_inline_string(item);
+            s.push_str(&inline);
         }
-        Node::Mapping(_) => Node::Str(format!("{:?}", key), QuoteType::Double, BlockStyle::None),
-        Node::Tagged(inner, tag) => {
-            if matches!(*inner, Node::Str(ref s, _, _) if s.is_empty()) {
-                Node::Tagged(inner, tag)
-            } else {
-                Node::Tagged(Box::new(force_key_to_string(*inner)), tag)
-            }
+        s.push(']');
+        Node::Str(s, QuoteType::Double, BlockStyle::None)
+    } else if let Node::Mapping(_) = &normalized {
+        let inline = crate::parser::document::helpers::node_to_inline_string(&normalized);
+        Node::Str(inline, QuoteType::Double, BlockStyle::None)
+    } else if let Node::Tagged(inner, tag) = &normalized {
+        if matches!(**inner, Node::Str(ref s, _, _) if s.is_empty()) {
+            Node::Tagged(inner.clone(), tag.clone())
+        } else {
+            Node::Tagged(Box::new(force_key_to_string((**inner).clone())), tag.clone())
         }
-        Node::Anchored(inner, name) => {
-            if matches!(*inner, Node::Str(ref s, _, _) if s.is_empty()) {
-                Node::Anchored(inner, name)
-            } else {
-                Node::Anchored(Box::new(force_key_to_string(*inner)), name)
-            }
+    } else if let Node::Anchored(inner, name) = &normalized {
+        if matches!(**inner, Node::Str(ref s, _, _) if s.is_empty()) {
+            Node::Anchored(inner.clone(), name.clone())
+        } else {
+            Node::Anchored(Box::new(force_key_to_string((**inner).clone())), name.clone())
         }
-        other => Node::Str(format!("{:?}", other), QuoteType::Double, BlockStyle::None),
+    } else {
+        let inline = crate::parser::document::helpers::node_to_inline_string(&normalized);
+        Node::Str(inline, QuoteType::Double, BlockStyle::None)
     }
 }
 
