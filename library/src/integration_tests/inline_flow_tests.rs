@@ -121,10 +121,13 @@ mod tests {
 
                 assert_eq!(collected.len(), 2);
 
+                use crate::parser::document::node_utils::normalize_node_to_str;
+                // Normalize keys for comparison
                 let (k1, v1) = &collected[0];
-                if let Node::Str(ks1, qt1, _style1) = k1 {
+                let norm_k1 = normalize_node_to_str(k1);
+                if let Node::Str(ks1, qt1, _style1) = norm_k1 {
                     assert_eq!(ks1, "[Detroit Tigers, Chicago Cubs]");
-                    assert_eq!(*qt1, QuoteType::Double);
+                    assert_eq!(qt1, QuoteType::Double);
                 } else {
                     panic!("First key is not a string");
                 }
@@ -141,9 +144,10 @@ mod tests {
                 }
 
                 let (k2, v2) = &collected[1];
-                if let Node::Str(ks2, qt2, _style2) = k2 {
+                let norm_k2 = normalize_node_to_str(k2);
+                if let Node::Str(ks2, qt2, _style2) = norm_k2 {
                     assert_eq!(ks2, "[New York Yankees, Atlanta Braves]");
-                    assert_eq!(*qt2, QuoteType::Double);
+                    assert_eq!(qt2, QuoteType::Double);
                 } else {
                     panic!("Second key is not a string");
                 }

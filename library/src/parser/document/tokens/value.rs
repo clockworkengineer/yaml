@@ -390,7 +390,7 @@ pub fn parse_value_with_tokens(
                 // For block scalars, preserve block style; otherwise, coerce to plain string
                 match &result {
                     Node::Str(s, q, style)
-                        if *style == BlockStyle::Literal || *style == BlockStyle::Folded =>
+                        if style == &BlockStyle::Literal || style == &BlockStyle::Folded =>
                     {
                         result = Node::Str(s.clone(), q.clone(), style.clone());
                     }

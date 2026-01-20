@@ -1,6 +1,5 @@
 /// Construct a set node from items.
-pub fn make_set_node(items: Vec<Node>) -> Node {
-    Node::Set(items)
+pub mod node_utils {
 }
 
 /// Construct a tagged node from an inner node and tag string.
@@ -41,33 +40,51 @@ use crate::parser::document::helpers::node_to_inline_string;
 
 /// Normalize a Node to a double-quoted Node::Str for use as a mapping key.
 pub fn normalize_node_to_str(node: &Node) -> Node {
+    use crate::nodes::node::{NodeStringConvert, QuoteType, BlockStyle};
     use crate::nodes::node_utils::{is_string_node, is_number_node, is_boolean_node, normalize_node};
     let normalized = normalize_node(node);
-    match &normalized {
-        n if is_string_node(n) => n.clone(),
-        n if is_number_node(n) || is_boolean_node(n) => {
-            let inline = node_to_inline_string(n);
-            Node::Str(inline, QuoteType::Double, BlockStyle::None)
+        match &normalized {
+            n if is_string_node(n) => n.clone(),
+            n if is_number_node(n) || is_boolean_node(n) => {
+                let inline = n.to_string_lossy();
+                Node::Str(inline, QuoteType::Double, BlockStyle::None)
+            }
+            Node::Array(items) => {
+                let mut s = String::from("[");
+                for (i, item) in items.iter().enumerate() {
+                    if i > 0 {
+                        s.push_str(", ");
+                    }
+                    // Use as_str() if possible, else lossy
+                    if let Some(str_val) = item.as_str() {
+                        s.push_str(str_val);
+                    } else {
+                        s.push_str(&item.to_string_lossy());
+                    }
+                }
+                s.push(']');
+                Node::Str(s, QuoteType::Double, BlockStyle::None)
+            }
+            Node::Mapping(_) => {
+                let inline = normalized.to_string_lossy();
+                Node::Str(inline, QuoteType::Double, BlockStyle::None)
+            }
+            other => {
+                let inline = other.to_string_lossy();
+                Node::Str(inline, QuoteType::Double, BlockStyle::None)
+            }
         }
-        Node::Array(_) | Node::Mapping(_) => {
-            let inline = node_to_inline_string(&normalized);
-            Node::Str(inline, QuoteType::Double, BlockStyle::None)
-        }
-        other => {
-            let inline = node_to_inline_string(other);
-            Node::Str(inline, QuoteType::Double, BlockStyle::None)
-        }
-    }
 }
 
 /// Forcibly convert any mapping key to a string node (double quoted)
 pub fn force_key_to_string(key: Node) -> Node {
+    use crate::nodes::node::{NodeStringConvert, QuoteType, BlockStyle};
     use crate::nodes::node_utils::{is_string_node, is_number_node, is_boolean_node, normalize_node};
     let normalized = normalize_node(&key);
     if is_string_node(&normalized) {
         normalized
     } else if is_number_node(&normalized) || is_boolean_node(&normalized) {
-        let inline = crate::parser::document::helpers::node_to_inline_string(&normalized);
+        let inline = normalized.to_string_lossy();
         Node::Str(inline, QuoteType::Double, BlockStyle::None)
     } else if let Node::Array(items) = &normalized {
         let mut s = String::from("[");
@@ -75,13 +92,13 @@ pub fn force_key_to_string(key: Node) -> Node {
             if i > 0 {
                 s.push_str(", ");
             }
-            let inline = crate::parser::document::helpers::node_to_inline_string(item);
+            let inline = item.to_string_lossy();
             s.push_str(&inline);
         }
         s.push(']');
         Node::Str(s, QuoteType::Double, BlockStyle::None)
     } else if let Node::Mapping(_) = &normalized {
-        let inline = crate::parser::document::helpers::node_to_inline_string(&normalized);
+        let inline = normalized.to_string_lossy();
         Node::Str(inline, QuoteType::Double, BlockStyle::None)
     } else if let Node::Tagged(inner, tag) = &normalized {
         if matches!(**inner, Node::Str(ref s, _, _) if s.is_empty()) {
@@ -96,7 +113,7 @@ pub fn force_key_to_string(key: Node) -> Node {
             Node::Anchored(Box::new(force_key_to_string((**inner).clone())), name.clone())
         }
     } else {
-        let inline = crate::parser::document::helpers::node_to_inline_string(&normalized);
+        let inline = normalized.to_string_lossy();
         Node::Str(inline, QuoteType::Double, BlockStyle::None)
     }
 }

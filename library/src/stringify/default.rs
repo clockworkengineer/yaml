@@ -99,7 +99,6 @@ fn escape_single(s: &str) -> String {
 /// # Returns
 ///
 /// A new String with normalized line endings
-use crate::nodes::node_utils::normalize_node;
 
 use crate::nodes::node::{Node, QuoteType, BlockStyle};
 

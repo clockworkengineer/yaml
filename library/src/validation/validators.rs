@@ -148,7 +148,7 @@ impl LengthValidator {
 impl Validator for LengthValidator {
     fn validate(&self, node: &Node) -> ValidationResult {
         let length = match node {
-            Node::Str(s, _, _) => s.len(),
+            n if n.as_str().is_some() => n.as_str().unwrap().len(),
             Node::Array(arr) => arr.len(),
             Node::Set(set) => set.len(),
             _ => {
@@ -218,21 +218,20 @@ impl PatternValidator {
 
 impl Validator for PatternValidator {
     fn validate(&self, node: &Node) -> ValidationResult {
-        match node {
-            Node::Str(s, _, _) => {
-                if self.matches(s) {
-                    Ok(())
-                } else {
-                    Err(ValidationError::PatternMismatch {
-                        pattern: self.pattern.clone(),
-                        value: s.clone(),
-                    }.into())
-                }
+        if let Some(s) = node.as_str() {
+            if self.matches(s) {
+                Ok(())
+            } else {
+                Err(ValidationError::PatternMismatch {
+                    pattern: self.pattern.clone(),
+                    value: s.to_string(),
+                }.into())
             }
-            _ => Err(ValidationError::InvalidNodeType {
+        } else {
+            Err(ValidationError::InvalidNodeType {
                 validator: "PatternValidator".to_string(),
                 found: node_type_name(node).to_string(),
-            }.into()),
+            }.into())
         }
     }
 

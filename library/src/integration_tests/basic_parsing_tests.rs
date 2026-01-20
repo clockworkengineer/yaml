@@ -185,16 +185,10 @@ mod tests {
                 if let Node::Mapping(pairs) = &nodes[0] {
                     assert_eq!(pairs.len(), 3);
 
-                    // Check that different string values are parsed correctly
-                    if let Node::Str(content, _, _) = &pairs[0].1 {
-                        assert_eq!(content, "single quoted");
-                    }
-                    if let Node::Str(content, _, _) = &pairs[1].1 {
-                        assert_eq!(content, "double quoted");
-                    }
-                    if let Node::Str(content, _, _) = &pairs[2].1 {
-                        assert_eq!(content, "unquoted");
-                    }
+                    // Check that different string values are parsed correctly using as_str()
+                    assert_eq!(pairs[0].1.as_str(), Some("single quoted"));
+                    assert_eq!(pairs[1].1.as_str(), Some("double quoted"));
+                    assert_eq!(pairs[2].1.as_str(), Some("unquoted"));
                 }
             }
         }

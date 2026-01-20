@@ -3,8 +3,10 @@ pub trait NodeStringConvert {
     /// Convert node to string (lossy)
     fn to_string_lossy(&self) -> alloc::string::String;
     /// Get string value if node is a string
+    #[allow(dead_code)]
     fn as_str(&self) -> Option<&str>;
     /// Clone node as a string node
+    #[allow(dead_code)]
     fn clone_as_string(&self) -> Option<Node>;
 }
 

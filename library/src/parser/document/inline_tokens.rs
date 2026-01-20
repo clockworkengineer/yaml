@@ -1,8 +1,8 @@
+use crate::nodes::node_utils::make_set_node;
 /// Token-based flow collection parsers
 ///
 /// Handles inline YAML collections using tokens instead of character parsing.
 /// This approach provides clearer boundaries and better error handling.
-use crate::parser::document::node_utils::make_set_node;
 
 use crate::nodes::node::Node;
 use crate::parser::directives::DirectiveContext;

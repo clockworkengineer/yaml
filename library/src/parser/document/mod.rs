@@ -17,7 +17,7 @@ mod inline_tokens;
 mod loop_guards;
 mod main_loop;
 mod mapping;
-mod node_utils;
+pub mod node_utils;
 mod parse;
 mod scalar;
 mod sequence;
