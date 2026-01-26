@@ -282,7 +282,7 @@ fn parse_block_scalar(
     }
     Ok(Node::Str(full, QuoteType::Unquoted, style))
 }
-use crate::parser::document::error_builder::{indentation_error, syntax_error};
+use crate::parser::document::error_builder::syntax_error;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
 // Recursion guard removed
@@ -311,11 +311,11 @@ pub(crate) fn parse_scalar_with_tokens(
 // Module: parser/document/scalar.rs
 
 use crate::nodes::node::Node;
-use crate::nodes::node::{BlockStyle, Numeric, QuoteType};
 use crate::parser::directives::DirectiveContext;
 
 #[cfg(test)]
 mod tests {
+        use crate::nodes::node::{QuoteType, BlockStyle};
     use super::*;
     use crate::io::sources::buffer::Buffer;
 
