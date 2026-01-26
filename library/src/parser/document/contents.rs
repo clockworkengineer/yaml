@@ -162,6 +162,11 @@ fn handle_multiple_explicit_keys(
     Ok(parse_multiple_explicit_keys(source, current_indent).map_err(YamlError::from)?)
 }
 
+/// Helper to skip whitespace and comments in the source
+fn skip_trivia(source: &mut dyn ISource) {
+    crate::utils::skip_whitespace_and_comments(source);
+}
+
 /// Parses the contents of a YAML document based on the current character and context.
 ///
 /// Determines the appropriate parsing strategy based on the current character:
@@ -183,18 +188,8 @@ pub fn parse_document_contents(
     directives: &DirectiveContext,
     ctx: &ParsingContext,
 ) -> ParseResult<Node> {
-    // Normalize position to the next significant token
-    crate::utils::skip_whitespace_and_comments(source);
-    // Central, context-aware indentation/whitespace validation hook.
-    // Currently conservative (no-op for valid inputs) but wired in so that
-    // future tightening of rules in `helpers::validate_indentation_and_whitespace`
-    // automatically applies to all document content parsing without further
-    // structural changes.
+    skip_trivia(source);
     crate::parser::document::helpers::validate_indentation_and_whitespace(source, directives, ctx)?;
-    // Use the block head classifier as a centralized, token-based view
-    // of the upcoming construct. On this first integration we largely
-    // mirror the existing character-based branching logic to avoid
-    // behavioral changes while preparing for future tightening.
     let head_kind = helpers::classify_block_head(source, directives, ctx);
 
     // Handle explicit keys first so token-dispatch doesn't overshadow '?'
@@ -217,6 +212,9 @@ pub fn parse_document_contents(
     }
 
     // (debug removed)
+            use crate::parser::token_stream::TokenStream;
+
+            /// Utility for initializing a token stream and restoring source state if needed
     match source.current() {
         Some(c) if c == '-' => {
             // Only treat dash as sequence start if not in flow context or explicit key context
@@ -283,10 +281,7 @@ pub fn parse_document_contents(
             }
         }
         Some(c) if c == '#' => {
-            // Use token stream to skip comments and whitespace uniformly
-            let mut stream =
-                crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-            stream.skip_trivia()?;
+            skip_trivia(source);
             parse_document_contents(source, indent_level, directives, ctx)
         }
         Some(c) if c == '{' => {
