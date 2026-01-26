@@ -683,7 +683,7 @@ impl<'a> Lexer<'a> {
             {
                 // Check if it's alphanumeric which clearly indicates invalid adjacent content
                 if c.is_alphanumeric() {
-                    return Err(crate::parser::document::error_builder::syntax_error(
+                    return Err(error_helpers::syntax_error(
                         self.source,
                         &format!(
                             "YAML syntax error: Invalid content '{}' immediately after '{}' - whitespace or newline required",
@@ -808,8 +808,7 @@ impl<'a> Lexer<'a> {
                     self.source.next();
                 }
                 None => {
-                    #[cfg(debug_assertions)]
-                    eprintln!("DEBUG: Unterminated single-quoted string: reached EOF");
+                    lexer_debug!("Unterminated single-quoted string: reached EOF");
                     return Err(error_helpers::syntax_error(
                         self.source,
                         "YAML compliance error: Unterminated single-quoted string (unexpected EOF)",
@@ -1012,7 +1011,7 @@ impl<'a> Lexer<'a> {
                         }
                         // Invalid escape sequences - reject per YAML 1.2 spec
                         Some(c) => {
-                            return Err(crate::parser::document::error_builder::syntax_error(
+                            return Err(error_helpers::syntax_error(
                                 self.source,
                                 &format!(
                                     "YAML compliance error: Invalid escape sequence '\\{}' in double-quoted string",
@@ -1021,11 +1020,8 @@ impl<'a> Lexer<'a> {
                             ));
                         }
                         None => {
-                            #[cfg(debug_assertions)]
-                            eprintln!(
-                                "DEBUG: Unterminated double-quoted string: reached EOF after escape"
-                            );
-                            return Err(crate::parser::document::error_builder::syntax_error(
+                            lexer_debug!("Unterminated double-quoted string: reached EOF after escape");
+                            return Err(error_helpers::syntax_error(
                                 self.source,
                                 "YAML compliance error: Unterminated double-quoted string (unexpected EOF after escape)",
                             ));
@@ -1052,8 +1048,7 @@ impl<'a> Lexer<'a> {
                     self.source.next();
                 }
                 None => {
-                    #[cfg(debug_assertions)]
-                    eprintln!("DEBUG: Unterminated double-quoted string: reached EOF");
+                    lexer_debug!("Unterminated double-quoted string: reached EOF");
                     return Err(error_helpers::syntax_error(
                         self.source,
                         "YAML compliance error: Unterminated double-quoted string (unexpected EOF)",
