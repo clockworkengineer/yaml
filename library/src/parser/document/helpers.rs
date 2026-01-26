@@ -2,7 +2,6 @@
 mod unit_tests {
     use super::*;
     use crate::io::sources::buffer::Buffer;
-    use crate::parser::directives::DirectiveContext;
 
     #[test]
     fn test_handle_directives_parses_yaml_and_tag() {

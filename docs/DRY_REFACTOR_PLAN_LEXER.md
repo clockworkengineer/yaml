@@ -1,40 +1,59 @@
 # DRY Refactor Plan for lexer.rs
 
 ## Overview
-The `lexer.rs` file implements a YAML lexer with a variety of token types and a large number of methods for tokenization, whitespace handling, and context management. The code is functional but contains several areas where DRY (Don't Repeat Yourself) principles can be applied to reduce duplication, improve maintainability, and clarify intent.
+This plan identifies and addresses code duplication and opportunities for DRY (Don't Repeat Yourself) refactoring in the YAML lexer (`lexer.rs`). The goal is to improve maintainability, reduce bugs, and make future enhancements easier.
 
 ## Key DRY Refactor Opportunities
 
 ### 1. Whitespace and Indentation Handling
-- **Duplication:** There are multiple methods and code blocks for consuming, skipping, and peeking whitespace (e.g., `consume_horizontal_whitespace`, `skip_horizontal_whitespace`, `peek_next_non_whitespace`, and repeated whitespace checks in token scanning).
-- **Plan:** Consolidate whitespace logic into a single utility module or trait. Use helper functions to handle all whitespace-related operations, reducing repeated code in token scanning and indentation logic.
+- **Duplication:** Whitespace and indentation logic is scattered across multiple methods.
+- **Plan:** Centralize whitespace and indentation helpers in a utility module (e.g., `utils/whitespace.rs`).
 
 ### 2. Token Scanning Patterns
-- **Duplication:** The scanning of tags, anchors, aliases, and scalars follows similar patterns: consume a leading character, collect content until a delimiter, handle errors, and return a token. Each has its own method with similar structure.
-- **Plan:** Abstract common scanning logic into a generic function or macro that takes the leading character, delimiter set, and token constructor as parameters. Specialize only where necessary (e.g., for escape sequences in quoted strings).
+- **Duplication:** Anchor, alias, and tag scanning share similar tokenization logic.
+- **Plan:** Abstract common token scanning logic into a generic helper (e.g., `utils/token_scan.rs`).
 
-### 3. Error Handling
-- **Duplication:** Error construction and reporting is repeated in many places, especially for syntax errors and forbidden patterns.
-- **Plan:** Create helper functions or macros for common error patterns, such as forbidden indentation, unterminated strings, and invalid escape sequences. This will reduce boilerplate and centralize error message formatting.
+### 3. Error Handling and Logging
+- **Duplication:** Error construction and debug output are repeated in many places.
+- **Plan:** Centralize error construction in a helper (e.g., `utils/error_helpers.rs`). Use a macro for debug/log output to avoid repeated feature flag checks and string formatting.
 
-### 4. Flow Context and Indentation Checks
-- **Duplication:** Logic for handling flow context (e.g., in `emit_indentation_token_if_any`, `scan_indentation`, and token scanning) is scattered and sometimes repeated.
-- **Plan:** Encapsulate flow context checks and indentation validation in dedicated helper functions. Use clear, descriptive names to clarify when flow context affects behavior.
-
-### 5. Token Emission Logging
+### 4. Token Emission Logging
 - **Duplication:** Logging for token emission is repeated with similar patterns and feature flags.
 - **Plan:** Use a macro or helper function for conditional logging, reducing repeated `#[cfg(feature = "debug-trace")]` blocks and string formatting.
 
-### 6. Test Utilities
+### 5. Test Utilities
 - **Duplication:** Test setup for creating a buffer and lexer is repeated in each test.
 - **Plan:** Move common test setup into a test utility function or module to reduce repetition in test cases.
 
-## Next Steps
-1. Refactor whitespace and indentation handling into shared helpers.
-2. Abstract common token scanning logic.
-3. Centralize error handling and logging.
-4. Encapsulate flow context logic.
-5. Refactor test setup for DRYness.
+## Concrete Refactor Steps
+
+1. **Centralize whitespace/indentation helpers**
+    - Move all whitespace and indentation logic to `utils/whitespace.rs`.
+    - Replace inlined logic in `lexer.rs` with calls to these helpers.
+
+2. **Abstract common token scanning logic**
+    - Create a generic function in `utils/token_scan.rs` for scanning anchors, aliases, and tags.
+    - Refactor `scan_anchor`, `scan_alias`, and `scan_tag` to use this helper.
+
+3. **Centralize error handling and logging**
+    - Move error construction to `utils/error_helpers.rs`.
+    - Replace direct error construction in `lexer.rs` with calls to these helpers.
+    - Create a macro for debug/log output (e.g., `lexer_debug!`) and use it for all token emission and debug output.
+
+4. **Deduplicate token emission logging**
+    - Replace all repeated token emission logging with the new macro.
+    - Remove redundant `#[cfg(feature = "debug-trace")]` blocks.
+
+5. **Refactor test utilities**
+    - Move repeated test setup code into a shared test helper module.
+    - Update all lexer tests to use the shared setup.
+
+## Expected Outcomes
+- Reduced code duplication and improved maintainability in `lexer.rs`.
+- Centralized, reusable helpers for whitespace, token scanning, and error handling.
+- Consistent and DRY logging and error reporting.
+- Cleaner, more maintainable test code.
 
 ---
-This plan provides a roadmap for refactoring `lexer.rs` to follow DRY principles, improving maintainability and clarity.
+
+*Generated by GitHub Copilot on 2026-01-26*

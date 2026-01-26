@@ -1,3 +1,4 @@
+
 //! Example demonstrating performance measurement and optimization utilities
 //!
 //! Shows how to use DocumentStats, Timer, and Profiler for analyzing

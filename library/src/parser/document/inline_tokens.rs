@@ -65,7 +65,6 @@ macro_rules! syntax_err {
         crate::parser::document::error_builder::syntax_error($stream, $msg)
     };
 }
-use crate::parser::document::error_builder::syntax_error;
 use crate::parser::document::tokens::value::parse_value_with_tokens;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;

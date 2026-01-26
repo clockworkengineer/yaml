@@ -1,7 +1,6 @@
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::nodes::node::Node::Document;
-use crate::parser::directives::parse_directives;
 
 use crate::parser::document::helpers::{self, parse_document_markers, parse_document_end_marker, skip_whitespace_and_comments, to_yaml_error, handle_directives};
 use crate::parser::document::main_loop::parse_document;

@@ -6,13 +6,13 @@
 
 use crate::constants::*;
 use crate::io::traits::ISource;
+use crate::parser::utils::error_helpers;
 use crate::parser::utils::token_scan;
 use crate::parser::utils::whitespace;
-use crate::parser::utils::error_helpers;
 
 #[cfg(feature = "debug-trace")]
 #[inline]
-fn lexer_log(msg: String) {
+pub fn lexer_log(msg: String) {
     #[cfg(feature = "std")]
     {
         if let Ok(v) = std::env::var("YAML_TRACE_LEXER") {
@@ -170,8 +170,7 @@ impl<'a> Lexer<'a> {
         let ch = match self.source.current() {
             Some(c) => c,
             None => {
-                #[cfg(feature = "debug-trace")]
-                lexer_log("Emitting Token::Eof".to_string());
+                lexer_debug!("Emitting Token::Eof");
                 return Ok(Some(Token::Eof));
             }
         };
@@ -195,13 +194,11 @@ impl<'a> Lexer<'a> {
                 Ok(Some(Token::Comment(comment)))
             }
             '!' => {
-                #[cfg(feature = "debug-trace")]
-                lexer_log("Emitting Token::Tag".to_string());
+                lexer_debug!("Emitting Token::Tag");
                 Ok(Some(self.scan_tag()?))
             }
             '&' => {
-                #[cfg(feature = "debug-trace")]
-                lexer_log("Emitting Token::Anchor".to_string());
+                lexer_debug!("Emitting Token::Anchor");
                 Ok(Some(self.scan_anchor()?))
             }
             CHAR_ASTERISK => {
@@ -232,25 +229,21 @@ impl<'a> Lexer<'a> {
                 );
 
                 if treat_as_alias {
-                    #[cfg(feature = "debug-trace")]
-                    lexer_log("Emitting Token::Alias".to_string());
+                    lexer_debug!("Emitting Token::Alias");
                     Ok(Some(self.scan_alias()?))
                 } else {
-                    #[cfg(feature = "debug-trace")]
-                    lexer_log("Emitting Token::Plain (leading '*')".to_string());
+                    lexer_debug!("Emitting Token::Plain (leading '*')");
                     Ok(Some(self.scan_plain_scalar()?))
                 }
             }
             CHAR_LBRACE => {
                 self.source.next();
                 self.last_was_linebreak = false;
-                #[cfg(feature = "debug-trace")]
-                lexer_log("Emitting Token::FlowMappingStart".to_string());
+                lexer_debug!("Emitting Token::FlowMappingStart");
                 Ok(Some(Token::FlowMappingStart))
             }
             CHAR_RBRACE => {
-                #[cfg(feature = "debug-trace")]
-                lexer_log("Emitting Token::FlowMappingEnd".to_string());
+                lexer_debug!("Emitting Token::FlowMappingEnd");
                 self.source.next();
                 self.validate_post_flow_closer('}')?;
                 self.last_was_linebreak = false;
@@ -438,7 +431,7 @@ impl<'a> Lexer<'a> {
                 break;
             }
         }
-                        }
+    }
 
     /// Emit an indentation token if applicable at line start.
     /// Returns Ok(Some(Token)) if an indent/dedent should be emitted, Ok(None) otherwise.
@@ -517,15 +510,13 @@ impl<'a> Lexer<'a> {
             let indent = self.scan_indentation(self.in_flow)?;
             self.at_line_start = false;
             self.last_indent = indent;
-            #[cfg(feature = "debug-trace")]
-            lexer_log(format!("Emitting Token::Indent({})", indent));
+            lexer_debug!("Emitting Token::Indent({})", indent);
             return Ok(Some(Token::Indent(indent)));
         } else if self.last_indent > 0 {
             // No leading space/tab, but previous indent was > 0: emit Indent(0) to signal dedent
             self.at_line_start = false;
             self.last_indent = 0;
-            #[cfg(feature = "debug-trace")]
-            lexer_log("Emitting Token::Indent(0) (dedent to top level)".to_string());
+            lexer_debug!("Emitting Token::Indent(0) (dedent to top level)");
             return Ok(Some(Token::Indent(0)));
         }
         Ok(None)
@@ -588,21 +579,13 @@ impl<'a> Lexer<'a> {
     /// If in flow context, suppress newline tokens and continue scanning.
     fn handle_newline(&mut self, is_cr: bool) -> Result<Option<Token>, crate::error::YamlError> {
         if is_cr {
-            #[cfg(feature = "debug-trace")]
-            lexer_log(format!(
-                "Emitting Token::Newline (CR) (in_flow={})",
-                self.in_flow
-            ));
+            lexer_debug!("Emitting Token::Newline (CR) (in_flow={})", self.in_flow);
             self.source.next();
             if self.source.current() == Some(CHAR_NEWLINE) {
                 self.source.next();
             }
         } else {
-            #[cfg(feature = "debug-trace")]
-            lexer_log(format!(
-                "Emitting Token::Newline (in_flow={})",
-                self.in_flow
-            ));
+            lexer_debug!("Emitting Token::Newline (in_flow={})", self.in_flow);
             self.source.next();
         }
 
@@ -962,12 +945,10 @@ impl<'a> Lexer<'a> {
                                         self.source.next();
                                     }
                                     _ => {
-                                        return Err(
-                                            error_helpers::syntax_error(
-                                                self.source,
-                                                "YAML compliance error: Invalid \\x escape sequence, expected 2 hex digits",
-                                            ),
-                                        );
+                                        return Err(error_helpers::syntax_error(
+                                            self.source,
+                                            "YAML compliance error: Invalid \\x escape sequence, expected 2 hex digits",
+                                        ));
                                     }
                                 }
                             }
@@ -985,12 +966,10 @@ impl<'a> Lexer<'a> {
                                         self.source.next();
                                     }
                                     _ => {
-                                        return Err(
-                                            error_helpers::syntax_error(
-                                                self.source,
-                                                "YAML compliance error: Invalid \\u escape sequence, expected 4 hex digits",
-                                            ),
-                                        );
+                                        return Err(error_helpers::syntax_error(
+                                            self.source,
+                                            "YAML compliance error: Invalid \\u escape sequence, expected 4 hex digits",
+                                        ));
                                     }
                                 }
                             }
@@ -998,15 +977,13 @@ impl<'a> Lexer<'a> {
                             match char::from_u32(code) {
                                 Some(ch) => content.push(ch),
                                 None => {
-                                    return Err(
-                                        error_helpers::syntax_error(
-                                            self.source,
-                                            &format!(
-                                                "YAML compliance error: Invalid unicode codepoint U+{:04X}",
-                                                code
-                                            ),
+                                    return Err(error_helpers::syntax_error(
+                                        self.source,
+                                        &format!(
+                                            "YAML compliance error: Invalid unicode codepoint U+{:04X}",
+                                            code
                                         ),
-                                    );
+                                    ));
                                 }
                             }
                         }
@@ -1021,12 +998,10 @@ impl<'a> Lexer<'a> {
                                         self.source.next();
                                     }
                                     _ => {
-                                        return Err(
-                                            error_helpers::syntax_error(
-                                                self.source,
-                                                "YAML compliance error: Invalid \\U escape sequence, expected 8 hex digits",
-                                            ),
-                                        );
+                                        return Err(error_helpers::syntax_error(
+                                            self.source,
+                                            "YAML compliance error: Invalid \\U escape sequence, expected 8 hex digits",
+                                        ));
                                     }
                                 }
                             }
@@ -1034,15 +1009,13 @@ impl<'a> Lexer<'a> {
                             match char::from_u32(code) {
                                 Some(ch) => content.push(ch),
                                 None => {
-                                    return Err(
-                                        error_helpers::syntax_error(
-                                            self.source,
-                                            &format!(
-                                                "YAML compliance error: Invalid unicode codepoint U+{:08X}",
-                                                code
-                                            ),
+                                    return Err(error_helpers::syntax_error(
+                                        self.source,
+                                        &format!(
+                                            "YAML compliance error: Invalid unicode codepoint U+{:08X}",
+                                            code
                                         ),
-                                    );
+                                    ));
                                 }
                             }
                         }
@@ -1076,10 +1049,10 @@ impl<'a> Lexer<'a> {
                     // can report a clear syntax error instead of
                     // silently treating it as a valid comment.
                     if let Some(CHAR_HASH) = self.source.current() {
-                            return Err(error_helpers::syntax_error(
-                                self.source,
-                                "YAML syntax error: comment must be separated from quoted scalar by whitespace",
-                            ));
+                        return Err(error_helpers::syntax_error(
+                            self.source,
+                            "YAML syntax error: comment must be separated from quoted scalar by whitespace",
+                        ));
                     }
                     break;
                 }
