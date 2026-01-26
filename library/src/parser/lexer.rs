@@ -131,11 +131,11 @@ pub struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-        /// Helper to log and return a token in a DRY way
-        fn emit_token(&self, token: Token) -> Option<Token> {
-            lexer_debug!("Emitting Token::{:?}", token);
-            Some(token)
-        }
+    /// Helper to log and return a token in a DRY way
+    fn emit_token(&self, token: Token) -> Option<Token> {
+        lexer_debug!("Emitting Token::{:?}", token);
+        Some(token)
+    }
     /// Create a new lexer wrapping a character source
     pub fn new(source: &'a mut dyn ISource, in_flow: bool) -> Self {
         Lexer {
@@ -224,13 +224,13 @@ impl<'a> Lexer<'a> {
                 let result = Some(tok.clone());
                 lexer_debug!("Emitting Token::{:?}", tok);
                 Ok(result)
-            },
+            }
             '&' => {
                 let tok = self.scan_anchor()?;
                 let result = Some(tok.clone());
                 lexer_debug!("Emitting Token::{:?}", tok);
                 Ok(result)
-            },
+            }
             CHAR_ASTERISK => {
                 // Disambiguate between an alias token (e.g. "*anchor") and
                 // plain scalar content starting with '*', such as lines inside
@@ -1031,7 +1031,9 @@ impl<'a> Lexer<'a> {
                             ));
                         }
                         None => {
-                            lexer_debug!("Unterminated double-quoted string: reached EOF after escape");
+                            lexer_debug!(
+                                "Unterminated double-quoted string: reached EOF after escape"
+                            );
                             return Err(error_helpers::syntax_error(
                                 self.source,
                                 "YAML compliance error: Unterminated double-quoted string (unexpected EOF after escape)",

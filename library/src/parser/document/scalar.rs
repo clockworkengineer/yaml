@@ -315,9 +315,9 @@ use crate::parser::directives::DirectiveContext;
 
 #[cfg(test)]
 mod tests {
-        use crate::nodes::node::{QuoteType, BlockStyle};
     use super::*;
     use crate::io::sources::buffer::Buffer;
+    use crate::nodes::node::{BlockStyle, QuoteType};
 
     #[test]
     fn test_block_literal_basic_via_tokens() {

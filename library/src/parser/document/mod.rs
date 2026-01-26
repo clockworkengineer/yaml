@@ -7,7 +7,6 @@
 ///
 mod anchors;
 mod block_scalar;
-mod bridge;
 mod contents;
 pub mod context;
 pub mod error_builder;
