@@ -1,14 +1,22 @@
+/// Helper to construct a Node::Array from items
+fn make_array_node(items: Vec<Node>) -> Node {
+    Node::Array(items)
+}
+
+/// Helper to construct a Node::Mapping from pairs
+fn make_mapping_node(pairs: Vec<(Node, Node)>) -> Node {
+    Node::Mapping(pairs)
+}
 /// Helper to skip whitespace and comments in the token stream
 fn skip_inline_trivia(stream: &mut TokenStream) -> crate::parser::ParseResult<()> {
     stream.skip_trivia()
 }
-use crate::nodes::node_utils::make_set_node;
 /// Token-based flow collection parsers
 ///
 /// Handles inline YAML collections using tokens instead of character parsing.
 /// This approach provides clearer boundaries and better error handling.
-
 use crate::nodes::node::Node;
+use crate::nodes::node_utils::make_set_node;
 use crate::parser::directives::DirectiveContext;
 /// Macro for common syntax error construction
 macro_rules! syntax_err {
@@ -227,7 +235,7 @@ pub fn parse_inline_sequence_with_tokens(
             }
         }
     }
-    Ok(Node::Array(items))
+    Ok(make_array_node(items))
 }
 
 /// Parse a flow (inline) mapping using tokens
@@ -446,10 +454,10 @@ pub fn parse_inline_mapping_with_tokens(
             Ok(make_set_node(set_items))
         } else {
             // Fallback to mapping for compatibility when any value isn't None
-            Ok(Node::Mapping(pairs))
+            Ok(make_mapping_node(pairs))
         }
     } else {
-        Ok(Node::Mapping(pairs))
+        Ok(make_mapping_node(pairs))
     }
 }
 
