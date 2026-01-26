@@ -1,42 +1,70 @@
-# Refactoring Plan for inline_tokens.rs (DRY Principles)
+# DRY Refactor Plan for lexer.rs
 
-## Objective
-Refactor `inline_tokens.rs` to eliminate code duplication, improve maintainability, and adhere to DRY (Don't Repeat Yourself) principles.
+## Overview
+The lexer.rs file contains the implementation of the YAML lexer, responsible for tokenizing YAML input. The file is relatively large and contains several methods with overlapping logic, repeated patterns, and opportunities for abstraction. Applying DRY (Don't Repeat Yourself) principles will improve maintainability, reduce bugs, and make the codebase easier to extend.
 
-## Analysis (based on context)
-- The file likely contains parsing logic for inline YAML constructs (mappings, sequences, etc.).
-- Common patterns in such files include repeated token handling, error construction, and node creation.
-- Helper functions/macros (e.g., for error handling, token dispatch, node construction) may be scattered or duplicated.
+## Key DRY Issues Identified
+1. **Whitespace and Indentation Handling**
+	- Multiple methods handle whitespace, indentation, and tab/space logic with similar code blocks.
+	- The logic for peeking ahead, saving/restoring state, and consuming whitespace is repeated.
 
-## Refactoring Plan
+2. **Token Scanning Patterns**
+	- Methods for scanning tags, anchors, aliases, and scalars share similar character consumption and termination logic.
+	- Error handling for empty names and invalid characters is duplicated.
 
-### 1. Identify Duplicated Logic
-- Review all parsing functions for repeated code blocks (e.g., token matching, error handling, node construction).
-- List all utility/helper functions/macros that are duplicated or could be generalized.
+3. **Flow Context and Newline Handling**
+	- Flow context checks and newline suppression logic are scattered and repeated.
+	- The handling of line breaks, especially in flow context, is similar across several methods.
 
-### 2. Centralize Error Handling
-- Use a single macro or function for error construction (similar to `parse_err!` in contents.rs).
-- Ensure all error paths use this centralized approach.
+4. **Escape Sequence Parsing**
+	- The double-quoted scalar scanner contains a large match block for escape sequences, which could be factored out.
 
-### 3. Abstract Token Dispatch
-- Create a generic token dispatch function for handling token streams and delegating to appropriate parsers.
-- Replace repeated token matching logic with calls to this function.
+5. **State Management**
+	- Saving and restoring lexer state is performed in several places with similar patterns.
 
-### 4. Generalize Node Construction
-- If node creation (e.g., for mappings, sequences) is repeated, abstract into helper functions.
-- Use these helpers across all parsing functions.
+## Concrete Refactor Plan
 
-### 5. Consolidate Trivia Skipping
-- Use a single helper for skipping whitespace/comments before parsing tokens.
-- Ensure all entry points call this helper.
+### 1. Abstract Whitespace and Indentation Logic
+- Create utility methods for consuming horizontal whitespace, peeking next non-whitespace character, and handling indentation.
+- Replace repeated whitespace/tab/space handling with calls to these utilities.
 
-### 6. Modularize Parsing Functions
-- Split large parsing functions into smaller, reusable components.
-- Group related helpers (e.g., for inline mapping/sequence) together.
+### 2. Unify Token Scanning Patterns
+- Create a generic method for scanning a token until a set of terminator characters is reached.
+- Parameterize the method for tag, anchor, alias, and plain scalar scanning.
+- Centralize error handling for empty names and invalid characters.
 
-### 7. Documentation and Comments
-- Add doc comments to all helpers and macros.
-- Document the refactored structure and rationale for changes.
+### 3. Centralize Flow Context and Newline Handling
+- Abstract flow context checks and newline suppression into helper methods.
+- Use these helpers in all relevant places (e.g., handle_newline, scan_plain_scalar).
+
+### 4. Extract Escape Sequence Parsing
+- Move escape sequence parsing logic from scan_double_quoted into a dedicated method.
+- This method should handle all escape types and error reporting.
+
+### 5. Consolidate State Management
+- Provide utility methods for saving/restoring state and peeking ahead.
+- Use these consistently instead of duplicating the logic.
+
+### 6. Improve Test Coverage for Refactored Utilities
+- Add or update unit tests to cover the new utility methods and ensure no regressions.
+
+## Refactor Steps
+1. Identify and extract all whitespace/indentation handling into utility functions.
+2. Refactor tag, anchor, alias, and scalar scanning to use a shared scanning utility.
+3. Move escape sequence parsing to a dedicated function and update scan_double_quoted.
+4. Replace repeated state management code with utility calls.
+5. Update all call sites to use the new abstractions.
+6. Run and expand tests to verify correctness.
+
+## Expected Benefits
+- Reduced code duplication and improved clarity.
+- Easier to maintain and extend lexer logic.
+- Fewer bugs due to centralized error handling and state management.
+
+---
+
+**Author:** GitHub Copilot
+**Date:** 2026-01-26
 
 ### 8. Testing and Validation
 - Ensure all existing tests pass after refactoring.

@@ -400,8 +400,23 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    /// Skip horizontal whitespace (space and tab)
-    fn skip_horizontal_whitespace(&mut self) {
+    /// Utility: Consume horizontal whitespace (space and tab) and return count
+    fn consume_horizontal_whitespace(&mut self) -> usize {
+        let mut count = 0;
+        while let Some(ch) = self.source.current() {
+            if ch == CHAR_SPACE || ch == CHAR_TAB {
+                self.source.next();
+                count += 1;
+            } else {
+                break;
+            }
+        }
+        count
+    }
+
+    /// Utility: Peek next non-whitespace character without consuming
+    fn peek_next_non_whitespace(&mut self) -> Option<char> {
+        let state = self.source.save_state();
         while let Some(ch) = self.source.current() {
             if ch == CHAR_SPACE || ch == CHAR_TAB {
                 self.source.next();
@@ -409,6 +424,14 @@ impl<'a> Lexer<'a> {
                 break;
             }
         }
+        let result = self.source.current();
+        self.source.restore_state(state);
+        result
+    }
+
+    /// Skip horizontal whitespace (space and tab)
+    fn skip_horizontal_whitespace(&mut self) {
+        self.consume_horizontal_whitespace();
     }
 
     /// Emit an indentation token if applicable at line start.
@@ -513,80 +536,22 @@ impl<'a> Lexer<'a> {
                 count += 1;
                 self.source.next();
             } else if ch == CHAR_TAB {
-                // Special-case: a leading tab at column 0 in block
-                // context that directly precedes a flow collection
-                // delimiter ("[", "]", "{", or "}") should be
-                // treated as flow whitespace rather than indentation.
-                // This matches YAML test 6CA3, where a tab is used
-                // before a flow sequence start/end.
+                // Special-case: a leading tab at column 0 in block context that directly precedes a flow collection delimiter
                 if !in_flow && count == 0 && first_char_is_tab {
-                    let state = self.source.save_state();
-                    // Temporarily consume spaces/tabs to inspect the
-                    // next non-whitespace character on this line.
-                    while let Some(c) = self.source.current() {
-                        if c == CHAR_SPACE || c == CHAR_TAB {
-                            self.source.next();
-                        } else {
-                            break;
-                        }
-                    }
-                    let next_non_ws = self.source.current();
-                    self.source.restore_state(state);
-
-                    if matches!(
-                        next_non_ws,
-                        Some(CHAR_LBRACKET)
-                            | Some(CHAR_RBRACKET)
-                            | Some(CHAR_LBRACE)
-                            | Some(CHAR_RBRACE)
-                    ) {
-                        // Consume the leading tab as horizontal
-                        // whitespace and do not contribute to
-                        // indentation level.
+                    if matches!(self.peek_next_non_whitespace(), Some(CHAR_LBRACKET) | Some(CHAR_RBRACKET) | Some(CHAR_LBRACE) | Some(CHAR_RBRACE)) {
                         self.source.next();
                         continue;
                     }
                 }
-                // Tabs are forbidden for indentation in YAML block context
-                // but allowed as whitespace in flow context (inside [], {}).
-                // Flow-specific indentation checks (e.g., tabs immediately
-                // after a newline inside a flow collection) are handled in
-                // `emit_indentation_token_if_any`.
                 if in_flow {
-                    // In flow context, treat tabs here as horizontal
-                    // whitespace and do not contribute to indentation level.
                     self.source.next();
                     continue;
                 }
-
-                // Check if this is a tab at the very start (primary indentation)
                 if count == 0 && first_char_is_tab {
                     tab_at_start = true;
                 }
-
-                // In block context, reject tabs as primary indentation
-                // (tab at column 0 or before any spaces), unless the line
-                // contains only whitespace (blank line). Check if there's
-                // any non-whitespace content after the tabs/spaces.
                 if tab_at_start {
-                    let state = self.source.save_state();
-                    // Consume all remaining spaces/tabs on this line
-                    while let Some(c) = self.source.current() {
-                        if c == CHAR_SPACE || c == CHAR_TAB {
-                            self.source.next();
-                        } else {
-                            break;
-                        }
-                    }
-                    let next_non_ws = self.source.current();
-                    self.source.restore_state(state);
-
-                    // If the line is blank (only whitespace before newline/EOF),
-                    // allow the tabs. Otherwise, reject them as indentation.
-                    if !matches!(
-                        next_non_ws,
-                        Some(CHAR_NEWLINE) | Some(CHAR_CARRIAGE_RETURN) | None
-                    ) {
+                    if !matches!(self.peek_next_non_whitespace(), Some(CHAR_NEWLINE) | Some(CHAR_CARRIAGE_RETURN) | None) {
                         return Err(crate::parser::document::error_builder::forbidden_error(
                             self.source,
                             "Tabs",
@@ -594,17 +559,12 @@ impl<'a> Lexer<'a> {
                         ));
                     }
                 }
-
-                // Tab after spaces: allow it through (e.g., in block scalar
-                // content). Treat tab as advancing by 1 for indent counting
-                // purposes.
                 count += 1;
                 self.source.next();
             } else {
                 break;
             }
         }
-        // Indentation consumed; reset linebreak flag
         self.last_was_linebreak = false;
         Ok(count)
     }
