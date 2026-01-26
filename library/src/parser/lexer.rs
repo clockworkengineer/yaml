@@ -6,6 +6,7 @@
 
 use crate::constants::*;
 use crate::io::traits::ISource;
+use crate::parser::utils::whitespace;
 
 #[cfg(feature = "debug-trace")]
 #[inline]
@@ -402,16 +403,13 @@ impl<'a> Lexer<'a> {
 
     /// Utility: Consume horizontal whitespace (space and tab) and return count
     fn consume_horizontal_whitespace(&mut self) -> usize {
-        let mut count = 0;
-        while let Some(ch) = self.source.current() {
-            if ch == CHAR_SPACE || ch == CHAR_TAB {
+        whitespace::consume_horizontal_whitespace(|| {
+            let ch = self.source.current();
+            if ch == Some(CHAR_SPACE) || ch == Some(CHAR_TAB) {
                 self.source.next();
-                count += 1;
-            } else {
-                break;
             }
-        }
-        count
+            ch
+        })
     }
 
     /// Utility: Peek next non-whitespace character without consuming
@@ -431,7 +429,13 @@ impl<'a> Lexer<'a> {
 
     /// Skip horizontal whitespace (space and tab)
     fn skip_horizontal_whitespace(&mut self) {
-        self.consume_horizontal_whitespace();
+        whitespace::skip_horizontal_whitespace(|| {
+            let ch = self.source.current();
+            if ch == Some(CHAR_SPACE) || ch == Some(CHAR_TAB) {
+                self.source.next();
+            }
+            ch
+        });
     }
 
     /// Emit an indentation token if applicable at line start.
@@ -538,7 +542,13 @@ impl<'a> Lexer<'a> {
             } else if ch == CHAR_TAB {
                 // Special-case: a leading tab at column 0 in block context that directly precedes a flow collection delimiter
                 if !in_flow && count == 0 && first_char_is_tab {
-                    if matches!(self.peek_next_non_whitespace(), Some(CHAR_LBRACKET) | Some(CHAR_RBRACKET) | Some(CHAR_LBRACE) | Some(CHAR_RBRACE)) {
+                    if matches!(
+                        self.peek_next_non_whitespace(),
+                        Some(CHAR_LBRACKET)
+                            | Some(CHAR_RBRACKET)
+                            | Some(CHAR_LBRACE)
+                            | Some(CHAR_RBRACE)
+                    ) {
                         self.source.next();
                         continue;
                     }
@@ -551,7 +561,10 @@ impl<'a> Lexer<'a> {
                     tab_at_start = true;
                 }
                 if tab_at_start {
-                    if !matches!(self.peek_next_non_whitespace(), Some(CHAR_NEWLINE) | Some(CHAR_CARRIAGE_RETURN) | None) {
+                    if !matches!(
+                        self.peek_next_non_whitespace(),
+                        Some(CHAR_NEWLINE) | Some(CHAR_CARRIAGE_RETURN) | None
+                    ) {
                         return Err(crate::parser::document::error_builder::forbidden_error(
                             self.source,
                             "Tabs",

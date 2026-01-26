@@ -3,4 +3,5 @@
 pub mod visit;
 pub mod indentation;
 pub mod comments;
+pub mod whitespace;
 
