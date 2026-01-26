@@ -15,6 +15,7 @@ stringify = ["alloc"]
 format-converters = ["stringify"]
 file-io = ["std"]
 debug-trace = []
+debug-anchors = []
 
 [dependencies]
 base64 = "0.22.1"

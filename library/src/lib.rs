@@ -1,4 +1,6 @@
 #[macro_use]
+pub mod anchors_debug_macro;
+#[macro_use]
 mod macros;
 
 /// YAML_lib - A lightweight, modular YAML toolkit for Rust

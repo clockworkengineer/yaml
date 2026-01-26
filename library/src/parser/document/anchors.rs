@@ -1,3 +1,4 @@
+use crate::anchors_debug;
 // Module: parser/document/anchors.rs
 
 use crate::nodes::node::Node;
@@ -29,8 +30,10 @@ pub(crate) fn collect_anchors(
     anchors_helpers::traverse_with_error(node, |n| {
         if let Node::Anchored(inner, name) = n {
             if name.trim().is_empty() {
+                anchors_debug!("Empty anchor name encountered");
                 return Some(error_helpers::empty_anchor_name().to_string());
             }
+            anchors_debug!("Collecting anchor: {}", name);
             // According to YAML spec, later anchor definitions override earlier ones
             anchors.insert(name.clone(), (**inner).clone());
         }
@@ -60,12 +63,14 @@ pub(crate) fn replace_aliases(
     let mut err: Option<crate::error::YamlError> = None;
     let mut replacer = |n: &mut Node| match n {
         Node::Alias(name) => {
+            anchors_debug!("Replacing alias: {}", name);
             match anchors_helpers2::lookup_anchor(anchors, name) {
                 Ok(found) => *n = found.clone(),
                 Err(e) => err = Some(e),
             }
         }
         Node::Anchored(inner, _name) => {
+            anchors_debug!("Replacing anchored node");
             let replacement = (**inner).clone();
             *n = replacement;
         }
@@ -97,6 +102,7 @@ pub(crate) fn expand_merge_keys(
     let mut err: Option<crate::error::YamlError> = None;
     let mut expander = |n: &mut Node| {
         if let Node::Mapping(pairs) = n {
+            anchors_debug!("Expanding merge keys in mapping");
             let mut combined: Vec<(Node, Node)> = Vec::new();
             let snapshot = pairs.clone();
             let mut i = 0usize;
@@ -108,6 +114,7 @@ pub(crate) fn expand_merge_keys(
                         let mut expanded_pairs: Vec<(Node, Node)> = Vec::new();
                         match &v {
                             Node::Alias(name) => {
+                                anchors_debug!("Expanding merge alias: {}", name);
                                 match anchors_helpers2::lookup_anchor(anchors, name)
                                     .and_then(|src| anchors_helpers2::as_mapping(src, name)) {
                                     Ok(src_pairs) => expanded_pairs.extend(src_pairs.clone()),
@@ -118,9 +125,11 @@ pub(crate) fn expand_merge_keys(
                                 }
                             }
                             Node::Array(items) => {
+                                anchors_debug!("Expanding merge array with {} items", items.len());
                                 for it in items.iter() {
                                     match it {
                                         Node::Alias(name) => {
+                                            anchors_debug!("Expanding merge alias in array: {}", name);
                                             match anchors_helpers2::lookup_anchor(anchors, name)
                                                 .and_then(|src| anchors_helpers2::as_mapping(src, name)) {
                                                 Ok(src_pairs) => expanded_pairs.extend(src_pairs.clone()),
@@ -131,6 +140,7 @@ pub(crate) fn expand_merge_keys(
                                             }
                                         }
                                         Node::Mapping(src_pairs) => {
+                                            anchors_debug!("Expanding merge mapping in array");
                                             expanded_pairs.extend(src_pairs.clone());
                                         }
                                         _ => {
