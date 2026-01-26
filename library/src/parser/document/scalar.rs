@@ -3,9 +3,13 @@ fn parse_single_quoted_scalar(
     stream: &mut TokenStream,
     s: &str,
 ) -> crate::parser::ParseResult<Node> {
-    use crate::nodes::node::{Node, QuoteType, BlockStyle};
+    use crate::nodes::node::{BlockStyle, Node, QuoteType};
     stream.next()?;
-    Ok(Node::Str(s.to_string(), QuoteType::Single, BlockStyle::None))
+    Ok(Node::Str(
+        s.to_string(),
+        QuoteType::Single,
+        BlockStyle::None,
+    ))
 }
 
 // Extracted double-quoted scalar parsing logic
@@ -13,7 +17,7 @@ fn parse_double_quoted_scalar(
     stream: &mut TokenStream,
     s: &str,
 ) -> crate::parser::ParseResult<Node> {
-    use crate::nodes::node::{Node, QuoteType, BlockStyle};
+    use crate::nodes::node::{BlockStyle, Node, QuoteType};
     stream.next()?;
     let unescaped = crate::utils::unescape_double_quoted(s);
     Ok(Node::Str(unescaped, QuoteType::Double, BlockStyle::None))
@@ -24,8 +28,8 @@ fn parse_plain_scalar(
     s: &str,
     directives: &DirectiveContext,
 ) -> crate::parser::ParseResult<Node> {
+    use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
     use crate::parser::lexer::Token;
-    use crate::nodes::node::{Node, BlockStyle, QuoteType, Numeric};
     stream.next()?;
     let mut accumulated = s.to_string();
     loop {
@@ -59,15 +63,20 @@ fn parse_plain_scalar(
         "null" | "~" => Ok(Node::None),
         "true" => Ok(Node::Boolean(true)),
         "false" => Ok(Node::Boolean(false)),
-        v if directives.is_yaml_11() && matches!(v, "yes" | "Yes" | "YES" | "on" | "On" | "ON") => Ok(Node::Boolean(true)),
-        v if directives.is_yaml_11() && matches!(v, "no" | "No" | "NO" | "off" | "Off" | "OFF") => Ok(Node::Boolean(false)),
+        v if directives.is_yaml_11() && matches!(v, "yes" | "Yes" | "YES" | "on" | "On" | "ON") => {
+            Ok(Node::Boolean(true))
+        }
+        v if directives.is_yaml_11() && matches!(v, "no" | "No" | "NO" | "off" | "Off" | "OFF") => {
+            Ok(Node::Boolean(false))
+        }
         v => {
             if v.starts_with('0') && v.len() > 1 {
                 if v.starts_with("0o") || v.starts_with("0O") {
                     if let Ok(i) = i64::from_str_radix(&v[2..], 8) {
                         return Ok(Node::Number(Numeric::Integer(i)));
                     }
-                } else if directives.is_yaml_11() && v.chars().skip(1).all(|c| c >= '0' && c <= '7') {
+                } else if directives.is_yaml_11() && v.chars().skip(1).all(|c| c >= '0' && c <= '7')
+                {
                     if let Ok(i) = i64::from_str_radix(&v[1..], 8) {
                         return Ok(Node::Number(Numeric::Integer(i)));
                     }
@@ -78,7 +87,11 @@ fn parse_plain_scalar(
             } else if let Ok(f) = v.parse::<f64>() {
                 Ok(Node::Number(Numeric::Float(f)))
             } else {
-                Ok(Node::Str(v.to_string(), QuoteType::Unquoted, BlockStyle::None))
+                Ok(Node::Str(
+                    v.to_string(),
+                    QuoteType::Unquoted,
+                    BlockStyle::None,
+                ))
             }
         }
     }
@@ -117,7 +130,9 @@ fn parse_block_scalar(
                         match c {
                             '\'' if !in_double => in_single = !in_single,
                             '"' if !in_single => in_double = !in_double,
-                            '#' if !in_single && !in_double => { break; }
+                            '#' if !in_single && !in_double => {
+                                break;
+                            }
                             _ => {}
                         }
                         line_stripped.push(c);
@@ -132,7 +147,10 @@ fn parse_block_scalar(
                 }
             }
             Some(Token::Newline) => {
-                if !saw_plain_current_line && first_content_indent.is_none() && pending_indent_for_line.is_some() {
+                if !saw_plain_current_line
+                    && first_content_indent.is_none()
+                    && pending_indent_for_line.is_some()
+                {
                     let indent = pending_indent_for_line.unwrap_or(0);
                     if indent > max_blank_indent_before_content {
                         max_blank_indent_before_content = indent;
@@ -147,7 +165,9 @@ fn parse_block_scalar(
             Some(Token::Comment(_)) => {
                 stream.next()?;
             }
-            Some(Token::Eof) => { break; }
+            Some(Token::Eof) => {
+                break;
+            }
             _ => break,
         }
     }
@@ -162,7 +182,9 @@ fn parse_block_scalar(
         }
     } else if blank_lines_before_content >= 3
         && max_blank_indent_before_content > 0
-        && pending_indent_for_line.map_or(false, |comment_indent| comment_indent < max_blank_indent_before_content)
+        && pending_indent_for_line.map_or(false, |comment_indent| {
+            comment_indent < max_blank_indent_before_content
+        })
     {
         let msg = format!(
             "Invalid empty block scalar: malformed indented blank lines without any content (blank max indent: {}, following indent: {:?})",
@@ -182,8 +204,12 @@ fn parse_block_scalar(
             }
         }
     }
-    use crate::nodes::node::{BlockStyle, QuoteType, Node};
-    let style = if indicator == '|' { BlockStyle::Literal } else { BlockStyle::Folded };
+    use crate::nodes::node::{BlockStyle, Node, QuoteType};
+    let style = if indicator == '|' {
+        BlockStyle::Literal
+    } else {
+        BlockStyle::Folded
+    };
     let mut full = block_header.trim_end().to_string();
     if !block_lines.is_empty() {
         full.push('\n');
@@ -233,7 +259,10 @@ pub(crate) fn parse_scalar_with_tokens(
                     let meta = rest.trim_start_matches(' ');
                     if !meta.is_empty() {
                         let first_token = meta.split_whitespace().next().unwrap_or("");
-                        if !first_token.chars().all(|c| c == '+' || c == '-' || c.is_ascii_digit()) {
+                        if !first_token
+                            .chars()
+                            .all(|c| c == '+' || c == '-' || c.is_ascii_digit())
+                        {
                             return Err(syntax_error(
                                 stream.source_mut(),
                                 "Invalid block scalar header: unexpected text immediately after '|' or '>'",
@@ -251,7 +280,8 @@ pub(crate) fn parse_scalar_with_tokens(
                 if let Some(ind) = chars.next() {
                     if ind == '|' || ind == '>' {
                         let rest = chars.as_str();
-                        rest.chars().all(|c| c == ' ' || c == '+' || c == '-' || c.is_ascii_digit())
+                        rest.chars()
+                            .all(|c| c == ' ' || c == '+' || c == '-' || c.is_ascii_digit())
                     } else {
                         false
                     }
@@ -278,12 +308,10 @@ pub(crate) fn parse_scalar_with_tokens(
             // Otherwise, treat as plain scalar with possible indented continuation lines
             return parse_plain_scalar(stream, &s, directives);
         }
-        _ => {
-            Err(syntax_error(
-                stream.source_mut(),
-                &format!("Expected a scalar token, got {}", current_token_str),
-            ))
-        },
+        _ => Err(syntax_error(
+            stream.source_mut(),
+            &format!("Expected a scalar token, got {}", current_token_str),
+        )),
     }
 }
 // Module: parser/document/scalar.rs
@@ -377,7 +405,9 @@ mod tests {
         let mut source = Buffer::new(value.as_bytes());
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
         let node = parse_scalar_with_tokens(&mut stream, &directives, 0).unwrap();
-        assert!(matches!(node, Node::Str(ref s, QuoteType::Unquoted, BlockStyle::None) if s.contains("plain line 1") && s.contains("plain line 2")));
+        assert!(
+            matches!(node, Node::Str(ref s, QuoteType::Unquoted, BlockStyle::None) if s.contains("plain line 1") && s.contains("plain line 2"))
+        );
     }
 
     #[test]
@@ -387,7 +417,9 @@ mod tests {
         let mut source = Buffer::new(value.as_bytes());
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
         let node = parse_scalar_with_tokens(&mut stream, &directives, 0).unwrap();
-        assert!(matches!(node, Node::Str(ref s, QuoteType::Single, BlockStyle::None) if s == "single quoted string"));
+        assert!(
+            matches!(node, Node::Str(ref s, QuoteType::Single, BlockStyle::None) if s == "single quoted string")
+        );
     }
 
     #[test]
@@ -397,14 +429,16 @@ mod tests {
         let mut source = Buffer::new(value.as_bytes());
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
         let node = parse_scalar_with_tokens(&mut stream, &directives, 0).unwrap();
-        assert!(matches!(node, Node::Str(ref s, QuoteType::Double, BlockStyle::None) if s == "double quoted string"));
+        assert!(
+            matches!(node, Node::Str(ref s, QuoteType::Double, BlockStyle::None) if s == "double quoted string")
+        );
     }
 
-// ---
-// The scalar parser is now modular:
-// - parse_block_scalar: handles block scalars (|, >)
-// - parse_plain_scalar: handles plain and multiline scalars
-// - parse_single_quoted_scalar: handles single-quoted scalars
-// - parse_double_quoted_scalar: handles double-quoted scalars
-// Error handling is centralized and token stream navigation uses helpers for DRYness.
+    // ---
+    // The scalar parser is now modular:
+    // - parse_block_scalar: handles block scalars (|, >)
+    // - parse_plain_scalar: handles plain and multiline scalars
+    // - parse_single_quoted_scalar: handles single-quoted scalars
+    // - parse_double_quoted_scalar: handles double-quoted scalars
+    // Error handling is centralized and token stream navigation uses helpers for DRYness.
 }
