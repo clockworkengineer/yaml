@@ -3,6 +3,7 @@
 use crate::nodes::node::Node;
 use crate::parser::ParseResult;
 use crate::utils::anchors_helpers;
+use crate::parser::utils::error_helpers;
 use std::collections::HashMap;
 
 /// Recursively collects all anchor definitions from a YAML document tree.
@@ -27,7 +28,7 @@ pub(crate) fn collect_anchors(
     anchors_helpers::traverse_with_error(node, |n| {
         if let Node::Anchored(inner, name) = n {
             if name.trim().is_empty() {
-                return Some(crate::error::messages::ERR_EMPTY_ANCHOR_NAME.to_string());
+                return Some(error_helpers::empty_anchor_name().to_string());
             }
             // According to YAML spec, later anchor definitions override earlier ones
             anchors.insert(name.clone(), (**inner).clone());
@@ -55,17 +56,13 @@ pub(crate) fn replace_aliases(
     node: &mut Node,
     anchors: &HashMap<String, Node>,
 ) -> ParseResult<()> {
-    let mut err: Option<String> = None;
+    let mut err: Option<crate::error::YamlError> = None;
     let mut replacer = |n: &mut Node| match n {
         Node::Alias(name) => {
             if let Some(found) = anchors.get(name) {
                 *n = found.clone();
             } else {
-                err = Some(format!(
-                    "{}{}",
-                    crate::error::messages::ERR_UNDEFINED_ANCHOR_PREFIX,
-                    name
-                ));
+                err = Some(error_helpers::undefined_anchor(name));
             }
         }
         Node::Anchored(inner, _name) => {
@@ -75,7 +72,7 @@ pub(crate) fn replace_aliases(
         _ => {}
     };
     crate::parser::utils::visit::visit_mut(node, &mut replacer);
-    if let Some(e) = err { Err(crate::error::YamlError::from(e)) } else { Ok(()) }
+    if let Some(e) = err { Err(e) } else { Ok(()) }
 }
 
 /// Expands YAML merge keys (<<) by incorporating referenced mapping values.
@@ -97,7 +94,7 @@ pub(crate) fn expand_merge_keys(
     node: &mut Node,
     anchors: &HashMap<String, Node>,
 ) -> ParseResult<()> {
-    let mut err: Option<String> = None;
+    let mut err: Option<crate::error::YamlError> = None;
     let mut expander = |n: &mut Node| {
         if let Node::Mapping(pairs) = n {
             let mut combined: Vec<(Node, Node)> = Vec::new();
@@ -115,18 +112,11 @@ pub(crate) fn expand_merge_keys(
                                     if let Node::Mapping(src_pairs) = src {
                                         expanded_pairs.extend(src_pairs.clone());
                                     } else {
-                                        err = Some(format!(
-                                            "Merge source '{}' is not a mapping",
-                                            name
-                                        ));
+                                        err = Some(error_helpers::merge_source_not_mapping(name));
                                         break;
                                     }
                                 } else {
-                                    err = Some(format!(
-                                        "{}{}",
-                                        crate::error::messages::ERR_UNDEFINED_ANCHOR_PREFIX,
-                                        name
-                                    ));
+                                    err = Some(error_helpers::undefined_anchor(name));
                                     break;
                                 }
                             }
@@ -138,14 +128,11 @@ pub(crate) fn expand_merge_keys(
                                                 if let Node::Mapping(src_pairs) = src {
                                                     expanded_pairs.extend(src_pairs.clone());
                                                 } else {
-                                                    err = Some(format!(
-                                                        "Merge source '{}' is not a mapping",
-                                                        name
-                                                    ));
+                                                    err = Some(error_helpers::merge_source_not_mapping(name));
                                                     break;
                                                 }
                                             } else {
-                                                err = Some(format!("{}{}", crate::error::messages::ERR_UNDEFINED_ANCHOR_PREFIX, name));
+                                                err = Some(error_helpers::undefined_anchor(name));
                                                 break;
                                             }
                                         }
@@ -153,7 +140,7 @@ pub(crate) fn expand_merge_keys(
                                             expanded_pairs.extend(src_pairs.clone());
                                         }
                                         _ => {
-                                            err = Some("Invalid merge sequence item: expected alias or mapping".to_string());
+                                            err = Some(error_helpers::invalid_merge_sequence_item());
                                             break;
                                         }
                                     }
@@ -163,10 +150,7 @@ pub(crate) fn expand_merge_keys(
                                 expanded_pairs.extend(src_pairs.clone());
                             }
                             other => {
-                                err = Some(format!(
-                                    "Invalid merge value: expected alias, sequence or mapping, got {:?}",
-                                    other
-                                ));
+                                err = Some(error_helpers::invalid_merge_value(&format!("{:?}", other)));
                             }
                         }
                         combined.extend(expanded_pairs);
@@ -249,5 +233,5 @@ pub(crate) fn expand_merge_keys(
         }
     };
     crate::parser::utils::visit::visit_mut(node, &mut expander);
-    if let Some(e) = err { Err(crate::error::YamlError::from(e)) } else { Ok(()) }
+    if let Some(e) = err { Err(e) } else { Ok(()) }
 }
