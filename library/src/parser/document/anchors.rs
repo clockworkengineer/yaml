@@ -2,6 +2,7 @@
 
 use crate::nodes::node::Node;
 use crate::parser::ParseResult;
+use crate::utils::anchors_helpers;
 use std::collections::HashMap;
 
 /// Recursively collects all anchor definitions from a YAML document tree.
@@ -23,19 +24,16 @@ pub(crate) fn collect_anchors(
     node: &Node,
     anchors: &mut HashMap<String, Node>,
 ) -> ParseResult<()> {
-    let mut err: Option<String> = None;
-    let mut collect = |n: &Node| {
+    anchors_helpers::traverse_with_error(node, |n| {
         if let Node::Anchored(inner, name) = n {
             if name.trim().is_empty() {
-                err = Some(crate::error::messages::ERR_EMPTY_ANCHOR_NAME.to_string());
-                return;
+                return Some(crate::error::messages::ERR_EMPTY_ANCHOR_NAME.to_string());
             }
             // According to YAML spec, later anchor definitions override earlier ones
             anchors.insert(name.clone(), (**inner).clone());
         }
-    };
-    crate::parser::utils::visit::visit(node, &mut collect);
-    if let Some(e) = err { Err(crate::error::YamlError::from(e)) } else { Ok(()) }
+        None
+    })
 }
 
 /// Recursively replaces all alias references with their corresponding anchor values.

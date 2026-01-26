@@ -16,6 +16,9 @@ pub mod optimization;
 pub mod streaming;
 pub mod escape;
 
+/// Anchor-related helpers for DRY refactor
+pub mod anchors_helpers;
+
 use crate::constants::{CHAR_HASH, CHAR_NEWLINE, CHAR_TAB};
 use crate::io::traits::ISource;
 use crate::{Node, Numeric};
