@@ -131,6 +131,11 @@ pub struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
+        /// Helper to log and return a token in a DRY way
+        fn emit_token(&self, token: Token) -> Option<Token> {
+            lexer_debug!("Emitting Token::{:?}", token);
+            Some(token)
+        }
     /// Create a new lexer wrapping a character source
     pub fn new(source: &'a mut dyn ISource, in_flow: bool) -> Self {
         Lexer {
@@ -215,13 +220,17 @@ impl<'a> Lexer<'a> {
                 Ok(Some(Token::Comment(comment)))
             }
             '!' => {
-                lexer_debug!("Emitting Token::Tag");
-                Ok(Some(self.scan_tag()?))
-            }
+                let tok = self.scan_tag()?;
+                let result = Some(tok.clone());
+                lexer_debug!("Emitting Token::{:?}", tok);
+                Ok(result)
+            },
             '&' => {
-                lexer_debug!("Emitting Token::Anchor");
-                Ok(Some(self.scan_anchor()?))
-            }
+                let tok = self.scan_anchor()?;
+                let result = Some(tok.clone());
+                lexer_debug!("Emitting Token::{:?}", tok);
+                Ok(result)
+            },
             CHAR_ASTERISK => {
                 // Disambiguate between an alias token (e.g. "*anchor") and
                 // plain scalar content starting with '*', such as lines inside
@@ -250,8 +259,10 @@ impl<'a> Lexer<'a> {
                 );
 
                 if treat_as_alias {
-                    lexer_debug!("Emitting Token::Alias");
-                    Ok(Some(self.scan_alias()?))
+                    let tok = self.scan_alias()?;
+                    let result = Some(tok.clone());
+                    lexer_debug!("Emitting Token::{:?}", tok);
+                    Ok(result)
                 } else {
                     lexer_debug!("Emitting Token::Plain (leading '*')");
                     Ok(Some(self.scan_plain_scalar()?))
@@ -264,10 +275,10 @@ impl<'a> Lexer<'a> {
                 Ok(Some(Token::FlowMappingStart))
             }
             CHAR_RBRACE => {
-                lexer_debug!("Emitting Token::FlowMappingEnd");
                 self.source.next();
                 self.validate_post_flow_closer('}')?;
                 self.last_was_linebreak = false;
+                lexer_debug!("Emitting Token::FlowMappingEnd");
                 Ok(Some(Token::FlowMappingEnd))
             }
             CHAR_LBRACKET => {
