@@ -6,8 +6,9 @@
 
 use crate::constants::*;
 use crate::io::traits::ISource;
-use crate::parser::utils::whitespace;
 use crate::parser::utils::token_scan;
+use crate::parser::utils::whitespace;
+use crate::parser::utils::error_helpers;
 
 #[cfg(feature = "debug-trace")]
 #[inline]
@@ -285,7 +286,7 @@ impl<'a> Lexer<'a> {
                             "DEBUG: Comment after comma with no whitespace at {:?}",
                             self.source.current()
                         );
-                        return Err(crate::parser::document::error_builder::syntax_error(
+                        return Err(error_helpers::syntax_error(
                             self.source,
                             "YAML syntax error: comment must be preceded by whitespace after ',' in flow collection",
                         ));
@@ -430,14 +431,14 @@ impl<'a> Lexer<'a> {
 
     /// Skip horizontal whitespace (space and tab)
     fn skip_horizontal_whitespace(&mut self) {
-        whitespace::skip_horizontal_whitespace(|| {
-            let ch = self.source.current();
-            if ch == Some(CHAR_SPACE) || ch == Some(CHAR_TAB) {
+        while let Some(ch) = self.source.current() {
+            if ch == CHAR_SPACE || ch == CHAR_TAB {
                 self.source.next();
+            } else {
+                break;
             }
-            ch
-        });
-    }
+        }
+                        }
 
     /// Emit an indentation token if applicable at line start.
     /// Returns Ok(Some(Token)) if an indent/dedent should be emitted, Ok(None) otherwise.
@@ -505,7 +506,7 @@ impl<'a> Lexer<'a> {
                         | Some(CHAR_CARRIAGE_RETURN)
                         | None
                 ) {
-                    return Err(crate::parser::document::error_builder::forbidden_error(
+                    return Err(error_helpers::forbidden_error(
                         self.source,
                         "Tabs",
                         "as indentation in YAML flow collections",
@@ -566,7 +567,7 @@ impl<'a> Lexer<'a> {
                         self.peek_next_non_whitespace(),
                         Some(CHAR_NEWLINE) | Some(CHAR_CARRIAGE_RETURN) | None
                     ) {
-                        return Err(crate::parser::document::error_builder::forbidden_error(
+                        return Err(error_helpers::forbidden_error(
                             self.source,
                             "Tabs",
                             "as indentation in YAML",
@@ -656,7 +657,7 @@ impl<'a> Lexer<'a> {
         }
         if let Some('#') = self.source.current() {
             if !seen_whitespace {
-                return Err(crate::parser::document::error_builder::syntax_error(
+                return Err(error_helpers::syntax_error(
                     self.source,
                     &format!(
                         "YAML syntax error: comment must be preceded by whitespace after '{}' in flow collection",
@@ -747,7 +748,9 @@ impl<'a> Lexer<'a> {
     fn scan_anchor(&mut self) -> Result<Token, crate::error::YamlError> {
         token_scan::scan_token_with_leading(
             self.source,
-            |src| { src.next(); }, // consume '&'
+            |src| {
+                src.next();
+            }, // consume '&'
             |ch| {
                 ch.is_whitespace()
                     || ch == CHAR_NEWLINE
@@ -768,7 +771,9 @@ impl<'a> Lexer<'a> {
     fn scan_alias(&mut self) -> Result<Token, crate::error::YamlError> {
         token_scan::scan_token_with_leading(
             self.source,
-            |src| { src.next(); }, // consume '*'
+            |src| {
+                src.next();
+            }, // consume '*'
             |ch| {
                 ch.is_whitespace()
                     || ch == CHAR_NEWLINE
@@ -816,7 +821,7 @@ impl<'a> Lexer<'a> {
                         // can report a clear syntax error instead of
                         // silently treating it as a valid comment.
                         if let Some(CHAR_HASH) = self.source.current() {
-                            return Err(crate::parser::document::error_builder::syntax_error(
+                            return Err(error_helpers::syntax_error(
                                 self.source,
                                 "YAML syntax error: comment must be separated from quoted scalar by whitespace",
                             ));
@@ -831,7 +836,7 @@ impl<'a> Lexer<'a> {
                 None => {
                     #[cfg(debug_assertions)]
                     eprintln!("DEBUG: Unterminated single-quoted string: reached EOF");
-                    return Err(crate::parser::document::error_builder::syntax_error(
+                    return Err(error_helpers::syntax_error(
                         self.source,
                         "YAML compliance error: Unterminated single-quoted string (unexpected EOF)",
                     ));
@@ -958,7 +963,7 @@ impl<'a> Lexer<'a> {
                                     }
                                     _ => {
                                         return Err(
-                                            crate::parser::document::error_builder::syntax_error(
+                                            error_helpers::syntax_error(
                                                 self.source,
                                                 "YAML compliance error: Invalid \\x escape sequence, expected 2 hex digits",
                                             ),
@@ -981,7 +986,7 @@ impl<'a> Lexer<'a> {
                                     }
                                     _ => {
                                         return Err(
-                                            crate::parser::document::error_builder::syntax_error(
+                                            error_helpers::syntax_error(
                                                 self.source,
                                                 "YAML compliance error: Invalid \\u escape sequence, expected 4 hex digits",
                                             ),
@@ -994,7 +999,7 @@ impl<'a> Lexer<'a> {
                                 Some(ch) => content.push(ch),
                                 None => {
                                     return Err(
-                                        crate::parser::document::error_builder::syntax_error(
+                                        error_helpers::syntax_error(
                                             self.source,
                                             &format!(
                                                 "YAML compliance error: Invalid unicode codepoint U+{:04X}",
@@ -1017,7 +1022,7 @@ impl<'a> Lexer<'a> {
                                     }
                                     _ => {
                                         return Err(
-                                            crate::parser::document::error_builder::syntax_error(
+                                            error_helpers::syntax_error(
                                                 self.source,
                                                 "YAML compliance error: Invalid \\U escape sequence, expected 8 hex digits",
                                             ),
@@ -1030,7 +1035,7 @@ impl<'a> Lexer<'a> {
                                 Some(ch) => content.push(ch),
                                 None => {
                                     return Err(
-                                        crate::parser::document::error_builder::syntax_error(
+                                        error_helpers::syntax_error(
                                             self.source,
                                             &format!(
                                                 "YAML compliance error: Invalid unicode codepoint U+{:08X}",
@@ -1071,10 +1076,10 @@ impl<'a> Lexer<'a> {
                     // can report a clear syntax error instead of
                     // silently treating it as a valid comment.
                     if let Some(CHAR_HASH) = self.source.current() {
-                        return Err(crate::parser::document::error_builder::syntax_error(
-                            self.source,
-                            "YAML syntax error: comment must be separated from quoted scalar by whitespace",
-                        ));
+                            return Err(error_helpers::syntax_error(
+                                self.source,
+                                "YAML syntax error: comment must be separated from quoted scalar by whitespace",
+                            ));
                     }
                     break;
                 }
@@ -1085,7 +1090,7 @@ impl<'a> Lexer<'a> {
                 None => {
                     #[cfg(debug_assertions)]
                     eprintln!("DEBUG: Unterminated double-quoted string: reached EOF");
-                    return Err(crate::parser::document::error_builder::syntax_error(
+                    return Err(error_helpers::syntax_error(
                         self.source,
                         "YAML compliance error: Unterminated double-quoted string (unexpected EOF)",
                     ));
