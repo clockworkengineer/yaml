@@ -1,13 +1,52 @@
-/// Helper to construct a Node::Array from items
+/// Parses a value or key in inline collections, handling special cases like double-colon scalars.
+///
+/// This helper is used by both sequence and mapping parsers to avoid code duplication.
+fn parse_inline_value(
+    stream: &mut TokenStream,
+    directives: &DirectiveContext,
+    depth: usize,
+) -> crate::parser::ParseResult<Node> {
+    // Special-case a leading double-colon inside a flow sequence
+    if matches!(stream.current(), Some(Token::Colon)) {
+        if let Some(Token::Colon) = stream.peek()? {
+            stream.next()?; // first ':'
+            stream.next()?; // second ':'
+            skip_inline_trivia(stream)?;
+            match stream.consume_scalar() {
+                Ok((s, _)) => Ok(Node::Str(
+                    format!("::{}", s),
+                    QuoteType::Unquoted,
+                    BlockStyle::None,
+                )),
+                Err(_) => Ok(Node::Str(
+                    "::".to_string(),
+                    QuoteType::Unquoted,
+                    BlockStyle::None,
+                )),
+            }
+        } else {
+            parse_value_with_tokens(stream, directives, depth + 1)
+        }
+    } else {
+        parse_value_with_tokens(stream, directives, depth + 1)
+    }
+}
+/// Constructs a Node::Array from a vector of items.
+///
+/// This helper centralizes array node creation for DRY compliance.
 fn make_array_node(items: Vec<Node>) -> Node {
     Node::Array(items)
 }
 
-/// Helper to construct a Node::Mapping from pairs
+/// Constructs a Node::Mapping from a vector of key-value pairs.
+///
+/// This helper centralizes mapping node creation for DRY compliance.
 fn make_mapping_node(pairs: Vec<(Node, Node)>) -> Node {
     Node::Mapping(pairs)
 }
-/// Helper to skip whitespace and comments in the token stream
+/// Skips whitespace and comments in the token stream.
+///
+/// This helper should be used before parsing any token to ensure trivia is not misinterpreted as content.
 fn skip_inline_trivia(stream: &mut TokenStream) -> crate::parser::ParseResult<()> {
     stream.skip_trivia()
 }
@@ -18,7 +57,9 @@ fn skip_inline_trivia(stream: &mut TokenStream) -> crate::parser::ParseResult<()
 use crate::nodes::node::Node;
 use crate::nodes::node_utils::make_set_node;
 use crate::parser::directives::DirectiveContext;
-/// Macro for common syntax error construction
+/// Macro for common syntax error construction.
+///
+/// Use this macro to create a syntax error with a consistent format.
 macro_rules! syntax_err {
     ($stream:expr, $msg:expr) => {
         crate::parser::document::error_builder::syntax_error($stream, $msg)
@@ -48,7 +89,7 @@ fn inline_log(msg: String) {
     log::trace!("{}", msg);
 }
 
-/// Parse a flow (inline) sequence using tokens
+/// Parses a flow (inline) sequence using tokens.
 ///
 /// Example: `[1, 2, 3]` or `[a, b, c]`
 ///
@@ -57,6 +98,7 @@ fn inline_log(msg: String) {
 /// - Trailing commas: `[1, 2, ]`
 /// - Nested collections: `[[1, 2], [3, 4]]`
 /// - Mixed types: `[1, "str", true]`
+/// - Implicit mappings and double-colon scalars
 pub fn parse_inline_sequence_with_tokens(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
@@ -134,28 +176,7 @@ pub fn parse_inline_sequence_with_tokens(
                 // "Expected comma or ] in flow sequence". Instead, treat it
                 // as a single plain scalar "::vector" when it appears at the
                 // start of a sequence item.
-                let value_or_key = if matches!(stream.current(), Some(Token::Colon)) {
-                    if let Some(Token::Colon) = stream.peek()? {
-                        // Consume the leading "::" prefix
-                        stream.next()?; // first ':'
-                        stream.next()?; // second ':'
-                        stream.skip_trivia()?;
-
-                        // Consume the following scalar and prepend "::".
-                        match stream.consume_scalar() {
-                            Ok((s, _)) => {
-                                Node::Str(format!("::{}", s), QuoteType::Unquoted, BlockStyle::None)
-                            }
-                            Err(_) => {
-                                Node::Str("::".to_string(), QuoteType::Unquoted, BlockStyle::None)
-                            }
-                        }
-                    } else {
-                        parse_value_with_tokens(stream, directives, depth + 1)?
-                    }
-                } else {
-                    parse_value_with_tokens(stream, directives, depth + 1)?
-                };
+                let value_or_key = parse_inline_value(stream, directives, depth)?;
 
                 // Skip inline trivia to check if this is actually a key
                 // (followed by a colon) for an implicit mapping. Per YAML
@@ -341,11 +362,10 @@ pub fn parse_inline_mapping_with_tokens(
                     inline_log("Empty key in flow mapping (starting with ':')".to_string());
                     Node::Str(String::new(), QuoteType::Unquoted, BlockStyle::None)
                 } else {
-                    // Progress check: record position before parsing key
                     let before_key = stream.stream_position();
                     #[cfg(feature = "debug-trace")]
                     inline_log(format!("before_key position = {}", before_key));
-                    let key = parse_value_with_tokens(stream, directives, depth + 1)?;
+                    let key = parse_inline_value(stream, directives, depth)?;
                     let after_key = stream.stream_position();
                     #[cfg(feature = "debug-trace")]
                     inline_log(format!("after_key position = {}", after_key));
