@@ -1,3 +1,7 @@
+/// Helper to skip whitespace and comments in the token stream
+fn skip_inline_trivia(stream: &mut TokenStream) -> crate::parser::ParseResult<()> {
+    stream.skip_trivia()
+}
 use crate::nodes::node_utils::make_set_node;
 /// Token-based flow collection parsers
 ///
@@ -6,6 +10,12 @@ use crate::nodes::node_utils::make_set_node;
 
 use crate::nodes::node::Node;
 use crate::parser::directives::DirectiveContext;
+/// Macro for common syntax error construction
+macro_rules! syntax_err {
+    ($stream:expr, $msg:expr) => {
+        crate::parser::document::error_builder::syntax_error($stream, $msg)
+    };
+}
 use crate::parser::document::error_builder::syntax_error;
 use crate::parser::document::tokens::value::parse_value_with_tokens;
 use crate::parser::lexer::Token;
@@ -60,7 +70,7 @@ pub fn parse_inline_sequence_with_tokens(
 
     loop {
         // Skip whitespace/comments
-        stream.skip_trivia()?;
+        skip_inline_trivia(stream)?;
 
         match stream.current() {
             Some(Token::FlowSequenceEnd) => {
@@ -68,11 +78,11 @@ pub fn parse_inline_sequence_with_tokens(
                 let _ = stream.consume_flow_sequence_end()?;
                 // If at top-level (depth == 0), check for extra closing bracket (4H7K)
                 if depth == 0 {
-                    stream.skip_trivia()?;
+                    skip_inline_trivia(stream)?;
                     if matches!(stream.current(), Some(Token::FlowSequenceEnd)) {
-                        return Err(syntax_error(
+                        return Err(syntax_err!(
                             stream.source_mut(),
-                            "Unexpected extra closing bracket ']' in flow sequence",
+                            "Unexpected extra closing bracket ']' in flow sequence"
                         ));
                     }
                 }
@@ -81,9 +91,9 @@ pub fn parse_inline_sequence_with_tokens(
             Some(Token::Comma) => {
                 if expect_item {
                     // Comma found when expecting an item: leading or double comma
-                    return Err(syntax_error(
+                    return Err(syntax_err!(
                         stream.source_mut(),
-                        "Leading or double comma in flow sequence is not allowed",
+                        "Leading or double comma in flow sequence is not allowed"
                     ));
                 }
                 // Allow trailing comma: set to expect next item, but do not error
@@ -92,17 +102,17 @@ pub fn parse_inline_sequence_with_tokens(
                 expect_item = true;
             }
             None | Some(Token::Eof) => {
-                return Err(syntax_error(
+                return Err(syntax_err!(
                     stream.source_mut(),
-                    "Unexpected end of input in flow sequence",
+                    "Unexpected end of input in flow sequence"
                 ));
             }
             _ => {
                 if !expect_item {
                     // Found value without comma separator
-                    return Err(syntax_error(
+                    return Err(syntax_err!(
                         stream.source_mut(),
-                        "Expected comma or ] in flow sequence",
+                        "Expected comma or ] in flow sequence"
                     ));
                 }
 
@@ -258,13 +268,13 @@ pub fn parse_inline_mapping_with_tokens(
                 "Exceeded 1000 iterations in parse_inline_mapping_with_tokens, possible infinite loop"
                     .to_string(),
             );
-            return Err(syntax_error(
+            return Err(syntax_err!(
                 stream.source_mut(),
-                "Exceeded 1000 iterations in flow mapping parser (possible infinite loop)",
+                "Exceeded 1000 iterations in flow mapping parser (possible infinite loop)"
             ));
         }
         // Skip whitespace/comments
-        stream.skip_trivia()?;
+        skip_inline_trivia(stream)?;
 
         #[cfg(feature = "debug-trace")]
         inline_log(format!(
@@ -285,9 +295,9 @@ pub fn parse_inline_mapping_with_tokens(
                 expect_entry = true;
             }
             None | Some(Token::Eof) => {
-                return Err(syntax_error(
+                return Err(syntax_err!(
                     stream.source_mut(),
-                    "Unexpected end of input in flow mapping",
+                    "Unexpected end of input in flow mapping"
                 ));
             }
             _ => {
@@ -304,9 +314,9 @@ pub fn parse_inline_mapping_with_tokens(
                         continue;
                     }
                     // Otherwise, found key-value without required separator
-                    return Err(syntax_error(
+                    return Err(syntax_err!(
                         stream.source_mut(),
-                        "Expected comma or } in flow mapping",
+                        "Expected comma or } in flow mapping"
                     ));
                 }
 
@@ -332,7 +342,7 @@ pub fn parse_inline_mapping_with_tokens(
                 };
 
                 // Skip whitespace
-                stream.skip_trivia()?;
+                skip_inline_trivia(stream)?;
 
                 // Debug: print current token before colon check
                 #[cfg(feature = "debug-trace")]
@@ -341,7 +351,7 @@ pub fn parse_inline_mapping_with_tokens(
                     stream.current()
                 ));
                 // Ensure all comments and newlines are skipped before colon check
-                stream.skip_trivia()?;
+                skip_inline_trivia(stream)?;
                 // Expect colon for key-value pair
                 if matches!(stream.current(), Some(Token::Colon)) {
                     // DRY: consume single colon with compliance validation (no behavior change)
@@ -357,7 +367,7 @@ pub fn parse_inline_mapping_with_tokens(
                     // should be treated as part of the plain value (e.g., {"key"::value} => ":value").
                     if matches!(stream.current(), Some(Token::Colon)) {
                         let _ = stream.consume_if(Token::Colon)?; // consume leading ':' of value
-                        stream.skip_trivia()?;
+                        skip_inline_trivia(stream)?;
                         // Consume the following scalar and prepend ':'
                         match stream.consume_scalar() {
                             Ok((s, _)) => {
@@ -451,12 +461,12 @@ fn ensure_progress(
     context: &str,
 ) -> crate::parser::ParseResult<()> {
     if before == after {
-        return Err(syntax_error(
+        return Err(syntax_err!(
             stream.source_mut(),
             &format!(
                 "Parser did not advance when parsing {} (possible malformed input)",
                 context
-            ),
+            )
         ));
     }
     Ok(())
