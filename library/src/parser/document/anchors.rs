@@ -3,6 +3,7 @@
 use crate::nodes::node::Node;
 use crate::parser::ParseResult;
 use crate::utils::anchors_helpers;
+use crate::utils::anchors_helpers2;
 use crate::parser::utils::error_helpers;
 use std::collections::HashMap;
 
@@ -59,10 +60,9 @@ pub(crate) fn replace_aliases(
     let mut err: Option<crate::error::YamlError> = None;
     let mut replacer = |n: &mut Node| match n {
         Node::Alias(name) => {
-            if let Some(found) = anchors.get(name) {
-                *n = found.clone();
-            } else {
-                err = Some(error_helpers::undefined_anchor(name));
+            match anchors_helpers2::lookup_anchor(anchors, name) {
+                Ok(found) => *n = found.clone(),
+                Err(e) => err = Some(e),
             }
         }
         Node::Anchored(inner, _name) => {
@@ -108,32 +108,26 @@ pub(crate) fn expand_merge_keys(
                         let mut expanded_pairs: Vec<(Node, Node)> = Vec::new();
                         match &v {
                             Node::Alias(name) => {
-                                if let Some(src) = anchors.get(name) {
-                                    if let Node::Mapping(src_pairs) = src {
-                                        expanded_pairs.extend(src_pairs.clone());
-                                    } else {
-                                        err = Some(error_helpers::merge_source_not_mapping(name));
+                                match anchors_helpers2::lookup_anchor(anchors, name)
+                                    .and_then(|src| anchors_helpers2::as_mapping(src, name)) {
+                                    Ok(src_pairs) => expanded_pairs.extend(src_pairs.clone()),
+                                    Err(e) => {
+                                        err = Some(e);
                                         break;
                                     }
-                                } else {
-                                    err = Some(error_helpers::undefined_anchor(name));
-                                    break;
                                 }
                             }
                             Node::Array(items) => {
                                 for it in items.iter() {
                                     match it {
                                         Node::Alias(name) => {
-                                            if let Some(src) = anchors.get(name) {
-                                                if let Node::Mapping(src_pairs) = src {
-                                                    expanded_pairs.extend(src_pairs.clone());
-                                                } else {
-                                                    err = Some(error_helpers::merge_source_not_mapping(name));
+                                            match anchors_helpers2::lookup_anchor(anchors, name)
+                                                .and_then(|src| anchors_helpers2::as_mapping(src, name)) {
+                                                Ok(src_pairs) => expanded_pairs.extend(src_pairs.clone()),
+                                                Err(e) => {
+                                                    err = Some(e);
                                                     break;
                                                 }
-                                            } else {
-                                                err = Some(error_helpers::undefined_anchor(name));
-                                                break;
                                             }
                                         }
                                         Node::Mapping(src_pairs) => {
