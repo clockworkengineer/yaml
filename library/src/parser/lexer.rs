@@ -29,7 +29,6 @@ fn is_tag_delimiter(source: &mut dyn ISource, ch: char) -> bool {
         || ch == CHAR_LBRACE
         || ch == CHAR_RBRACE
 }
-use crate::parser::utils::whitespace;
 
 #[cfg(feature = "debug-trace")]
 #[inline]
@@ -131,11 +130,6 @@ pub struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-    /// Helper to log and return a token in a DRY way
-    fn emit_token(&self, token: Token) -> Option<Token> {
-        lexer_debug!("Emitting Token::{:?}", token);
-        Some(token)
-    }
     /// Create a new lexer wrapping a character source
     pub fn new(source: &'a mut dyn ISource, in_flow: bool) -> Self {
         Lexer {
@@ -426,17 +420,6 @@ impl<'a> Lexer<'a> {
             CHAR_DOUBLE_QUOTE => Ok(Some(self.scan_double_quoted()?)),
             _ => Ok(Some(self.scan_plain_scalar()?)),
         }
-    }
-
-    /// Utility: Consume horizontal whitespace (space and tab) and return count
-    fn consume_horizontal_whitespace(&mut self) -> usize {
-        whitespace::consume_horizontal_whitespace(|| {
-            let ch = self.source.current();
-            if ch == Some(CHAR_SPACE) || ch == Some(CHAR_TAB) {
-                self.source.next();
-            }
-            ch
-        })
     }
 
     /// Utility: Peek next non-whitespace character without consuming

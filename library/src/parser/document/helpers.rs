@@ -9,7 +9,10 @@ mod unit_tests {
         let mut buf = Buffer::new(yaml);
         let directives = handle_directives(&mut buf).expect("Should parse directives");
         assert_eq!(directives.yaml_version, Some((1, 2)));
-        assert_eq!(directives.tag_prefixes.get("!e!"), Some(&"tag:example.com,2000:app/".to_string()));
+        assert_eq!(
+            directives.tag_prefixes.get("!e!"),
+            Some(&"tag:example.com,2000:app/".to_string())
+        );
     }
 
     #[test]
@@ -29,11 +32,15 @@ mod unit_tests {
     }
 }
 /// Helper to parse and merge directives for a document.
-pub(crate) fn handle_directives(source: &mut dyn ISource) -> ParseResult<crate::parser::directives::DirectiveContext> {
+pub(crate) fn handle_directives(
+    source: &mut dyn ISource,
+) -> ParseResult<crate::parser::directives::DirectiveContext> {
     let mut directives = crate::parser::directives::DirectiveContext::new();
     let parsed_directives = crate::parser::directives::parse_directives(source)?;
     directives.yaml_version = parsed_directives.yaml_version;
-    directives.tag_prefixes.extend(parsed_directives.tag_prefixes);
+    directives
+        .tag_prefixes
+        .extend(parsed_directives.tag_prefixes);
     Ok(directives)
 }
 /// Helper to convert any error to YamlError for consistent error handling.
@@ -41,29 +48,23 @@ pub(crate) fn to_yaml_error<E: std::fmt::Display>(err: E) -> YamlError {
     YamlError::new(crate::error::ErrorKind::ParseError, format!("{}", err))
 }
 /// Helper to check if the current token matches a given kind.
-pub(crate) fn is_token(ts: &crate::parser::token_stream::TokenStream, kind: &crate::parser::lexer::Token) -> bool {
+pub(crate) fn is_token(
+    ts: &crate::parser::token_stream::TokenStream,
+    kind: &crate::parser::lexer::Token,
+) -> bool {
     ts.current().map_or(false, |t| t == kind)
 }
 
-/// Helper to advance the token stream if the current token matches a given kind.
-pub(crate) fn advance_if(ts: &mut crate::parser::token_stream::TokenStream, kind: &crate::parser::lexer::Token) -> Result<bool, crate::error::YamlError> {
-    if ts.current().map_or(false, |t| t == kind) {
-        ts.next()?;
-        Ok(true)
-    } else {
-        Ok(false)
-    }
-}
 /// Centralized helper for skipping whitespace and comments in the source.
 /// Use this everywhere in the parser for consistency.
 pub(crate) fn skip_whitespace_and_comments(source: &mut dyn ISource) {
     crate::utils::skip_whitespace_and_comments(source);
 }
-use crate::parser::ParseResult;
-use crate::io::traits::ISource;
-use crate::parser::document::context::ParsingContext;
 use crate::error::YamlError;
+use crate::io::traits::ISource;
 use crate::nodes::node::Node;
+use crate::parser::ParseResult;
+use crate::parser::document::context::ParsingContext;
 
 /// Checks for and processes the document start marker (---).
 /// Returns an error if invalid content is found after the marker.
@@ -123,22 +124,18 @@ pub(crate) fn parse_document_markers(
                 Some(crate::parser::lexer::Token::Plain(_)) => {
                     // Check if next token is Colon (indicating a mapping key)
                     if let Some(crate::parser::lexer::Token::Colon) = ts.peek().ok().flatten() {
-                        return Err(crate::error::YamlError::from(
-                            parse_error_token(
-                                &ts,
-                                "Mapping keys are not allowed on the same line as document start marker (---).",
-                            ),
-                        ));
+                        return Err(crate::error::YamlError::from(parse_error_token(
+                            &ts,
+                            "Mapping keys are not allowed on the same line as document start marker (---).",
+                        )));
                     }
                     // Otherwise, it's a plain scalar which is allowed
                 }
                 Some(crate::parser::lexer::Token::Colon) => {
-                    return Err(crate::error::YamlError::from(
-                        parse_error_token(
-                            &ts,
-                            "Mapping keys are not allowed on the same line as document start marker (---).",
-                        ),
-                    ));
+                    return Err(crate::error::YamlError::from(parse_error_token(
+                        &ts,
+                        "Mapping keys are not allowed on the same line as document start marker (---).",
+                    )));
                 }
                 _ => {
                     // Allow other content (quoted strings, anchors, etc.)
@@ -191,12 +188,10 @@ pub(crate) fn parse_document_end_marker(
                 Some(_) => {
                     let ts =
                         crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-                    return Err(crate::error::YamlError::from(
-                        parse_error_token(
-                            &ts,
-                            "Invalid content after document end marker (...)"
-                        ),
-                    ));
+                    return Err(crate::error::YamlError::from(parse_error_token(
+                        &ts,
+                        "Invalid content after document end marker (...)",
+                    )));
                 }
             }
         }
@@ -292,8 +287,6 @@ pub(crate) fn validate_no_tab_indentation_tokens(
 ) -> crate::parser::ParseResult<()> {
     crate::parser::utils::indentation::validate_indentation_tokens(stream, ctx)
 }
-
-
 
 use crate::parser::directives::DirectiveContext;
 use crate::parser::lexer::Token;

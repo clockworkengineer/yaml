@@ -50,7 +50,7 @@ fn parse_scalar_dispatch(
                 ));
             }
         }
-        let block_header = s.clone();
+        let block_header = s;
         stream.next()?;
         return parse_block_scalar(stream, &block_header, has_explicit_indent_indicator);
     }
@@ -329,6 +329,7 @@ mod tests {
             matches!(node, Node::Str(ref s, QuoteType::Unquoted, BlockStyle::Literal) if s == "|\nline1\nline2")
         );
     }
+    #[test]
     fn test_block_folded_basic_via_tokens() {
         let mut source = Buffer::new(b">\n  line1\n  line2\n");
         let directives = DirectiveContext::new();

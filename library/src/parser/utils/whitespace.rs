@@ -1,6 +1,7 @@
 // Utility functions for whitespace and indentation handling in the lexer
 // Centralizes logic to support DRY refactoring
 
+#[allow(dead_code)]
 pub fn consume_horizontal_whitespace<F>(mut next_char: F) -> usize
 where
     F: FnMut() -> Option<char>,
@@ -16,6 +17,7 @@ where
     count
 }
 
+#[allow(dead_code)]
 pub fn skip_horizontal_whitespace<F>(mut next_char: F)
 where
     F: FnMut() -> Option<char>,
@@ -27,6 +29,7 @@ where
     }
 }
 
+#[allow(dead_code)]
 pub fn peek_next_non_whitespace<F, R>(
     mut save_state: F,
     mut restore_state: F,
