@@ -67,6 +67,8 @@ pub fn parse_inline_sequence_with_tokens(
         "inline_tokens: start flow sequence at token = {:?}",
         stream.current()
     );
+    // Always skip trivia before starting parsing
+    skip_inline_trivia(stream)?;
     // Expect opening bracket
     stream.expect(Token::FlowSequenceStart)?;
 
@@ -258,6 +260,8 @@ pub fn parse_inline_mapping_with_tokens(
         "ENTER parse_inline_mapping_with_tokens, current token: {:?}",
         stream.current()
     ));
+    // Always skip trivia before starting parsing
+    skip_inline_trivia(stream)?;
     // Expect opening brace
     stream.expect(Token::FlowMappingStart)?;
 
