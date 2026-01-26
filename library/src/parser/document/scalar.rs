@@ -1,3 +1,62 @@
+/// Shared helper for block scalar and plain scalar detection and parsing
+fn parse_scalar_dispatch(
+    stream: &mut TokenStream,
+    s: &str,
+    directives: &DirectiveContext,
+) -> crate::parser::ParseResult<Node> {
+    // Special-case invalid block scalar header
+    if let Some(ind) = s.chars().next() {
+        if (ind == '|' || ind == '>') && !stream.in_flow() {
+            let rest = &s[ind.len_utf8()..];
+            let meta = rest.trim_start_matches(' ');
+            if !meta.is_empty() {
+                let first_token = meta.split_whitespace().next().unwrap_or("");
+                if !first_token
+                    .chars()
+                    .all(|c| c == '+' || c == '-' || c.is_ascii_digit())
+                {
+                    return Err(syntax_error(
+                        stream.source_mut(),
+                        "Invalid block scalar header: unexpected text immediately after '|' or '>'",
+                    ));
+                }
+            }
+        }
+    }
+    // Block scalar detection
+    let is_block_header = {
+        let mut chars = s.chars();
+        if let Some(ind) = chars.next() {
+            if ind == '|' || ind == '>' {
+                let rest = chars.as_str();
+                rest.chars()
+                    .all(|c| c == ' ' || c == '+' || c == '-' || c.is_ascii_digit())
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    };
+    if is_block_header {
+        let header_meta = s[1..].trim();
+        let digits: String = header_meta.chars().filter(|c| c.is_ascii_digit()).collect();
+        let has_explicit_indent_indicator = !digits.is_empty();
+        if !digits.is_empty() {
+            if digits.len() != 1 || digits.chars().next().unwrap() == '0' {
+                return Err(syntax_error(
+                    stream.source_mut(),
+                    "Invalid block scalar indentation indicator: must be a single digit from 1-9",
+                ));
+            }
+        }
+        let block_header = s.clone();
+        stream.next()?;
+        return parse_block_scalar(stream, &block_header, has_explicit_indent_indicator);
+    }
+    // Otherwise, treat as plain scalar with possible indented continuation lines
+    parse_plain_scalar(stream, s, directives)
+}
 // Extracted single-quoted scalar parsing logic
 fn parse_single_quoted_scalar(
     stream: &mut TokenStream,
@@ -240,74 +299,9 @@ pub(crate) fn parse_scalar_with_tokens(
     let current_token = stream.current().cloned();
     let current_token_str = format!("{:?}", current_token);
     match current_token {
-        Some(Token::SingleQuoted(s)) => {
-            return parse_single_quoted_scalar(stream, &s);
-        }
-        Some(Token::DoubleQuoted(s)) => {
-            return parse_double_quoted_scalar(stream, &s);
-        }
-        Some(Token::Plain(s)) => {
-            // Special-case invalid block scalar header where a comment or other
-            // non-metadata text immediately follows the indicator without the
-            // required whitespace-only remainder, e.g. the YAML tests:
-            //   - X4QW: "block: ># comment" (comment without whitespace)
-            //   - S4GJ: "folded: > first line" (invalid text after indicator)
-            // In such cases, treat this as a syntax error rather than a plain scalar.
-            if let Some(ind) = s.chars().next() {
-                if (ind == '|' || ind == '>') && !stream.in_flow() {
-                    let rest = &s[ind.len_utf8()..];
-                    let meta = rest.trim_start_matches(' ');
-                    if !meta.is_empty() {
-                        let first_token = meta.split_whitespace().next().unwrap_or("");
-                        if !first_token
-                            .chars()
-                            .all(|c| c == '+' || c == '-' || c.is_ascii_digit())
-                        {
-                            return Err(syntax_error(
-                                stream.source_mut(),
-                                "Invalid block scalar header: unexpected text immediately after '|' or '>'",
-                            ));
-                        }
-                    }
-                }
-            }
-
-            // Block scalar detection: treat as block scalar ONLY when the plain token is a valid block header line
-            // i.e., first char '|' or '>' and the remainder contains only spaces, '+', '-', or digits (indent hints).
-            // This avoids misinterpreting plain tokens like ">folded" inside flow collections.
-            let is_block_header = {
-                let mut chars = s.chars();
-                if let Some(ind) = chars.next() {
-                    if ind == '|' || ind == '>' {
-                        let rest = chars.as_str();
-                        rest.chars()
-                            .all(|c| c == ' ' || c == '+' || c == '-' || c.is_ascii_digit())
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                }
-            };
-            if is_block_header {
-                let header_meta = s[1..].trim();
-                let digits: String = header_meta.chars().filter(|c| c.is_ascii_digit()).collect();
-                let has_explicit_indent_indicator = !digits.is_empty();
-                if !digits.is_empty() {
-                    if digits.len() != 1 || digits.chars().next().unwrap() == '0' {
-                        return Err(syntax_error(
-                            stream.source_mut(),
-                            "Invalid block scalar indentation indicator: must be a single digit from 1-9",
-                        ));
-                    }
-                }
-                let block_header = s.clone();
-                stream.next()?;
-                return parse_block_scalar(stream, &block_header, has_explicit_indent_indicator);
-            }
-            // Otherwise, treat as plain scalar with possible indented continuation lines
-            return parse_plain_scalar(stream, &s, directives);
-        }
+        Some(Token::SingleQuoted(s)) => parse_single_quoted_scalar(stream, &s),
+        Some(Token::DoubleQuoted(s)) => parse_double_quoted_scalar(stream, &s),
+        Some(Token::Plain(s)) => parse_scalar_dispatch(stream, &s, directives),
         _ => Err(syntax_error(
             stream.source_mut(),
             &format!("Expected a scalar token, got {}", current_token_str),
