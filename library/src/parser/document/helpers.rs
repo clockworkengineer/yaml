@@ -1,3 +1,29 @@
+/// Helper to parse and merge directives for a document.
+pub(crate) fn handle_directives(source: &mut dyn ISource) -> ParseResult<crate::parser::directives::DirectiveContext> {
+    let mut directives = crate::parser::directives::DirectiveContext::new();
+    let parsed_directives = crate::parser::directives::parse_directives(source)?;
+    directives.yaml_version = parsed_directives.yaml_version;
+    directives.tag_prefixes.extend(parsed_directives.tag_prefixes);
+    Ok(directives)
+}
+/// Helper to convert any error to YamlError for consistent error handling.
+pub(crate) fn to_yaml_error<E: std::fmt::Display>(err: E) -> YamlError {
+    YamlError::new(crate::error::ErrorKind::ParseError, format!("{}", err))
+}
+/// Helper to check if the current token matches a given kind.
+pub(crate) fn is_token(ts: &crate::parser::token_stream::TokenStream, kind: &crate::parser::lexer::Token) -> bool {
+    ts.current().map_or(false, |t| t == kind)
+}
+
+/// Helper to advance the token stream if the current token matches a given kind.
+pub(crate) fn advance_if(ts: &mut crate::parser::token_stream::TokenStream, kind: &crate::parser::lexer::Token) -> Result<bool, crate::error::YamlError> {
+    if ts.current().map_or(false, |t| t == kind) {
+        ts.next()?;
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
 /// Centralized helper for skipping whitespace and comments in the source.
 /// Use this everywhere in the parser for consistency.
 pub(crate) fn skip_whitespace_and_comments(source: &mut dyn ISource) {

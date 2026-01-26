@@ -3,7 +3,7 @@ use crate::nodes::node::Node;
 use crate::nodes::node::Node::Document;
 use crate::parser::directives::parse_directives;
 
-use crate::parser::document::helpers::{self, parse_document_markers, parse_document_end_marker, skip_whitespace_and_comments};
+use crate::parser::document::helpers::{self, parse_document_markers, parse_document_end_marker, skip_whitespace_and_comments, to_yaml_error, handle_directives};
 use crate::parser::document::main_loop::parse_document;
 use crate::parser::ParseResult;
 use crate::{loop_guard_check, loop_guard_init};
@@ -21,19 +21,19 @@ fn check_explicit_directives(
         let st = source.save_state();
         let mut ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
         ts.skip_trivia()?;
-        match ts.current() {
-            Some(crate::parser::lexer::Token::DocumentStart) => {}
-            Some(crate::parser::lexer::Token::DocumentEnd)
-            | Some(crate::parser::lexer::Token::Eof)
-            | None => {
-                source.restore_state(st);
-                let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-                return Err(helpers::parse_error_token(
-                    &ts,
-                    "Directive must be followed by a document",
-                ));
-            }
-            _ => {}
+        use crate::parser::lexer::Token;
+        if helpers::is_token(&ts, &Token::DocumentStart) {
+            // ok
+        } else if helpers::is_token(&ts, &Token::DocumentEnd)
+            || helpers::is_token(&ts, &Token::Eof)
+            || ts.current().is_none()
+        {
+            source.restore_state(st);
+            let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+            return Err(helpers::parse_error_token(
+                &ts,
+                "Directive must be followed by a document",
+            ));
         }
         source.restore_state(st);
     }
@@ -75,15 +75,8 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
             "Stream parsing"
         );
         skip_whitespace_and_comments(source);
-        // Always create a fresh DirectiveContext for each document
-        let mut directives = crate::parser::directives::DirectiveContext::new();
-        // Parse and apply any directives for this document
-        let parsed_directives = parse_directives(source)?;
-        // Merge parsed directives into the new context
-        directives.yaml_version = parsed_directives.yaml_version;
-        directives
-            .tag_prefixes
-            .extend(parsed_directives.tag_prefixes);
+        // Parse and merge directives using helper
+        let directives = handle_directives(source)?;
         check_explicit_directives(source, &directives)?;
 
         // Detect if there is a document start marker (---) at the current position
@@ -121,7 +114,7 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
                 );
                 source.restore_state(st2);
                 if next_is_start {
-                    parse_document_markers(source, &directives).map_err(|e| e.to_string())?;
+                    parse_document_markers(source, &directives).map_err(to_yaml_error)?;
                     // continue the loop to collapse runs of '---'
                     continue;
                 }
@@ -248,7 +241,7 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
                 return Err(err);
             }
         }
-        parse_document_end_marker(source, &directives).map_err(|e| e.to_string())?;
+        parse_document_end_marker(source, &directives).map_err(to_yaml_error)?;
         if !source.more() {
             break;
         }
