@@ -1,3 +1,22 @@
+/// Macro for common error construction
+macro_rules! parse_err {
+    ($msg:expr) => {
+        YamlError::from($msg)
+    };
+    ($stream:expr, $msg:expr) => {
+        YamlError::from(helpers::parse_error_token($stream, $msg))
+    };
+}
+/// Helper for indentation validation
+fn validate_indent(actual: usize, expected: usize, context: &str) -> Result<(), YamlError> {
+    if actual < expected {
+        return Err(parse_err!(format!(
+            "{} at invalid indentation: expected >= {}, got {}",
+            context, expected, actual
+        )));
+    }
+    Ok(())
+}
 use crate::error::YamlError;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
@@ -9,6 +28,23 @@ use crate::parser::document::helpers;
 use crate::parser::document::helpers::BlockHeadKind;
 use crate::parser::document::mapping::parse_mapping;
 use crate::parser::document::value::parse_value;
+
+/// Unified entry point for scalar/value parsing
+fn parse_scalar_or_value(
+    source: &mut dyn ISource,
+    directives: &DirectiveContext,
+    indent_level: usize,
+    ctx: &ParsingContext,
+) -> ParseResult<Node> {
+    // Top-level plain multiline scalar (HS5T)
+    if matches!(ctx.collection_type, CollectionType::None)
+        && matches!(source.current(), Some(c) if c.is_alphanumeric())
+    {
+        Ok(parse_plain_multiline_scalar(source, indent_level))
+    } else {
+        parse_value(source, directives)
+    }
+}
 
 /// Parse a top-level plain scalar spanning multiple non-empty lines, using
 /// YAML's plain line folding rules (spec example 7.12 / HS5T).
@@ -211,33 +247,20 @@ pub fn parse_document_contents(
         }
     }
 
-    // (debug removed)
-            use crate::parser::token_stream::TokenStream;
-
-            /// Utility for initializing a token stream and restoring source state if needed
     match source.current() {
         Some(c) if c == '-' => {
-            // Only treat dash as sequence start if not in flow context or explicit key context
             if ctx.in_flow || matches!(ctx.collection_type, CollectionType::BlockMapping) {
-                return Ok(parse_value(source, directives)?);
+                return parse_scalar_or_value(source, directives, indent_level, ctx);
             }
             let seq_indent = source.get_current_indent_level();
             let mut stream =
                 crate::parser::token_stream::TokenStream::new(source, directives, false)?;
             match stream.current() {
-                // If this is actually a document start marker (---), do not parse as a sequence.
-                // Leave the marker for the main loop to handle by returning Node::None without consuming.
                 Some(crate::parser::lexer::Token::DocumentStart) => {
                     return Ok(Node::None);
                 }
                 Some(crate::parser::lexer::Token::Dash) => {
-                    // seq_indent already captured above
-                    if seq_indent < indent_level {
-                        return Err(YamlError::from(format!(
-                            "Sequence item at invalid indentation: expected >= {}, got {}",
-                            indent_level, seq_indent
-                        )));
-                    }
+                    validate_indent(seq_indent, indent_level, "Sequence item")?;
                     let ctx_seq =
                         ctx.child_block_context(seq_indent, CollectionType::BlockSequence);
                     let seq =
@@ -254,30 +277,19 @@ pub fn parse_document_contents(
                     }
                     Ok(seq)
                 }
-                _ => Ok(parse_value(source, directives)?),
+                _ => parse_scalar_or_value(source, directives, indent_level, ctx),
             }
         }
         Some(c) if c == '.' => {
             let map_indent = source.get_current_indent_level();
             if is_doc_end(source, directives)? {
-                // Always break to main document loop, even if deeply nested
                 return Ok(Node::None);
             }
-            if map_indent < indent_level {
-                return Err(YamlError::from(format!(
-                    "Mapping key at invalid indentation: expected >= {}, got {}",
-                    indent_level, map_indent
-                )));
-            }
-            // Delegate to the block head classifier to decide whether
-            // this line begins a mapping key (e.g., plain/quoted key
-            // followed by ':' at the appropriate indentation) rather
-            // than re-running a separate token-based lookahead here.
-            // This keeps the decision centralized in `classify_block_head`.
+            validate_indent(map_indent, indent_level, "Mapping key")?;
             if matches!(head_kind, BlockHeadKind::BlockMapping) {
                 Ok(parse_mapping(source, map_indent, directives)?)
             } else {
-                Ok(parse_value(source, directives)?)
+                parse_scalar_or_value(source, directives, indent_level, ctx)
             }
         }
         Some(c) if c == '#' => {
@@ -307,11 +319,9 @@ pub fn parse_document_contents(
                 )?,
             )
         }
-        // Support tagged values or tagged keys using TokenStream
         Some(c) if c == '!' => {
             let mut stream =
                 crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-            // If a tag token appears and is followed by a colon at same level, treat as mapping key
             match stream.current() {
                 Some(crate::parser::lexer::Token::Tag(_)) => {
                     stream.next()?;
@@ -339,7 +349,6 @@ pub fn parse_document_contents(
                 ),
             }
         }
-        // Support anchors using TokenStream
         Some(c) if c == '&' => {
             let mut stream =
                 crate::parser::token_stream::TokenStream::new(source, directives, false)?;
@@ -370,11 +379,7 @@ pub fn parse_document_contents(
                 ),
             }
         }
-        // Support aliases at document level (e.g. "*anchor")
-        Some(c) if c == '*' => Ok(crate::parser::document::value::parse_value(
-            source, directives,
-        )?),
-        // Handle explicit value indicator (: value) with missing/null key using tokens
+        Some(c) if c == '*' => parse_scalar_or_value(source, directives, indent_level, ctx),
         Some(c) if c == ':' => {
             let current_indent = source.get_current_indent_level();
             let mut pairs: Vec<(Node, Node)> = Vec::new();
@@ -388,10 +393,10 @@ pub fn parse_document_contents(
                 if source.current() == Some('\t') {
                     let stream =
                         crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-                    return Err(YamlError::from(helpers::parse_error_token(
+                    return Err(parse_err!(
                         &stream,
-                        "Tabs cannot be used as separation after explicit value indicator",
-                    )));
+                        "Tabs cannot be used as separation after explicit value indicator"
+                    ));
                 }
                 crate::utils::skip_whitespace_and_comments(source);
 
@@ -423,13 +428,7 @@ pub fn parse_document_contents(
         }
         Some(c) if c == '?' => unreachable!(),
         Some(c) if c.is_alphanumeric() => {
-            // Rely on the token-based head classifier to decide whether this
-            // line begins a block mapping (e.g., a plain scalar followed by
-            // a ':' at the correct indentation) rather than re-running a
-            // separate character-level peek. This keeps the decision
-            // centralized in `classify_block_head`.
             if matches!(head_kind, BlockHeadKind::BlockMapping) {
-                // Prefer token-based mapping parsing for reliability
                 let base_indent = source.get_current_indent_level();
                 let mut stream =
                     crate::parser::token_stream::TokenStream::new(source, directives, false)?;
@@ -441,15 +440,8 @@ pub fn parse_document_contents(
                         0,
                     )?,
                 )
-            } else if matches!(ctx.collection_type, CollectionType::None) {
-                // Top-level plain multiline scalar (HS5T): parse as a single folded
-                // scalar value using character-level folding rules, avoiding token-
-                // level indentation validation that would reject tabs used purely
-                // as visual indentation inside the scalar text.
-                Ok(parse_plain_multiline_scalar(source, indent_level))
             } else {
-                // In nested contexts, fall back to value parsing logic
-                Ok(parse_value(source, directives)?)
+                parse_scalar_or_value(source, directives, indent_level, ctx)
             }
         }
         Some(c) if c.is_whitespace() => {
@@ -471,32 +463,23 @@ pub fn parse_document_contents(
             )?)
         }
         Some(c) if matches!(c, '<' | '>' | '"' | '\'' | '|') => {
-            // For lines starting with quote characters or block scalar
-            // indicators that could form a complex key, defer entirely to
-            // the head classifier: if it determined this line is a
-            // BlockMapping head (e.g., quoted key followed by ':'), parse a
-            // mapping; otherwise, treat it as a value.
             if matches!(head_kind, BlockHeadKind::BlockMapping) {
                 Ok(parse_mapping(source, indent_level, directives)?)
             } else {
-                Ok(parse_value(source, directives)?)
+                parse_scalar_or_value(source, directives, indent_level, ctx)
             }
         }
-        Some('%') => {
-            // A directive start encountered within content parsing: signal no node here.
-            // The main document loop will handle breaking at directives.
-            Ok(Node::None)
-        }
+        Some('%') => Ok(Node::None),
         Some(c) => {
             let stream = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-            Err(YamlError::from(helpers::parse_error_token(
+            Err(parse_err!(
                 &stream,
                 &format!(
                     "{}{}",
                     crate::error::messages::ERR_UNEXPECTED_CHAR_PREFIX,
                     c
-                ),
-            )))
+                )
+            ))
         }
         None => Ok(Node::None),
     }
