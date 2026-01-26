@@ -1,3 +1,34 @@
+#[cfg(test)]
+mod unit_tests {
+    use super::*;
+    use crate::io::sources::buffer::Buffer;
+    use crate::parser::directives::DirectiveContext;
+
+    #[test]
+    fn test_handle_directives_parses_yaml_and_tag() {
+        let yaml = b"%YAML 1.2\n%TAG !e! tag:example.com,2000:app/\n---\n";
+        let mut buf = Buffer::new(yaml);
+        let directives = handle_directives(&mut buf).expect("Should parse directives");
+        assert_eq!(directives.yaml_version, Some((1, 2)));
+        assert_eq!(directives.tag_prefixes.get("!e!"), Some(&"tag:example.com,2000:app/".to_string()));
+    }
+
+    #[test]
+    fn test_handle_directives_duplicate_yaml_error() {
+        let yaml = b"%YAML 1.2\n%YAML 1.2\n---\n";
+        let mut buf = Buffer::new(yaml);
+        let result = handle_directives(&mut buf);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("Duplicate YAML directive"));
+    }
+
+    #[test]
+    fn test_to_yaml_error_converts_string() {
+        let err = to_yaml_error("custom error message");
+        assert!(err.to_string().contains("custom error message"));
+    }
+}
 /// Helper to parse and merge directives for a document.
 pub(crate) fn handle_directives(source: &mut dyn ISource) -> ParseResult<crate::parser::directives::DirectiveContext> {
     let mut directives = crate::parser::directives::DirectiveContext::new();
