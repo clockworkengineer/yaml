@@ -3,7 +3,7 @@ use crate::nodes::node::Node;
 use crate::nodes::node::Node::Document;
 use crate::parser::directives::parse_directives;
 
-use crate::parser::document::helpers::{self, parse_document_markers, parse_document_end_marker};
+use crate::parser::document::helpers::{self, parse_document_markers, parse_document_end_marker, skip_whitespace_and_comments};
 use crate::parser::document::main_loop::parse_document;
 use crate::parser::ParseResult;
 use crate::{loop_guard_check, loop_guard_init};
@@ -74,7 +74,7 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
             crate::parser::document::loop_guards::MAX_LOOP_ITERATIONS,
             "Stream parsing"
         );
-        crate::utils::skip_whitespace_and_comments(source);
+        skip_whitespace_and_comments(source);
         // Always create a fresh DirectiveContext for each document
         let mut directives = crate::parser::directives::DirectiveContext::new();
         // Parse and apply any directives for this document
@@ -129,12 +129,12 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
             }
         }
         // Ensure we start the document after any trailing blank lines/comments following markers
-        crate::utils::skip_whitespace_and_comments(source);
+        skip_whitespace_and_comments(source);
         let document = parse_document(source, 0, &directives);
 
         // After parsing document, check for invalid trailing content before doc end
         if let Ok(_) = document {
-            crate::utils::skip_whitespace_and_comments(source);
+            skip_whitespace_and_comments(source);
             let st = source.save_state();
             if let Ok(mut ts) =
                 crate::parser::token_stream::TokenStream::new(source, &directives, false)

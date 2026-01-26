@@ -1,3 +1,8 @@
+/// Centralized helper for skipping whitespace and comments in the source.
+/// Use this everywhere in the parser for consistency.
+pub(crate) fn skip_whitespace_and_comments(source: &mut dyn ISource) {
+    crate::utils::skip_whitespace_and_comments(source);
+}
 use crate::parser::ParseResult;
 use crate::io::traits::ISource;
 use crate::parser::document::context::ParsingContext;
