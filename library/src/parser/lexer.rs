@@ -8,6 +8,27 @@ use crate::constants::*;
 use crate::io::traits::ISource;
 use crate::parser::utils::error_helpers;
 use crate::parser::utils::token_scan;
+
+// Helper for tag delimiter logic to avoid borrow checker issues
+fn is_tag_delimiter(source: &mut dyn ISource, ch: char) -> bool {
+    if ch == CHAR_COLON {
+        let state = source.save_state();
+        source.next();
+        let next_ch = source.current();
+        source.restore_state(state);
+        if next_ch.map_or(true, |c| c.is_whitespace() || c == CHAR_NEWLINE) {
+            return true;
+        }
+    }
+    ch.is_whitespace()
+        || ch == CHAR_NEWLINE
+        || ch == CHAR_HASH
+        || ch == CHAR_COMMA
+        || ch == CHAR_LBRACKET
+        || ch == CHAR_RBRACKET
+        || ch == CHAR_LBRACE
+        || ch == CHAR_RBRACE
+}
 use crate::parser::utils::whitespace;
 
 #[cfg(feature = "debug-trace")]
@@ -677,54 +698,24 @@ impl<'a> Lexer<'a> {
 
     /// Scan a tag: !tag or !!tag
     fn scan_tag(&mut self) -> Result<Token, crate::error::YamlError> {
-        self.source.next(); // consume '!'
-
-        let is_double = if self.source.current() == Some('!') {
-            self.source.next();
-            true
-        } else {
-            false
-        };
-
-        let mut tag_name = String::new();
-        while let Some(ch) = self.source.current() {
-            // Allow colon in tag name unless it is followed by whitespace (mapping key separator)
-            if ch == CHAR_COLON {
-                // Peek ahead: if next char is whitespace or end, stop tag
-                let state = self.source.save_state();
-                self.source.next();
-                let next_ch = self.source.current();
-                self.source.restore_state(state);
-                if next_ch.map_or(true, |c| c.is_whitespace() || c == CHAR_NEWLINE) {
-                    break;
+        token_scan::scan_token_with_leading(
+            self.source,
+            |src| {
+                src.next();
+            }, // consume '!'
+            |src, ch| is_tag_delimiter(src, ch),
+            |name| {
+                // Determine if it's a double bang (!!) or single (!)
+                let is_double = name.starts_with('!');
+                if is_double {
+                    Token::Tag(format!("!!{}", &name[1..]))
+                } else {
+                    Token::Tag(format!("!{}", name))
                 }
-            }
-            if ch.is_whitespace()
-                || ch == CHAR_NEWLINE
-                || ch == CHAR_HASH
-                || ch == CHAR_COMMA
-                || ch == CHAR_LBRACKET
-                || ch == CHAR_RBRACKET
-                || ch == CHAR_LBRACE
-                || ch == CHAR_RBRACE
-            {
-                break;
-            }
-            tag_name.push(ch);
-            self.source.next();
-        }
-
-        let tag = if is_double {
-            format!("!!{}", tag_name)
-        } else {
-            format!("!{}", tag_name)
-        };
-
-        // Note: "!" is a valid non-specific tag in YAML 1.2
-        // It means the application should auto-detect the type
-        // Similarly "!!" without a name is also technically valid (though unusual)
-
-        Ok(Token::Tag(tag))
+            },
+            false, // do not allow trailing colon for tags
+            "Empty tag name",
+        )
     }
 
     /// Scan an anchor: &name
@@ -734,7 +725,7 @@ impl<'a> Lexer<'a> {
             |src| {
                 src.next();
             }, // consume '&'
-            |ch| {
+            |_, ch| {
                 ch.is_whitespace()
                     || ch == CHAR_NEWLINE
                     || ch == CHAR_HASH
@@ -757,7 +748,7 @@ impl<'a> Lexer<'a> {
             |src| {
                 src.next();
             }, // consume '*'
-            |ch| {
+            |_, ch| {
                 ch.is_whitespace()
                     || ch == CHAR_NEWLINE
                     || ch == CHAR_HASH
