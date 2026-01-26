@@ -3,9 +3,9 @@ use crate::anchors_debug;
 
 use crate::nodes::node::Node;
 use crate::parser::ParseResult;
+use crate::parser::utils::error_helpers;
 use crate::utils::anchors_helpers;
 use crate::utils::anchors_helpers2;
-use crate::parser::utils::error_helpers;
 use std::collections::HashMap;
 
 /// Recursively collects all anchor definitions from a YAML document tree.
@@ -23,10 +23,7 @@ use std::collections::HashMap;
 ///
 /// Result indicating success or an error string for invalid anchors
 #[allow(dead_code)]
-pub(crate) fn collect_anchors(
-    node: &Node,
-    anchors: &mut HashMap<String, Node>,
-) -> ParseResult<()> {
+pub(crate) fn collect_anchors(node: &Node, anchors: &mut HashMap<String, Node>) -> ParseResult<()> {
     anchors_helpers::traverse_with_error(node, |n| {
         if let Node::Anchored(inner, name) = n {
             if name.trim().is_empty() {
@@ -56,10 +53,7 @@ pub(crate) fn collect_anchors(
 ///
 /// Result indicating success or an error string for undefined aliases
 #[allow(dead_code)]
-pub(crate) fn replace_aliases(
-    node: &mut Node,
-    anchors: &HashMap<String, Node>,
-) -> ParseResult<()> {
+pub(crate) fn replace_aliases(node: &mut Node, anchors: &HashMap<String, Node>) -> ParseResult<()> {
     let mut err: Option<crate::error::YamlError> = None;
     let mut replacer = |n: &mut Node| match n {
         Node::Alias(name) => {
@@ -116,7 +110,8 @@ pub(crate) fn expand_merge_keys(
                             Node::Alias(name) => {
                                 anchors_debug!("Expanding merge alias: {}", name);
                                 match anchors_helpers2::lookup_anchor(anchors, name)
-                                    .and_then(|src| anchors_helpers2::as_mapping(src, name)) {
+                                    .and_then(|src| anchors_helpers2::as_mapping(src, name))
+                                {
                                     Ok(src_pairs) => expanded_pairs.extend(src_pairs.clone()),
                                     Err(e) => {
                                         err = Some(e);
@@ -129,10 +124,17 @@ pub(crate) fn expand_merge_keys(
                                 for it in items.iter() {
                                     match it {
                                         Node::Alias(name) => {
-                                            anchors_debug!("Expanding merge alias in array: {}", name);
+                                            anchors_debug!(
+                                                "Expanding merge alias in array: {}",
+                                                name
+                                            );
                                             match anchors_helpers2::lookup_anchor(anchors, name)
-                                                .and_then(|src| anchors_helpers2::as_mapping(src, name)) {
-                                                Ok(src_pairs) => expanded_pairs.extend(src_pairs.clone()),
+                                                .and_then(|src| {
+                                                    anchors_helpers2::as_mapping(src, name)
+                                                }) {
+                                                Ok(src_pairs) => {
+                                                    expanded_pairs.extend(src_pairs.clone())
+                                                }
                                                 Err(e) => {
                                                     err = Some(e);
                                                     break;
@@ -144,7 +146,8 @@ pub(crate) fn expand_merge_keys(
                                             expanded_pairs.extend(src_pairs.clone());
                                         }
                                         _ => {
-                                            err = Some(error_helpers::invalid_merge_sequence_item());
+                                            err =
+                                                Some(error_helpers::invalid_merge_sequence_item());
                                             break;
                                         }
                                     }
@@ -154,7 +157,10 @@ pub(crate) fn expand_merge_keys(
                                 expanded_pairs.extend(src_pairs.clone());
                             }
                             other => {
-                                err = Some(error_helpers::invalid_merge_value(&format!("{:?}", other)));
+                                err = Some(error_helpers::invalid_merge_value(&format!(
+                                    "{:?}",
+                                    other
+                                )));
                             }
                         }
                         combined.extend(expanded_pairs);

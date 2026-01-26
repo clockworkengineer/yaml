@@ -6,7 +6,6 @@
 /// managing document boundaries and normalization of parsed nodes.
 ///
 mod anchors;
-mod block_scalar;
 mod contents;
 pub mod context;
 pub mod error_builder;
