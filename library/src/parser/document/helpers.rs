@@ -36,7 +36,8 @@ pub(crate) fn handle_directives(
     source: &mut dyn ISource,
 ) -> ParseResult<crate::parser::directives::DirectiveContext> {
     let mut directives = crate::parser::directives::DirectiveContext::new();
-    let parsed_directives = crate::parser::directives::parse_directives(source)?;
+    let parsed_directives = crate::parser::directives::parse_directives(source)
+        .map_err(to_yaml_error)?;
     directives.yaml_version = parsed_directives.yaml_version;
     directives
         .tag_prefixes
@@ -75,7 +76,8 @@ pub(crate) fn parse_document_markers(
     // Check for document start marker (---)
     let has_document_marker = {
         let st = source.save_state();
-        let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+        let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)
+            .map_err(to_yaml_error)?;
         let res = matches!(
             ts.current(),
             Some(crate::parser::lexer::Token::DocumentStart)
@@ -124,18 +126,18 @@ pub(crate) fn parse_document_markers(
                 Some(crate::parser::lexer::Token::Plain(_)) => {
                     // Check if next token is Colon (indicating a mapping key)
                     if let Some(crate::parser::lexer::Token::Colon) = ts.peek().ok().flatten() {
-                        return Err(crate::error::YamlError::from(parse_error_token(
+                        return Err(parse_error_token(
                             &ts,
                             "Mapping keys are not allowed on the same line as document start marker (---).",
-                        )));
+                        ));
                     }
                     // Otherwise, it's a plain scalar which is allowed
                 }
                 Some(crate::parser::lexer::Token::Colon) => {
-                    return Err(crate::error::YamlError::from(parse_error_token(
+                    return Err(parse_error_token(
                         &ts,
                         "Mapping keys are not allowed on the same line as document start marker (---).",
-                    )));
+                    ));
                 }
                 _ => {
                     // Allow other content (quoted strings, anchors, etc.)
@@ -160,7 +162,8 @@ pub(crate) fn parse_document_end_marker(
     crate::utils::skip_whitespace_and_comments(source);
     let has_document_end = {
         let st = source.save_state();
-        let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+        let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)
+            .map_err(to_yaml_error)?;
         let res = matches!(ts.current(), Some(crate::parser::lexer::Token::DocumentEnd));
         source.restore_state(st);
         res
@@ -187,11 +190,12 @@ pub(crate) fn parse_document_end_marker(
                 Some('\n') | Some('\r') | None => break,
                 Some(_) => {
                     let ts =
-                        crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-                    return Err(crate::error::YamlError::from(parse_error_token(
+                        crate::parser::token_stream::TokenStream::new(source, directives, false)
+                            .map_err(to_yaml_error)?;
+                    return Err(parse_error_token(
                         &ts,
                         "Invalid content after document end marker (...)",
-                    )));
+                    ));
                 }
             }
         }
@@ -256,7 +260,7 @@ pub(crate) fn validate_indentation_and_whitespace(
 ) -> ParseResult<()> {
     let state = source.save_state();
     let stream = crate::parser::token_stream::TokenStream::new(source, directives, false)
-        .map_err(crate::error::YamlError::from)?;
+        .map_err(to_yaml_error)?;
     let result = crate::parser::utils::indentation::validate_indentation_tokens(&stream, ctx);
     source.restore_state(state);
     result
