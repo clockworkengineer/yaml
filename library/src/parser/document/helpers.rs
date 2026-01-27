@@ -1,3 +1,24 @@
+// DRY NOTE: All comment parsing and comment spacing validation must use parse_comment_token and validate_comment_spacing_token below.
+//
+// HELPERS DOCUMENTATION
+// =====================
+// This file contains all parsing, validation, and utility helpers for YAML document parsing.
+// Each helper is documented with its purpose, usage, and entry point status.
+//
+// Entry Points:
+//   - Error construction: use error_builder or error_helpers
+//   - TokenStream setup/state: use setup_tokenstream_with_trivia or similar
+//   - Whitespace/comment skipping: use skip_whitespace_and_comments
+//   - Mapping key lookahead: use peek_ahead_for_mapping_key
+//   - Block head classification: use classify_block_head
+//   - Indentation/tab validation: use validate_indentation_and_whitespace
+//   - Comment parsing: use parse_comment_token
+//   - Comment spacing validation: use validate_comment_spacing_token
+//
+// All helpers below are the single entry points for their respective concerns. See DRY_REFACTOR_PLAN_HELPERS.md for details.
+// DRY NOTE: All indentation and tab validation must use validate_indentation_and_whitespace below.
+// DRY NOTE: All block head classification (mapping, sequence, value, etc.) must use classify_block_head below.
+// DRY NOTE: All mapping key lookahead (colon detection, flow depth) must use peek_ahead_for_mapping_key below.
 #[cfg(test)]
 mod unit_tests {
     use super::*;
@@ -36,8 +57,8 @@ pub(crate) fn handle_directives(
     source: &mut dyn ISource,
 ) -> ParseResult<crate::parser::directives::DirectiveContext> {
     let mut directives = crate::parser::directives::DirectiveContext::new();
-    let parsed_directives = crate::parser::directives::parse_directives(source)
-        .map_err(to_yaml_error)?;
+    let parsed_directives =
+        crate::parser::directives::parse_directives(source).map_err(to_yaml_error)?;
     directives.yaml_version = parsed_directives.yaml_version;
     directives
         .tag_prefixes
@@ -56,11 +77,7 @@ pub(crate) fn is_token(
     ts.current().map_or(false, |t| t == kind)
 }
 
-/// Centralized helper for skipping whitespace and comments in the source.
-/// Use this everywhere in the parser for consistency.
-pub(crate) fn skip_whitespace_and_comments(source: &mut dyn ISource) {
-    crate::utils::skip_whitespace_and_comments(source);
-}
+// Whitespace and comment skipping is unified: use crate::utils::skip_whitespace_and_comments(source) directly everywhere.
 use crate::error::YamlError;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
@@ -99,52 +116,49 @@ pub(crate) fn parse_document_markers(
                 break;
             }
         }
-
         // Use token stream to check for forbidden tokens before newline
         let st = source.save_state();
-        if let Ok(mut ts) = crate::parser::token_stream::TokenStream::new(source, directives, false)
-        {
-            // Skip whitespace tokens after ---
-            loop {
-                match ts.current() {
-                    Some(crate::parser::lexer::Token::Indent(_)) => {
-                        ts.next().ok();
+        let early_error = {
+            let mut err = None;
+            if let Ok(mut ts) =
+                crate::parser::token_stream::TokenStream::new(source, directives, false)
+            {
+                loop {
+                    match ts.current() {
+                        Some(crate::parser::lexer::Token::Indent(_)) => {
+                            ts.next().ok();
+                        }
+                        _ => break,
                     }
-                    _ => break,
                 }
-            }
-            // According to YAML 1.2 spec, scalar content after --- is allowed
-            // However, mapping keys (key: value) on the same line as --- are forbidden
-            // Check if this looks like a mapping by looking for Plain followed by Colon
-            match ts.current() {
-                Some(crate::parser::lexer::Token::Newline)
-                | Some(crate::parser::lexer::Token::Eof) => {}
-                Some(crate::parser::lexer::Token::Comment(_)) => {} // allow comment after ---
-                Some(crate::parser::lexer::Token::Tag(_)) => {
-                    // Allow tags - let the content parser handle them
-                }
-                Some(crate::parser::lexer::Token::Plain(_)) => {
-                    // Check if next token is Colon (indicating a mapping key)
-                    if let Some(crate::parser::lexer::Token::Colon) = ts.peek().ok().flatten() {
-                        return Err(parse_error_token(
+                match ts.current() {
+                    Some(crate::parser::lexer::Token::Newline)
+                    | Some(crate::parser::lexer::Token::Eof) => {}
+                    Some(crate::parser::lexer::Token::Comment(_)) => {}
+                    Some(crate::parser::lexer::Token::Tag(_)) => {}
+                    Some(crate::parser::lexer::Token::Plain(_)) => {
+                        if let Some(crate::parser::lexer::Token::Colon) = ts.peek().ok().flatten() {
+                            err = Some(parse_error_token(
+                                &ts,
+                                "Mapping keys are not allowed on the same line as document start marker (---).",
+                            ));
+                        }
+                    }
+                    Some(crate::parser::lexer::Token::Colon) => {
+                        err = Some(parse_error_token(
                             &ts,
                             "Mapping keys are not allowed on the same line as document start marker (---).",
                         ));
                     }
-                    // Otherwise, it's a plain scalar which is allowed
-                }
-                Some(crate::parser::lexer::Token::Colon) => {
-                    return Err(parse_error_token(
-                        &ts,
-                        "Mapping keys are not allowed on the same line as document start marker (---).",
-                    ));
-                }
-                _ => {
-                    // Allow other content (quoted strings, anchors, etc.)
+                    _ => {}
                 }
             }
-        }
+            err
+        };
         source.restore_state(st);
+        if let Some(e) = early_error {
+            return Err(e);
+        }
         // Move to next line if needed
         if source.current() == Some('\n') || source.current() == Some('\r') {
             source.next();
@@ -240,6 +254,9 @@ pub(crate) fn parse_error_token(
         .build_yaml()
 }
 
+/// DRY: Single entry point for indentation and tab validation.
+/// All logic that needs to validate indentation or tab usage must use this function.
+///
 /// Unified indentation and whitespace validation entry point.
 ///
 /// This is the central hook for indentation/whitespace validation used by the
@@ -294,6 +311,9 @@ pub(crate) fn validate_no_tab_indentation_tokens(
 
 use crate::parser::directives::DirectiveContext;
 use crate::parser::lexer::Token;
+/// DRY: Single entry point for mapping key lookahead.
+/// All logic that needs to check for a mapping key (colon detection, flow depth) must use this function.
+///
 /// Peeks ahead to determine if the current content represents a mapping key.
 ///
 /// Looks for a colon (:) character that would indicate the current content
@@ -392,6 +412,9 @@ pub(crate) enum BlockHeadKind {
     None,
 }
 
+/// DRY: Single entry point for block head classification.
+/// All logic that needs to classify the upcoming block head (mapping, sequence, value, etc.) must use this function.
+///
 /// Classify the upcoming block head using TokenStream without consuming
 /// any characters from the underlying source.
 pub(crate) fn classify_block_head(
@@ -489,6 +512,9 @@ pub(crate) fn validate_trailing_content_after_document_end(
 
 /// Parses a comment line from the source.
 ///
+/// DRY ENTRY POINT: All comment parsing must use this function.
+/// Usage: Call this when you need to parse a comment token from the stream.
+///
 /// Consumes a comment starting with '#' and returns the comment text
 /// without the hash character and with trailing whitespace trimmed.
 ///
@@ -515,6 +541,9 @@ pub(crate) fn parse_comment_token(stream: &mut crate::parser::token_stream::Toke
 }
 
 /// Validates that a Comment token is preceded by whitespace, newline, or is at the start of the stream.
+///
+/// DRY ENTRY POINT: All comment spacing validation must use this function.
+/// Usage: Call this before accepting a comment token to ensure correct spacing.
 ///
 /// According to the YAML spec, a comment indicator (#) must be preceded by whitespace or be at the start of a line.
 /// This function checks the previous token in the TokenStream context.
