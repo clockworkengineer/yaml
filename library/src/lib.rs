@@ -1,25 +1,29 @@
+#[macro_use]
+pub mod anchors_debug_macro;
+#[macro_use]
+mod macros;
 
-//! YAML_lib - A lightweight, modular YAML toolkit for Rust
-//!
-//! This library provides a flexible YAML implementation with:
-//! - Core Node type for representing YAML structures
-//! - Parser to build Node trees from streams
-//! - Multiple format serializers (YAML, JSON, XML, TOML, Bencode)
-//! - File and buffer I/O abstractions
-//! - Pretty-printing utilities
-//! - Unicode-aware file handling
-//!
-//! Minimum supported Rust version: 1.88.0
-//!
-//! ## Feature Flags
-//!
-//! - `std` (default): Enable standard library support
-//! - `alloc` (default): Enable allocation support (required for most features)
-//! - `embedded`: Enable embedded systems optimizations and limits
-//! - `parse-only`: Only enable parsing, disable serialization
-//! - `stringify`: Enable YAML stringification (requires `alloc`)
-//! - `format-converters`: Enable JSON, XML, TOML, Bencode converters
-//! - `file-io`: Enable file I/O operations (requires `std`)
+/// YAML_lib - A lightweight, modular YAML toolkit for Rust
+///
+/// This library provides a flexible YAML implementation with:
+/// - Core Node type for representing YAML structures
+/// - Parser to build Node trees from streams
+/// - Multiple format serializers (YAML, JSON, XML, TOML, Bencode)
+/// - File and buffer I/O abstractions
+/// - Pretty-printing utilities
+/// - Unicode-aware file handling
+///
+/// Minimum supported Rust version: 1.88.0
+///
+/// ## Feature Flags
+///
+/// - `std` (default): Enable standard library support
+/// - `alloc` (default): Enable allocation support (required for most features)
+/// - `embedded`: Enable embedded systems optimizations and limits
+/// - `parse-only`: Only enable parsing, disable serialization
+/// - `stringify`: Enable YAML stringification (requires `alloc`)
+/// - `format-converters`: Enable JSON, XML, TOML, Bencode converters
+/// - `file-io`: Enable file I/O operations (requires `std`)
 
 #[cfg_attr(not(feature = "std"), no_std)]
 

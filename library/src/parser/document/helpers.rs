@@ -1,11 +1,231 @@
-//! Module: parser/document/helpers.rs
+// DRY NOTE: All comment parsing and comment spacing validation must use parse_comment_token and validate_comment_spacing_token below.
+//
+// HELPERS DOCUMENTATION
+// =====================
+// This file contains all parsing, validation, and utility helpers for YAML document parsing.
+// Each helper is documented with its purpose, usage, and entry point status.
+//
+// Entry Points:
+//   - Error construction: use error_builder or error_helpers
+//   - TokenStream setup/state: use setup_tokenstream_with_trivia or similar
+//   - Whitespace/comment skipping: use skip_whitespace_and_comments
+//   - Mapping key lookahead: use peek_ahead_for_mapping_key
+//   - Block head classification: use classify_block_head
+//   - Indentation/tab validation: use validate_indentation_and_whitespace
+//   - Comment parsing: use parse_comment_token
+//   - Comment spacing validation: use validate_comment_spacing_token
+//
+// All helpers below are the single entry points for their respective concerns. See DRY_REFACTOR_PLAN_HELPERS.md for details.
+// DRY NOTE: All indentation and tab validation must use validate_indentation_and_whitespace below.
+// DRY NOTE: All block head classification (mapping, sequence, value, etc.) must use classify_block_head below.
+// DRY NOTE: All mapping key lookahead (colon detection, flow depth) must use peek_ahead_for_mapping_key below.
+#[cfg(test)]
+mod unit_tests {
+    use super::*;
+    use crate::io::sources::buffer::Buffer;
 
+    #[test]
+    fn test_handle_directives_parses_yaml_and_tag() {
+        let yaml = b"%YAML 1.2\n%TAG !e! tag:example.com,2000:app/\n---\n";
+        let mut buf = Buffer::new(yaml);
+        let directives = handle_directives(&mut buf).expect("Should parse directives");
+        assert_eq!(directives.yaml_version, Some((1, 2)));
+        assert_eq!(
+            directives.tag_prefixes.get("!e!"),
+            Some(&"tag:example.com,2000:app/".to_string())
+        );
+    }
+
+    #[test]
+    fn test_handle_directives_duplicate_yaml_error() {
+        let yaml = b"%YAML 1.2\n%YAML 1.2\n---\n";
+        let mut buf = Buffer::new(yaml);
+        let result = handle_directives(&mut buf);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("Duplicate YAML directive"));
+    }
+
+    #[test]
+    fn test_to_yaml_error_converts_string() {
+        let err = to_yaml_error("custom error message");
+        assert!(err.to_string().contains("custom error message"));
+    }
+}
+/// Helper to parse and merge directives for a document.
+pub(crate) fn handle_directives(
+    source: &mut dyn ISource,
+) -> ParseResult<crate::parser::directives::DirectiveContext> {
+    let mut directives = crate::parser::directives::DirectiveContext::new();
+    let parsed_directives =
+        crate::parser::directives::parse_directives(source).map_err(to_yaml_error)?;
+    directives.yaml_version = parsed_directives.yaml_version;
+    directives
+        .tag_prefixes
+        .extend(parsed_directives.tag_prefixes);
+    Ok(directives)
+}
+/// Helper to convert any error to YamlError for consistent error handling.
+pub(crate) fn to_yaml_error<E: std::fmt::Display>(err: E) -> YamlError {
+    YamlError::new(crate::error::ErrorKind::ParseError, format!("{}", err))
+}
+/// Helper to check if the current token matches a given kind.
+pub(crate) fn is_token(
+    ts: &crate::parser::token_stream::TokenStream,
+    kind: &crate::parser::lexer::Token,
+) -> bool {
+    ts.current().map_or(false, |t| t == kind)
+}
+
+// Whitespace and comment skipping is unified: use crate::utils::skip_whitespace_and_comments(source) directly everywhere.
+use crate::error::YamlError;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::parser::ParseResult;
 use crate::parser::document::context::ParsingContext;
 
-use crate::error::YamlError;
+/// Checks for and processes the document start marker (---).
+/// Returns an error if invalid content is found after the marker.
+pub(crate) fn parse_document_markers(
+    source: &mut dyn ISource,
+    directives: &DirectiveContext,
+) -> ParseResult<()> {
+    // Check for document start marker (---)
+    let has_document_marker = {
+        let st = source.save_state();
+        let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)
+            .map_err(to_yaml_error)?;
+        let res = matches!(
+            ts.current(),
+            Some(crate::parser::lexer::Token::DocumentStart)
+        );
+        source.restore_state(st);
+        res
+    };
+    if has_document_marker {
+        source.next();
+        source.next();
+        source.next();
+        // After --- marker, only allow whitespace, comments, block scalar indicators, or tags until end of line.
+        // Tabs immediately after the marker act as separation, not indentation (K54U), so skip
+        // horizontal whitespace at the character level before invoking the token stream.
+        while let Some(c) = source.current() {
+            if c == ' ' || c == '\t' {
+                source.next();
+            } else {
+                break;
+            }
+        }
+        // Use token stream to check for forbidden tokens before newline
+        let st = source.save_state();
+        let early_error = {
+            let mut err = None;
+            if let Ok(mut ts) =
+                crate::parser::token_stream::TokenStream::new(source, directives, false)
+            {
+                loop {
+                    match ts.current() {
+                        Some(crate::parser::lexer::Token::Indent(_)) => {
+                            ts.next().ok();
+                        }
+                        _ => break,
+                    }
+                }
+                match ts.current() {
+                    Some(crate::parser::lexer::Token::Newline)
+                    | Some(crate::parser::lexer::Token::Eof) => {}
+                    Some(crate::parser::lexer::Token::Comment(_)) => {}
+                    Some(crate::parser::lexer::Token::Tag(_)) => {}
+                    Some(crate::parser::lexer::Token::Plain(_)) => {
+                        if let Some(crate::parser::lexer::Token::Colon) = ts.peek().ok().flatten() {
+                            err = Some(parse_error_token(
+                                &ts,
+                                "Mapping keys are not allowed on the same line as document start marker (---).",
+                            ));
+                        }
+                    }
+                    Some(crate::parser::lexer::Token::Colon) => {
+                        err = Some(parse_error_token(
+                            &ts,
+                            "Mapping keys are not allowed on the same line as document start marker (---).",
+                        ));
+                    }
+                    _ => {}
+                }
+            }
+            err
+        };
+        source.restore_state(st);
+        if let Some(e) = early_error {
+            return Err(e);
+        }
+        // Move to next line if needed
+        if source.current() == Some('\n') || source.current() == Some('\r') {
+            source.next();
+        }
+    }
+    Ok(())
+}
+
+/// Checks for and processes the document end marker (...).
+/// Returns an error if invalid content is found after the marker.
+pub(crate) fn parse_document_end_marker(
+    source: &mut dyn ISource,
+    directives: &DirectiveContext,
+) -> ParseResult<()> {
+    crate::utils::skip_whitespace_and_comments(source);
+    let has_document_end = {
+        let st = source.save_state();
+        let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)
+            .map_err(to_yaml_error)?;
+        let res = matches!(ts.current(), Some(crate::parser::lexer::Token::DocumentEnd));
+        source.restore_state(st);
+        res
+    };
+    if has_document_end {
+        source.next();
+        source.next();
+        source.next();
+        // Validate only inline content after '...' up to end-of-line
+        loop {
+            match source.current() {
+                Some(' ') | Some('\t') => {
+                    source.next();
+                }
+                Some('#') => {
+                    // Inline comment: consume until end of line
+                    while let Some(c) = source.current() {
+                        if c == '\n' || c == '\r' {
+                            break;
+                        }
+                        source.next();
+                    }
+                }
+                Some('\n') | Some('\r') | None => break,
+                Some(_) => {
+                    let ts =
+                        crate::parser::token_stream::TokenStream::new(source, directives, false)
+                            .map_err(to_yaml_error)?;
+                    return Err(parse_error_token(
+                        &ts,
+                        "Invalid content after document end marker (...)",
+                    ));
+                }
+            }
+        }
+        // Consume one optional Windows or Unix newline if present
+        if source.current() == Some('\r') {
+            source.next();
+            if source.current() == Some('\n') {
+                source.next();
+            }
+        } else if source.current() == Some('\n') {
+            source.next();
+        }
+    }
+    Ok(())
+}
+// ...existing code...
 /// Creates a formatted error message with current token context information (TokenStream-based).
 ///
 /// Generates an error message that includes the current token and stream position for debugging.
@@ -34,6 +254,9 @@ pub(crate) fn parse_error_token(
         .build_yaml()
 }
 
+/// DRY: Single entry point for indentation and tab validation.
+/// All logic that needs to validate indentation or tab usage must use this function.
+///
 /// Unified indentation and whitespace validation entry point.
 ///
 /// This is the central hook for indentation/whitespace validation used by the
@@ -54,7 +277,7 @@ pub(crate) fn validate_indentation_and_whitespace(
 ) -> ParseResult<()> {
     let state = source.save_state();
     let stream = crate::parser::token_stream::TokenStream::new(source, directives, false)
-        .map_err(crate::error::YamlError::from)?;
+        .map_err(to_yaml_error)?;
     let result = crate::parser::utils::indentation::validate_indentation_tokens(&stream, ctx);
     source.restore_state(state);
     result
@@ -86,10 +309,11 @@ pub(crate) fn validate_no_tab_indentation_tokens(
     crate::parser::utils::indentation::validate_indentation_tokens(stream, ctx)
 }
 
-
-
 use crate::parser::directives::DirectiveContext;
 use crate::parser::lexer::Token;
+/// DRY: Single entry point for mapping key lookahead.
+/// All logic that needs to check for a mapping key (colon detection, flow depth) must use this function.
+///
 /// Peeks ahead to determine if the current content represents a mapping key.
 ///
 /// Looks for a colon (:) character that would indicate the current content
@@ -188,6 +412,9 @@ pub(crate) enum BlockHeadKind {
     None,
 }
 
+/// DRY: Single entry point for block head classification.
+/// All logic that needs to classify the upcoming block head (mapping, sequence, value, etc.) must use this function.
+///
 /// Classify the upcoming block head using TokenStream without consuming
 /// any characters from the underlying source.
 pub(crate) fn classify_block_head(
@@ -285,6 +512,9 @@ pub(crate) fn validate_trailing_content_after_document_end(
 
 /// Parses a comment line from the source.
 ///
+/// DRY ENTRY POINT: All comment parsing must use this function.
+/// Usage: Call this when you need to parse a comment token from the stream.
+///
 /// Consumes a comment starting with '#' and returns the comment text
 /// without the hash character and with trailing whitespace trimmed.
 ///
@@ -311,6 +541,9 @@ pub(crate) fn parse_comment_token(stream: &mut crate::parser::token_stream::Toke
 }
 
 /// Validates that a Comment token is preceded by whitespace, newline, or is at the start of the stream.
+///
+/// DRY ENTRY POINT: All comment spacing validation must use this function.
+/// Usage: Call this before accepting a comment token to ensure correct spacing.
 ///
 /// According to the YAML spec, a comment indicator (#) must be preceded by whitespace or be at the start of a line.
 /// This function checks the previous token in the TokenStream context.

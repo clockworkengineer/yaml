@@ -1,160 +1,13 @@
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::nodes::node::Node::Document;
-use crate::parser::directives::parse_directives;
 
-use crate::parser::document::helpers;
-use crate::parser::document::main_loop::parse_document;
 use crate::parser::ParseResult;
+use crate::parser::document::helpers::{
+    self, handle_directives, parse_document_end_marker, parse_document_markers, to_yaml_error,
+};
+use crate::parser::document::main_loop::parse_document;
 use crate::{loop_guard_check, loop_guard_init};
-
-/// Checks for and processes the document start marker (---).
-/// Returns an error if invalid content is found after the marker.
-fn parse_document_markers(
-    source: &mut dyn ISource,
-    directives: &crate::parser::directives::DirectiveContext,
-) -> ParseResult<()> {
-    // Check for document start marker (---)
-    let has_document_marker = {
-        let st = source.save_state();
-        let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-        let res = matches!(
-            ts.current(),
-            Some(crate::parser::lexer::Token::DocumentStart)
-        );
-        source.restore_state(st);
-        res
-    };
-    if has_document_marker {
-        source.next();
-        source.next();
-        source.next();
-        // After --- marker, only allow whitespace, comments, block scalar indicators, or tags until end of line.
-        // Tabs immediately after the marker act as separation, not indentation (K54U), so skip
-        // horizontal whitespace at the character level before invoking the token stream.
-        while let Some(c) = source.current() {
-            if c == ' ' || c == '\t' {
-                source.next();
-            } else {
-                break;
-            }
-        }
-
-        // Use token stream to check for forbidden tokens before newline
-        let st = source.save_state();
-        if let Ok(mut ts) = crate::parser::token_stream::TokenStream::new(source, directives, false)
-        {
-            // Skip whitespace tokens after ---
-            loop {
-                match ts.current() {
-                    Some(crate::parser::lexer::Token::Indent(_)) => {
-                        ts.next().ok();
-                    }
-                    _ => break,
-                }
-            }
-            // According to YAML 1.2 spec, scalar content after --- is allowed
-            // However, mapping keys (key: value) on the same line as --- are forbidden
-            // Check if this looks like a mapping by looking for Plain followed by Colon
-            match ts.current() {
-                Some(crate::parser::lexer::Token::Newline)
-                | Some(crate::parser::lexer::Token::Eof) => {}
-                Some(crate::parser::lexer::Token::Comment(_)) => {} // allow comment after ---
-                Some(crate::parser::lexer::Token::Tag(_)) => {
-                    // Allow tags - let the content parser handle them
-                }
-                Some(crate::parser::lexer::Token::Plain(_)) => {
-                    // Check if next token is Colon (indicating a mapping key)
-                    if let Some(crate::parser::lexer::Token::Colon) = ts.peek().ok().flatten() {
-                        return Err(crate::error::YamlError::from(
-                            helpers::parse_error_token(
-                                &ts,
-                                "Mapping keys are not allowed on the same line as document start marker (---).",
-                            ),
-                        ));
-                    }
-                    // Otherwise, it's a plain scalar which is allowed
-                }
-                Some(crate::parser::lexer::Token::Colon) => {
-                    return Err(crate::error::YamlError::from(
-                        helpers::parse_error_token(
-                            &ts,
-                            "Mapping keys are not allowed on the same line as document start marker (---).",
-                        ),
-                    ));
-                }
-                _ => {
-                    // Allow other content (quoted strings, anchors, etc.)
-                }
-            }
-        }
-        source.restore_state(st);
-        // Move to next line if needed
-        if source.current() == Some('\n') || source.current() == Some('\r') {
-            source.next();
-        }
-    }
-    Ok(())
-}
-
-/// Checks for and processes the document end marker (...).
-/// Returns an error if invalid content is found after the marker.
-fn parse_document_end_marker(
-    source: &mut dyn ISource,
-    directives: &crate::parser::directives::DirectiveContext,
-) -> ParseResult<()> {
-    crate::utils::skip_whitespace_and_comments(source);
-    let has_document_end = {
-        let st = source.save_state();
-        let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-        let res = matches!(ts.current(), Some(crate::parser::lexer::Token::DocumentEnd));
-        source.restore_state(st);
-        res
-    };
-    if has_document_end {
-        source.next();
-        source.next();
-        source.next();
-        // Validate only inline content after '...' up to end-of-line
-        loop {
-            match source.current() {
-                Some(' ') | Some('\t') => {
-                    source.next();
-                }
-                Some('#') => {
-                    // Inline comment: consume until end of line
-                    while let Some(c) = source.current() {
-                        if c == '\n' || c == '\r' {
-                            break;
-                        }
-                        source.next();
-                    }
-                }
-                Some('\n') | Some('\r') | None => break,
-                Some(_) => {
-                    let ts =
-                        crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-                    return Err(crate::error::YamlError::from(
-                        helpers::parse_error_token(
-                            &ts,
-                            "Invalid content after document end marker (...)",
-                        ),
-                    ));
-                }
-            }
-        }
-        // Consume one optional Windows or Unix newline if present
-        if source.current() == Some('\r') {
-            source.next();
-            if source.current() == Some('\n') {
-                source.next();
-            }
-        } else if source.current() == Some('\n') {
-            source.next();
-        }
-    }
-    Ok(())
-}
 
 /// Checks for explicit directives and ensures a document follows them.
 /// Returns an error if directives are not followed by a document.
@@ -168,19 +21,19 @@ fn check_explicit_directives(
         let st = source.save_state();
         let mut ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
         ts.skip_trivia()?;
-        match ts.current() {
-            Some(crate::parser::lexer::Token::DocumentStart) => {}
-            Some(crate::parser::lexer::Token::DocumentEnd)
-            | Some(crate::parser::lexer::Token::Eof)
-            | None => {
-                source.restore_state(st);
-                let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-                return Err(helpers::parse_error_token(
-                    &ts,
-                    "Directive must be followed by a document",
-                ));
-            }
-            _ => {}
+        use crate::parser::lexer::Token;
+        if helpers::is_token(&ts, &Token::DocumentStart) {
+            // ok
+        } else if helpers::is_token(&ts, &Token::DocumentEnd)
+            || helpers::is_token(&ts, &Token::Eof)
+            || ts.current().is_none()
+        {
+            source.restore_state(st);
+            let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+            return Err(helpers::parse_error_token(
+                &ts,
+                "Directive must be followed by a document",
+            ));
         }
         source.restore_state(st);
     }
@@ -222,15 +75,8 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
             "Stream parsing"
         );
         crate::utils::skip_whitespace_and_comments(source);
-        // Always create a fresh DirectiveContext for each document
-        let mut directives = crate::parser::directives::DirectiveContext::new();
-        // Parse and apply any directives for this document
-        let parsed_directives = parse_directives(source)?;
-        // Merge parsed directives into the new context
-        directives.yaml_version = parsed_directives.yaml_version;
-        directives
-            .tag_prefixes
-            .extend(parsed_directives.tag_prefixes);
+        // Parse and merge directives using helper
+        let directives = handle_directives(source)?;
         check_explicit_directives(source, &directives)?;
 
         // Detect if there is a document start marker (---) at the current position
@@ -268,7 +114,7 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
                 );
                 source.restore_state(st2);
                 if next_is_start {
-                    parse_document_markers(source, &directives).map_err(|e| e.to_string())?;
+                    parse_document_markers(source, &directives).map_err(to_yaml_error)?;
                     // continue the loop to collapse runs of '---'
                     continue;
                 }
@@ -395,7 +241,7 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
                 return Err(err);
             }
         }
-        parse_document_end_marker(source, &directives).map_err(|e| e.to_string())?;
+        parse_document_end_marker(source, &directives).map_err(to_yaml_error)?;
         if !source.more() {
             break;
         }

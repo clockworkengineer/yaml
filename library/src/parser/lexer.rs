@@ -6,10 +6,33 @@
 
 use crate::constants::*;
 use crate::io::traits::ISource;
+use crate::parser::utils::error_helpers;
+use crate::parser::utils::token_scan;
+
+// Helper for tag delimiter logic to avoid borrow checker issues
+fn is_tag_delimiter(source: &mut dyn ISource, ch: char) -> bool {
+    if ch == CHAR_COLON {
+        let state = source.save_state();
+        source.next();
+        let next_ch = source.current();
+        source.restore_state(state);
+        if next_ch.map_or(true, |c| c.is_whitespace() || c == CHAR_NEWLINE) {
+            return true;
+        }
+    }
+    ch.is_whitespace()
+        || ch == CHAR_NEWLINE
+        || ch == CHAR_HASH
+        || ch == CHAR_COMMA
+        || ch == CHAR_LBRACKET
+        || ch == CHAR_RBRACKET
+        || ch == CHAR_LBRACE
+        || ch == CHAR_RBRACE
+}
 
 #[cfg(feature = "debug-trace")]
 #[inline]
-fn lexer_log(msg: String) {
+pub fn lexer_log(msg: String) {
     #[cfg(feature = "std")]
     {
         if let Ok(v) = std::env::var("YAML_TRACE_LEXER") {
@@ -167,8 +190,7 @@ impl<'a> Lexer<'a> {
         let ch = match self.source.current() {
             Some(c) => c,
             None => {
-                #[cfg(feature = "debug-trace")]
-                lexer_log("Emitting Token::Eof".to_string());
+                lexer_debug!("Emitting Token::Eof");
                 return Ok(Some(Token::Eof));
             }
         };
@@ -192,14 +214,16 @@ impl<'a> Lexer<'a> {
                 Ok(Some(Token::Comment(comment)))
             }
             '!' => {
-                #[cfg(feature = "debug-trace")]
-                lexer_log("Emitting Token::Tag".to_string());
-                Ok(Some(self.scan_tag()?))
+                let tok = self.scan_tag()?;
+                let result = Some(tok.clone());
+                lexer_debug!("Emitting Token::{:?}", tok);
+                Ok(result)
             }
             '&' => {
-                #[cfg(feature = "debug-trace")]
-                lexer_log("Emitting Token::Anchor".to_string());
-                Ok(Some(self.scan_anchor()?))
+                let tok = self.scan_anchor()?;
+                let result = Some(tok.clone());
+                lexer_debug!("Emitting Token::{:?}", tok);
+                Ok(result)
             }
             CHAR_ASTERISK => {
                 // Disambiguate between an alias token (e.g. "*anchor") and
@@ -229,28 +253,26 @@ impl<'a> Lexer<'a> {
                 );
 
                 if treat_as_alias {
-                    #[cfg(feature = "debug-trace")]
-                    lexer_log("Emitting Token::Alias".to_string());
-                    Ok(Some(self.scan_alias()?))
+                    let tok = self.scan_alias()?;
+                    let result = Some(tok.clone());
+                    lexer_debug!("Emitting Token::{:?}", tok);
+                    Ok(result)
                 } else {
-                    #[cfg(feature = "debug-trace")]
-                    lexer_log("Emitting Token::Plain (leading '*')".to_string());
+                    lexer_debug!("Emitting Token::Plain (leading '*')");
                     Ok(Some(self.scan_plain_scalar()?))
                 }
             }
             CHAR_LBRACE => {
                 self.source.next();
                 self.last_was_linebreak = false;
-                #[cfg(feature = "debug-trace")]
-                lexer_log("Emitting Token::FlowMappingStart".to_string());
+                lexer_debug!("Emitting Token::FlowMappingStart");
                 Ok(Some(Token::FlowMappingStart))
             }
             CHAR_RBRACE => {
-                #[cfg(feature = "debug-trace")]
-                lexer_log("Emitting Token::FlowMappingEnd".to_string());
                 self.source.next();
                 self.validate_post_flow_closer('}')?;
                 self.last_was_linebreak = false;
+                lexer_debug!("Emitting Token::FlowMappingEnd");
                 Ok(Some(Token::FlowMappingEnd))
             }
             CHAR_LBRACKET => {
@@ -283,7 +305,7 @@ impl<'a> Lexer<'a> {
                             "DEBUG: Comment after comma with no whitespace at {:?}",
                             self.source.current()
                         );
-                        return Err(crate::parser::document::error_builder::syntax_error(
+                        return Err(error_helpers::syntax_error(
                             self.source,
                             "YAML syntax error: comment must be preceded by whitespace after ',' in flow collection",
                         ));
@@ -400,6 +422,21 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Utility: Peek next non-whitespace character without consuming
+    fn peek_next_non_whitespace(&mut self) -> Option<char> {
+        let state = self.source.save_state();
+        while let Some(ch) = self.source.current() {
+            if ch == CHAR_SPACE || ch == CHAR_TAB {
+                self.source.next();
+            } else {
+                break;
+            }
+        }
+        let result = self.source.current();
+        self.source.restore_state(state);
+        result
+    }
+
     /// Skip horizontal whitespace (space and tab)
     fn skip_horizontal_whitespace(&mut self) {
         while let Some(ch) = self.source.current() {
@@ -477,7 +514,7 @@ impl<'a> Lexer<'a> {
                         | Some(CHAR_CARRIAGE_RETURN)
                         | None
                 ) {
-                    return Err(crate::parser::document::error_builder::forbidden_error(
+                    return Err(error_helpers::forbidden_error(
                         self.source,
                         "Tabs",
                         "as indentation in YAML flow collections",
@@ -488,15 +525,13 @@ impl<'a> Lexer<'a> {
             let indent = self.scan_indentation(self.in_flow)?;
             self.at_line_start = false;
             self.last_indent = indent;
-            #[cfg(feature = "debug-trace")]
-            lexer_log(format!("Emitting Token::Indent({})", indent));
+            lexer_debug!("Emitting Token::Indent({})", indent);
             return Ok(Some(Token::Indent(indent)));
         } else if self.last_indent > 0 {
             // No leading space/tab, but previous indent was > 0: emit Indent(0) to signal dedent
             self.at_line_start = false;
             self.last_indent = 0;
-            #[cfg(feature = "debug-trace")]
-            lexer_log("Emitting Token::Indent(0) (dedent to top level)".to_string());
+            lexer_debug!("Emitting Token::Indent(0) (dedent to top level)");
             return Ok(Some(Token::Indent(0)));
         }
         Ok(None)
@@ -513,98 +548,44 @@ impl<'a> Lexer<'a> {
                 count += 1;
                 self.source.next();
             } else if ch == CHAR_TAB {
-                // Special-case: a leading tab at column 0 in block
-                // context that directly precedes a flow collection
-                // delimiter ("[", "]", "{", or "}") should be
-                // treated as flow whitespace rather than indentation.
-                // This matches YAML test 6CA3, where a tab is used
-                // before a flow sequence start/end.
+                // Special-case: a leading tab at column 0 in block context that directly precedes a flow collection delimiter
                 if !in_flow && count == 0 && first_char_is_tab {
-                    let state = self.source.save_state();
-                    // Temporarily consume spaces/tabs to inspect the
-                    // next non-whitespace character on this line.
-                    while let Some(c) = self.source.current() {
-                        if c == CHAR_SPACE || c == CHAR_TAB {
-                            self.source.next();
-                        } else {
-                            break;
-                        }
-                    }
-                    let next_non_ws = self.source.current();
-                    self.source.restore_state(state);
-
                     if matches!(
-                        next_non_ws,
+                        self.peek_next_non_whitespace(),
                         Some(CHAR_LBRACKET)
                             | Some(CHAR_RBRACKET)
                             | Some(CHAR_LBRACE)
                             | Some(CHAR_RBRACE)
                     ) {
-                        // Consume the leading tab as horizontal
-                        // whitespace and do not contribute to
-                        // indentation level.
                         self.source.next();
                         continue;
                     }
                 }
-                // Tabs are forbidden for indentation in YAML block context
-                // but allowed as whitespace in flow context (inside [], {}).
-                // Flow-specific indentation checks (e.g., tabs immediately
-                // after a newline inside a flow collection) are handled in
-                // `emit_indentation_token_if_any`.
                 if in_flow {
-                    // In flow context, treat tabs here as horizontal
-                    // whitespace and do not contribute to indentation level.
                     self.source.next();
                     continue;
                 }
-
-                // Check if this is a tab at the very start (primary indentation)
                 if count == 0 && first_char_is_tab {
                     tab_at_start = true;
                 }
-
-                // In block context, reject tabs as primary indentation
-                // (tab at column 0 or before any spaces), unless the line
-                // contains only whitespace (blank line). Check if there's
-                // any non-whitespace content after the tabs/spaces.
                 if tab_at_start {
-                    let state = self.source.save_state();
-                    // Consume all remaining spaces/tabs on this line
-                    while let Some(c) = self.source.current() {
-                        if c == CHAR_SPACE || c == CHAR_TAB {
-                            self.source.next();
-                        } else {
-                            break;
-                        }
-                    }
-                    let next_non_ws = self.source.current();
-                    self.source.restore_state(state);
-
-                    // If the line is blank (only whitespace before newline/EOF),
-                    // allow the tabs. Otherwise, reject them as indentation.
                     if !matches!(
-                        next_non_ws,
+                        self.peek_next_non_whitespace(),
                         Some(CHAR_NEWLINE) | Some(CHAR_CARRIAGE_RETURN) | None
                     ) {
-                        return Err(crate::parser::document::error_builder::forbidden_error(
+                        return Err(error_helpers::forbidden_error(
                             self.source,
                             "Tabs",
                             "as indentation in YAML",
                         ));
                     }
                 }
-
-                // Tab after spaces: allow it through (e.g., in block scalar
-                // content). Treat tab as advancing by 1 for indent counting
-                // purposes.
                 count += 1;
                 self.source.next();
             } else {
                 break;
             }
         }
-        // Indentation consumed; reset linebreak flag
         self.last_was_linebreak = false;
         Ok(count)
     }
@@ -613,21 +594,13 @@ impl<'a> Lexer<'a> {
     /// If in flow context, suppress newline tokens and continue scanning.
     fn handle_newline(&mut self, is_cr: bool) -> Result<Option<Token>, crate::error::YamlError> {
         if is_cr {
-            #[cfg(feature = "debug-trace")]
-            lexer_log(format!(
-                "Emitting Token::Newline (CR) (in_flow={})",
-                self.in_flow
-            ));
+            lexer_debug!("Emitting Token::Newline (CR) (in_flow={})", self.in_flow);
             self.source.next();
             if self.source.current() == Some(CHAR_NEWLINE) {
                 self.source.next();
             }
         } else {
-            #[cfg(feature = "debug-trace")]
-            lexer_log(format!(
-                "Emitting Token::Newline (in_flow={})",
-                self.in_flow
-            ));
+            lexer_debug!("Emitting Token::Newline (in_flow={})", self.in_flow);
             self.source.next();
         }
 
@@ -682,7 +655,7 @@ impl<'a> Lexer<'a> {
         }
         if let Some('#') = self.source.current() {
             if !seen_whitespace {
-                return Err(crate::parser::document::error_builder::syntax_error(
+                return Err(error_helpers::syntax_error(
                     self.source,
                     &format!(
                         "YAML syntax error: comment must be preceded by whitespace after '{}' in flow collection",
@@ -704,7 +677,7 @@ impl<'a> Lexer<'a> {
             {
                 // Check if it's alphanumeric which clearly indicates invalid adjacent content
                 if c.is_alphanumeric() {
-                    return Err(crate::parser::document::error_builder::syntax_error(
+                    return Err(error_helpers::syntax_error(
                         self.source,
                         &format!(
                             "YAML syntax error: Invalid content '{}' immediately after '{}' - whitespace or newline required",
@@ -719,132 +692,70 @@ impl<'a> Lexer<'a> {
 
     /// Scan a tag: !tag or !!tag
     fn scan_tag(&mut self) -> Result<Token, crate::error::YamlError> {
-        self.source.next(); // consume '!'
-
-        let is_double = if self.source.current() == Some('!') {
-            self.source.next();
-            true
-        } else {
-            false
-        };
-
-        let mut tag_name = String::new();
-        while let Some(ch) = self.source.current() {
-            // Allow colon in tag name unless it is followed by whitespace (mapping key separator)
-            if ch == CHAR_COLON {
-                // Peek ahead: if next char is whitespace or end, stop tag
-                let state = self.source.save_state();
-                self.source.next();
-                let next_ch = self.source.current();
-                self.source.restore_state(state);
-                if next_ch.map_or(true, |c| c.is_whitespace() || c == CHAR_NEWLINE) {
-                    break;
+        token_scan::scan_token_with_leading(
+            self.source,
+            |src| {
+                src.next();
+            }, // consume '!'
+            |src, ch| is_tag_delimiter(src, ch),
+            |name| {
+                // Determine if it's a double bang (!!) or single (!)
+                let is_double = name.starts_with('!');
+                if is_double {
+                    Token::Tag(format!("!!{}", &name[1..]))
+                } else {
+                    Token::Tag(format!("!{}", name))
                 }
-            }
-            if ch.is_whitespace()
-                || ch == CHAR_NEWLINE
-                || ch == CHAR_HASH
-                || ch == CHAR_COMMA
-                || ch == CHAR_LBRACKET
-                || ch == CHAR_RBRACKET
-                || ch == CHAR_LBRACE
-                || ch == CHAR_RBRACE
-            {
-                break;
-            }
-            tag_name.push(ch);
-            self.source.next();
-        }
-
-        let tag = if is_double {
-            format!("!!{}", tag_name)
-        } else {
-            format!("!{}", tag_name)
-        };
-
-        // Note: "!" is a valid non-specific tag in YAML 1.2
-        // It means the application should auto-detect the type
-        // Similarly "!!" without a name is also technically valid (though unusual)
-
-        Ok(Token::Tag(tag))
+            },
+            false, // do not allow trailing colon for tags
+            "Empty tag name",
+        )
     }
 
     /// Scan an anchor: &name
     fn scan_anchor(&mut self) -> Result<Token, crate::error::YamlError> {
-        self.source.next(); // consume '&'
-
-        let mut name = String::new();
-        while let Some(ch) = self.source.current() {
-            // Per YAML 1.2, anchor names (ns-anchor-char) may contain
-            // most printable characters, including ':' and many symbols.
-            // We stop only at whitespace, newlines, comments, and flow
-            // indicators. This allows anchors like '&:@*!$"<foo>:' as
-            // required by the official test suite (W5VH).
-            if ch.is_whitespace()
-                || ch == CHAR_NEWLINE
-                || ch == CHAR_HASH
-                || ch == CHAR_COMMA
-                || ch == CHAR_LBRACKET
-                || ch == CHAR_RBRACKET
-                || ch == CHAR_LBRACE
-                || ch == CHAR_RBRACE
-            {
-                break;
-            }
-            name.push(ch);
-            self.source.next();
-        }
-
-        // Trim any trailing ':' from the anchor name. This lets us accept
-        // '&root:' (commonly used before a mapping value) while keeping the
-        // logical anchor name as "root". For more complex anchors like
-        // '&:@*!$"<foo>:', the trailing ':' is part of the allowed name
-        // in the YAML test suite, so we only strip a single colon when it
-        // appears at the very end of the token and is directly followed by
-        // a mapping colon token.
-        if name.ends_with(':') {
-            name.pop();
-        }
-
-        if name.is_empty() {
-            return Err(crate::parser::document::error_builder::syntax_error(
-                self.source,
-                "Empty anchor name",
-            ));
-        }
-
-        Ok(Token::Anchor(name))
+        token_scan::scan_token_with_leading(
+            self.source,
+            |src| {
+                src.next();
+            }, // consume '&'
+            |_, ch| {
+                ch.is_whitespace()
+                    || ch == CHAR_NEWLINE
+                    || ch == CHAR_HASH
+                    || ch == CHAR_COMMA
+                    || ch == CHAR_LBRACKET
+                    || ch == CHAR_RBRACKET
+                    || ch == CHAR_LBRACE
+                    || ch == CHAR_RBRACE
+            },
+            Token::Anchor,
+            true, // allow trailing colon
+            "Empty anchor name",
+        )
     }
 
     /// Scan an alias: *name
     fn scan_alias(&mut self) -> Result<Token, crate::error::YamlError> {
-        self.source.next(); // consume '*'
-
-        let mut name = String::new();
-        while let Some(ch) = self.source.current() {
-            if ch.is_whitespace()
-                || ch == CHAR_NEWLINE
-                || ch == CHAR_HASH
-                || ch == CHAR_COMMA
-                || ch == CHAR_LBRACKET
-                || ch == CHAR_RBRACKET
-                || ch == CHAR_LBRACE
-                || ch == CHAR_RBRACE
-            {
-                break;
-            }
-            name.push(ch);
-            self.source.next();
-        }
-
-        if name.is_empty() {
-            return Err(crate::parser::document::error_builder::syntax_error(
-                self.source,
-                "Empty alias name",
-            ));
-        }
-
-        Ok(Token::Alias(name))
+        token_scan::scan_token_with_leading(
+            self.source,
+            |src| {
+                src.next();
+            }, // consume '*'
+            |_, ch| {
+                ch.is_whitespace()
+                    || ch == CHAR_NEWLINE
+                    || ch == CHAR_HASH
+                    || ch == CHAR_COMMA
+                    || ch == CHAR_LBRACKET
+                    || ch == CHAR_RBRACKET
+                    || ch == CHAR_LBRACE
+                    || ch == CHAR_RBRACE
+            },
+            Token::Alias,
+            false, // do not allow trailing colon
+            "Empty alias name",
+        )
     }
 
     /// Scan a directive: %YAML or %TAG
@@ -878,7 +789,7 @@ impl<'a> Lexer<'a> {
                         // can report a clear syntax error instead of
                         // silently treating it as a valid comment.
                         if let Some(CHAR_HASH) = self.source.current() {
-                            return Err(crate::parser::document::error_builder::syntax_error(
+                            return Err(error_helpers::syntax_error(
                                 self.source,
                                 "YAML syntax error: comment must be separated from quoted scalar by whitespace",
                             ));
@@ -891,9 +802,8 @@ impl<'a> Lexer<'a> {
                     self.source.next();
                 }
                 None => {
-                    #[cfg(debug_assertions)]
-                    eprintln!("DEBUG: Unterminated single-quoted string: reached EOF");
-                    return Err(crate::parser::document::error_builder::syntax_error(
+                    lexer_debug!("Unterminated single-quoted string: reached EOF");
+                    return Err(error_helpers::syntax_error(
                         self.source,
                         "YAML compliance error: Unterminated single-quoted string (unexpected EOF)",
                     ));
@@ -1019,12 +929,10 @@ impl<'a> Lexer<'a> {
                                         self.source.next();
                                     }
                                     _ => {
-                                        return Err(
-                                            crate::parser::document::error_builder::syntax_error(
-                                                self.source,
-                                                "YAML compliance error: Invalid \\x escape sequence, expected 2 hex digits",
-                                            ),
-                                        );
+                                        return Err(error_helpers::syntax_error(
+                                            self.source,
+                                            "YAML compliance error: Invalid \\x escape sequence, expected 2 hex digits",
+                                        ));
                                     }
                                 }
                             }
@@ -1042,12 +950,10 @@ impl<'a> Lexer<'a> {
                                         self.source.next();
                                     }
                                     _ => {
-                                        return Err(
-                                            crate::parser::document::error_builder::syntax_error(
-                                                self.source,
-                                                "YAML compliance error: Invalid \\u escape sequence, expected 4 hex digits",
-                                            ),
-                                        );
+                                        return Err(error_helpers::syntax_error(
+                                            self.source,
+                                            "YAML compliance error: Invalid \\u escape sequence, expected 4 hex digits",
+                                        ));
                                     }
                                 }
                             }
@@ -1055,15 +961,13 @@ impl<'a> Lexer<'a> {
                             match char::from_u32(code) {
                                 Some(ch) => content.push(ch),
                                 None => {
-                                    return Err(
-                                        crate::parser::document::error_builder::syntax_error(
-                                            self.source,
-                                            &format!(
-                                                "YAML compliance error: Invalid unicode codepoint U+{:04X}",
-                                                code
-                                            ),
+                                    return Err(error_helpers::syntax_error(
+                                        self.source,
+                                        &format!(
+                                            "YAML compliance error: Invalid unicode codepoint U+{:04X}",
+                                            code
                                         ),
-                                    );
+                                    ));
                                 }
                             }
                         }
@@ -1078,12 +982,10 @@ impl<'a> Lexer<'a> {
                                         self.source.next();
                                     }
                                     _ => {
-                                        return Err(
-                                            crate::parser::document::error_builder::syntax_error(
-                                                self.source,
-                                                "YAML compliance error: Invalid \\U escape sequence, expected 8 hex digits",
-                                            ),
-                                        );
+                                        return Err(error_helpers::syntax_error(
+                                            self.source,
+                                            "YAML compliance error: Invalid \\U escape sequence, expected 8 hex digits",
+                                        ));
                                     }
                                 }
                             }
@@ -1091,21 +993,19 @@ impl<'a> Lexer<'a> {
                             match char::from_u32(code) {
                                 Some(ch) => content.push(ch),
                                 None => {
-                                    return Err(
-                                        crate::parser::document::error_builder::syntax_error(
-                                            self.source,
-                                            &format!(
-                                                "YAML compliance error: Invalid unicode codepoint U+{:08X}",
-                                                code
-                                            ),
+                                    return Err(error_helpers::syntax_error(
+                                        self.source,
+                                        &format!(
+                                            "YAML compliance error: Invalid unicode codepoint U+{:08X}",
+                                            code
                                         ),
-                                    );
+                                    ));
                                 }
                             }
                         }
                         // Invalid escape sequences - reject per YAML 1.2 spec
                         Some(c) => {
-                            return Err(crate::parser::document::error_builder::syntax_error(
+                            return Err(error_helpers::syntax_error(
                                 self.source,
                                 &format!(
                                     "YAML compliance error: Invalid escape sequence '\\{}' in double-quoted string",
@@ -1114,11 +1014,10 @@ impl<'a> Lexer<'a> {
                             ));
                         }
                         None => {
-                            #[cfg(debug_assertions)]
-                            eprintln!(
-                                "DEBUG: Unterminated double-quoted string: reached EOF after escape"
+                            lexer_debug!(
+                                "Unterminated double-quoted string: reached EOF after escape"
                             );
-                            return Err(crate::parser::document::error_builder::syntax_error(
+                            return Err(error_helpers::syntax_error(
                                 self.source,
                                 "YAML compliance error: Unterminated double-quoted string (unexpected EOF after escape)",
                             ));
@@ -1133,7 +1032,7 @@ impl<'a> Lexer<'a> {
                     // can report a clear syntax error instead of
                     // silently treating it as a valid comment.
                     if let Some(CHAR_HASH) = self.source.current() {
-                        return Err(crate::parser::document::error_builder::syntax_error(
+                        return Err(error_helpers::syntax_error(
                             self.source,
                             "YAML syntax error: comment must be separated from quoted scalar by whitespace",
                         ));
@@ -1145,9 +1044,8 @@ impl<'a> Lexer<'a> {
                     self.source.next();
                 }
                 None => {
-                    #[cfg(debug_assertions)]
-                    eprintln!("DEBUG: Unterminated double-quoted string: reached EOF");
-                    return Err(crate::parser::document::error_builder::syntax_error(
+                    lexer_debug!("Unterminated double-quoted string: reached EOF");
+                    return Err(error_helpers::syntax_error(
                         self.source,
                         "YAML compliance error: Unterminated double-quoted string (unexpected EOF)",
                     ));

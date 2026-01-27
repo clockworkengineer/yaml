@@ -1,7 +1,11 @@
+use crate::anchors_debug;
 // Module: parser/document/anchors.rs
 
 use crate::nodes::node::Node;
 use crate::parser::ParseResult;
+use crate::parser::utils::error_helpers;
+use crate::utils::anchors_helpers;
+use crate::utils::anchors_helpers2;
 use std::collections::HashMap;
 
 /// Recursively collects all anchor definitions from a YAML document tree.
@@ -19,23 +23,19 @@ use std::collections::HashMap;
 ///
 /// Result indicating success or an error string for invalid anchors
 #[allow(dead_code)]
-pub(crate) fn collect_anchors(
-    node: &Node,
-    anchors: &mut HashMap<String, Node>,
-) -> ParseResult<()> {
-    let mut err: Option<String> = None;
-    let mut collect = |n: &Node| {
+pub(crate) fn collect_anchors(node: &Node, anchors: &mut HashMap<String, Node>) -> ParseResult<()> {
+    anchors_helpers::traverse_with_error(node, |n| {
         if let Node::Anchored(inner, name) = n {
             if name.trim().is_empty() {
-                err = Some(crate::error::messages::ERR_EMPTY_ANCHOR_NAME.to_string());
-                return;
+                anchors_debug!("Empty anchor name encountered");
+                return Some(error_helpers::empty_anchor_name().to_string());
             }
+            anchors_debug!("Collecting anchor: {}", name);
             // According to YAML spec, later anchor definitions override earlier ones
             anchors.insert(name.clone(), (**inner).clone());
         }
-    };
-    crate::parser::utils::visit::visit(node, &mut collect);
-    if let Some(e) = err { Err(crate::error::YamlError::from(e)) } else { Ok(()) }
+        None
+    })
 }
 
 /// Recursively replaces all alias references with their corresponding anchor values.
@@ -53,31 +53,25 @@ pub(crate) fn collect_anchors(
 ///
 /// Result indicating success or an error string for undefined aliases
 #[allow(dead_code)]
-pub(crate) fn replace_aliases(
-    node: &mut Node,
-    anchors: &HashMap<String, Node>,
-) -> ParseResult<()> {
-    let mut err: Option<String> = None;
+pub(crate) fn replace_aliases(node: &mut Node, anchors: &HashMap<String, Node>) -> ParseResult<()> {
+    let mut err: Option<crate::error::YamlError> = None;
     let mut replacer = |n: &mut Node| match n {
         Node::Alias(name) => {
-            if let Some(found) = anchors.get(name) {
-                *n = found.clone();
-            } else {
-                err = Some(format!(
-                    "{}{}",
-                    crate::error::messages::ERR_UNDEFINED_ANCHOR_PREFIX,
-                    name
-                ));
+            anchors_debug!("Replacing alias: {}", name);
+            match anchors_helpers2::lookup_anchor(anchors, name) {
+                Ok(found) => *n = found.clone(),
+                Err(e) => err = Some(e),
             }
         }
         Node::Anchored(inner, _name) => {
+            anchors_debug!("Replacing anchored node");
             let replacement = (**inner).clone();
             *n = replacement;
         }
         _ => {}
     };
     crate::parser::utils::visit::visit_mut(node, &mut replacer);
-    if let Some(e) = err { Err(crate::error::YamlError::from(e)) } else { Ok(()) }
+    if let Some(e) = err { Err(e) } else { Ok(()) }
 }
 
 /// Expands YAML merge keys (<<) by incorporating referenced mapping values.
@@ -99,9 +93,10 @@ pub(crate) fn expand_merge_keys(
     node: &mut Node,
     anchors: &HashMap<String, Node>,
 ) -> ParseResult<()> {
-    let mut err: Option<String> = None;
+    let mut err: Option<crate::error::YamlError> = None;
     let mut expander = |n: &mut Node| {
         if let Node::Mapping(pairs) = n {
+            anchors_debug!("Expanding merge keys in mapping");
             let mut combined: Vec<(Node, Node)> = Vec::new();
             let snapshot = pairs.clone();
             let mut i = 0usize;
@@ -113,49 +108,46 @@ pub(crate) fn expand_merge_keys(
                         let mut expanded_pairs: Vec<(Node, Node)> = Vec::new();
                         match &v {
                             Node::Alias(name) => {
-                                if let Some(src) = anchors.get(name) {
-                                    if let Node::Mapping(src_pairs) = src {
-                                        expanded_pairs.extend(src_pairs.clone());
-                                    } else {
-                                        err = Some(format!(
-                                            "Merge source '{}' is not a mapping",
-                                            name
-                                        ));
+                                anchors_debug!("Expanding merge alias: {}", name);
+                                match anchors_helpers2::lookup_anchor(anchors, name)
+                                    .and_then(|src| anchors_helpers2::as_mapping(src, name))
+                                {
+                                    Ok(src_pairs) => expanded_pairs.extend(src_pairs.clone()),
+                                    Err(e) => {
+                                        err = Some(e);
                                         break;
                                     }
-                                } else {
-                                    err = Some(format!(
-                                        "{}{}",
-                                        crate::error::messages::ERR_UNDEFINED_ANCHOR_PREFIX,
-                                        name
-                                    ));
-                                    break;
                                 }
                             }
                             Node::Array(items) => {
+                                anchors_debug!("Expanding merge array with {} items", items.len());
                                 for it in items.iter() {
                                     match it {
                                         Node::Alias(name) => {
-                                            if let Some(src) = anchors.get(name) {
-                                                if let Node::Mapping(src_pairs) = src {
-                                                    expanded_pairs.extend(src_pairs.clone());
-                                                } else {
-                                                    err = Some(format!(
-                                                        "Merge source '{}' is not a mapping",
-                                                        name
-                                                    ));
+                                            anchors_debug!(
+                                                "Expanding merge alias in array: {}",
+                                                name
+                                            );
+                                            match anchors_helpers2::lookup_anchor(anchors, name)
+                                                .and_then(|src| {
+                                                    anchors_helpers2::as_mapping(src, name)
+                                                }) {
+                                                Ok(src_pairs) => {
+                                                    expanded_pairs.extend(src_pairs.clone())
+                                                }
+                                                Err(e) => {
+                                                    err = Some(e);
                                                     break;
                                                 }
-                                            } else {
-                                                err = Some(format!("{}{}", crate::error::messages::ERR_UNDEFINED_ANCHOR_PREFIX, name));
-                                                break;
                                             }
                                         }
                                         Node::Mapping(src_pairs) => {
+                                            anchors_debug!("Expanding merge mapping in array");
                                             expanded_pairs.extend(src_pairs.clone());
                                         }
                                         _ => {
-                                            err = Some("Invalid merge sequence item: expected alias or mapping".to_string());
+                                            err =
+                                                Some(error_helpers::invalid_merge_sequence_item());
                                             break;
                                         }
                                     }
@@ -165,10 +157,10 @@ pub(crate) fn expand_merge_keys(
                                 expanded_pairs.extend(src_pairs.clone());
                             }
                             other => {
-                                err = Some(format!(
-                                    "Invalid merge value: expected alias, sequence or mapping, got {:?}",
+                                err = Some(error_helpers::invalid_merge_value(&format!(
+                                    "{:?}",
                                     other
-                                ));
+                                )));
                             }
                         }
                         combined.extend(expanded_pairs);
@@ -251,5 +243,5 @@ pub(crate) fn expand_merge_keys(
         }
     };
     crate::parser::utils::visit::visit_mut(node, &mut expander);
-    if let Some(e) = err { Err(crate::error::YamlError::from(e)) } else { Ok(()) }
+    if let Some(e) = err { Err(e) } else { Ok(()) }
 }

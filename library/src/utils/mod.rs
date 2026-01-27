@@ -11,10 +11,14 @@ pub mod string_interner;
 #[cfg(feature = "alloc")]
 pub mod optimization;
 
+pub mod escape;
 /// Streaming and iterator support for efficient YAML processing
 #[cfg(feature = "alloc")]
 pub mod streaming;
-pub mod escape;
+
+/// Anchor-related helpers for DRY refactor
+pub mod anchors_helpers;
+pub mod anchors_helpers2;
 
 use crate::constants::{CHAR_HASH, CHAR_NEWLINE, CHAR_TAB};
 use crate::io::traits::ISource;
