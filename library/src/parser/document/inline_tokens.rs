@@ -1,8 +1,8 @@
 // DRY NOTE: All error construction in this file must use centralized helpers from error_builder.rs (e.g., syntax_error, structure_error, mapping_key_error_yaml, etc.).
 // Do not return raw error strings or construct errors directly.
-/// Parses a value or key in inline collections, handling special cases like double-colon scalars.
+/// DRY ENTRY POINT: Parses a value or key in inline collections, handling special cases like double-colon scalars.
 ///
-/// This helper is used by both sequence and mapping parsers to avoid code duplication.
+/// Used by both sequence and mapping parsers. All inline value parsing must use this function.
 fn parse_inline_value(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
@@ -37,29 +37,28 @@ fn parse_inline_value(
         parse_value_with_tokens(stream, directives, depth + 1)
     }
 }
-/// Constructs a Node::Array from a vector of items.
+/// DRY ENTRY POINT: Constructs a Node::Array from a vector of items.
 ///
-/// This helper centralizes array node creation for DRY compliance.
+/// All array node construction in inline parsing must use this helper.
 fn make_array_node(items: Vec<Node>) -> Node {
     Node::Array(items)
 }
 
-/// Constructs a Node::Mapping from a vector of key-value pairs.
+/// DRY ENTRY POINT: Constructs a Node::Mapping from a vector of key-value pairs.
 ///
-/// This helper centralizes mapping node creation for DRY compliance.
+/// All mapping node construction in inline parsing must use this helper.
 fn make_mapping_node(pairs: Vec<(Node, Node)>) -> Node {
     Node::Mapping(pairs)
 }
-/// Skips whitespace and comments in the token stream.
+/// DRY ENTRY POINT: Skips whitespace and comments in the token stream.
 ///
-/// This helper should be used before parsing any token to ensure trivia is not misinterpreted as content.
+/// All trivia (whitespace/comment) skipping in inline parsing must use this helper before parsing any token.
 fn skip_inline_trivia(stream: &mut TokenStream) -> crate::parser::ParseResult<()> {
     stream.skip_trivia()
 }
 /// Token-based flow collection parsers
 ///
-/// Handles inline YAML collections using tokens instead of character parsing.
-/// This approach provides clearer boundaries and better error handling.
+/// DRY: All inline YAML collection parsing (sequences and mappings) uses token-based helpers for clarity and error handling.
 use crate::nodes::node::Node;
 use crate::nodes::node_utils::make_set_node;
 use crate::parser::directives::DirectiveContext;
@@ -86,7 +85,7 @@ fn inline_log(msg: String) {
     log::trace!("{}", msg);
 }
 
-/// Parses a flow (inline) sequence using tokens.
+/// DRY ENTRY POINT: Parses a flow (inline) sequence using tokens.
 ///
 /// Example: `[1, 2, 3]` or `[a, b, c]`
 ///
@@ -96,6 +95,8 @@ fn inline_log(msg: String) {
 /// - Nested collections: `[[1, 2], [3, 4]]`
 /// - Mixed types: `[1, "str", true]`
 /// - Implicit mappings and double-colon scalars
+///
+/// All inline sequence parsing must use this function.
 pub fn parse_inline_sequence_with_tokens(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
@@ -215,7 +216,7 @@ pub fn parse_inline_sequence_with_tokens(
                     };
 
                     // Create a single-pair mapping
-                    let mapping = Node::Mapping(vec![(value_or_key, val)]);
+                    let mapping = make_mapping_node(vec![(value_or_key, val)]);
                     #[cfg(feature = "debug-trace")]
                     log::debug!(
                         "inline_tokens: seq item (implicit mapping) -> {:?}",
@@ -258,7 +259,7 @@ pub fn parse_inline_sequence_with_tokens(
     Ok(make_array_node(items))
 }
 
-/// Parse a flow (inline) mapping using tokens
+/// DRY ENTRY POINT: Parse a flow (inline) mapping using tokens
 ///
 /// Example: `{a: 1, b: 2}` or `{key: value}`
 ///
@@ -267,6 +268,8 @@ pub fn parse_inline_sequence_with_tokens(
 /// - Trailing commas: `{a: 1, b: 2, }`
 /// - Nested collections: `{a: {b: c}}`
 /// - Quoted keys: `{"key": value}`
+///
+/// All inline mapping parsing must use this function.
 pub fn parse_inline_mapping_with_tokens(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
@@ -484,7 +487,9 @@ pub fn parse_inline_mapping_with_tokens(
     }
 }
 
-/// Ensure that the token stream progressed between two checkpoints, else raise a syntax error.
+/// DRY ENTRY POINT: Ensure that the token stream progressed between two checkpoints, else raise a syntax error.
+///
+/// All progress checking in inline parsing must use this helper.
 fn ensure_progress(
     stream: &mut TokenStream,
     before: usize,
