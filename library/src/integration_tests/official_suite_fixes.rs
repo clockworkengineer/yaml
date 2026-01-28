@@ -45,6 +45,24 @@ mod tests {
     }
     use super::*;
 
+    // Test 236B - Indentation/structure: Invalid mapping/sequence structure (should error)
+    #[test]
+    fn test_236b_invalid_mapping_sequence_structure() {
+        // This YAML is from the 236B test case (should fail to parse)
+        let yaml = b"foo:\n  bar\ninvalid\n";
+        let mut source = BufferSource::new(yaml);
+        let result = parse(&mut source);
+
+        #[cfg(feature = "debug-trace")]
+        println!("236B Result: {:?}", result);
+
+        // Fail the test if parsing does NOT return an error
+        assert!(
+            result.is_err(),
+            "236B should fail to parse, but succeeded: {:?}",
+            result
+        );
+    }
     // Test 229Q - Spec Example 2.4. Sequence of Mappings
     #[test]
     fn test_229q_sequence_of_mappings() {
