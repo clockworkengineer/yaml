@@ -198,25 +198,11 @@ impl MappingParseContext {
 
     /// Handle dedent tokens by popping stack frames and closing mappings.
     fn handle_dedent(&mut self, stream: &mut TokenStream) {
-        loop {
-            let current_indent = self
-                .stack
-                .last()
-                .map(|(lvl, _)| *lvl)
-                .unwrap_or(self.base_indent);
-            let token_indent = match stream.current() {
-                Some(Token::Indent(level)) => *level,
-                _ => current_indent,
-            };
-            if token_indent < current_indent && self.stack.len() > 1 {
-                let (_, closed_pairs) = self.stack.pop().unwrap();
-                if let Some((_, parent_pairs)) = self.stack.last_mut() {
-                    parent_pairs.push((Node::None, Node::Mapping(closed_pairs)));
-                }
-            } else {
-                break;
-            }
-        }
+        let token_indent = match stream.current() {
+            Some(Token::Indent(level)) => *level,
+            _ => self.get_current_indent(),
+        };
+        self.dedent_unwind_mapping_stack(token_indent);
     }
 
     /// Handle special YAML tokens (indent, document start/end, flow end, etc.) during mapping parsing.
@@ -283,52 +269,79 @@ impl MappingParseContext {
         saw_comment_between_entries: bool,
     ) -> crate::parser::ParseResult<Option<(Node, Node)>> {
         let token = stream.current().cloned();
-        match token {
-            Some(Token::Indent(level)) => {
-                let last_value_is_empty = self
-                    .stack
-                    .last()
-                    .and_then(|(_, pairs)| pairs.last())
-                    .map(|(_, v)| matches!(v, Node::None))
-                    .unwrap_or(false);
-                if level > current_indent {
-                    if !last_value_is_empty && saw_comment_between_entries {
-                        use crate::error::enhanced::{EnhancedError, ErrorCode};
-                        let err = EnhancedError::new(mapping_key_error_yaml(
-                            stream.source_mut(),
-                            "Invalid indentation after comment: indented content cannot extend a completed scalar mapping value",
-                        ))
-                        .with_code(ErrorCode::E007)
-                        .with_note("Check for misplaced comments or indentation.");
-                        return Err(err.to_string().into());
-                    }
-                    self.stack.push((level, Vec::new()));
-                    stream.next()?;
-                    return Ok(None);
+        if let Some(result) = self.handle_indent_tokens(
+            stream,
+            token.clone(),
+            current_indent,
+            saw_comment_between_entries,
+        )? {
+            return Ok(result);
+        }
+        if let Some(result) = Self::handle_mapping_control_tokens(&mut self.stack, token) {
+            return Ok(Some(result));
+        }
+        let (key, value) = self.parse_mapping_pair(stream, directives, current_indent, depth)?;
+        let norm_key = force_key_to_string(key);
+        Ok(Some((norm_key, value)))
+    }
+
+    /// Handle indent/dedent tokens and error cases for try_parse_and_insert_pair.
+    fn handle_indent_tokens(
+        &mut self,
+        stream: &mut TokenStream,
+        token: Option<Token>,
+        current_indent: usize,
+        saw_comment_between_entries: bool,
+    ) -> crate::parser::ParseResult<Option<Option<(Node, Node)>>> {
+        if let Some(Token::Indent(level)) = token {
+            let last_value_is_empty = self
+                .stack
+                .last()
+                .and_then(|(_, pairs)| pairs.last())
+                .map(|(_, v)| matches!(v, Node::None))
+                .unwrap_or(false);
+            if level > current_indent {
+                if !last_value_is_empty && saw_comment_between_entries {
+                    use crate::error::enhanced::{EnhancedError, ErrorCode};
+                    let err = EnhancedError::new(mapping_key_error_yaml(
+                        stream.source_mut(),
+                        "Invalid indentation after comment: indented content cannot extend a completed scalar mapping value",
+                    ))
+                    .with_code(ErrorCode::E007)
+                    .with_note("Check for misplaced comments or indentation.");
+                    return Err(err.to_string().into());
                 }
-                if level < current_indent {
-                    self.dedent_unwind_mapping_stack(level);
-                    stream.next()?;
-                    return Ok(None);
-                }
+                self.stack.push((level, Vec::new()));
                 stream.next()?;
-                return Ok(None);
+                return Ok(Some(None));
             }
+            if level < current_indent {
+                self.dedent_unwind_mapping_stack(level);
+                stream.next()?;
+                return Ok(Some(None));
+            }
+            stream.next()?;
+            return Ok(Some(None));
+        }
+        Ok(None)
+    }
+
+    /// Handle mapping control tokens (end of mapping, document, etc.) for try_parse_and_insert_pair.
+    fn handle_mapping_control_tokens(
+        stack: &mut Vec<(usize, Vec<(Node, Node)>)>,
+        token: Option<Token>,
+    ) -> Option<(Node, Node)> {
+        match token {
             Some(Token::Eof)
             | Some(Token::DocumentEnd)
             | Some(Token::DocumentStart)
             | Some(Token::Dash)
             | Some(Token::FlowMappingEnd)
             | Some(Token::FlowSequenceEnd) => {
-                let (_, pairs) = self.stack.pop().unwrap();
-                return Ok(Some((Node::None, Node::Mapping(pairs))));
+                let (_, pairs) = stack.pop().unwrap();
+                Some((Node::None, Node::Mapping(pairs)))
             }
-            _ => {
-                let (key, value) =
-                    self.parse_mapping_pair(stream, directives, current_indent, depth)?;
-                let norm_key = force_key_to_string(key);
-                Ok(Some((norm_key, value)))
-            }
+            _ => None,
         }
     }
 }
@@ -360,11 +373,19 @@ impl MappingParseContext {
         ));
         stream.skip_newlines_and_comments()?;
 
-        // Handle explicit key with omitted value
         let cur = stream.current();
+        // Early return for colon after key
         if let Some(Token::Colon) = cur {
             stream.next()?;
-        } else if explicit_key {
+            let value =
+                parse_mapping_value(stream, directives, cur_indent, depth, explicit_key, &key)?;
+            #[cfg(feature = "debug-trace")]
+            log::debug!("mapping_pair: return pair = ({:?}, {:?})", key, value);
+            return Ok((key, value));
+        }
+
+        // Early return for explicit key with omitted value
+        if explicit_key {
             #[cfg(feature = "debug-trace")]
             mapping_log(format!(
                 "parse_mapping_pair: after explicit key newline/whitespace, token = {:?}",
@@ -379,19 +400,28 @@ impl MappingParseContext {
                 | Some(Token::DocumentStart)
                 | Some(Token::Eof)
                 | None
-                | Some(Token::Indent(_)) => {
-                    return Ok((key, Node::None));
-                }
+                | Some(Token::Indent(_)) => return Ok((key, Node::None)),
                 _ => {}
             }
             if !matches!(cur, Some(Token::Colon)) {
                 return Ok((key, Node::None));
             } else {
                 stream.next()?;
+                let value =
+                    parse_mapping_value(stream, directives, cur_indent, depth, explicit_key, &key)?;
+                #[cfg(feature = "debug-trace")]
+                log::debug!("mapping_pair: return pair = ({:?}, {:?})", key, value);
+                return Ok((key, value));
             }
-        } else if matches!(cur, Some(Token::Eof) | None) {
+        }
+
+        // Early return for EOF or None
+        if matches!(cur, Some(Token::Eof) | None) {
             return Ok((key, Node::None));
-        } else if matches!(
+        }
+
+        // Early return for plain/tag/anchor/question tokens
+        if matches!(
             cur,
             Some(Token::Plain(_))
                 | Some(Token::Tag(_))
@@ -399,10 +429,14 @@ impl MappingParseContext {
                 | Some(Token::QuestionMark)
         ) {
             return Ok((key, Node::None));
-        } else if matches!(cur, Some(Token::Dash)) {
+        }
+
+        // Early return for dash token
+        if matches!(cur, Some(Token::Dash)) {
             return Ok((key, Node::None));
         }
 
+        // Default: parse value
         let value = parse_mapping_value(stream, directives, cur_indent, depth, explicit_key, &key)?;
         #[cfg(feature = "debug-trace")]
         log::debug!("mapping_pair: return pair = ({:?}, {:?})", key, value);
