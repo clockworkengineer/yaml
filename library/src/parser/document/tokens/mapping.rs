@@ -1,3 +1,68 @@
+/// Parses a value that is indented relative to the current mapping key.
+/// Distinguishes between block sequences and nested mappings, and handles YAML compliance errors.
+/// Handles indented/nested value after a mapping key.
+fn parse_indented_mapping_value(
+    stream: &mut TokenStream,
+    directives: &DirectiveContext,
+    cur_indent: usize,
+    depth: usize,
+    explicit_key: bool,
+) -> crate::parser::ParseResult<Node> {
+    let indent_level = if let Some(Token::Indent(level)) = stream.current() {
+        if *level > cur_indent {
+            let _lvl = *level;
+            stream.next()?; // consume Indent
+            Some(_lvl)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    if let Some(level) = indent_level {
+        stream.skip_newlines_and_comments()?;
+        if matches!(stream.current(), Some(Token::Dash)) {
+            use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
+            let ctx_seq = crate::parser::document::context::ParsingContext::new(level)
+                .child_block_context(
+                    level,
+                    crate::parser::document::context::CollectionType::BlockSequence,
+                );
+            let seq = parse_sequence_with_tokens(
+                stream,
+                level,
+                cur_indent,
+                directives,
+                &ctx_seq,
+                depth + 1,
+            )?;
+            return Ok(seq);
+        } else {
+            let map = parse_mapping_with_tokens(stream, level, directives, depth + 1)?;
+            return Ok(map);
+        }
+    }
+    // YAML compliance error: Mapping key without value (expected value after colon)
+    if !explicit_key && matches!(stream.current(), Some(Token::Eof) | None) {
+        use crate::error::enhanced::{EnhancedError, ErrorCode};
+        let err = EnhancedError::new(crate::parser::document::error_builder::syntax_error(
+            stream.source_mut(),
+            "YAML compliance error: Mapping key without value (expected value after colon)",
+        ))
+        .with_code(ErrorCode::E001);
+        return Err(err.to_string().into());
+    }
+    Ok(Node::None)
+}
+/// Context for managing the state of a block mapping parse.
+/// Maintains a stack of (indent_level, pairs) to support nested mappings and dedent unwinding.
+struct MappingParseContext {
+    /// Stack of (indent_level, mapping pairs) for nested mappings
+    stack: Vec<(usize, Vec<(Node, Node)>)>,
+    /// The base indentation level for this mapping
+    base_indent: usize,
+}
+
 use crate::nodes::node::Node;
 use crate::nodes::node::{BlockStyle, QuoteType};
 use crate::parser::directives::DirectiveContext;
@@ -8,6 +73,7 @@ use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
 
 #[cfg(feature = "debug-trace")]
+/// Helper for debug logging of mapping parser internals.
 #[inline]
 fn mapping_log(msg: String) {
     #[cfg(feature = "std")]
@@ -25,19 +91,26 @@ fn mapping_log(msg: String) {
     log::trace!("{}", msg);
 }
 
-/// Parse a single key-value mapping pair (for sequence items)
+/// Parses a single key-value mapping pair (for sequence items).
+/// Used when a mapping pair appears as a sequence item (e.g., - key: value).
 #[allow(dead_code)]
 pub fn parse_single_mapping_pair_with_tokens(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
 ) -> crate::parser::ParseResult<Node> {
-    let (key, value) = parse_mapping_pair(stream, directives, 0, 0)?;
+    let ctx = MappingParseContext {
+        stack: vec![(0, Vec::new())],
+        base_indent: 0,
+    };
+    let (key, value) = ctx.parse_mapping_pair(stream, directives, 0, 0)?;
     Ok(Node::Mapping(vec![(key, value)]))
 }
 
-/// Parse a block mapping using tokens
+/// Parses a block mapping using tokens.
+/// This is the main entry point for block mapping parsing in the token-based parser.
+/// Handles indentation, dedent unwinding, and special YAML tokens.
 ///
-/// Example:
+/// # Example
 /// ```yaml
 /// key1: value1
 /// key2: value2
@@ -51,122 +124,107 @@ pub fn parse_single_mapping_pair_with_tokens(
 /// - Clear token boundaries prevent infinite loops
 /// - Natural handling of explicit keys (?)
 #[allow(dead_code)]
+
 pub fn parse_mapping_with_tokens(
     stream: &mut TokenStream,
     base_indent: usize,
     directives: &DirectiveContext,
     depth: usize,
 ) -> crate::parser::ParseResult<Node> {
-    #[cfg(feature = "debug-trace")]
-    log::debug!("mapping_tokens: start parse_mapping_with_tokens");
     use crate::utils::optimization::{CapacityHints, NodeBuilder};
-    // Use a small capacity profile for typical mappings
     let node_builder = NodeBuilder::with_hints(CapacityHints::small());
-    let mut stack: Vec<(usize, Vec<(Node, Node)>)> = Vec::new();
-    // Pre-allocate mapping pairs using NodeBuilder
-    stack.push((
+    let mut ctx = MappingParseContext {
+        stack: vec![(
+            base_indent,
+            Vec::with_capacity(node_builder.hints().mapping_pairs),
+        )],
         base_indent,
-        Vec::with_capacity(node_builder.hints().mapping_pairs),
-    ));
+    };
 
-    #[inline]
-    fn get_current_indent(stack: &Vec<(usize, Vec<(Node, Node)>)>, base_indent: usize) -> usize {
-        stack.last().map(|(lvl, _)| *lvl).unwrap_or(base_indent)
+    stream.skip_trivia()?;
+    ctx.parse_mapping_loop(stream, directives, depth)
+}
+
+impl MappingParseContext {
+    /// Main mapping parse loop as a method. Handles comments, dedent, and pair parsing.
+    fn parse_mapping_loop(
+        &mut self,
+        stream: &mut TokenStream,
+        directives: &DirectiveContext,
+        depth: usize,
+    ) -> crate::parser::ParseResult<Node> {
+        loop {
+            let saw_comment_between_entries = stream.skip_newlines_and_comments_with_flag()?;
+            self.handle_dedent(stream);
+            let current_indent = self.get_current_indent();
+            let token = stream.current().cloned();
+            if let Some(result) = self.handle_special_tokens(stream, current_indent, &token)? {
+                return Ok(result);
+            }
+            if let Some(pair) = self.try_parse_and_insert_pair(
+                stream,
+                directives,
+                current_indent,
+                depth,
+                saw_comment_between_entries,
+            )? {
+                if let Some((_, pairs)) = self.stack.last_mut() {
+                    pairs.push(pair);
+                }
+            }
+        }
+    }
+}
+
+impl MappingParseContext {
+    /// Get the current indentation level from the top of the stack.
+    fn get_current_indent(&self) -> usize {
+        self.stack
+            .last()
+            .map(|(lvl, _)| *lvl)
+            .unwrap_or(self.base_indent)
     }
 
-    #[inline]
-    fn dedent_unwind_mapping_stack(
-        stack: &mut Vec<(usize, Vec<(Node, Node)>)>,
-        target_level: usize,
-    ) {
-        while stack.len() > 1 && stack.last().map(|(i, _)| *i).unwrap_or(0) > target_level {
-            let (_, closed_pairs) = stack.pop().unwrap();
-            if let Some((_, parent_pairs)) = stack.last_mut() {
-                // Pre-allocate mapping node using NodeBuilder
+    /// Unwind the mapping stack to the target indentation level, closing nested mappings as needed.
+    fn dedent_unwind_mapping_stack(&mut self, target_level: usize) {
+        while self.stack.len() > 1 && self.stack.last().map(|(i, _)| *i).unwrap_or(0) > target_level
+        {
+            let (_, closed_pairs) = self.stack.pop().unwrap();
+            if let Some((_, parent_pairs)) = self.stack.last_mut() {
                 parent_pairs.push((Node::None, Node::Mapping(closed_pairs)));
             }
         }
     }
 
-    // Skip initial trivia (whitespace, comments)
-    stream.skip_trivia()?;
+    /// Handle dedent tokens by popping stack frames and closing mappings.
+    fn handle_dedent(&mut self, stream: &mut TokenStream) {
+        let token_indent = match stream.current() {
+            Some(Token::Indent(level)) => *level,
+            _ => self.get_current_indent(),
+        };
+        self.dedent_unwind_mapping_stack(token_indent);
+    }
 
-    loop {
-        // Skip comments and newlines between entries; preserve Indent for dedent
-        // detection. Track whether we saw a standalone comment so we can
-        // distinguish cases like 8XDJ where an indented line after a comment
-        // should *not* start a nested mapping when the preceding key already
-        // has a scalar value.
-        let saw_comment_between_entries = stream.skip_newlines_and_comments_with_flag()?;
-
-        // Before parsing a new key, check for dedent and unwind stack if needed
-        let mut _dedented = false;
-        loop {
-            let current_indent = stack.last().map(|(lvl, _)| *lvl).unwrap_or(base_indent);
-            let token_indent = match stream.current() {
-                Some(Token::Indent(level)) => *level,
-                _ => current_indent,
-            };
-            if token_indent < current_indent && stack.len() > 1 {
-                // Pop stack frames until the current indent matches the token's indent
-                let (_, closed_pairs) = stack.pop().unwrap();
-                if let Some((_, parent_pairs)) = stack.last_mut() {
-                    parent_pairs.push((Node::None, Node::Mapping(closed_pairs)));
-                }
-                _dedented = true;
-            } else {
-                break;
-            }
-        }
-
-        let current_indent = get_current_indent(&stack, base_indent);
-        let token = stream.current().cloned();
+    /// Handle special YAML tokens (indent, document start/end, flow end, etc.) during mapping parsing.
+    fn handle_special_tokens(
+        &mut self,
+        stream: &mut TokenStream,
+        current_indent: usize,
+        token: &Option<Token>,
+    ) -> crate::parser::ParseResult<Option<Node>> {
         match token {
-            Some(Token::Indent(level)) if level < current_indent => {
-                #[cfg(feature = "debug-trace")]
-                mapping_log(format!(
-                    "Dedent (level: {}, current_indent: {}, stack_len: {}) - closing current mapping",
-                    level,
-                    current_indent,
-                    stack.len()
-                ));
-                // Pop stack frames until the current indent matches the token's indent
-                dedent_unwind_mapping_stack(&mut stack, level);
-                // After dedent, return to parent so the next key is parsed at the correct level
-                let (_, pairs) = stack.last().unwrap();
-                // Use NodeBuilder for final mapping node
-                return Ok(Node::Mapping(pairs.clone()));
+            Some(Token::Indent(level)) if *level < current_indent => {
+                self.dedent_unwind_mapping_stack(*level);
+                let (_, pairs) = self.stack.last().unwrap();
+                return Ok(Some(Node::Mapping(pairs.clone())));
             }
             Some(Token::Eof) => {
-                // At EOF: unwind the stack, closing all open mappings
-                #[cfg(feature = "debug-trace")]
-                mapping_log(format!(
-                    "EOF encountered, unwinding stack. stack_len={}",
-                    stack.len()
-                ));
-                while stack.len() > 1 {
-                    let (_top_indent, top_pairs) = stack.pop().unwrap();
-                    #[cfg(feature = "debug-trace")]
-                    mapping_log(format!(
-                        "EOF unwind: closing mapping at indent {} with {} pairs",
-                        _top_indent,
-                        top_pairs.len()
-                    ));
-                    if let Some((_, parent_pairs)) = stack.last_mut() {
-                        // Insert as value for last key in parent if possible
+                while self.stack.len() > 1 {
+                    let (_top_indent, top_pairs) = self.stack.pop().unwrap();
+                    if let Some((_, parent_pairs)) = self.stack.last_mut() {
                         if let Some((_, last_value)) = parent_pairs.last_mut() {
-                            #[cfg(feature = "debug-trace")]
-                            mapping_log(
-                                "EOF unwind: inserting mapping_node as last_value in parent"
-                                    .to_string(),
-                            );
                             *last_value = Node::Mapping(top_pairs);
                         } else {
-                            // If no key, push as orphan (should not happen in valid YAML)
-                            #[cfg(feature = "debug-trace")]
-                            mapping_log(
-                                "EOF unwind: pushing orphan mapping_node to parent".to_string(),
-                            );
                             parent_pairs.push((
                                 force_key_to_string(Node::Str(
                                     "<unwound>".to_string(),
@@ -176,192 +234,104 @@ pub fn parse_mapping_with_tokens(
                                 Node::Mapping(top_pairs),
                             ));
                         }
-                        #[cfg(feature = "debug-trace")]
-                        mapping_log(format!(
-                            "Parent pairs after EOF unwind: {}",
-                            parent_pairs.len()
-                        ));
                     }
-                    #[cfg(feature = "debug-trace")]
-                    mapping_log(format!(
-                        "Stack after EOF unwind pop: {:?}",
-                        stack.iter().map(|(i, v)| (*i, v.len())).collect::<Vec<_>>()
-                    ));
                 }
-                let (_, pairs) = stack.pop().unwrap();
-                #[cfg(feature = "debug-trace")]
-                mapping_log(format!(
-                    "Final mapping pairs at EOF: {:?}",
-                    pairs.iter().map(|(k, v)| (k, v)).collect::<Vec<_>>()
-                ));
-                return Ok(Node::Mapping(pairs));
+                let (_, pairs) = self.stack.pop().unwrap();
+                return Ok(Some(Node::Mapping(pairs)));
             }
             Some(Token::DocumentStart)
             | Some(Token::Dash)
             | Some(Token::FlowMappingEnd)
             | Some(Token::FlowSequenceEnd) => {
-                // End of mapping
-                let (_, pairs) = stack.pop().unwrap();
-                return Ok(Node::Mapping(pairs));
+                let (_, pairs) = self.stack.pop().unwrap();
+                return Ok(Some(Node::Mapping(pairs)));
             }
             Some(Token::DocumentEnd) => {
-                // Document end marker - validate no content after it on same line
                 crate::parser::document::helpers::validate_trailing_content_after_document_end(
                     stream,
                 )?;
-                let (_, pairs) = stack.pop().unwrap();
-                return Ok(Node::Mapping(pairs));
-            }
-            // Newlines and comments are already skipped at loop start
-            Some(Token::Indent(level)) => {
-                #[cfg(feature = "debug-trace")]
-                mapping_log(format!(
-                    "Token::Indent encountered: level={}, stack_len={}, stack={:?}",
-                    level,
-                    stack.len(),
-                    stack.iter().map(|(i, v)| (*i, v.len())).collect::<Vec<_>>()
-                ));
-                let current_indent = get_current_indent(&stack, base_indent);
-                #[cfg(feature = "debug-trace")]
-                mapping_log(format!(
-                    "INDENT token encountered: level={}, current_indent={}, stack_len={}",
-                    level,
-                    current_indent,
-                    stack.len()
-                ));
-                if level > current_indent {
-                    // If we are about to start a new nested mapping but the
-                    // last value at this indentation level is already a
-                    // non-empty scalar, and we just crossed a standalone
-                    // comment line, treat this as an 8XDJ-style structural
-                    // error instead of silently building a nested mapping.
-                    let last_value_is_empty = stack
-                        .last()
-                        .and_then(|(_, pairs)| pairs.last())
-                        .map(|(_, v)| matches!(v, Node::None))
-                        .unwrap_or(false);
-                    if !last_value_is_empty && saw_comment_between_entries {
-                        return Err(mapping_key_error_yaml(
-                            stream.source_mut(),
-                            "Invalid indentation after comment: indented content cannot extend a completed scalar mapping value",
-                        ));
-                    }
-
-                    // New nested mapping: push to stack
-                    #[cfg(feature = "debug-trace")]
-                    mapping_log(format!(
-                        "Pushing new stack frame for nested mapping at indent {} (current_indent={}, stack_len={})",
-                        level,
-                        current_indent,
-                        stack.len()
-                    ));
-                    stack.push((level, Vec::new()));
-                    #[cfg(feature = "debug-trace")]
-                    mapping_log(format!(
-                        "Stack after push: {:?}",
-                        stack.iter().map(|(i, v)| (*i, v.len())).collect::<Vec<_>>()
-                    ));
-                    stream.next()?;
-                    continue;
-                } else if level < current_indent {
-                    // Dedent: pop stack and insert completed mapping into parent
-                    #[cfg(feature = "debug-trace")]
-                    mapping_log(format!(
-                        "Dedent detected: popping stack. level={}, current_indent={}, stack_len={}",
-                        level,
-                        current_indent,
-                        stack.len()
-                    ));
-                    // ...existing code for dedent...
-                    stream.next()?;
-                    continue;
-                } else {
-                    stream.next()?;
-                    continue;
-                }
+                let (_, pairs) = self.stack.pop().unwrap();
+                return Ok(Some(Node::Mapping(pairs)));
             }
             _ => {}
         }
-        #[cfg(feature = "debug-trace")]
-        mapping_log(format!(
-            "At top of loop, token={:?}, stack_len={}, stack={:?}",
-            token,
-            stack.len(),
-            stack.iter().map(|(i, v)| (*i, v.len())).collect::<Vec<_>>()
-        ));
-        match token {
-            // Newlines and comments already handled by skip_newlines_and_comments()
-            Some(Token::Indent(level)) => {
-                #[cfg(feature = "debug-trace")]
-                mapping_log(format!(
-                    "Token::Indent encountered: level={}, stack_len={}, stack={:?}",
-                    level,
-                    stack.len(),
-                    stack.iter().map(|(i, v)| (*i, v.len())).collect::<Vec<_>>()
-                ));
-                let current_indent = stack.last().map(|(lvl, _)| *lvl).unwrap_or(base_indent);
-                #[cfg(feature = "debug-trace")]
-                mapping_log(format!(
-                    "INDENT token encountered: level={}, current_indent={}, stack_len={}",
-                    level,
-                    current_indent,
-                    stack.len()
-                ));
-                if level > current_indent {
-                    // Only allow a new nested mapping when the last key at this
-                    // indentation level has an empty value (Node::None). This
-                    // matches YAML's rule that an indented block value may only
-                    // follow a key whose value is provided via a nested block
-                    // (i.e., after a "key:" line with no scalar on the same
-                    // line). For cases like 8XDJ, where the key already has a
-                    // scalar value on the same line, an additional more-indented
-                    // line should not start a nested mapping and is instead
-                    // treated as invalid.
-                    let allow_nested = stack
-                        .last()
-                        .and_then(|(_, pairs)| pairs.last())
-                        .map(|(_, v)| matches!(v, Node::None))
-                        .unwrap_or(false);
-                    if !allow_nested {
-                        return Err(mapping_key_error_yaml(
-                            stream.source_mut(),
-                            "Invalid indentation: nested mapping value is only allowed after a key with an empty value",
-                        ));
-                    }
+        Ok(None)
+    }
 
-                    // New nested mapping: push to stack
-                    #[cfg(feature = "debug-trace")]
-                    mapping_log(format!(
-                        "Pushing new stack frame for nested mapping at indent {} (current_indent={}, stack_len={})",
-                        level,
-                        current_indent,
-                        stack.len()
-                    ));
-                    stack.push((level, Vec::new()));
-                    #[cfg(feature = "debug-trace")]
-                    mapping_log(format!(
-                        "Stack after push: {:?}",
-                        stack.iter().map(|(i, v)| (*i, v.len())).collect::<Vec<_>>()
-                    ));
-                    stream.next()?;
-                    continue;
-                } else if level < current_indent {
-                    // Dedent: pop stack and insert completed mapping into parent
-                    #[cfg(feature = "debug-trace")]
-                    mapping_log(format!(
-                        "Dedent detected: popping stack. level={}, current_indent={}, stack_len={}",
-                        level,
-                        current_indent,
-                        stack.len()
-                    ));
-                    dedent_unwind_mapping_stack(&mut stack, level);
-                    stream.next()?;
-                    continue;
-                } else {
-                    stream.next()?;
-                    continue;
+    /// Attempt to parse and insert a key-value pair into the current mapping.
+    /// Handles indentation, dedent, and special tokens.
+    fn try_parse_and_insert_pair(
+        &mut self,
+        stream: &mut TokenStream,
+        directives: &DirectiveContext,
+        current_indent: usize,
+        depth: usize,
+        saw_comment_between_entries: bool,
+    ) -> crate::parser::ParseResult<Option<(Node, Node)>> {
+        let token = stream.current().cloned();
+        if let Some(result) = self.handle_indent_tokens(
+            stream,
+            token.clone(),
+            current_indent,
+            saw_comment_between_entries,
+        )? {
+            return Ok(result);
+        }
+        if let Some(result) = Self::handle_mapping_control_tokens(&mut self.stack, token) {
+            return Ok(Some(result));
+        }
+        let (key, value) = self.parse_mapping_pair(stream, directives, current_indent, depth)?;
+        let norm_key = force_key_to_string(key);
+        Ok(Some((norm_key, value)))
+    }
+
+    /// Handle indent/dedent tokens and error cases for try_parse_and_insert_pair.
+    fn handle_indent_tokens(
+        &mut self,
+        stream: &mut TokenStream,
+        token: Option<Token>,
+        current_indent: usize,
+        saw_comment_between_entries: bool,
+    ) -> crate::parser::ParseResult<Option<Option<(Node, Node)>>> {
+        if let Some(Token::Indent(level)) = token {
+            let last_value_is_empty = self
+                .stack
+                .last()
+                .and_then(|(_, pairs)| pairs.last())
+                .map(|(_, v)| matches!(v, Node::None))
+                .unwrap_or(false);
+            if level > current_indent {
+                if !last_value_is_empty && saw_comment_between_entries {
+                    use crate::error::enhanced::{EnhancedError, ErrorCode};
+                    let err = EnhancedError::new(mapping_key_error_yaml(
+                        stream.source_mut(),
+                        "Invalid indentation after comment: indented content cannot extend a completed scalar mapping value",
+                    ))
+                    .with_code(ErrorCode::E007)
+                    .with_note("Check for misplaced comments or indentation.");
+                    return Err(err.to_string().into());
                 }
+                self.stack.push((level, Vec::new()));
+                stream.next()?;
+                return Ok(Some(None));
             }
+            if level < current_indent {
+                self.dedent_unwind_mapping_stack(level);
+                stream.next()?;
+                return Ok(Some(None));
+            }
+            stream.next()?;
+            return Ok(Some(None));
+        }
+        Ok(None)
+    }
+
+    /// Handle mapping control tokens (end of mapping, document, etc.) for try_parse_and_insert_pair.
+    fn handle_mapping_control_tokens(
+        stack: &mut Vec<(usize, Vec<(Node, Node)>)>,
+        token: Option<Token>,
+    ) -> Option<(Node, Node)> {
+        match token {
             Some(Token::Eof)
             | Some(Token::DocumentEnd)
             | Some(Token::DocumentStart)
@@ -369,199 +339,59 @@ pub fn parse_mapping_with_tokens(
             | Some(Token::FlowMappingEnd)
             | Some(Token::FlowSequenceEnd) => {
                 let (_, pairs) = stack.pop().unwrap();
-                return Ok(Node::Mapping(pairs));
+                Some((Node::None, Node::Mapping(pairs)))
             }
-            _ => {
-                let cur_indent = get_current_indent(&stack, base_indent);
-                let (key, value) = parse_mapping_pair(stream, directives, cur_indent, depth)?;
-                let norm_key = force_key_to_string(key);
-                // Debug: print key type before insertion
-                #[cfg(feature = "debug-trace")]
-                mapping_log(format!("Inserting mapping key: {:?}", norm_key));
-                // Patch: If the value is a Set with a single empty string, and the next token is an explicit key (?),
-                // treat the following block as the value for this key (for !!set explicit block format)
-                if let Node::Set(items) = &value {
-                    let is_empty_str = items.len() == 1
-                        && matches!(items[0], Node::Str(ref s, _, _) if s.is_empty());
-                    let is_mapping_set = if let Some(Token::Plain(_)) = stream.current() {
-                        true
-                    } else {
-                        false
-                    };
-                    if (is_empty_str && is_mapping_set)
-                        || (is_empty_str
-                            && crate::parser::document::explicit_key::is_explicit_key_start(stream))
-                    {
-                        let mapping_value =
-                            parse_mapping_with_tokens(stream, cur_indent, directives, depth + 1)?;
-                        if let Node::Mapping(ref pairs) = mapping_value {
-                            // Use DRY helper to convert mapping pairs with None values into set items
-                            if let Some(mut set_items) =
-                                crate::parser::document::node_utils::pairs_to_set_items_if_all_none(
-                                    pairs,
-                                )
-                            {
-                                // FLATTEN: If the current value is a Set, merge its items
-                                let mut all_items = Vec::new();
-                                for item in items.iter() {
-                                    if !matches!(item, Node::Str(s, _, _) if s.is_empty()) {
-                                        all_items.push(item.clone());
-                                    }
-                                }
-                                all_items.append(&mut set_items);
-                                return Ok(Node::Set(all_items));
-                            } else {
-                                // Not a valid set, return as mapping
-                                return Ok(Node::Mapping(pairs.clone()));
-                            }
-                        } else {
-                            // Not a mapping, just return as-is
-                            return Ok(mapping_value);
-                        }
-                    }
-                }
-                if let Some((_, _pairs)) = stack.last_mut() {
-                    // Get stack info before mutable borrow
-                    let stack_idx = stack.len().saturating_sub(1);
-                    let (_stack_indent, _pairs_len) =
-                        if let Some((lvl, pairs)) = stack.get(stack_idx) {
-                            (*lvl, pairs.len())
-                        } else {
-                            (base_indent, 0)
-                        };
-                    #[cfg(feature = "debug-trace")]
-                    mapping_log(format!(
-                        "Inserting pair: key={:?}, value={:?} into stack at indent {} (pairs before: {})",
-                        norm_key, value, _stack_indent, _pairs_len
-                    ));
-                    if let Some((_, pairs)) = stack.last_mut() {
-                        pairs.push((norm_key, value));
-                        // After push, print only the new pairs length for this stack frame
-                        #[cfg(feature = "debug-trace")]
-                        mapping_log(format!(
-                            "Stack at indent {} now has {} pairs",
-                            _stack_indent,
-                            pairs.len()
-                        ));
-                    }
-                }
-            }
+            _ => None,
         }
     }
-
-    // unreachable: loop always returns on end condition
 }
 
-/// Parse a single key-value pair
-#[allow(dead_code)]
-fn parse_mapping_pair(
-    stream: &mut TokenStream,
-    directives: &DirectiveContext,
-    cur_indent: usize,
-    depth: usize,
-) -> crate::parser::ParseResult<(Node, Node)> {
-    #[cfg(feature = "debug-trace")]
-    mapping_log(format!(
-        "parse_mapping_pair: start, token = {:?}",
-        stream.current()
-    ));
-    #[cfg(feature = "debug-trace")]
-    log::debug!("mapping_pair: start at token = {:?}", stream.current());
-    // Unify explicit and implicit key handling: always use token stream for key detection
-    // If the next token is a question mark, it's an explicit key
-    let mut explicit_key = false;
-    if crate::parser::document::explicit_key::is_explicit_key_start(stream) {
-        stream.next()?;
-        explicit_key = true;
-    }
+impl MappingParseContext {
+    /// Parse a single key-value pair within a mapping.
+    /// Handles explicit keys, omitted values, and YAML edge cases.
+    #[allow(dead_code)]
+    fn parse_mapping_pair(
+        &self,
+        stream: &mut TokenStream,
+        directives: &DirectiveContext,
+        cur_indent: usize,
+        depth: usize,
+    ) -> crate::parser::ParseResult<(Node, Node)> {
+        #[cfg(feature = "debug-trace")]
+        mapping_log(format!(
+            "parse_mapping_pair: start, token = {:?}",
+            stream.current()
+        ));
+        #[cfg(feature = "debug-trace")]
+        log::debug!("mapping_pair: start at token = {:?}", stream.current());
 
-    // Handle decorators (tag/anchor) and parse the key value
-    let key = {
-        let parsed_key = if matches!(
-            stream.current(),
-            Some(Token::Tag(_)) | Some(Token::Anchor(_))
-        ) {
-            // Capture any decorators attached to this key position
-            let decorators = stream.consume_decorators()?;
-            #[cfg(feature = "debug-trace")]
-            mapping_log(format!(
-                "parse_mapping_pair: after decorators, token = {:?}",
-                stream.current()
-            ));
-            // If the next significant token is a colon, this is a decorated
-            // empty key such as '!!str:' or '&root:'. In that case, build
-            // an empty string key and wrap it in the tag/anchor nodes.
-            if matches!(stream.current(), Some(Token::Colon)) {
-                use crate::nodes::node::{BlockStyle, QuoteType};
-                let mut node = Node::Str("".to_string(), QuoteType::Unquoted, BlockStyle::None);
-                if let Some(tag) = decorators.tag {
-                    node = Node::Tagged(Box::new(node), tag);
-                }
-                if let Some(anchor) = decorators.anchor {
-                    node = Node::Anchored(Box::new(node), anchor);
-                }
-                node
-            } else {
-                // Otherwise, parse the actual key scalar and then apply
-                // decorators around it if present. This ensures constructs
-                // like '&root key: value' still produce an anchored key
-                // node and keeps decorated-empty-key tests passing.
-                let mut key_node = parse_value_with_tokens(stream, directives, depth + 1)?;
-                if let Some(tag) = decorators.tag {
-                    key_node = Node::Tagged(Box::new(key_node), tag);
-                }
-                if let Some(anchor) = decorators.anchor {
-                    // SU74: YAML 1.2 does not allow anchors to be applied
-                    // directly to alias nodes in key position (e.g.,
-                    // "&b *alias : value"). Treat such constructs as
-                    // structural errors rather than accepting an
-                    // "anchored alias" key.
-                    if matches!(key_node, Node::Alias(_)) {
-                        return Err(mapping_key_error_yaml(
-                            stream.source_mut(),
-                            "Invalid anchored alias key: anchors cannot be applied to alias nodes",
-                        ));
-                    }
-                    if matches!(key_node, Node::Anchored(_, _)) {
-                        return Err(mapping_key_error_yaml(
-                            stream.source_mut(),
-                            "A mapping key cannot have multiple anchors",
-                        ));
-                    }
-                    key_node = Node::Anchored(Box::new(key_node), anchor);
-                }
-                key_node
-            }
-        } else {
-            parse_value_with_tokens(stream, directives, depth + 1)?
-        };
-        parsed_key
-    };
-    #[cfg(feature = "debug-trace")]
-    mapping_log(format!(
-        "parse_mapping_pair: after key, token = {:?}",
-        stream.current()
-    ));
-    // Allow newlines/comments after key before colon
-    stream.skip_newlines_and_comments()?;
-    match stream.current() {
-        Some(Token::Colon) => {
+        let (explicit_key, key) = self.parse_mapping_key(stream, directives, depth)?;
+        #[cfg(feature = "debug-trace")]
+        mapping_log(format!(
+            "parse_mapping_pair: after key, token = {:?}",
+            stream.current()
+        ));
+        stream.skip_newlines_and_comments()?;
+
+        let cur = stream.current();
+        // Early return for colon after key
+        if let Some(Token::Colon) = cur {
             stream.next()?;
+            let value =
+                parse_mapping_value(stream, directives, cur_indent, depth, explicit_key, &key)?;
+            #[cfg(feature = "debug-trace")]
+            log::debug!("mapping_pair: return pair = ({:?}, {:?})", key, value);
+            return Ok((key, value));
         }
-        _ if explicit_key => {
-            // Explicit key may omit a value entirely (e.g., !!set with '? key').
-            // YAML allows explicit keys without a following colon to indicate an
-            // empty value. If the colon isn't found on the next non-trivia token,
-            // treat the value as empty rather than error.
-            // If the next token is a new key, document boundary, or EOF, treat as empty value
-            // This is critical for !!set block format: ? item1\n? item2\n? item3
-            // Always treat as Node::None if not followed by colon/value.
+
+        // Early return for explicit key with omitted value
+        if explicit_key {
             #[cfg(feature = "debug-trace")]
             mapping_log(format!(
                 "parse_mapping_pair: after explicit key newline/whitespace, token = {:?}",
                 stream.current()
             ));
-            match stream.current() {
+            match cur {
                 Some(Token::Plain(_))
                 | Some(Token::Tag(_))
                 | Some(Token::Anchor(_))
@@ -569,56 +399,131 @@ fn parse_mapping_pair(
                 | Some(Token::DocumentEnd)
                 | Some(Token::DocumentStart)
                 | Some(Token::Eof)
-                | None => {
-                    // Explicit key with no value: treat as Node::None
-                    return Ok((key, Node::None));
-                }
-                // Also treat Indent as start of new mapping entry (Node::None)
-                Some(Token::Indent(_)) => {
-                    return Ok((key, Node::None));
-                }
-                _ => {
-                    // Otherwise, always attempt to parse a value (let value parser handle)
-                }
+                | None
+                | Some(Token::Indent(_)) => return Ok((key, Node::None)),
+                _ => {}
             }
-            // If colon is not present, treat as empty value
-            if !matches!(stream.current(), Some(Token::Colon)) {
+            if !matches!(cur, Some(Token::Colon)) {
                 return Ok((key, Node::None));
             } else {
                 stream.next()?;
+                let value =
+                    parse_mapping_value(stream, directives, cur_indent, depth, explicit_key, &key)?;
+                #[cfg(feature = "debug-trace")]
+                log::debug!("mapping_pair: return pair = ({:?}, {:?})", key, value);
+                return Ok((key, value));
             }
         }
-        Some(Token::Eof) | None => {
-            // Treat EOF or None as valid empty value
+
+        // Early return for EOF or None
+        if matches!(cur, Some(Token::Eof) | None) {
             return Ok((key, Node::None));
         }
-        // If next token is a valid key, treat as empty value
-        Some(Token::Plain(_))
-        | Some(Token::Tag(_))
-        | Some(Token::Anchor(_))
-        | Some(Token::QuestionMark) => {
+
+        // Early return for plain/tag/anchor/question tokens
+        if matches!(
+            cur,
+            Some(Token::Plain(_))
+                | Some(Token::Tag(_))
+                | Some(Token::Anchor(_))
+                | Some(Token::QuestionMark)
+        ) {
             return Ok((key, Node::None));
         }
-        Some(Token::Dash) => {
-            // Allow dash as value only if it follows a newline (handled above)
+
+        // Early return for dash token
+        if matches!(cur, Some(Token::Dash)) {
             return Ok((key, Node::None));
         }
-        // Do not error on Indent or other tokens; let the value parser handle it
-        _ => {
-            // No error: let the value parser handle the next token
+
+        // Default: parse value
+        let value = parse_mapping_value(stream, directives, cur_indent, depth, explicit_key, &key)?;
+        #[cfg(feature = "debug-trace")]
+        log::debug!("mapping_pair: return pair = ({:?}, {:?})", key, value);
+        Ok((key, value))
+    }
+}
+
+impl MappingParseContext {
+    /// Parse a mapping key, handling explicit keys and decorators (tags/anchors).
+    fn parse_mapping_key(
+        &self,
+        stream: &mut TokenStream,
+        directives: &DirectiveContext,
+        depth: usize,
+    ) -> crate::parser::ParseResult<(bool, Node)> {
+        let mut explicit_key = false;
+        if crate::parser::document::explicit_key::is_explicit_key_start(stream) {
+            stream.next()?;
+            explicit_key = true;
+        }
+        if matches!(
+            stream.current(),
+            Some(Token::Tag(_)) | Some(Token::Anchor(_))
+        ) {
+            let decorators = stream.consume_decorators()?;
+            if matches!(stream.current(), Some(Token::Colon)) {
+                use crate::nodes::node::{BlockStyle, QuoteType};
+                let node = Node::Str("".to_string(), QuoteType::Unquoted, BlockStyle::None);
+                let key = apply_decorators_to_key(node, decorators, stream)?;
+                Ok((explicit_key, key))
+            } else {
+                let key_node = parse_value_with_tokens(stream, directives, depth + 1)?;
+                let key = apply_decorators_to_key(key_node, decorators, stream)?;
+                Ok((explicit_key, key))
+            }
+        } else {
+            let key_node = parse_value_with_tokens(stream, directives, depth + 1)?;
+            Ok((explicit_key, key_node))
         }
     }
+}
 
-    #[cfg(feature = "debug-trace")]
-    log::debug!("mapping_pair: before value, token = {:?}", stream.current());
-    // Parse the value - check for empty value BEFORE skipping whitespace
+/// Apply decorators (tag, anchor) to a mapping key node.
+fn apply_decorators_to_key(
+    mut key_node: Node,
+    decorators: crate::parser::token_stream::Decorators,
+    stream: &mut TokenStream,
+) -> crate::parser::ParseResult<Node> {
+    if let Some(tag) = decorators.tag {
+        key_node = Node::Tagged(Box::new(key_node), tag);
+    }
+    if let Some(anchor) = decorators.anchor {
+        if matches!(key_node, Node::Alias(_)) {
+            use crate::error::enhanced::{EnhancedError, ErrorCode};
+            let err = EnhancedError::new(mapping_key_error_yaml(
+                stream.source_mut(),
+                "Invalid anchored alias key: anchors cannot be applied to alias nodes",
+            ))
+            .with_code(ErrorCode::E004)
+            .with_note("Anchors are not allowed on alias nodes.");
+            return Err(err.to_string().into());
+        }
+        if matches!(key_node, Node::Anchored(_, _)) {
+            use crate::error::enhanced::{EnhancedError, ErrorCode};
+            let err = EnhancedError::new(mapping_key_error_yaml(
+                stream.source_mut(),
+                "A mapping key cannot have multiple anchors",
+            ))
+            .with_code(ErrorCode::E005)
+            .with_note("A key can only have one anchor.");
+            return Err(err.to_string().into());
+        }
+        key_node = Node::Anchored(Box::new(key_node), anchor);
+    }
+    Ok(key_node)
+}
+
+fn parse_mapping_value(
+    stream: &mut TokenStream,
+    directives: &DirectiveContext,
+    cur_indent: usize,
+    depth: usize,
+    explicit_key: bool,
+    _key: &Node,
+) -> crate::parser::ParseResult<Node> {
     let cur_token = stream.current().cloned();
-    #[cfg(feature = "debug-trace")]
-    log::debug!(
-        "mapping_pair: value parse branch, cur_token = {:?}",
-        cur_token
-    );
-    let value = match cur_token {
+    match cur_token {
         Some(Token::Newline)
         | None
         | Some(Token::Eof)
@@ -628,51 +533,15 @@ fn parse_mapping_pair(
                 stream.next()?;
             }
             stream.skip_newlines_and_comments()?;
-            let indent_level = if let Some(Token::Indent(level)) = stream.current() {
-                if *level > cur_indent {
-                    let _lvl = *level;
-                    stream.next()?; // consume Indent
-                    Some(_lvl)
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-            if let Some(level) = indent_level {
-                stream.skip_newlines_and_comments()?;
-                if matches!(stream.current(), Some(Token::Dash)) {
-                    use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
-                    let ctx_seq = crate::parser::document::context::ParsingContext::new(level)
-                        .child_block_context(
-                            level,
-                            crate::parser::document::context::CollectionType::BlockSequence,
-                        );
-                    let seq = parse_sequence_with_tokens(
-                        stream,
-                        level,
-                        cur_indent,
-                        directives,
-                        &ctx_seq,
-                        depth + 1,
-                    )?;
-                    return Ok((key, seq));
-                } else {
-                    let map = parse_mapping_with_tokens(stream, level, directives, depth + 1)?;
-                    return Ok((key, map));
-                }
-            }
-            // If not explicit key, error only if next token is EOF (no value, no newline, no indentation)
-            if !explicit_key && matches!(stream.current(), Some(Token::Eof) | None) {
-                return Err(crate::parser::document::error_builder::syntax_error(
-                    stream.source_mut(),
-                    "YAML compliance error: Mapping key without value (expected value after colon)",
-                ));
-            }
-            Node::None
+            return parse_indented_mapping_value(
+                stream,
+                directives,
+                cur_indent,
+                depth,
+                explicit_key,
+            );
         }
         Some(Token::Indent(level)) => {
-            // Increased indentation: parse nested mapping or sequence as value
             stream.next()?; // consume Indent
             if matches!(stream.current(), Some(Token::Dash)) {
                 use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
@@ -681,34 +550,26 @@ fn parse_mapping_pair(
                         level,
                         crate::parser::document::context::CollectionType::BlockSequence,
                     );
-                parse_sequence_with_tokens(
+                return parse_sequence_with_tokens(
                     stream,
                     level,
                     cur_indent,
                     directives,
                     &ctx_seq,
                     depth + 1,
-                )?
+                );
             } else {
-                parse_mapping_with_tokens(stream, level, directives, depth + 1)?
+                return parse_mapping_with_tokens(stream, level, directives, depth + 1);
             }
         }
         _ => {
-            // Skip whitespace before value, then parse the actual value.
-            // Any anchored-or-tagged block values that are properly
-            // indented under the key (e.g., BU8L) are already handled
-            // by the Newline/Indent branches above; here we only route
-            // to the general value parser.
             stream.skip_trivia()?;
             let v = parse_value_with_tokens(stream, directives, depth + 1)?;
             #[cfg(feature = "debug-trace")]
             log::debug!("mapping_pair: parsed value = {:?}", v);
-            v
+            Ok(v)
         }
-    };
-    #[cfg(feature = "debug-trace")]
-    log::debug!("mapping_pair: return pair = ({:?}, {:?})", key, value);
-    Ok((key, value))
+    }
 }
 
 #[cfg(test)]

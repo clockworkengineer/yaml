@@ -231,26 +231,8 @@ fn parse_block_scalar(
         }
     }
     use crate::parser::document::error_builder::indentation_error;
-    if let Some(first_indent) = first_content_indent {
-        if blank_lines_before_content >= 2 && max_blank_indent_before_content > first_indent {
-            let msg = format!(
-                "Invalid indentation in block scalar: blank lines before block scalar content are more indented than the content (blank max: {}, first content indent: {})",
-                max_blank_indent_before_content, first_indent
-            );
-            return Err(indentation_error(stream.source_mut(), &msg));
-        }
-    } else if blank_lines_before_content >= 3
-        && max_blank_indent_before_content > 0
-        && pending_indent_for_line.map_or(false, |comment_indent| {
-            comment_indent < max_blank_indent_before_content
-        })
-    {
-        let msg = format!(
-            "Invalid empty block scalar: malformed indented blank lines without any content (blank max indent: {}, following indent: {:?})",
-            max_blank_indent_before_content, pending_indent_for_line
-        );
-        return Err(indentation_error(stream.source_mut(), &msg));
-    }
+    // Loosen blank line indentation rules: allow any number/indentation of blank lines before first content line
+    // Only enforce indentation rules on actual content lines, not on blank lines before content
     let indicator = block_header.chars().next().unwrap();
     if indicator == '|' && !has_explicit_indent_indicator {
         if let Some(first_indent) = first_content_indent {
@@ -269,9 +251,8 @@ fn parse_block_scalar(
     } else {
         BlockStyle::Folded
     };
-    let mut full = block_header.trim_end().to_string();
+    let mut full = String::new();
     if !block_lines.is_empty() {
-        full.push('\n');
         full.push_str(&block_lines.join("\n"));
     }
     let header_meta = block_header[1..].trim_start();
@@ -326,7 +307,7 @@ mod tests {
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
         let node = parse_scalar_with_tokens(&mut stream, &directives, 0).unwrap();
         assert!(
-            matches!(node, Node::Str(ref s, QuoteType::Unquoted, BlockStyle::Literal) if s == "|\nline1\nline2")
+            matches!(node, Node::Str(ref s, QuoteType::Unquoted, BlockStyle::Literal) if s == "line1\nline2")
         );
     }
     #[test]
@@ -336,7 +317,7 @@ mod tests {
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
         let node = parse_scalar_with_tokens(&mut stream, &directives, 0).unwrap();
         assert!(
-            matches!(node, Node::Str(ref s, QuoteType::Unquoted, BlockStyle::Folded) if s == ">\nline1\nline2")
+            matches!(node, Node::Str(ref s, QuoteType::Unquoted, BlockStyle::Folded) if s == "line1\nline2")
         );
     }
 
