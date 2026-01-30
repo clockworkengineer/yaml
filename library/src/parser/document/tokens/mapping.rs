@@ -98,7 +98,10 @@ pub fn parse_single_mapping_pair_with_tokens(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
 ) -> crate::parser::ParseResult<Node> {
-    let ctx = MappingParseContext { stack: vec![(0, Vec::new())], base_indent: 0 };
+    let ctx = MappingParseContext {
+        stack: vec![(0, Vec::new())],
+        base_indent: 0,
+    };
     let (key, value) = ctx.parse_mapping_pair(stream, directives, 0, 0)?;
     Ok(Node::Mapping(vec![(key, value)]))
 }
@@ -339,14 +342,14 @@ impl MappingParseContext {
                 return Ok(Some((Node::None, Node::Mapping(pairs))));
             }
             _ => {
-                let (key, value) = self.parse_mapping_pair(stream, directives, current_indent, depth)?;
+                let (key, value) =
+                    self.parse_mapping_pair(stream, directives, current_indent, depth)?;
                 let norm_key = force_key_to_string(key);
                 Ok(Some((norm_key, value)))
             }
         }
     }
 }
-
 
 impl MappingParseContext {
     /// Parse a single key-value pair within a mapping.
@@ -367,7 +370,7 @@ impl MappingParseContext {
         #[cfg(feature = "debug-trace")]
         log::debug!("mapping_pair: start at token = {:?}", stream.current());
 
-        let (explicit_key, key) = parse_mapping_key(stream, directives, depth)?;
+        let (explicit_key, key) = self.parse_mapping_key(stream, directives, depth)?;
         #[cfg(feature = "debug-trace")]
         mapping_log(format!(
             "parse_mapping_pair: after key, token = {:?}",
@@ -425,35 +428,38 @@ impl MappingParseContext {
     }
 }
 
-/// Parse a mapping key, handling explicit keys and decorators (tags/anchors).
-fn parse_mapping_key(
-    stream: &mut TokenStream,
-    directives: &DirectiveContext,
-    depth: usize,
-) -> crate::parser::ParseResult<(bool, Node)> {
-    let mut explicit_key = false;
-    if crate::parser::document::explicit_key::is_explicit_key_start(stream) {
-        stream.next()?;
-        explicit_key = true;
-    }
-    if matches!(
-        stream.current(),
-        Some(Token::Tag(_)) | Some(Token::Anchor(_))
-    ) {
-        let decorators = stream.consume_decorators()?;
-        if matches!(stream.current(), Some(Token::Colon)) {
-            use crate::nodes::node::{BlockStyle, QuoteType};
-            let node = Node::Str("".to_string(), QuoteType::Unquoted, BlockStyle::None);
-            let key = apply_decorators_to_key(node, decorators, stream)?;
-            Ok((explicit_key, key))
+impl MappingParseContext {
+    /// Parse a mapping key, handling explicit keys and decorators (tags/anchors).
+    fn parse_mapping_key(
+        &self,
+        stream: &mut TokenStream,
+        directives: &DirectiveContext,
+        depth: usize,
+    ) -> crate::parser::ParseResult<(bool, Node)> {
+        let mut explicit_key = false;
+        if crate::parser::document::explicit_key::is_explicit_key_start(stream) {
+            stream.next()?;
+            explicit_key = true;
+        }
+        if matches!(
+            stream.current(),
+            Some(Token::Tag(_)) | Some(Token::Anchor(_))
+        ) {
+            let decorators = stream.consume_decorators()?;
+            if matches!(stream.current(), Some(Token::Colon)) {
+                use crate::nodes::node::{BlockStyle, QuoteType};
+                let node = Node::Str("".to_string(), QuoteType::Unquoted, BlockStyle::None);
+                let key = apply_decorators_to_key(node, decorators, stream)?;
+                Ok((explicit_key, key))
+            } else {
+                let key_node = parse_value_with_tokens(stream, directives, depth + 1)?;
+                let key = apply_decorators_to_key(key_node, decorators, stream)?;
+                Ok((explicit_key, key))
+            }
         } else {
             let key_node = parse_value_with_tokens(stream, directives, depth + 1)?;
-            let key = apply_decorators_to_key(key_node, decorators, stream)?;
-            Ok((explicit_key, key))
+            Ok((explicit_key, key_node))
         }
-    } else {
-        let key_node = parse_value_with_tokens(stream, directives, depth + 1)?;
-        Ok((explicit_key, key_node))
     }
 }
 
