@@ -1,6 +1,6 @@
+/// Parses a value that is indented relative to the current mapping key.
+/// Distinguishes between block sequences and nested mappings, and handles YAML compliance errors.
 /// Handles indented/nested value after a mapping key.
-/// This function parses a value that is indented relative to the current mapping key.
-/// It distinguishes between block sequences and nested mappings, and handles YAML compliance errors.
 fn parse_indented_mapping_value(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
@@ -42,6 +42,7 @@ fn parse_indented_mapping_value(
             return Ok(map);
         }
     }
+    // YAML compliance error: Mapping key without value (expected value after colon)
     if !explicit_key && matches!(stream.current(), Some(Token::Eof) | None) {
         use crate::error::enhanced::{EnhancedError, ErrorCode};
         let err = EnhancedError::new(crate::parser::document::error_builder::syntax_error(
@@ -53,7 +54,6 @@ fn parse_indented_mapping_value(
     }
     Ok(Node::None)
 }
-/// Context for mapping parser state
 /// Context for managing the state of a block mapping parse.
 /// Maintains a stack of (indent_level, pairs) to support nested mappings and dedent unwinding.
 struct MappingParseContext {
@@ -91,7 +91,7 @@ fn mapping_log(msg: String) {
     log::trace!("{}", msg);
 }
 
-/// Parse a single key-value mapping pair (for sequence items).
+/// Parses a single key-value mapping pair (for sequence items).
 /// Used when a mapping pair appears as a sequence item (e.g., - key: value).
 #[allow(dead_code)]
 pub fn parse_single_mapping_pair_with_tokens(
@@ -106,11 +106,11 @@ pub fn parse_single_mapping_pair_with_tokens(
     Ok(Node::Mapping(vec![(key, value)]))
 }
 
-/// Parse a block mapping using tokens.
+/// Parses a block mapping using tokens.
 /// This is the main entry point for block mapping parsing in the token-based parser.
-/// It handles indentation, dedent unwinding, and special YAML tokens.
+/// Handles indentation, dedent unwinding, and special YAML tokens.
 ///
-/// Example:
+/// # Example
 /// ```yaml
 /// key1: value1
 /// key2: value2
