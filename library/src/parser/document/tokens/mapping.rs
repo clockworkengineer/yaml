@@ -41,10 +41,13 @@ fn parse_indented_mapping_value(
         }
     }
     if !explicit_key && matches!(stream.current(), Some(Token::Eof) | None) {
-        return Err(crate::parser::document::error_builder::syntax_error(
+        use crate::error::enhanced::{EnhancedError, ErrorCode};
+        let err = EnhancedError::new(crate::parser::document::error_builder::syntax_error(
             stream.source_mut(),
             "YAML compliance error: Mapping key without value (expected value after colon)",
-        ));
+        ))
+        .with_code(ErrorCode::E001);
+        return Err(err.to_string().into());
     }
     Ok(Node::None)
 }
@@ -258,10 +261,14 @@ impl MappingParseContext {
                     .unwrap_or(false);
                 if level > current_indent {
                     if !last_value_is_empty && saw_comment_between_entries {
-                        return Err(mapping_key_error_yaml(
+                        use crate::error::enhanced::{EnhancedError, ErrorCode};
+                        let err = EnhancedError::new(mapping_key_error_yaml(
                             stream.source_mut(),
                             "Invalid indentation after comment: indented content cannot extend a completed scalar mapping value",
-                        ));
+                        ))
+                        .with_code(ErrorCode::E007)
+                        .with_note("Check for misplaced comments or indentation.");
+                        return Err(err.to_string().into());
                     }
                     self.stack.push((level, Vec::new()));
                     stream.next()?;
@@ -407,16 +414,24 @@ fn apply_decorators_to_key(
     }
     if let Some(anchor) = decorators.anchor {
         if matches!(key_node, Node::Alias(_)) {
-            return Err(mapping_key_error_yaml(
+            use crate::error::enhanced::{EnhancedError, ErrorCode};
+            let err = EnhancedError::new(mapping_key_error_yaml(
                 stream.source_mut(),
                 "Invalid anchored alias key: anchors cannot be applied to alias nodes",
-            ));
+            ))
+            .with_code(ErrorCode::E004)
+            .with_note("Anchors are not allowed on alias nodes.");
+            return Err(err.to_string().into());
         }
         if matches!(key_node, Node::Anchored(_, _)) {
-            return Err(mapping_key_error_yaml(
+            use crate::error::enhanced::{EnhancedError, ErrorCode};
+            let err = EnhancedError::new(mapping_key_error_yaml(
                 stream.source_mut(),
                 "A mapping key cannot have multiple anchors",
-            ));
+            ))
+            .with_code(ErrorCode::E005)
+            .with_note("A key can only have one anchor.");
+            return Err(err.to_string().into());
         }
         key_node = Node::Anchored(Box::new(key_node), anchor);
     }
