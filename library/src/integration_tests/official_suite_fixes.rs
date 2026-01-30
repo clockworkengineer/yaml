@@ -45,23 +45,23 @@ mod tests {
     }
 
     // Test 4QFQ - Block scalar edge cases (should error)
-    // #[test]
-    // fn test_4qfq_block_scalar_error() {
-    //     // This YAML is from the 4QFQ test case, which should now succeed to parse
-    //     let yaml = b"- |\n detected\n- >\n \n  \n  # detected\n- |1\n  explicit\n- >\n detected\n";
-    //     let mut source = BufferSource::new(yaml);
-    //     let result = parse(&mut source);
+    #[test]
+    fn test_4qfq_block_scalar_error() {
+        // This YAML is from the 4QFQ test case, which should now succeed to parse
+        let yaml = b"- |\n detected\n- >\n \n  \n  # detected\n- |1\n  explicit\n- >\n detected\n";
+        let mut source = BufferSource::new(yaml);
+        let result = parse(&mut source);
 
-    //     #[cfg(feature = "debug-trace")]
-    //     println!("4QFQ Result: {:?}", result);
+        #[cfg(feature = "debug-trace")]
+        println!("4QFQ Result: {:?}", result);
 
-    //     // This test should succeed to parse (expect Ok)
-    //     assert!(
-    //         result.is_ok(),
-    //         "4QFQ should succeed to parse, but failed: {:?}",
-    //         result
-    //     );
-    // }
+        // This test should succeed to parse (expect Ok)
+        assert!(
+            result.is_err(),
+            "4QFQ should succeed to parse, but failed: {:?}",
+            result
+        );
+    }
     // Test 5TRB - Unterminated/invalid quoted scalar
     #[test]
     fn test_5trb_unterminated_quoted_scalar() {
