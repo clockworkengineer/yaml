@@ -161,7 +161,7 @@ impl MappingParseContext {
             if let Some(result) = self.handle_special_tokens(stream, current_indent, &token)? {
                 return Ok(result);
             }
-            if let Some(pair) = self.parse_and_maybe_insert_pair(
+            if let Some(pair) = self.try_parse_and_insert_pair(
                 stream,
                 directives,
                 current_indent,
@@ -173,24 +173,6 @@ impl MappingParseContext {
                 }
             }
         }
-    }
-
-    /// Wrapper for try_parse_and_insert_pair, renamed for clarity.
-    fn parse_and_maybe_insert_pair(
-        &mut self,
-        stream: &mut TokenStream,
-        directives: &DirectiveContext,
-        current_indent: usize,
-        depth: usize,
-        saw_comment_between_entries: bool,
-    ) -> crate::parser::ParseResult<Option<(Node, Node)>> {
-        self.try_parse_and_insert_pair(
-            stream,
-            directives,
-            current_indent,
-            depth,
-            saw_comment_between_entries,
-        )
     }
 }
 
