@@ -98,7 +98,8 @@ pub fn parse_single_mapping_pair_with_tokens(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
 ) -> crate::parser::ParseResult<Node> {
-    let (key, value) = parse_mapping_pair(stream, directives, 0, 0)?;
+    let ctx = MappingParseContext { stack: vec![(0, Vec::new())], base_indent: 0 };
+    let (key, value) = ctx.parse_mapping_pair(stream, directives, 0, 0)?;
     Ok(Node::Mapping(vec![(key, value)]))
 }
 
@@ -140,7 +141,6 @@ pub fn parse_mapping_with_tokens(
     stream.skip_trivia()?;
     ctx.parse_mapping_loop(stream, directives, depth)
 }
-
 
 impl MappingParseContext {
     /// Main mapping parse loop as a method. Handles comments, dedent, and pair parsing.
@@ -339,7 +339,7 @@ impl MappingParseContext {
                 return Ok(Some((Node::None, Node::Mapping(pairs))));
             }
             _ => {
-                let (key, value) = parse_mapping_pair(stream, directives, current_indent, depth)?;
+                let (key, value) = self.parse_mapping_pair(stream, directives, current_indent, depth)?;
                 let norm_key = force_key_to_string(key);
                 Ok(Some((norm_key, value)))
             }
@@ -347,78 +347,82 @@ impl MappingParseContext {
     }
 }
 
-/// Parse a single key-value pair within a mapping.
-/// Handles explicit keys, omitted values, and YAML edge cases.
-#[allow(dead_code)]
-fn parse_mapping_pair(
-    stream: &mut TokenStream,
-    directives: &DirectiveContext,
-    cur_indent: usize,
-    depth: usize,
-) -> crate::parser::ParseResult<(Node, Node)> {
-    #[cfg(feature = "debug-trace")]
-    mapping_log(format!(
-        "parse_mapping_pair: start, token = {:?}",
-        stream.current()
-    ));
-    #[cfg(feature = "debug-trace")]
-    log::debug!("mapping_pair: start at token = {:?}", stream.current());
 
-    let (explicit_key, key) = parse_mapping_key(stream, directives, depth)?;
-    #[cfg(feature = "debug-trace")]
-    mapping_log(format!(
-        "parse_mapping_pair: after key, token = {:?}",
-        stream.current()
-    ));
-    stream.skip_newlines_and_comments()?;
-
-    // Handle explicit key with omitted value
-    let cur = stream.current();
-    if let Some(Token::Colon) = cur {
-        stream.next()?;
-    } else if explicit_key {
+impl MappingParseContext {
+    /// Parse a single key-value pair within a mapping.
+    /// Handles explicit keys, omitted values, and YAML edge cases.
+    #[allow(dead_code)]
+    fn parse_mapping_pair(
+        &self,
+        stream: &mut TokenStream,
+        directives: &DirectiveContext,
+        cur_indent: usize,
+        depth: usize,
+    ) -> crate::parser::ParseResult<(Node, Node)> {
         #[cfg(feature = "debug-trace")]
         mapping_log(format!(
-            "parse_mapping_pair: after explicit key newline/whitespace, token = {:?}",
+            "parse_mapping_pair: start, token = {:?}",
             stream.current()
         ));
-        match cur {
-            Some(Token::Plain(_))
-            | Some(Token::Tag(_))
-            | Some(Token::Anchor(_))
-            | Some(Token::QuestionMark)
-            | Some(Token::DocumentEnd)
-            | Some(Token::DocumentStart)
-            | Some(Token::Eof)
-            | None
-            | Some(Token::Indent(_)) => {
-                return Ok((key, Node::None));
-            }
-            _ => {}
-        }
-        if !matches!(cur, Some(Token::Colon)) {
-            return Ok((key, Node::None));
-        } else {
-            stream.next()?;
-        }
-    } else if matches!(cur, Some(Token::Eof) | None) {
-        return Ok((key, Node::None));
-    } else if matches!(
-        cur,
-        Some(Token::Plain(_))
-            | Some(Token::Tag(_))
-            | Some(Token::Anchor(_))
-            | Some(Token::QuestionMark)
-    ) {
-        return Ok((key, Node::None));
-    } else if matches!(cur, Some(Token::Dash)) {
-        return Ok((key, Node::None));
-    }
+        #[cfg(feature = "debug-trace")]
+        log::debug!("mapping_pair: start at token = {:?}", stream.current());
 
-    let value = parse_mapping_value(stream, directives, cur_indent, depth, explicit_key, &key)?;
-    #[cfg(feature = "debug-trace")]
-    log::debug!("mapping_pair: return pair = ({:?}, {:?})", key, value);
-    Ok((key, value))
+        let (explicit_key, key) = parse_mapping_key(stream, directives, depth)?;
+        #[cfg(feature = "debug-trace")]
+        mapping_log(format!(
+            "parse_mapping_pair: after key, token = {:?}",
+            stream.current()
+        ));
+        stream.skip_newlines_and_comments()?;
+
+        // Handle explicit key with omitted value
+        let cur = stream.current();
+        if let Some(Token::Colon) = cur {
+            stream.next()?;
+        } else if explicit_key {
+            #[cfg(feature = "debug-trace")]
+            mapping_log(format!(
+                "parse_mapping_pair: after explicit key newline/whitespace, token = {:?}",
+                stream.current()
+            ));
+            match cur {
+                Some(Token::Plain(_))
+                | Some(Token::Tag(_))
+                | Some(Token::Anchor(_))
+                | Some(Token::QuestionMark)
+                | Some(Token::DocumentEnd)
+                | Some(Token::DocumentStart)
+                | Some(Token::Eof)
+                | None
+                | Some(Token::Indent(_)) => {
+                    return Ok((key, Node::None));
+                }
+                _ => {}
+            }
+            if !matches!(cur, Some(Token::Colon)) {
+                return Ok((key, Node::None));
+            } else {
+                stream.next()?;
+            }
+        } else if matches!(cur, Some(Token::Eof) | None) {
+            return Ok((key, Node::None));
+        } else if matches!(
+            cur,
+            Some(Token::Plain(_))
+                | Some(Token::Tag(_))
+                | Some(Token::Anchor(_))
+                | Some(Token::QuestionMark)
+        ) {
+            return Ok((key, Node::None));
+        } else if matches!(cur, Some(Token::Dash)) {
+            return Ok((key, Node::None));
+        }
+
+        let value = parse_mapping_value(stream, directives, cur_indent, depth, explicit_key, &key)?;
+        #[cfg(feature = "debug-trace")]
+        log::debug!("mapping_pair: return pair = ({:?}, {:?})", key, value);
+        Ok((key, value))
+    }
 }
 
 /// Parse a mapping key, handling explicit keys and decorators (tags/anchors).
