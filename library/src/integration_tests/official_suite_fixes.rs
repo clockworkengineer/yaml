@@ -4,9 +4,46 @@
 //! to allow debugging and fixing without needing the full test suite data.
 
 use crate::{BufferSource, Node, parse};
+// Standalone test for 4HVU - Wrong indentation in Sequence (false positive)
+
+// Standalone test for 2CMS - Invalid mapping in plain multiline (false positive)
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_4hvu_sequence_indentation_standalone() {
+        let yaml = b"- item1\n- item2\n  - subitem1\n  - subitem2\n";
+        let mut source = BufferSource::new(yaml);
+        let result = parse(&mut source);
+
+        #[cfg(feature = "debug-trace")]
+        println!("4HVU Standalone Result: {:?}", result);
+
+        // If marked as false positive, we should succeed
+        assert!(
+            result.is_err(),
+            "4HVU should parse (false positive): {:?}",
+            result.err()
+        );
+    }
+    #[test]
+    fn test_2cms_plain_multiline_standalone() {
+        // This might be a false positive - need to understand what makes it invalid
+        let yaml = b"key: this is a plain\n  multiline scalar\n  that continues\n";
+        let mut source = BufferSource::new(yaml);
+        let result = parse(&mut source);
+
+        #[cfg(feature = "debug-trace")]
+        println!("2CMS Standalone Result: {:?}", result);
+
+        // If this is marked as false positive, we should succeed
+        assert!(
+            result.is_err(),
+            "2CMS should parse (false positive): {:?}",
+            result.err()
+        );
+    }
+
     // Test 4QFQ - Block scalar edge cases (should error)
     // #[test]
     // fn test_4qfq_block_scalar_error() {
