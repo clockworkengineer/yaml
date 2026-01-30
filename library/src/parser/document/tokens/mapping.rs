@@ -198,45 +198,48 @@ impl MappingParseContext {
         saw_comment_between_entries: bool,
     ) -> crate::parser::ParseResult<Option<(Node, Node)>> {
         let token = stream.current().cloned();
-        if let Some(Token::Indent(level)) = token {
-            let last_value_is_empty = self
-                .stack
-                .last()
-                .and_then(|(_, pairs)| pairs.last())
-                .map(|(_, v)| matches!(v, Node::None))
-                .unwrap_or(false);
-            if level > current_indent {
-                if !last_value_is_empty && saw_comment_between_entries {
-                    return Err(mapping_key_error_yaml(
-                        stream.source_mut(),
-                        "Invalid indentation after comment: indented content cannot extend a completed scalar mapping value",
-                    ));
+        match token {
+            Some(Token::Indent(level)) => {
+                let last_value_is_empty = self
+                    .stack
+                    .last()
+                    .and_then(|(_, pairs)| pairs.last())
+                    .map(|(_, v)| matches!(v, Node::None))
+                    .unwrap_or(false);
+                if level > current_indent {
+                    if !last_value_is_empty && saw_comment_between_entries {
+                        return Err(mapping_key_error_yaml(
+                            stream.source_mut(),
+                            "Invalid indentation after comment: indented content cannot extend a completed scalar mapping value",
+                        ));
+                    }
+                    self.stack.push((level, Vec::new()));
+                    stream.next()?;
+                    return Ok(None);
                 }
-                self.stack.push((level, Vec::new()));
-                stream.next()?;
-                return Ok(None);
-            } else if level < current_indent {
-                self.dedent_unwind_mapping_stack(level);
-                stream.next()?;
-                return Ok(None);
-            } else {
+                if level < current_indent {
+                    self.dedent_unwind_mapping_stack(level);
+                    stream.next()?;
+                    return Ok(None);
+                }
                 stream.next()?;
                 return Ok(None);
             }
+            Some(Token::Eof)
+            | Some(Token::DocumentEnd)
+            | Some(Token::DocumentStart)
+            | Some(Token::Dash)
+            | Some(Token::FlowMappingEnd)
+            | Some(Token::FlowSequenceEnd) => {
+                let (_, pairs) = self.stack.pop().unwrap();
+                return Ok(Some((Node::None, Node::Mapping(pairs))));
+            }
+            _ => {
+                let (key, value) = parse_mapping_pair(stream, directives, current_indent, depth)?;
+                let norm_key = force_key_to_string(key);
+                Ok(Some((norm_key, value)))
+            }
         }
-        if let Some(Token::Eof)
-        | Some(Token::DocumentEnd)
-        | Some(Token::DocumentStart)
-        | Some(Token::Dash)
-        | Some(Token::FlowMappingEnd)
-        | Some(Token::FlowSequenceEnd) = token
-        {
-            let (_, pairs) = self.stack.pop().unwrap();
-            return Ok(Some((Node::None, Node::Mapping(pairs))));
-        }
-        let (key, value) = parse_mapping_pair(stream, directives, current_indent, depth)?;
-        let norm_key = force_key_to_string(key);
-        Ok(Some((norm_key, value)))
     }
 }
 
@@ -265,51 +268,46 @@ fn parse_mapping_pair(
     stream.skip_newlines_and_comments()?;
 
     // Handle explicit key with omitted value
-    match stream.current() {
-        Some(Token::Colon) => {
+    let cur = stream.current();
+    if let Some(Token::Colon) = cur {
+        stream.next()?;
+    } else if explicit_key {
+        #[cfg(feature = "debug-trace")]
+        mapping_log(format!(
+            "parse_mapping_pair: after explicit key newline/whitespace, token = {:?}",
+            stream.current()
+        ));
+        match cur {
+            Some(Token::Plain(_))
+            | Some(Token::Tag(_))
+            | Some(Token::Anchor(_))
+            | Some(Token::QuestionMark)
+            | Some(Token::DocumentEnd)
+            | Some(Token::DocumentStart)
+            | Some(Token::Eof)
+            | None
+            | Some(Token::Indent(_)) => {
+                return Ok((key, Node::None));
+            }
+            _ => {}
+        }
+        if !matches!(cur, Some(Token::Colon)) {
+            return Ok((key, Node::None));
+        } else {
             stream.next()?;
         }
-        _ if explicit_key => {
-            #[cfg(feature = "debug-trace")]
-            mapping_log(format!(
-                "parse_mapping_pair: after explicit key newline/whitespace, token = {:?}",
-                stream.current()
-            ));
-            match stream.current() {
-                Some(Token::Plain(_))
-                | Some(Token::Tag(_))
-                | Some(Token::Anchor(_))
-                | Some(Token::QuestionMark)
-                | Some(Token::DocumentEnd)
-                | Some(Token::DocumentStart)
-                | Some(Token::Eof)
-                | None => {
-                    return Ok((key, Node::None));
-                }
-                Some(Token::Indent(_)) => {
-                    return Ok((key, Node::None));
-                }
-                _ => {}
-            }
-            if !matches!(stream.current(), Some(Token::Colon)) {
-                return Ok((key, Node::None));
-            } else {
-                stream.next()?;
-            }
-        }
-        Some(Token::Eof) | None => {
-            return Ok((key, Node::None));
-        }
+    } else if matches!(cur, Some(Token::Eof) | None) {
+        return Ok((key, Node::None));
+    } else if matches!(
+        cur,
         Some(Token::Plain(_))
-        | Some(Token::Tag(_))
-        | Some(Token::Anchor(_))
-        | Some(Token::QuestionMark) => {
-            return Ok((key, Node::None));
-        }
-        Some(Token::Dash) => {
-            return Ok((key, Node::None));
-        }
-        _ => {}
+            | Some(Token::Tag(_))
+            | Some(Token::Anchor(_))
+            | Some(Token::QuestionMark)
+    ) {
+        return Ok((key, Node::None));
+    } else if matches!(cur, Some(Token::Dash)) {
+        return Ok((key, Node::None));
     }
 
     let value = parse_mapping_value(stream, directives, cur_indent, depth, explicit_key, &key)?;
