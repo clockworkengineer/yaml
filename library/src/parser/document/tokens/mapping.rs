@@ -1,3 +1,9 @@
+/// Context for mapping parser state
+struct MappingParseContext {
+    stack: Vec<(usize, Vec<(Node, Node)>)>,
+    base_indent: usize,
+}
+
 use crate::nodes::node::Node;
 use crate::nodes::node::{BlockStyle, QuoteType};
 use crate::parser::directives::DirectiveContext;
@@ -59,169 +65,179 @@ pub fn parse_mapping_with_tokens(
 ) -> crate::parser::ParseResult<Node> {
     use crate::utils::optimization::{CapacityHints, NodeBuilder};
     let node_builder = NodeBuilder::with_hints(CapacityHints::small());
-    let mut stack: Vec<(usize, Vec<(Node, Node)>)> = Vec::new();
-    stack.push((
+    let mut ctx = MappingParseContext {
+        stack: vec![(
+            base_indent,
+            Vec::with_capacity(node_builder.hints().mapping_pairs),
+        )],
         base_indent,
-        Vec::with_capacity(node_builder.hints().mapping_pairs),
-    ));
+    };
 
     stream.skip_trivia()?;
 
     loop {
         let saw_comment_between_entries = stream.skip_newlines_and_comments_with_flag()?;
-        handle_dedent(&mut stack, base_indent, stream);
-        let current_indent = get_current_indent(&stack, base_indent);
+        ctx.handle_dedent(stream);
+        let current_indent = ctx.get_current_indent();
         let token = stream.current().cloned();
-        if let Some(result) = handle_special_tokens(&mut stack, stream, current_indent, &token)? {
+        if let Some(result) = ctx.handle_special_tokens(stream, current_indent, &token)? {
             return Ok(result);
         }
-        if let Some(pair) = try_parse_and_insert_pair(
-            &mut stack,
+        if let Some(pair) = ctx.try_parse_and_insert_pair(
             stream,
             directives,
             current_indent,
             depth,
             saw_comment_between_entries,
         )? {
-            if let Some((_, pairs)) = stack.last_mut() {
+            if let Some((_, pairs)) = ctx.stack.last_mut() {
                 pairs.push(pair);
             }
         }
     }
 }
 
-fn get_current_indent(stack: &Vec<(usize, Vec<(Node, Node)>)>, base_indent: usize) -> usize {
-    stack.last().map(|(lvl, _)| *lvl).unwrap_or(base_indent)
-}
-
-fn dedent_unwind_mapping_stack(stack: &mut Vec<(usize, Vec<(Node, Node)>)>, target_level: usize) {
-    while stack.len() > 1 && stack.last().map(|(i, _)| *i).unwrap_or(0) > target_level {
-        let (_, closed_pairs) = stack.pop().unwrap();
-        if let Some((_, parent_pairs)) = stack.last_mut() {
-            parent_pairs.push((Node::None, Node::Mapping(closed_pairs)));
-        }
+impl MappingParseContext {
+    fn get_current_indent(&self) -> usize {
+        self.stack
+            .last()
+            .map(|(lvl, _)| *lvl)
+            .unwrap_or(self.base_indent)
     }
-}
 
-fn handle_dedent(
-    stack: &mut Vec<(usize, Vec<(Node, Node)>)>,
-    base_indent: usize,
-    stream: &mut TokenStream,
-) {
-    loop {
-        let current_indent = stack.last().map(|(lvl, _)| *lvl).unwrap_or(base_indent);
-        let token_indent = match stream.current() {
-            Some(Token::Indent(level)) => *level,
-            _ => current_indent,
-        };
-        if token_indent < current_indent && stack.len() > 1 {
-            let (_, closed_pairs) = stack.pop().unwrap();
-            if let Some((_, parent_pairs)) = stack.last_mut() {
+    fn dedent_unwind_mapping_stack(&mut self, target_level: usize) {
+        while self.stack.len() > 1 && self.stack.last().map(|(i, _)| *i).unwrap_or(0) > target_level
+        {
+            let (_, closed_pairs) = self.stack.pop().unwrap();
+            if let Some((_, parent_pairs)) = self.stack.last_mut() {
                 parent_pairs.push((Node::None, Node::Mapping(closed_pairs)));
             }
-        } else {
-            break;
         }
     }
-}
 
-fn handle_special_tokens(
-    stack: &mut Vec<(usize, Vec<(Node, Node)>)>,
-    stream: &mut TokenStream,
-    current_indent: usize,
-    token: &Option<Token>,
-) -> crate::parser::ParseResult<Option<Node>> {
-    match token {
-        Some(Token::Indent(level)) if *level < current_indent => {
-            dedent_unwind_mapping_stack(stack, *level);
-            let (_, pairs) = stack.last().unwrap();
-            return Ok(Some(Node::Mapping(pairs.clone())));
+    fn handle_dedent(&mut self, stream: &mut TokenStream) {
+        loop {
+            let current_indent = self
+                .stack
+                .last()
+                .map(|(lvl, _)| *lvl)
+                .unwrap_or(self.base_indent);
+            let token_indent = match stream.current() {
+                Some(Token::Indent(level)) => *level,
+                _ => current_indent,
+            };
+            if token_indent < current_indent && self.stack.len() > 1 {
+                let (_, closed_pairs) = self.stack.pop().unwrap();
+                if let Some((_, parent_pairs)) = self.stack.last_mut() {
+                    parent_pairs.push((Node::None, Node::Mapping(closed_pairs)));
+                }
+            } else {
+                break;
+            }
         }
-        Some(Token::Eof) => {
-            while stack.len() > 1 {
-                let (_top_indent, top_pairs) = stack.pop().unwrap();
-                if let Some((_, parent_pairs)) = stack.last_mut() {
-                    if let Some((_, last_value)) = parent_pairs.last_mut() {
-                        *last_value = Node::Mapping(top_pairs);
-                    } else {
-                        parent_pairs.push((
-                            force_key_to_string(Node::Str(
-                                "<unwound>".to_string(),
-                                QuoteType::Unquoted,
-                                BlockStyle::None,
-                            )),
-                            Node::Mapping(top_pairs),
-                        ));
+    }
+
+    fn handle_special_tokens(
+        &mut self,
+        stream: &mut TokenStream,
+        current_indent: usize,
+        token: &Option<Token>,
+    ) -> crate::parser::ParseResult<Option<Node>> {
+        match token {
+            Some(Token::Indent(level)) if *level < current_indent => {
+                self.dedent_unwind_mapping_stack(*level);
+                let (_, pairs) = self.stack.last().unwrap();
+                return Ok(Some(Node::Mapping(pairs.clone())));
+            }
+            Some(Token::Eof) => {
+                while self.stack.len() > 1 {
+                    let (_top_indent, top_pairs) = self.stack.pop().unwrap();
+                    if let Some((_, parent_pairs)) = self.stack.last_mut() {
+                        if let Some((_, last_value)) = parent_pairs.last_mut() {
+                            *last_value = Node::Mapping(top_pairs);
+                        } else {
+                            parent_pairs.push((
+                                force_key_to_string(Node::Str(
+                                    "<unwound>".to_string(),
+                                    QuoteType::Unquoted,
+                                    BlockStyle::None,
+                                )),
+                                Node::Mapping(top_pairs),
+                            ));
+                        }
                     }
                 }
+                let (_, pairs) = self.stack.pop().unwrap();
+                return Ok(Some(Node::Mapping(pairs)));
             }
-            let (_, pairs) = stack.pop().unwrap();
-            return Ok(Some(Node::Mapping(pairs)));
+            Some(Token::DocumentStart)
+            | Some(Token::Dash)
+            | Some(Token::FlowMappingEnd)
+            | Some(Token::FlowSequenceEnd) => {
+                let (_, pairs) = self.stack.pop().unwrap();
+                return Ok(Some(Node::Mapping(pairs)));
+            }
+            Some(Token::DocumentEnd) => {
+                crate::parser::document::helpers::validate_trailing_content_after_document_end(
+                    stream,
+                )?;
+                let (_, pairs) = self.stack.pop().unwrap();
+                return Ok(Some(Node::Mapping(pairs)));
+            }
+            _ => {}
         }
-        Some(Token::DocumentStart)
+        Ok(None)
+    }
+
+    fn try_parse_and_insert_pair(
+        &mut self,
+        stream: &mut TokenStream,
+        directives: &DirectiveContext,
+        current_indent: usize,
+        depth: usize,
+        saw_comment_between_entries: bool,
+    ) -> crate::parser::ParseResult<Option<(Node, Node)>> {
+        let token = stream.current().cloned();
+        if let Some(Token::Indent(level)) = token {
+            let last_value_is_empty = self
+                .stack
+                .last()
+                .and_then(|(_, pairs)| pairs.last())
+                .map(|(_, v)| matches!(v, Node::None))
+                .unwrap_or(false);
+            if level > current_indent {
+                if !last_value_is_empty && saw_comment_between_entries {
+                    return Err(mapping_key_error_yaml(
+                        stream.source_mut(),
+                        "Invalid indentation after comment: indented content cannot extend a completed scalar mapping value",
+                    ));
+                }
+                self.stack.push((level, Vec::new()));
+                stream.next()?;
+                return Ok(None);
+            } else if level < current_indent {
+                self.dedent_unwind_mapping_stack(level);
+                stream.next()?;
+                return Ok(None);
+            } else {
+                stream.next()?;
+                return Ok(None);
+            }
+        }
+        if let Some(Token::Eof)
+        | Some(Token::DocumentEnd)
+        | Some(Token::DocumentStart)
         | Some(Token::Dash)
         | Some(Token::FlowMappingEnd)
-        | Some(Token::FlowSequenceEnd) => {
-            let (_, pairs) = stack.pop().unwrap();
-            return Ok(Some(Node::Mapping(pairs)));
+        | Some(Token::FlowSequenceEnd) = token
+        {
+            let (_, pairs) = self.stack.pop().unwrap();
+            return Ok(Some((Node::None, Node::Mapping(pairs))));
         }
-        Some(Token::DocumentEnd) => {
-            crate::parser::document::helpers::validate_trailing_content_after_document_end(stream)?;
-            let (_, pairs) = stack.pop().unwrap();
-            return Ok(Some(Node::Mapping(pairs)));
-        }
-        _ => {}
+        let (key, value) = parse_mapping_pair(stream, directives, current_indent, depth)?;
+        let norm_key = force_key_to_string(key);
+        Ok(Some((norm_key, value)))
     }
-    Ok(None)
-}
-
-fn try_parse_and_insert_pair(
-    stack: &mut Vec<(usize, Vec<(Node, Node)>)>,
-    stream: &mut TokenStream,
-    directives: &DirectiveContext,
-    current_indent: usize,
-    depth: usize,
-    saw_comment_between_entries: bool,
-) -> crate::parser::ParseResult<Option<(Node, Node)>> {
-    let token = stream.current().cloned();
-    if let Some(Token::Indent(level)) = token {
-        let last_value_is_empty = stack
-            .last()
-            .and_then(|(_, pairs)| pairs.last())
-            .map(|(_, v)| matches!(v, Node::None))
-            .unwrap_or(false);
-        if level > current_indent {
-            if !last_value_is_empty && saw_comment_between_entries {
-                return Err(mapping_key_error_yaml(
-                    stream.source_mut(),
-                    "Invalid indentation after comment: indented content cannot extend a completed scalar mapping value",
-                ));
-            }
-            stack.push((level, Vec::new()));
-            stream.next()?;
-            return Ok(None);
-        } else if level < current_indent {
-            dedent_unwind_mapping_stack(stack, level);
-            stream.next()?;
-            return Ok(None);
-        } else {
-            stream.next()?;
-            return Ok(None);
-        }
-    }
-    if let Some(Token::Eof)
-    | Some(Token::DocumentEnd)
-    | Some(Token::DocumentStart)
-    | Some(Token::Dash)
-    | Some(Token::FlowMappingEnd)
-    | Some(Token::FlowSequenceEnd) = token
-    {
-        let (_, pairs) = stack.pop().unwrap();
-        return Ok(Some((Node::None, Node::Mapping(pairs))));
-    }
-    let (key, value) = parse_mapping_pair(stream, directives, current_indent, depth)?;
-    let norm_key = force_key_to_string(key);
-    Ok(Some((norm_key, value)))
 }
 
 /// Parse a single key-value pair (refactored)
