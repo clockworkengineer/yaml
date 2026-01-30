@@ -1,3 +1,53 @@
+/// Handles indented/nested value after a mapping key
+fn parse_indented_mapping_value(
+    stream: &mut TokenStream,
+    directives: &DirectiveContext,
+    cur_indent: usize,
+    depth: usize,
+    explicit_key: bool,
+) -> crate::parser::ParseResult<Node> {
+    let indent_level = if let Some(Token::Indent(level)) = stream.current() {
+        if *level > cur_indent {
+            let _lvl = *level;
+            stream.next()?; // consume Indent
+            Some(_lvl)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    if let Some(level) = indent_level {
+        stream.skip_newlines_and_comments()?;
+        if matches!(stream.current(), Some(Token::Dash)) {
+            use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
+            let ctx_seq = crate::parser::document::context::ParsingContext::new(level)
+                .child_block_context(
+                    level,
+                    crate::parser::document::context::CollectionType::BlockSequence,
+                );
+            let seq = parse_sequence_with_tokens(
+                stream,
+                level,
+                cur_indent,
+                directives,
+                &ctx_seq,
+                depth + 1,
+            )?;
+            return Ok(seq);
+        } else {
+            let map = parse_mapping_with_tokens(stream, level, directives, depth + 1)?;
+            return Ok(map);
+        }
+    }
+    if !explicit_key && matches!(stream.current(), Some(Token::Eof) | None) {
+        return Err(crate::parser::document::error_builder::syntax_error(
+            stream.source_mut(),
+            "YAML compliance error: Mapping key without value (expected value after colon)",
+        ));
+    }
+    Ok(Node::None)
+}
 /// Context for mapping parser state
 struct MappingParseContext {
     stack: Vec<(usize, Vec<(Node, Node)>)>,
@@ -392,47 +442,13 @@ fn parse_mapping_value(
                 stream.next()?;
             }
             stream.skip_newlines_and_comments()?;
-            let indent_level = if let Some(Token::Indent(level)) = stream.current() {
-                if *level > cur_indent {
-                    let _lvl = *level;
-                    stream.next()?; // consume Indent
-                    Some(_lvl)
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-            if let Some(level) = indent_level {
-                stream.skip_newlines_and_comments()?;
-                if matches!(stream.current(), Some(Token::Dash)) {
-                    use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
-                    let ctx_seq = crate::parser::document::context::ParsingContext::new(level)
-                        .child_block_context(
-                            level,
-                            crate::parser::document::context::CollectionType::BlockSequence,
-                        );
-                    let seq = parse_sequence_with_tokens(
-                        stream,
-                        level,
-                        cur_indent,
-                        directives,
-                        &ctx_seq,
-                        depth + 1,
-                    )?;
-                    return Ok(seq);
-                } else {
-                    let map = parse_mapping_with_tokens(stream, level, directives, depth + 1)?;
-                    return Ok(map);
-                }
-            }
-            if !explicit_key && matches!(stream.current(), Some(Token::Eof) | None) {
-                return Err(crate::parser::document::error_builder::syntax_error(
-                    stream.source_mut(),
-                    "YAML compliance error: Mapping key without value (expected value after colon)",
-                ));
-            }
-            Ok(Node::None)
+            return parse_indented_mapping_value(
+                stream,
+                directives,
+                cur_indent,
+                depth,
+                explicit_key,
+            );
         }
         Some(Token::Indent(level)) => {
             stream.next()?; // consume Indent
@@ -443,16 +459,16 @@ fn parse_mapping_value(
                         level,
                         crate::parser::document::context::CollectionType::BlockSequence,
                     );
-                parse_sequence_with_tokens(
+                return parse_sequence_with_tokens(
                     stream,
                     level,
                     cur_indent,
                     directives,
                     &ctx_seq,
                     depth + 1,
-                )
+                );
             } else {
-                parse_mapping_with_tokens(stream, level, directives, depth + 1)
+                return parse_mapping_with_tokens(stream, level, directives, depth + 1);
             }
         }
         _ => {
