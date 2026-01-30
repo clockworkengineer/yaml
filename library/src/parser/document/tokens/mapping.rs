@@ -224,7 +224,7 @@ fn try_parse_and_insert_pair(
     Ok(Some((norm_key, value)))
 }
 
-/// Parse a single key-value pair
+/// Parse a single key-value pair (refactored)
 #[allow(dead_code)]
 fn parse_mapping_pair(
     stream: &mut TokenStream,
@@ -239,95 +239,21 @@ fn parse_mapping_pair(
     ));
     #[cfg(feature = "debug-trace")]
     log::debug!("mapping_pair: start at token = {:?}", stream.current());
-    // Unify explicit and implicit key handling: always use token stream for key detection
-    // If the next token is a question mark, it's an explicit key
-    let mut explicit_key = false;
-    if crate::parser::document::explicit_key::is_explicit_key_start(stream) {
-        stream.next()?;
-        explicit_key = true;
-    }
 
-    // Handle decorators (tag/anchor) and parse the key value
-    let key = {
-        let parsed_key = if matches!(
-            stream.current(),
-            Some(Token::Tag(_)) | Some(Token::Anchor(_))
-        ) {
-            // Capture any decorators attached to this key position
-            let decorators = stream.consume_decorators()?;
-            #[cfg(feature = "debug-trace")]
-            mapping_log(format!(
-                "parse_mapping_pair: after decorators, token = {:?}",
-                stream.current()
-            ));
-            // If the next significant token is a colon, this is a decorated
-            // empty key such as '!!str:' or '&root:'. In that case, build
-            // an empty string key and wrap it in the tag/anchor nodes.
-            if matches!(stream.current(), Some(Token::Colon)) {
-                use crate::nodes::node::{BlockStyle, QuoteType};
-                let mut node = Node::Str("".to_string(), QuoteType::Unquoted, BlockStyle::None);
-                if let Some(tag) = decorators.tag {
-                    node = Node::Tagged(Box::new(node), tag);
-                }
-                if let Some(anchor) = decorators.anchor {
-                    node = Node::Anchored(Box::new(node), anchor);
-                }
-                node
-            } else {
-                // Otherwise, parse the actual key scalar and then apply
-                // decorators around it if present. This ensures constructs
-                // like '&root key: value' still produce an anchored key
-                // node and keeps decorated-empty-key tests passing.
-                let mut key_node = parse_value_with_tokens(stream, directives, depth + 1)?;
-                if let Some(tag) = decorators.tag {
-                    key_node = Node::Tagged(Box::new(key_node), tag);
-                }
-                if let Some(anchor) = decorators.anchor {
-                    // SU74: YAML 1.2 does not allow anchors to be applied
-                    // directly to alias nodes in key position (e.g.,
-                    // "&b *alias : value"). Treat such constructs as
-                    // structural errors rather than accepting an
-                    // "anchored alias" key.
-                    if matches!(key_node, Node::Alias(_)) {
-                        return Err(mapping_key_error_yaml(
-                            stream.source_mut(),
-                            "Invalid anchored alias key: anchors cannot be applied to alias nodes",
-                        ));
-                    }
-                    if matches!(key_node, Node::Anchored(_, _)) {
-                        return Err(mapping_key_error_yaml(
-                            stream.source_mut(),
-                            "A mapping key cannot have multiple anchors",
-                        ));
-                    }
-                    key_node = Node::Anchored(Box::new(key_node), anchor);
-                }
-                key_node
-            }
-        } else {
-            parse_value_with_tokens(stream, directives, depth + 1)?
-        };
-        parsed_key
-    };
+    let (explicit_key, key) = parse_mapping_key(stream, directives, depth)?;
     #[cfg(feature = "debug-trace")]
     mapping_log(format!(
         "parse_mapping_pair: after key, token = {:?}",
         stream.current()
     ));
-    // Allow newlines/comments after key before colon
     stream.skip_newlines_and_comments()?;
+
+    // Handle explicit key with omitted value
     match stream.current() {
         Some(Token::Colon) => {
             stream.next()?;
         }
         _ if explicit_key => {
-            // Explicit key may omit a value entirely (e.g., !!set with '? key').
-            // YAML allows explicit keys without a following colon to indicate an
-            // empty value. If the colon isn't found on the next non-trivia token,
-            // treat the value as empty rather than error.
-            // If the next token is a new key, document boundary, or EOF, treat as empty value
-            // This is critical for !!set block format: ? item1\n? item2\n? item3
-            // Always treat as Node::None if not followed by colon/value.
             #[cfg(feature = "debug-trace")]
             mapping_log(format!(
                 "parse_mapping_pair: after explicit key newline/whitespace, token = {:?}",
@@ -342,18 +268,13 @@ fn parse_mapping_pair(
                 | Some(Token::DocumentStart)
                 | Some(Token::Eof)
                 | None => {
-                    // Explicit key with no value: treat as Node::None
                     return Ok((key, Node::None));
                 }
-                // Also treat Indent as start of new mapping entry (Node::None)
                 Some(Token::Indent(_)) => {
                     return Ok((key, Node::None));
                 }
-                _ => {
-                    // Otherwise, always attempt to parse a value (let value parser handle)
-                }
+                _ => {}
             }
-            // If colon is not present, treat as empty value
             if !matches!(stream.current(), Some(Token::Colon)) {
                 return Ok((key, Node::None));
             } else {
@@ -361,10 +282,8 @@ fn parse_mapping_pair(
             }
         }
         Some(Token::Eof) | None => {
-            // Treat EOF or None as valid empty value
             return Ok((key, Node::None));
         }
-        // If next token is a valid key, treat as empty value
         Some(Token::Plain(_))
         | Some(Token::Tag(_))
         | Some(Token::Anchor(_))
@@ -372,25 +291,84 @@ fn parse_mapping_pair(
             return Ok((key, Node::None));
         }
         Some(Token::Dash) => {
-            // Allow dash as value only if it follows a newline (handled above)
             return Ok((key, Node::None));
         }
-        // Do not error on Indent or other tokens; let the value parser handle it
-        _ => {
-            // No error: let the value parser handle the next token
-        }
+        _ => {}
     }
 
+    let value = parse_mapping_value(stream, directives, cur_indent, depth, explicit_key, &key)?;
     #[cfg(feature = "debug-trace")]
-    log::debug!("mapping_pair: before value, token = {:?}", stream.current());
-    // Parse the value - check for empty value BEFORE skipping whitespace
+    log::debug!("mapping_pair: return pair = ({:?}, {:?})", key, value);
+    Ok((key, value))
+}
+
+fn parse_mapping_key(
+    stream: &mut TokenStream,
+    directives: &DirectiveContext,
+    depth: usize,
+) -> crate::parser::ParseResult<(bool, Node)> {
+    let mut explicit_key = false;
+    if crate::parser::document::explicit_key::is_explicit_key_start(stream) {
+        stream.next()?;
+        explicit_key = true;
+    }
+    if matches!(
+        stream.current(),
+        Some(Token::Tag(_)) | Some(Token::Anchor(_))
+    ) {
+        let decorators = stream.consume_decorators()?;
+        if matches!(stream.current(), Some(Token::Colon)) {
+            use crate::nodes::node::{BlockStyle, QuoteType};
+            let node = Node::Str("".to_string(), QuoteType::Unquoted, BlockStyle::None);
+            let key = apply_decorators_to_key(node, decorators, stream)?;
+            Ok((explicit_key, key))
+        } else {
+            let key_node = parse_value_with_tokens(stream, directives, depth + 1)?;
+            let key = apply_decorators_to_key(key_node, decorators, stream)?;
+            Ok((explicit_key, key))
+        }
+    } else {
+        let key_node = parse_value_with_tokens(stream, directives, depth + 1)?;
+        Ok((explicit_key, key_node))
+    }
+}
+
+fn apply_decorators_to_key(
+    mut key_node: Node,
+    decorators: crate::parser::token_stream::Decorators,
+    stream: &mut TokenStream,
+) -> crate::parser::ParseResult<Node> {
+    if let Some(tag) = decorators.tag {
+        key_node = Node::Tagged(Box::new(key_node), tag);
+    }
+    if let Some(anchor) = decorators.anchor {
+        if matches!(key_node, Node::Alias(_)) {
+            return Err(mapping_key_error_yaml(
+                stream.source_mut(),
+                "Invalid anchored alias key: anchors cannot be applied to alias nodes",
+            ));
+        }
+        if matches!(key_node, Node::Anchored(_, _)) {
+            return Err(mapping_key_error_yaml(
+                stream.source_mut(),
+                "A mapping key cannot have multiple anchors",
+            ));
+        }
+        key_node = Node::Anchored(Box::new(key_node), anchor);
+    }
+    Ok(key_node)
+}
+
+fn parse_mapping_value(
+    stream: &mut TokenStream,
+    directives: &DirectiveContext,
+    cur_indent: usize,
+    depth: usize,
+    explicit_key: bool,
+    _key: &Node,
+) -> crate::parser::ParseResult<Node> {
     let cur_token = stream.current().cloned();
-    #[cfg(feature = "debug-trace")]
-    log::debug!(
-        "mapping_pair: value parse branch, cur_token = {:?}",
-        cur_token
-    );
-    let value = match cur_token {
+    match cur_token {
         Some(Token::Newline)
         | None
         | Some(Token::Eof)
@@ -428,23 +406,21 @@ fn parse_mapping_pair(
                         &ctx_seq,
                         depth + 1,
                     )?;
-                    return Ok((key, seq));
+                    return Ok(seq);
                 } else {
                     let map = parse_mapping_with_tokens(stream, level, directives, depth + 1)?;
-                    return Ok((key, map));
+                    return Ok(map);
                 }
             }
-            // If not explicit key, error only if next token is EOF (no value, no newline, no indentation)
             if !explicit_key && matches!(stream.current(), Some(Token::Eof) | None) {
                 return Err(crate::parser::document::error_builder::syntax_error(
                     stream.source_mut(),
                     "YAML compliance error: Mapping key without value (expected value after colon)",
                 ));
             }
-            Node::None
+            Ok(Node::None)
         }
         Some(Token::Indent(level)) => {
-            // Increased indentation: parse nested mapping or sequence as value
             stream.next()?; // consume Indent
             if matches!(stream.current(), Some(Token::Dash)) {
                 use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
@@ -460,27 +436,19 @@ fn parse_mapping_pair(
                     directives,
                     &ctx_seq,
                     depth + 1,
-                )?
+                )
             } else {
-                parse_mapping_with_tokens(stream, level, directives, depth + 1)?
+                parse_mapping_with_tokens(stream, level, directives, depth + 1)
             }
         }
         _ => {
-            // Skip whitespace before value, then parse the actual value.
-            // Any anchored-or-tagged block values that are properly
-            // indented under the key (e.g., BU8L) are already handled
-            // by the Newline/Indent branches above; here we only route
-            // to the general value parser.
             stream.skip_trivia()?;
             let v = parse_value_with_tokens(stream, directives, depth + 1)?;
             #[cfg(feature = "debug-trace")]
             log::debug!("mapping_pair: parsed value = {:?}", v);
-            v
+            Ok(v)
         }
-    };
-    #[cfg(feature = "debug-trace")]
-    log::debug!("mapping_pair: return pair = ({:?}, {:?})", key, value);
-    Ok((key, value))
+    }
 }
 
 #[cfg(test)]
