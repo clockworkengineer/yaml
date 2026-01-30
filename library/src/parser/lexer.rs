@@ -693,7 +693,7 @@ impl<'a> Lexer<'a> {
     /// Scan a tag: !tag or !!tag
     fn scan_tag(&mut self) -> Result<Token, crate::error::YamlError> {
         // Special case: allow a single '!' as a valid tag (YAML 1.2 plain tag)
-        let mut peek = self.source.save_state();
+        let peek = self.source.save_state();
         self.source.next(); // consume '!'
         if let Some(ch) = self.source.current() {
             if is_tag_delimiter(self.source, ch) {

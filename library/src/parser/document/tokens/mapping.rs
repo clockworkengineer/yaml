@@ -1,4 +1,6 @@
-/// Handles indented/nested value after a mapping key
+/// Handles indented/nested value after a mapping key.
+/// This function parses a value that is indented relative to the current mapping key.
+/// It distinguishes between block sequences and nested mappings, and handles YAML compliance errors.
 fn parse_indented_mapping_value(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
@@ -52,8 +54,12 @@ fn parse_indented_mapping_value(
     Ok(Node::None)
 }
 /// Context for mapping parser state
+/// Context for managing the state of a block mapping parse.
+/// Maintains a stack of (indent_level, pairs) to support nested mappings and dedent unwinding.
 struct MappingParseContext {
+    /// Stack of (indent_level, mapping pairs) for nested mappings
     stack: Vec<(usize, Vec<(Node, Node)>)>,
+    /// The base indentation level for this mapping
     base_indent: usize,
 }
 
@@ -67,6 +73,7 @@ use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
 
 #[cfg(feature = "debug-trace")]
+/// Helper for debug logging of mapping parser internals.
 #[inline]
 fn mapping_log(msg: String) {
     #[cfg(feature = "std")]
@@ -84,7 +91,8 @@ fn mapping_log(msg: String) {
     log::trace!("{}", msg);
 }
 
-/// Parse a single key-value mapping pair (for sequence items)
+/// Parse a single key-value mapping pair (for sequence items).
+/// Used when a mapping pair appears as a sequence item (e.g., - key: value).
 #[allow(dead_code)]
 pub fn parse_single_mapping_pair_with_tokens(
     stream: &mut TokenStream,
@@ -94,7 +102,9 @@ pub fn parse_single_mapping_pair_with_tokens(
     Ok(Node::Mapping(vec![(key, value)]))
 }
 
-/// Parse a block mapping using tokens
+/// Parse a block mapping using tokens.
+/// This is the main entry point for block mapping parsing in the token-based parser.
+/// It handles indentation, dedent unwinding, and special YAML tokens.
 ///
 /// Example:
 /// ```yaml
@@ -151,6 +161,7 @@ pub fn parse_mapping_with_tokens(
 }
 
 impl MappingParseContext {
+    /// Get the current indentation level from the top of the stack.
     fn get_current_indent(&self) -> usize {
         self.stack
             .last()
@@ -158,6 +169,7 @@ impl MappingParseContext {
             .unwrap_or(self.base_indent)
     }
 
+    /// Unwind the mapping stack to the target indentation level, closing nested mappings as needed.
     fn dedent_unwind_mapping_stack(&mut self, target_level: usize) {
         while self.stack.len() > 1 && self.stack.last().map(|(i, _)| *i).unwrap_or(0) > target_level
         {
@@ -168,6 +180,7 @@ impl MappingParseContext {
         }
     }
 
+    /// Handle dedent tokens by popping stack frames and closing mappings.
     fn handle_dedent(&mut self, stream: &mut TokenStream) {
         loop {
             let current_indent = self
@@ -190,6 +203,7 @@ impl MappingParseContext {
         }
     }
 
+    /// Handle special YAML tokens (indent, document start/end, flow end, etc.) during mapping parsing.
     fn handle_special_tokens(
         &mut self,
         stream: &mut TokenStream,
@@ -242,6 +256,8 @@ impl MappingParseContext {
         Ok(None)
     }
 
+    /// Attempt to parse and insert a key-value pair into the current mapping.
+    /// Handles indentation, dedent, and special tokens.
     fn try_parse_and_insert_pair(
         &mut self,
         stream: &mut TokenStream,
@@ -300,7 +316,8 @@ impl MappingParseContext {
     }
 }
 
-/// Parse a single key-value pair (refactored)
+/// Parse a single key-value pair within a mapping.
+/// Handles explicit keys, omitted values, and YAML edge cases.
 #[allow(dead_code)]
 fn parse_mapping_pair(
     stream: &mut TokenStream,
@@ -373,6 +390,7 @@ fn parse_mapping_pair(
     Ok((key, value))
 }
 
+/// Parse a mapping key, handling explicit keys and decorators (tags/anchors).
 fn parse_mapping_key(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
@@ -404,6 +422,7 @@ fn parse_mapping_key(
     }
 }
 
+/// Apply decorators (tag, anchor) to a mapping key node.
 fn apply_decorators_to_key(
     mut key_node: Node,
     decorators: crate::parser::token_stream::Decorators,
