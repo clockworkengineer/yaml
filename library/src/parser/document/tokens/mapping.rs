@@ -120,6 +120,7 @@ pub fn parse_single_mapping_pair_with_tokens(
 /// - Clear token boundaries prevent infinite loops
 /// - Natural handling of explicit keys (?)
 #[allow(dead_code)]
+
 pub fn parse_mapping_with_tokens(
     stream: &mut TokenStream,
     base_indent: usize,
@@ -137,26 +138,56 @@ pub fn parse_mapping_with_tokens(
     };
 
     stream.skip_trivia()?;
+    ctx.parse_mapping_loop(stream, directives, depth)
+}
 
-    loop {
-        let saw_comment_between_entries = stream.skip_newlines_and_comments_with_flag()?;
-        ctx.handle_dedent(stream);
-        let current_indent = ctx.get_current_indent();
-        let token = stream.current().cloned();
-        if let Some(result) = ctx.handle_special_tokens(stream, current_indent, &token)? {
-            return Ok(result);
+
+impl MappingParseContext {
+    /// Main mapping parse loop as a method. Handles comments, dedent, and pair parsing.
+    fn parse_mapping_loop(
+        &mut self,
+        stream: &mut TokenStream,
+        directives: &DirectiveContext,
+        depth: usize,
+    ) -> crate::parser::ParseResult<Node> {
+        loop {
+            let saw_comment_between_entries = stream.skip_newlines_and_comments_with_flag()?;
+            self.handle_dedent(stream);
+            let current_indent = self.get_current_indent();
+            let token = stream.current().cloned();
+            if let Some(result) = self.handle_special_tokens(stream, current_indent, &token)? {
+                return Ok(result);
+            }
+            if let Some(pair) = self.parse_and_maybe_insert_pair(
+                stream,
+                directives,
+                current_indent,
+                depth,
+                saw_comment_between_entries,
+            )? {
+                if let Some((_, pairs)) = self.stack.last_mut() {
+                    pairs.push(pair);
+                }
+            }
         }
-        if let Some(pair) = ctx.try_parse_and_insert_pair(
+    }
+
+    /// Wrapper for try_parse_and_insert_pair, renamed for clarity.
+    fn parse_and_maybe_insert_pair(
+        &mut self,
+        stream: &mut TokenStream,
+        directives: &DirectiveContext,
+        current_indent: usize,
+        depth: usize,
+        saw_comment_between_entries: bool,
+    ) -> crate::parser::ParseResult<Option<(Node, Node)>> {
+        self.try_parse_and_insert_pair(
             stream,
             directives,
             current_indent,
             depth,
             saw_comment_between_entries,
-        )? {
-            if let Some((_, pairs)) = ctx.stack.last_mut() {
-                pairs.push(pair);
-            }
-        }
+        )
     }
 }
 
