@@ -82,10 +82,20 @@ fn run_yaml_test_suite() {
     };
 
     let skip_list: Vec<&str> = vec![];
+    let known_failures: Vec<&str> = vec![
+        "00", "001", "004", "005", "006", "007", "008", "01", "06", "BD7L", "BF9H", "BS4K", "C2SP",
+        "CXX2", "D49Q", "DK4H", "DMG6", "EB22", "EW3V", "F8F9", "G7JE", "G9HC", "GDY7", "GT5M",
+        "H7TQ", "HU3P", "JKF3", "JY7Z", "KS4U", "N4JP", "P2EQ", "Q4CL", "QB6E", "QLJ7", "RHX7",
+        "RXY3", "S98Z", "SY6V", "TD5N", "U44R", "U99R", "YJV2", "ZCZ6", "ZL4Z", "ZVH3",
+        // Newly captured known failures
+        "236B", "2CMS", "4HVU", "4JVG", "5LLU", "5TRB", "5U3A", "6S55", "7LBH", "7MNF", "9C9N",
+        "9CWY", "9HCY",
+    ];
     let mut passed = 0;
     let mut failed = 0;
     let mut skipped = 0;
     let mut failures = Vec::new();
+    let mut unexpected_failures = Vec::new();
 
     let mut test_dirs = get_all_test_dirs(suite_dir);
     if test_dirs.is_empty() {
@@ -172,6 +182,10 @@ fn run_yaml_test_suite() {
                 "{} (expected: {}, got: {})",
                 test.id, expected, got
             ));
+            if !known_failures.contains(&test.id.as_str()) {
+                println!("UNEXPECTED FAILURE: {}", test.id);
+                unexpected_failures.push(test.id.clone());
+            }
         }
     }
     println!("\n=== YAML Test Suite Results (All Tests) ===");
@@ -185,10 +199,21 @@ fn run_yaml_test_suite() {
             println!("{}. {}", i + 1, failure);
         }
     }
+    if !unexpected_failures.is_empty() {
+        println!("\n=== Unexpected Failures ===");
+        for (i, id) in unexpected_failures.iter().enumerate() {
+            println!("{}. {}", i + 1, id);
+        }
+    }
     let total_tests = passed + failed;
     if total_tests > 0 {
         let pass_rate = (passed as f64 / total_tests as f64) * 100.0;
         println!("\nPass Rate: {:.1}%", pass_rate);
+        assert!(
+            unexpected_failures.is_empty(),
+            "Unexpected YAML test failures detected: {:?}",
+            unexpected_failures
+        );
         assert!(
             pass_rate >= 85.0,
             "YAML test suite pass rate is below 85%: {:.1}%",
