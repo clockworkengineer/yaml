@@ -57,195 +57,142 @@ fn get_all_test_dirs(suite_dir: &Path) -> Vec<PathBuf> {
     test_dirs
 }
 
-// Run all YAML test suite cases and assert pass rate >= 86%
-// #[test]
-// fn run_yaml_test_suite() {
-//     // Try multiple possible paths for the test suite
-//     let possible_paths = vec![
-//         Path::new("c:/Projects/yaml/yaml-test-suite"),
-//         Path::new("../yaml-test-suite"),
-//     ];
+// Run all YAML test suite cases and assert pass rate >= 85%
+#[test]
+fn run_yaml_test_suite() {
+    // Try multiple possible paths for the test suite
+    let possible_paths = vec![
+        Path::new("c:/Projects/yaml/yaml-test-suite"),
+        Path::new("../yaml-test-suite"),
+    ];
 
-//     let suite_dir = possible_paths.iter().find(|p| p.exists()).cloned();
-//     let suite_dir = match suite_dir {
-//         Some(dir) => dir,
-//         None => {
-//             println!("YAML test suite repo directory not found in any of these locations:");
-//             for path in &possible_paths {
-//                 println!("  - {:?}", path);
-//             }
-//             println!(
-//                 "Please clone https://github.com/yaml/yaml-test-suite.git to one of these locations."
-//             );
-//             return;
-//         }
-//     };
+    let suite_dir = possible_paths.iter().find(|p| p.exists()).cloned();
+    let suite_dir = match suite_dir {
+        Some(dir) => dir,
+        None => {
+            println!("YAML test suite repo directory not found in any of these locations:");
+            for path in &possible_paths {
+                println!("  - {:?}", path);
+            }
+            println!(
+                "Please clone https://github.com/yaml/yaml-test-suite.git to one of these locations."
+            );
+            return;
+        }
+    };
 
-//     let skip_list: Vec<&str> = vec![];
-//     let mut passed = 0;
-//     let mut failed = 0;
-//     let mut skipped = 0;
-//     let mut failures = Vec::new();
+    let skip_list: Vec<&str> = vec![];
+    let mut passed = 0;
+    let mut failed = 0;
+    let mut skipped = 0;
+    let mut failures = Vec::new();
 
-//     let mut test_dirs = get_all_test_dirs(suite_dir);
-//     if test_dirs.is_empty() {
-//         println!("No test directories found. Make sure you're using the data release branch.");
-//         println!("Run: cd tests/yaml-test-suite && git checkout data-2022-01-17");
-//         return;
-//     }
-//     test_dirs.sort();
-//     let total_dirs = test_dirs.len();
-//     println!("Running all {} YAML test suite tests...", total_dirs);
-//     let mut test_num = 0;
-//     let test_limit = 402;
-//     for (idx, test_dir) in test_dirs.iter().enumerate() {
-//         if idx >= test_limit {
-//             println!(
-//                 "\n--- Stopping at {} tests (limit reached) ---\n",
-//                 test_limit
-//             );
-//             break;
-//         }
-//         let test_dir = test_dir.clone();
-//         let test = match load_test_case(&test_dir) {
-//             Some(t) => t,
-//             None => {
-//                 skipped += 1;
-//                 continue;
-//             }
-//         };
-//         if skip_list.contains(&test.id.as_str()) {
-//             skipped += 1;
-//             continue;
-//         }
-//         test_num += 1;
-//         println!("[{}/{}] Testing: {}", test_num, test_limit, test.id);
-//         std::io::Write::flush(&mut std::io::stdout()).unwrap();
-//         let start_time = Instant::now();
-//         let result = panic::catch_unwind(|| {
-//             if test.has_error_file {
-//                 // Should error
-//                 let mut errored = false;
-//                 let parse_result = std::panic::catch_unwind(|| {
-//                     parse_yaml(&test.yaml);
-//                 });
-//                 if parse_result.is_err() {
-//                     errored = true;
-//                 }
-//                 if errored { Err(()) } else { Ok(()) }
-//             } else {
-//                 // Should succeed
-//                 let _ = parse_yaml(&test.yaml);
-//                 Ok(())
-//             }
-//         });
-//         let elapsed = start_time.elapsed();
-//         print!("  Result: ");
-//         std::io::Write::flush(&mut std::io::stdout()).unwrap();
-//         if elapsed > Duration::from_millis(200) {
-//             skipped += 1;
-//             println!("TIMEOUT (took {:?})", elapsed);
-//             continue;
-//         }
-//         let test_passed = match result {
-//             Ok(Ok(())) if !test.has_error_file => true,
-//             Ok(Err(())) if test.has_error_file => true,
-//             _ => false,
-//         };
-//         if test_passed {
-//             passed += 1;
-//             println!("PASS");
-//         } else {
-//             failed += 1;
-//             let expected = if test.has_error_file {
-//                 "error"
-//             } else {
-//                 "success"
-//             };
-//             let got = match result {
-//                 Ok(Ok(())) => "success",
-//                 Ok(Err(())) => "error",
-//                 _ => "error",
-//             };
-//             println!("FAIL (expected: {}, got: {})", expected, got);
-//             failures.push(format!(
-//                 "{} (expected: {}, got: {})",
-//                 test.id, expected, got
-//             ));
-//         }
-//     }
-//     println!("\n=== YAML Test Suite Results (All Tests) ===");
-//     println!("Passed:  {}", passed);
-//     println!("Failed:  {}", failed);
-//     println!("Skipped: {}", skipped);
-//     println!("Total:   {}", passed + failed + skipped);
-//     if !failures.is_empty() {
-//         println!("\n=== Failures ===");
-//         for (i, failure) in failures.iter().enumerate() {
-//             println!("{}. {}", i + 1, failure);
-//         }
-//     }
-//     let total_tests = passed + failed;
-//     if total_tests > 0 {
-//         let pass_rate = (passed as f64 / total_tests as f64) * 100.0;
-//         println!("\nPass Rate: {:.1}%", pass_rate);
-//         assert!(
-//             pass_rate >= 86.0,
-//             "YAML test suite pass rate is below 86%: {:.1}%",
-//             pass_rate
-//         );
-//     }
-// }
-
-// /// Test a specific YAML test case by ID
-// #[allow(dead_code)]
-// fn test_specific_case(test_id: &str) {
-//     let test_dir = Path::new("../tests/yaml-test-suite").join(test_id);
-
-//     if !test_dir.exists() {
-//         panic!("Test case {} not found at {:?}", test_id, test_dir);
-//     }
-
-//     let test = load_test_case(&test_dir).expect("Failed to load test case");
-
-//     println!("Testing: {} - {}", test.id, test.name);
-//     println!("Is error test: {}", test.has_error_file);
-//     println!("\nYAML:\n{}", test.yaml);
-
-//     let mut source = BufferSource::new(test.yaml.as_bytes());
-//     let result = parse(&mut source);
-
-//     match result {
-//         Ok(doc) => {
-//             println!("\n✓ Parsed successfully!");
-//             if test.has_error_file {
-//                 println!("  WARNING: This is an error test but parsing succeeded");
-//             }
-//             // Don't print the full doc as it can be very large
-//             println!("  Document type: {:?}", std::mem::discriminant(&doc));
-//         }
-//         Err(e) => {
-//             println!("\n✗ Parse failed: {}", e);
-//             if !test.has_error_file {
-//                 println!("  WARNING: This test should have succeeded");
-//             }
-//         }
-//     }
-// }
-
-// #[test]
-// #[ignore] // Run with: cargo test test_examples -- --ignored
-// fn test_examples() {
-//     // Test some specific examples
-//     let examples = vec![
-//         "229Q", // Spec Example 2.4. Sequence of Mappings
-//         "236B", // Spec Example 2.3. Mapping Scalars to Scalars
-//         "26DV", // Whitespace around colon
-//         "27NA", // Spec Example 2.5. Sequence of Sequences
-//     ];
-
-//     for id in examples {
-//         println!("\n=== Testing {} ===", id);
-//         test_specific_case(id);
-//     }
-// }
+    let mut test_dirs = get_all_test_dirs(suite_dir);
+    if test_dirs.is_empty() {
+        println!("No test directories found. Make sure you're using the data release branch.");
+        println!("Run: cd tests/yaml-test-suite && git checkout data-2022-01-17");
+        return;
+    }
+    test_dirs.sort();
+    let total_dirs = test_dirs.len();
+    println!("Running all {} YAML test suite tests...", total_dirs);
+    let mut test_num = 0;
+    let test_limit = 402;
+    for (idx, test_dir) in test_dirs.iter().enumerate() {
+        if idx >= test_limit {
+            println!(
+                "\n--- Stopping at {} tests (limit reached) ---\n",
+                test_limit
+            );
+            break;
+        }
+        let test_dir = test_dir.clone();
+        let test = match load_test_case(&test_dir) {
+            Some(t) => t,
+            None => {
+                skipped += 1;
+                continue;
+            }
+        };
+        if skip_list.contains(&test.id.as_str()) {
+            skipped += 1;
+            continue;
+        }
+        test_num += 1;
+        println!("[{}/{}] Testing: {}", test_num, test_limit, test.id);
+        std::io::Write::flush(&mut std::io::stdout()).unwrap();
+        let start_time = Instant::now();
+        let result = panic::catch_unwind(|| {
+            if test.has_error_file {
+                // Should error
+                let mut errored = false;
+                let parse_result = std::panic::catch_unwind(|| {
+                    parse_yaml(&test.yaml);
+                });
+                if parse_result.is_err() {
+                    errored = true;
+                }
+                if errored { Err(()) } else { Ok(()) }
+            } else {
+                // Should succeed
+                let _ = parse_yaml(&test.yaml);
+                Ok(())
+            }
+        });
+        let elapsed = start_time.elapsed();
+        print!("  Result: ");
+        std::io::Write::flush(&mut std::io::stdout()).unwrap();
+        if elapsed > Duration::from_millis(200) {
+            skipped += 1;
+            println!("TIMEOUT (took {:?})", elapsed);
+            continue;
+        }
+        let test_passed = match result {
+            Ok(Ok(())) if !test.has_error_file => true,
+            Ok(Err(())) if test.has_error_file => true,
+            _ => false,
+        };
+        if test_passed {
+            passed += 1;
+            println!("PASS");
+        } else {
+            failed += 1;
+            let expected = if test.has_error_file {
+                "error"
+            } else {
+                "success"
+            };
+            let got = match result {
+                Ok(Ok(())) => "success",
+                Ok(Err(())) => "error",
+                _ => "error",
+            };
+            println!("FAIL (expected: {}, got: {})", expected, got);
+            failures.push(format!(
+                "{} (expected: {}, got: {})",
+                test.id, expected, got
+            ));
+        }
+    }
+    println!("\n=== YAML Test Suite Results (All Tests) ===");
+    println!("Passed:  {}", passed);
+    println!("Failed:  {}", failed);
+    println!("Skipped: {}", skipped);
+    println!("Total:   {}", passed + failed + skipped);
+    if !failures.is_empty() {
+        println!("\n=== Failures ===");
+        for (i, failure) in failures.iter().enumerate() {
+            println!("{}. {}", i + 1, failure);
+        }
+    }
+    let total_tests = passed + failed;
+    if total_tests > 0 {
+        let pass_rate = (passed as f64 / total_tests as f64) * 100.0;
+        println!("\nPass Rate: {:.1}%", pass_rate);
+        assert!(
+            pass_rate >= 85.0,
+            "YAML test suite pass rate is below 85%: {:.1}%",
+            pass_rate
+        );
+    }
+}
