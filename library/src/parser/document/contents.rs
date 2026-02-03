@@ -198,9 +198,18 @@ fn handle_multiple_explicit_keys(
     Ok(parse_multiple_explicit_keys(source, current_indent).map_err(YamlError::from)?)
 }
 
-/// Helper to skip whitespace and comments in the source
-fn skip_trivia(source: &mut dyn ISource) {
-    crate::utils::skip_whitespace_and_comments(source);
+/// Helper to skip whitespace and comments with context-aware tab validation.
+/// In block context, validates that tabs are not used for indentation after newlines.
+fn skip_trivia_with_ctx(source: &mut dyn ISource, ctx: &ParsingContext) -> crate::parser::ParseResult<()> {
+    if !ctx.in_flow {
+        match crate::utils::skip_whitespace_and_comments_validate_tabs(source) {
+            Ok(()) => Ok(()),
+            Err(_e) => Err(crate::parser::document::error_builder::tab_indentation_error_yaml(source)),
+        }
+    } else {
+        crate::utils::skip_whitespace_and_comments(source);
+        Ok(())
+    }
 }
 
 /// Parses the contents of a YAML document based on the current character and context.
@@ -224,7 +233,7 @@ pub fn parse_document_contents(
     directives: &DirectiveContext,
     ctx: &ParsingContext,
 ) -> ParseResult<Node> {
-    skip_trivia(source);
+    skip_trivia_with_ctx(source, ctx)?;
     crate::parser::document::helpers::validate_indentation_and_whitespace(source, directives, ctx)?;
     let head_kind = helpers::classify_block_head(source, directives, ctx);
 
@@ -293,7 +302,7 @@ pub fn parse_document_contents(
             }
         }
         Some(c) if c == '#' => {
-            skip_trivia(source);
+            skip_trivia_with_ctx(source, ctx)?;
             parse_document_contents(source, indent_level, directives, ctx)
         }
         Some(c) if c == '{' => {

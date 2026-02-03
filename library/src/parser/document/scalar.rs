@@ -64,11 +64,7 @@ fn parse_single_quoted_scalar(
 ) -> crate::parser::ParseResult<Node> {
     use crate::nodes::node::{BlockStyle, Node, QuoteType};
     stream.next()?;
-    Ok(Node::Str(
-        s.to_string(),
-        QuoteType::Single,
-        BlockStyle::None,
-    ))
+    Ok(Node::Str(s.to_string(), QuoteType::Single, BlockStyle::None))
 }
 
 // Extracted double-quoted scalar parsing logic

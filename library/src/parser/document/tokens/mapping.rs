@@ -565,6 +565,18 @@ fn parse_mapping_value(
         _ => {
             stream.skip_trivia()?;
             let v = parse_value_with_tokens(stream, directives, depth + 1)?;
+            // Low-hanging fix (Q4CL): After a quoted scalar value, disallow trailing plain text on the same line.
+            if let Node::Str(_, quote, _) = &v {
+                use crate::nodes::node::QuoteType;
+                if matches!(quote, QuoteType::Single | QuoteType::Double) {
+                    if matches!(stream.current(), Some(Token::Plain(_))) {
+                        return Err(crate::parser::document::error_builder::syntax_error(
+                            stream.source_mut(),
+                            "Invalid content immediately after quoted scalar: trailing plain text on the same line is not allowed",
+                        ));
+                    }
+                }
+            }
             #[cfg(feature = "debug-trace")]
             log::debug!("mapping_pair: parsed value = {:?}", v);
             Ok(v)
