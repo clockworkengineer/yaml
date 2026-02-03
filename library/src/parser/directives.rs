@@ -186,6 +186,41 @@ impl DirectiveContext {
         tag.to_string()
     }
 
+    /// Validate that a tag using an explicit handle is defined in this document.
+    ///
+    /// YAML allows local tags like `!foo` without a handle, and the default
+    /// `!!` handle. However, tags of the form `!handle!suffix` require that
+    /// `handle` be declared via a `%TAG` directive in the same document.
+    /// If such a handle is not present, this should be a parse error.
+    pub fn validate_tag_handle_usage(&self, tag: &str) -> Result<(), YamlError> {
+        // Verbatim tag form `!<...>` does not use handles; always allowed
+        if tag.starts_with("!<") {
+            return Ok(());
+        }
+        // Default handle is allowed
+        if tag.starts_with("!!") {
+            return Ok(());
+        }
+        // Local tag without handle (e.g., !foo) is allowed
+        if tag.starts_with('!') {
+            // Look for a second '!' that would terminate an explicit handle
+            if let Some(idx) = tag[1..].find('!') {
+                let handle_end = 1 + idx; // position of the second '!'
+                let handle = &tag[..=handle_end]; // include both '!'
+                if !self.tag_prefixes.contains_key(handle) {
+                    return Err(YamlError::new(
+                        ErrorKind::ParseError,
+                        alloc::format!(
+                            "Undefined tag handle '{}'. Define it with a %TAG directive",
+                            handle
+                        ),
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Returns true if the YAML version is 1.1
     pub fn is_yaml_11(&self) -> bool {
         matches!(self.yaml_version, Some((1, 1)))

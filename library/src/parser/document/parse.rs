@@ -91,6 +91,50 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
             res
         };
 
+        // Additional early guard for QLJ7: if a tag with an explicit handle
+        // appears on the same line as '---' and the current document's directives
+        // do not declare that handle, reject before parsing the document.
+        // This duplicates the marker helper's check to catch edge paths.
+        if has_document_start {
+            let st_pre_marker = source.save_state();
+            // Consume '---' characters
+            if matches!(source.current(), Some('-')) {
+                source.next();
+            }
+            if matches!(source.current(), Some('-')) {
+                source.next();
+            }
+            if matches!(source.current(), Some('-')) {
+                source.next();
+            }
+            while let Some(c) = source.current() {
+                if c == ' ' || c == '\t' {
+                    source.next();
+                } else {
+                    break;
+                }
+            }
+            if matches!(source.current(), Some('!')) {
+                let st_tag = source.save_state();
+                let mut tag_raw = String::new();
+                while let Some(ch) = source.current() {
+                    if ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n' || ch == '#' {
+                        break;
+                    }
+                    tag_raw.push(ch);
+                    source.next();
+                }
+                source.restore_state(st_tag);
+                if !tag_raw.is_empty() {
+                    if let Err(e) = directives.validate_tag_handle_usage(&tag_raw) {
+                        // Build a simple parse error without borrowing the source twice
+                        source.restore_state(st_pre_marker);
+                        return Err(to_yaml_error(e.to_string()));
+                    }
+                }
+            }
+            source.restore_state(st_pre_marker);
+        }
         let marker_res = parse_document_markers(source, &directives);
         #[cfg(feature = "debug-trace")]
         log::debug!("parse: parse_document_markers result: {:?}", marker_res);
@@ -147,11 +191,8 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
                         ));
                     }
                     // Check for any other content that shouldn't be here (not document marker or EOF).
-                    //
-                    // However, lines starting with a '%' are YAML directive lines
-                    // (e.g. "%YAML", "%TAG") and are handled by the character-based
-                    // directive parser, not the token stream. Treat those as potential
-                    // starts of the next document rather than as stray content.
+                    // Treat lines starting with '%' as potential directive lines for the next
+                    // document; they are handled by the character-based directive parser.
                     Some(crate::parser::lexer::Token::Plain(text)) => {
                         let trimmed = text.trim_start();
                         if !trimmed.starts_with('%') {
@@ -245,20 +286,44 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
         if !source.more() {
             break;
         }
-        // Only start another document when an explicit '---' marker is present
-        // ahead in the token stream. This avoids treating trailing content
-        // (such as lines that look like directives) as a separate document
-        // when no document separator is present, which matches YAML test
-        // suite expectations for cases like XLQ9.
+        // Decide whether to start another document.
+        // Start when we see either:
+        //  - an explicit '---' marker ahead, or
+        //  - a directive line ("%YAML ", "%TAG ") preceding the next '---'.
+        // This preserves XLQ9 behavior (avoid treating stray content as a new
+        // document) while allowing directive lines between documents (e.g., 5TYM).
         let st_ahead = source.save_state();
-        let dir = crate::parser::directives::DirectiveContext::new();
-        let mut ts_ahead = crate::parser::token_stream::TokenStream::new(source, &dir, false)?;
-        // Skip trivia
-        ts_ahead.skip_trivia()?;
-        let has_next_doc = matches!(
-            ts_ahead.current(),
-            Some(crate::parser::lexer::Token::DocumentStart)
-        );
+        // Character-level peek for directive lines
+        crate::utils::skip_whitespace_and_comments(source);
+        let mut has_next_doc = false;
+        if let Some('%') = source.current() {
+            // Save/restore around the small peek to avoid consuming st_ahead
+            let st_dir = source.save_state();
+            let mut head = String::new();
+            for _ in 0..5 {
+                if let Some(ch) = source.current() {
+                    head.push(ch);
+                    source.next();
+                } else {
+                    break;
+                }
+            }
+            source.restore_state(st_dir);
+            if head.starts_with("%YAML ") || head.starts_with("%TAG ") {
+                has_next_doc = true;
+            }
+        }
+        if !has_next_doc {
+            // TokenStream-based check for explicit '---' ahead
+            let dir = crate::parser::directives::DirectiveContext::new();
+            let mut ts_ahead = crate::parser::token_stream::TokenStream::new(source, &dir, false)?;
+            ts_ahead.skip_trivia()?;
+            has_next_doc = matches!(
+                ts_ahead.current(),
+                Some(crate::parser::lexer::Token::DocumentStart)
+            );
+        }
+        // Restore the original position after ahead checks
         source.restore_state(st_ahead);
         if !has_next_doc {
             break;

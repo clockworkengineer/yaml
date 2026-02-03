@@ -67,6 +67,9 @@ fn parse_document_main_loop(
                 continue;
             }
             '%' => {
+                // Encountered a '%' at top-level while parsing content. Break out and
+                // let the outer stream parser handle possible directives for the next
+                // document. RHX7 is enforced at the stream level (post-document check).
                 break;
             }
             _ => {
@@ -158,6 +161,40 @@ pub fn parse_document(
     log::debug!("parse_document: start at indent {}", indent_level);
     crate::utils::skip_whitespace_and_comments(source);
     let document_nodes = parse_document_main_loop(source, indent_level, directives)?;
+
+    // QLJ7: Validate that any explicit tag handles used within this document
+    // are defined via a %TAG directive for this document. Tag handles do not
+    // carry over across documents.
+    fn validate_tags_rec(node: &Node, directives: &DirectiveContext) -> ParseResult<()> {
+        match node {
+            Node::Tagged(inner, tag_raw) => {
+                directives.validate_tag_handle_usage(tag_raw).map_err(|e| e)?;
+                validate_tags_rec(inner, directives)?;
+            }
+            Node::Mapping(pairs) => {
+                for (k, v) in pairs {
+                    validate_tags_rec(k, directives)?;
+                    validate_tags_rec(v, directives)?;
+                }
+            }
+            Node::Array(items) => {
+                for it in items {
+                    validate_tags_rec(it, directives)?;
+                }
+            }
+            Node::Anchored(inner, _) => {
+                validate_tags_rec(inner, directives)?;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+    for n in &document_nodes {
+        // Convert validation error to a simple parse error without precise position
+        if let Err(e) = validate_tags_rec(n, directives) {
+            return Err(crate::parser::document::helpers::to_yaml_error(format!("{}", e)));
+        }
+    }
 
     // Mapping-value-specific validation for H7J7-style cases:
     // Detect a document shape where a mapping with an anchored empty

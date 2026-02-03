@@ -116,6 +116,31 @@ pub(crate) fn parse_document_markers(
                 break;
             }
         }
+        // Before invoking the token stream, do a character-level tag handle check
+        // to reliably catch explicit handles like '!handle!Type' on the same line
+        // as the document start marker, even if tokenization classifies the text
+        // as Plain in some edge cases.
+        if matches!(source.current(), Some('!')) {
+            // Peek ahead to extract the raw tag up to whitespace or comment
+            let st_tag = source.save_state();
+            let mut tag_raw = String::new();
+            while let Some(ch) = source.current() {
+                if ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n' || ch == '#' {
+                    break;
+                }
+                tag_raw.push(ch);
+                source.next();
+            }
+            source.restore_state(st_tag);
+            if !tag_raw.is_empty() {
+                if let Err(e) = directives.validate_tag_handle_usage(&tag_raw) {
+                    // Build a token-stream-based error for consistent formatting
+                    let ts_err = crate::parser::token_stream::TokenStream::new(source, directives, false)
+                        .map_err(to_yaml_error)?;
+                    return Err(parse_error_token(&ts_err, &e.to_string()));
+                }
+            }
+        }
         // Use token stream to check for forbidden tokens before newline
         let st = source.save_state();
         let early_error = {
@@ -135,7 +160,14 @@ pub(crate) fn parse_document_markers(
                     Some(crate::parser::lexer::Token::Newline)
                     | Some(crate::parser::lexer::Token::Eof) => {}
                     Some(crate::parser::lexer::Token::Comment(_)) => {}
-                    Some(crate::parser::lexer::Token::Tag(_)) => {}
+                    Some(crate::parser::lexer::Token::Tag(tag_str)) => {
+                        // QLJ7: Validate explicit tag handle usage immediately after '---'.
+                        // If an explicit handle like '!prefix!' is used without a corresponding
+                        // %TAG directive for this document, report a syntax error.
+                        if let Err(e) = directives.validate_tag_handle_usage(&tag_str) {
+                            err = Some(parse_error_token(&ts, &e.to_string()));
+                        }
+                    }
                     Some(crate::parser::lexer::Token::Plain(_)) => {
                         if let Some(crate::parser::lexer::Token::Colon) = ts.peek().ok().flatten() {
                             err = Some(parse_error_token(

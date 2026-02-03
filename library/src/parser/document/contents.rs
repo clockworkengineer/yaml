@@ -333,10 +333,14 @@ pub fn parse_document_contents(
                 crate::parser::token_stream::TokenStream::new(source, directives, false)?;
             match stream.current() {
                 Some(crate::parser::lexer::Token::Tag(_)) => {
-                    stream.next()?;
-                    stream.skip_trivia()?;
-                    let is_mapping_key =
-                        matches!(stream.current(), Some(crate::parser::lexer::Token::Colon));
+                    // Do not consume the tag here; allow value parser to
+                    // handle decorators (tag/anchor) and enforce validation.
+                    // Determine if this represents a mapping key by peeking
+                    // ahead for a colon after the tag.
+                    let is_mapping_key = match stream.peek() {
+                        Ok(Some(crate::parser::lexer::Token::Colon)) => true,
+                        _ => false,
+                    };
                     if is_mapping_key {
                         Ok(parse_mapping(source, indent_level, directives)?)
                     } else {
