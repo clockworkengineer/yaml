@@ -320,6 +320,19 @@ pub fn parse_value_with_tokens(
         // - Comma: next entry in a flow collection (e.g., "foo: !!str,")
         // - FlowMappingEnd/FlowSequenceEnd: end of flow collection
         // - DocumentStart/DocumentEnd: document boundary
+        // SY6V: Disallow an anchor immediately preceding a block sequence indicator ('-').
+        // "&anchor - item" is invalid; anchors must attach to the node being introduced,
+        // e.g., "- &anchor item". Treat this as a syntax error rather than an empty
+        // decorated value when not inside a flow collection.
+        if matches!(stream.current(), Some(Token::Dash))
+            && decorators.anchor.is_some()
+            && stream.current_flow_depth() == 0
+        {
+            return Err(syntax_error(
+                stream.source_mut(),
+                "Invalid anchor usage: anchor cannot directly precede a sequence indicator; attach the anchor to the node (e.g., '- &name value')",
+            ));
+        }
         match stream.current() {
             Some(Token::Eof)
             | Some(Token::Dash)
@@ -364,6 +377,20 @@ pub fn parse_value_with_tokens(
                 crate::parser::document::node_utils::resolved_is_set(&directives.resolve_tag(t))
             })
             .unwrap_or(false);
+
+        // SY6V: Disallow an anchor immediately followed by a plain token that starts
+        // with a block sequence indicator ('-') in block context. This pattern
+        // ("&anchor - item") is invalid; the anchor must attach to the node being
+        // introduced ("- &anchor item").
+        if decorators.anchor.is_some()
+            && stream.current_flow_depth() == 0
+            && matches!(stream.current(), Some(Token::Plain(s)) if s.trim_start().starts_with('-'))
+        {
+            return Err(syntax_error(
+                stream.source_mut(),
+                "Invalid anchor usage: anchor cannot directly precede a sequence indicator; attach the anchor to the node (e.g., '- &name value')",
+            ));
+        }
 
         let mut result = if tag_is_set {
             if matches!(stream.current(), Some(Token::FlowMappingStart)) {

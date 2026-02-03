@@ -355,19 +355,53 @@ pub fn parse_document_contents(
             match stream.current() {
                 Some(crate::parser::lexer::Token::Anchor(_)) => {
                     stream.next()?;
-                    stream.skip_trivia()?;
-                    let is_mapping_key =
-                        matches!(stream.current(), Some(crate::parser::lexer::Token::Colon));
-                    if is_mapping_key {
-                        Ok(parse_mapping(source, indent_level, directives)?)
-                    } else {
-                        Ok(
+                    // After '&anchor', decide next action based on immediate token,
+                    // without skipping trivia so we can distinguish same-line vs newline.
+                    match stream.current() {
+                        Some(crate::parser::lexer::Token::Colon) => {
+                            Ok(parse_mapping(source, indent_level, directives)?)
+                        }
+                        Some(crate::parser::lexer::Token::Dash) => {
+                            let mut ts_err = crate::parser::token_stream::TokenStream::new(
+                                source,
+                                directives,
+                                false,
+                            )?;
+                            Err(crate::parser::document::error_builder::syntax_error(
+                                ts_err.source_mut(),
+                                "Invalid anchor usage: anchor cannot directly precede a sequence indicator on the same line; attach the anchor to the node (e.g., '- &name value')",
+                            ))
+                        }
+                        Some(crate::parser::lexer::Token::Plain(s)) => {
+                            if s.trim_start().starts_with('-') {
+                                let mut ts_err =
+                                    crate::parser::token_stream::TokenStream::new(
+                                        source,
+                                        directives,
+                                        false,
+                                    )?;
+                                Err(crate::parser::document::error_builder::syntax_error(
+                                    ts_err.source_mut(),
+                                    "Invalid anchor usage: anchor cannot directly precede a sequence indicator on the same line; attach the anchor to the node (e.g., '- &name value')",
+                                ))
+                            } else {
+                                Ok(
+                                    crate::parser::document::tokens::value::parse_value_with_tokens(
+                                        &mut stream,
+                                        directives,
+                                        0,
+                                    )?,
+                                )
+                            }
+                        }
+                        // Newline or anything else: defer to value parser
+                        _ => Ok(
                             crate::parser::document::tokens::value::parse_value_with_tokens(
                                 &mut stream,
                                 directives,
                                 0,
                             )?,
-                        )
+                        ),
                     }
                 }
                 _ => Ok(
