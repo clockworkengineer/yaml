@@ -316,6 +316,20 @@ impl MappingParseContext {
                 return Ok(Some(None));
             }
             if level < current_indent {
+                // U44R fix: A shallow dedent within a nested mapping (i.e.,
+                // dedenting to a level still greater than the base indent)
+                // indicates inconsistent key indentation and should be
+                // rejected, rather than silently unwinding.
+                if level > self.base_indent {
+                    use crate::error::enhanced::{EnhancedError, ErrorCode};
+                    let err = EnhancedError::new(mapping_key_error_yaml(
+                        stream.source_mut(),
+                        "Invalid indentation for nested mapping key: inconsistent dedent within mapping value",
+                    ))
+                    .with_code(ErrorCode::E009)
+                    .with_note("Ensure all keys under the nested mapping use the same indentation.");
+                    return Err(err.to_string().into());
+                }
                 self.dedent_unwind_mapping_stack(level);
                 stream.next()?;
                 return Ok(Some(None));
