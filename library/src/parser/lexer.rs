@@ -127,6 +127,10 @@ pub struct Lexer<'a> {
     // Used to distinguish indentation after newline vs. leading tabs at stream start in flow
     last_was_linebreak: bool,
     last_indent: usize, // Track last emitted indent
+    // True when the next non-indentation token will be the first content token on the line
+    awaiting_line_content_start: bool,
+    // True if the most recently emitted non-indentation token started the line's content
+    last_token_started_line: bool,
 }
 
 impl<'a> Lexer<'a> {
@@ -140,6 +144,8 @@ impl<'a> Lexer<'a> {
             in_flow,
             last_was_linebreak: false,
             last_indent: 0,
+            awaiting_line_content_start: false,
+            last_token_started_line: false,
         }
     }
 
@@ -182,8 +188,115 @@ impl<'a> Lexer<'a> {
 
     /// Scan and return the next token from the source
     fn scan_token(&mut self) -> Result<Option<Token>, crate::error::YamlError> {
+        // If we're awaiting the first content token of a line but a non-indentation
+        // token has already been emitted, clear the flag to avoid misclassifying
+        // mid-line tokens as starting the line's content.
+        if self.awaiting_line_content_start {
+            if let Some(prev) = self.current_token.as_ref() {
+                if !matches!(prev, Token::Indent(_) | Token::Newline) {
+                    self.awaiting_line_content_start = false;
+                }
+            }
+        }
         // Skip whitespace (except at line start where it's indentation)
         if !self.at_line_start {
+            // YAML forbids using tabs as indentation in block context, including
+            // the horizontal whitespace immediately following block indicators
+            // like '-', '?', and ':' at the start of a content span. If the last
+            // emitted token was one of these indicators and we're not in a flow
+            // collection, validate that the upcoming horizontal whitespace does
+            // not contain any tabs before the next non-whitespace character.
+            if !self.in_flow {
+                if let Some(prev_tok) = self.current_token.clone() {
+                    match prev_tok {
+                        Token::Dash => {
+                            // After a sequence '-' at line start, tabs are only forbidden
+                            // when they serve as indentation before a nested indicator (e.g., '-\t-').
+                            let state = self.source.save_state();
+                            let mut saw_tab = false;
+                            while let Some(c) = self.source.current() {
+                                if c == CHAR_SPACE || c == CHAR_TAB {
+                                    if c == CHAR_TAB {
+                                        saw_tab = true;
+                                    }
+                                    self.source.next();
+                                } else {
+                                    break;
+                                }
+                            }
+                            let c1 = self.source.current();
+                            // Peek one more to distinguish nested '-' from scalar starting with '-'
+                            let c2 = if c1.is_some() { self.peek_ahead(1) } else { None };
+                            self.source.restore_state(state);
+                            let nested_indicator = match c1 {
+                                Some('-') => match c2 {
+                                    Some(n) if n == CHAR_SPACE || n == CHAR_TAB || n == CHAR_NEWLINE || n == CHAR_CARRIAGE_RETURN => true,
+                                    None => true,
+                                    _ => false,
+                                },
+                                Some('?') | Some(CHAR_COLON) => true,
+                                _ => false,
+                            };
+                            if saw_tab && nested_indicator {
+                                return Err(error_helpers::forbidden_error(
+                                    self.source,
+                                    "Tabs",
+                                    "as indentation in YAML",
+                                ));
+                            }
+                        }
+                        Token::QuestionMark => {
+                            // After explicit key '?', tabs in separating whitespace are not allowed.
+                            let state = self.source.save_state();
+                            let mut saw_tab = false;
+                            while let Some(c) = self.source.current() {
+                                if c == CHAR_SPACE || c == CHAR_TAB {
+                                    if c == CHAR_TAB {
+                                        saw_tab = true;
+                                    }
+                                    self.source.next();
+                                } else {
+                                    break;
+                                }
+                            }
+                            self.source.restore_state(state);
+                            if saw_tab {
+                                return Err(error_helpers::forbidden_error(
+                                    self.source,
+                                    "Tabs",
+                                    "as indentation in YAML",
+                                ));
+                            }
+                        }
+                        Token::Colon => {
+                            // Only forbid tabs after ':' when ':' started this line's content
+                            if self.last_token_started_line {
+                                let state = self.source.save_state();
+                                let mut saw_tab = false;
+                                while let Some(c) = self.source.current() {
+                                    if c == CHAR_SPACE || c == CHAR_TAB {
+                                        if c == CHAR_TAB {
+                                            saw_tab = true;
+                                        }
+                                        self.source.next();
+                                    } else {
+                                        break;
+                                    }
+                                }
+                                self.source.restore_state(state);
+                                if saw_tab {
+                                    return Err(error_helpers::forbidden_error(
+                                        self.source,
+                                        "Tabs",
+                                        "as indentation in YAML",
+                                    ));
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
             self.skip_horizontal_whitespace();
         }
 
@@ -200,6 +313,8 @@ impl<'a> Lexer<'a> {
             if let Some(tok) = self.emit_indentation_token_if_any(ch)? {
                 return Ok(Some(tok));
             }
+            // No indentation to emit; the next token will start the line's content.
+            self.awaiting_line_content_start = true;
         }
 
         self.at_line_start = false;
@@ -322,6 +437,9 @@ impl<'a> Lexer<'a> {
                 if self.in_flow {
                     self.source.next();
                     self.last_was_linebreak = false;
+                    // Track whether this ':' started the line's content
+                    self.last_token_started_line = self.awaiting_line_content_start;
+                    self.awaiting_line_content_start = false;
                     Ok(Some(Token::Colon))
                 } else {
                     let state = self.source.save_state();
@@ -330,6 +448,9 @@ impl<'a> Lexer<'a> {
                     if next_ch.map_or(true, |c| c.is_whitespace() || c == CHAR_NEWLINE) {
                         // Separator in block context
                         self.last_was_linebreak = false;
+                        // Track whether this ':' started the line's content
+                        self.last_token_started_line = self.awaiting_line_content_start;
+                        self.awaiting_line_content_start = false;
                         Ok(Some(Token::Colon))
                     } else {
                         // Part of scalar, restore and scan as plain scalar
@@ -525,6 +646,8 @@ impl<'a> Lexer<'a> {
             let indent = self.scan_indentation(self.in_flow)?;
             self.at_line_start = false;
             self.last_indent = indent;
+            // After emitting an Indent, the next token will be the first content token on this line
+            self.awaiting_line_content_start = true;
             lexer_debug!("Emitting Token::Indent({})", indent);
             return Ok(Some(Token::Indent(indent)));
         } else if self.last_indent > 0 {
