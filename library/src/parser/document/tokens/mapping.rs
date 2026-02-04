@@ -300,36 +300,15 @@ impl MappingParseContext {
                 .and_then(|(_, pairs)| pairs.last())
                 .map(|(_, v)| matches!(v, Node::None))
                 .unwrap_or(false);
-            // U44R: If the previous mapping pair ended with a quoted scalar value
-            // on the same line, then an immediately following indented line must
-            // NOT be treated as a continuation. This is invalid indentation and
-            // should be rejected. This prevents mis-parsing cases like:
-            //
-            //   key1: "quoted1"
-            //    key2: "bad indentation"
-            //
-            // where `key2` is incorrectly indented relative to the mapping base.
-            let last_value_is_quoted_scalar = self
-                .stack
-                .last()
-                .and_then(|(_, pairs)| pairs.last())
-                .map(|(_, v)| matches!(
-                    v,
-                    Node::Str(_, crate::nodes::node::QuoteType::Single, _)
-                        | Node::Str(_, crate::nodes::node::QuoteType::Double, _)
-                ))
-                .unwrap_or(false);
             if level > current_indent {
-                if (!last_value_is_empty && saw_comment_between_entries)
-                    || last_value_is_quoted_scalar
-                {
+                if !last_value_is_empty && saw_comment_between_entries {
                     use crate::error::enhanced::{EnhancedError, ErrorCode};
                     let err = EnhancedError::new(mapping_key_error_yaml(
                         stream.source_mut(),
-                        "Invalid indentation after quoted scalar: indented content cannot extend a completed mapping value",
+                        "Invalid indentation after comment: indented content cannot extend a completed scalar mapping value",
                     ))
                     .with_code(ErrorCode::E007)
-                    .with_note("Ensure keys under the mapping align consistently; quoted scalars cannot be continued by indentation.");
+                    .with_note("Check for misplaced comments or indentation.");
                     return Err(err.to_string().into());
                 }
                 self.stack.push((level, Vec::new()));
