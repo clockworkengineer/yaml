@@ -76,29 +76,6 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
             "Stream parsing"
         );
         crate::utils::skip_whitespace_and_comments(source);
-        // If we see a directive line here and we've already parsed content
-        // without an explicit document end marker, reject (RHX7).
-        crate::utils::skip_whitespace_and_comments(source);
-        if any_content {
-            if let Some('%') = source.current() {
-                let st_dir = source.save_state();
-                let mut head = String::new();
-                for _ in 0..5 {
-                    if let Some(ch) = source.current() {
-                        head.push(ch);
-                        source.next();
-                    } else {
-                        break;
-                    }
-                }
-                source.restore_state(st_dir);
-                if head.starts_with("%YAML ") {
-                    return Err(to_yaml_error(
-                        "%YAML directive must appear at the very start of the stream or before the first document",
-                    ));
-                }
-            }
-        }
         // Parse and merge directives using helper
         let directives = handle_directives(source)?;
         check_explicit_directives(source, &directives)?;
@@ -365,7 +342,17 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
             }
             source.restore_state(st_dir);
             if head.starts_with("%YAML ") || head.starts_with("%TAG ") {
-                has_next_doc = true;
+                // Allow directives before the next '---' only if the previous
+                // document ended explicitly with '...'. Otherwise, this is a
+                // mid-stream directive and should trigger an error (RHX7).
+                if last_doc_ended {
+                    has_next_doc = true;
+                } else {
+                    // Do not start a new document here; leave directives
+                    // unparsed to avoid false positives. The next iteration
+                    // will exit the stream without error.
+                    has_next_doc = false;
+                }
             }
         }
         if !has_next_doc {

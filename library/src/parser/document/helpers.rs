@@ -226,21 +226,19 @@ pub(crate) fn parse_document_end_marker(
         };
         let found = dot_count == 3 && sep_ok;
         source.restore_state(st);
-        if found {
-            true
-        } else {
-            let st2 = source.save_state();
-            let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)
-                .map_err(to_yaml_error)?;
-            let res = matches!(ts.current(), Some(crate::parser::lexer::Token::DocumentEnd));
-            source.restore_state(st2);
-            res
-        }
+        found
     };
     if has_document_end {
-        source.next();
-        source.next();
-        source.next();
+        // Consume the '...' marker explicitly when present at the current position.
+        if source.current() == Some('.') {
+            source.next();
+        }
+        if source.current() == Some('.') {
+            source.next();
+        }
+        if source.current() == Some('.') {
+            source.next();
+        }
         consumed_end = true;
         // Validate only inline content after '...' up to end-of-line
         loop {
