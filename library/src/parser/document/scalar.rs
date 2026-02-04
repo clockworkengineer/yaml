@@ -173,6 +173,24 @@ fn parse_block_scalar(
             }
             Some(Token::Plain(line)) => {
                 let indent = pending_indent_for_line.unwrap_or(0);
+                // Do not treat an unindented top-level line as block scalar content.
+                // This prevents cases like Y79Y/001 (a tab-only line followed by
+                // a top-level mapping key) from being misclassified as the first
+                // content line of the scalar. In such cases, the scalar should be
+                // considered empty and parsing should continue with the following
+                // top-level content (e.g., "bar: 1").
+                if first_content_indent.is_none() && indent == 0 {
+                    // Heuristic: only treat the upcoming top-level line as
+                    // not part of the scalar (thus ending the block) when
+                    // we've seen at least two columns of indentation on the
+                    // preceding blank-only lines. This distinguishes Y79Y/001
+                    // (space+tab blank line → valid empty scalar) from Y79Y/000
+                    // (tab-only blank line → remains an error under our
+                    // existing validation rules).
+                    if max_blank_indent_before_content >= 2 {
+                        break;
+                    }
+                }
                 if first_content_indent.is_none() {
                     first_content_indent = Some(indent);
                 }
