@@ -135,8 +135,9 @@ pub(crate) fn parse_document_markers(
             if !tag_raw.is_empty() {
                 if let Err(e) = directives.validate_tag_handle_usage(&tag_raw) {
                     // Build a token-stream-based error for consistent formatting
-                    let ts_err = crate::parser::token_stream::TokenStream::new(source, directives, false)
-                        .map_err(to_yaml_error)?;
+                    let ts_err =
+                        crate::parser::token_stream::TokenStream::new(source, directives, false)
+                            .map_err(to_yaml_error)?;
                     return Err(parse_error_token(&ts_err, &e.to_string()));
                 }
             }
@@ -214,7 +215,9 @@ pub(crate) fn parse_document_end_marker(
         let mut dot_count = 0;
         while let Some('.') = source.current() {
             dot_count += 1;
-            if dot_count == 3 { break; }
+            if dot_count == 3 {
+                break;
+            }
             source.next();
         }
         let sep_ok = match source.current() {

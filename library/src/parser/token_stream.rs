@@ -169,8 +169,14 @@ impl<'a> TokenStream<'a> {
                 self.next()?;
                 Ok(())
             }
-            Some(_token) => Err(crate::parser::document::error_builder::expected_error(self.source_mut(), &format!("token {:?}", expected))),
-            None => Err(crate::parser::document::error_builder::expected_error(self.source_mut(), &format!("token {:?}", expected))),
+            Some(_token) => Err(crate::parser::document::error_builder::expected_error(
+                self.source_mut(),
+                &format!("token {:?}", expected),
+            )),
+            None => Err(crate::parser::document::error_builder::expected_error(
+                self.source_mut(),
+                &format!("token {:?}", expected),
+            )),
         }
     }
 
@@ -188,7 +194,10 @@ impl<'a> TokenStream<'a> {
 
     /// Internal DRY helper: advance while predicate matches current token
     #[inline]
-    fn advance_while(&mut self, mut predicate: impl FnMut(&Token) -> bool) -> Result<(), crate::error::YamlError> {
+    fn advance_while(
+        &mut self,
+        mut predicate: impl FnMut(&Token) -> bool,
+    ) -> Result<(), crate::error::YamlError> {
         while self.current().map_or(false, |t| predicate(t)) {
             self.next()?;
         }
@@ -254,7 +263,9 @@ impl<'a> TokenStream<'a> {
     /// inline comment at the end of a content line, and a comment line
     /// appearing before an indented block (as in 8XDJ).
     #[inline]
-    pub fn skip_newlines_and_comments_with_flag(&mut self) -> Result<bool, crate::error::YamlError> {
+    pub fn skip_newlines_and_comments_with_flag(
+        &mut self,
+    ) -> Result<bool, crate::error::YamlError> {
         #[cfg(feature = "debug-trace")]
         ts_log(format!(
             "token_stream: skip_newlines_and_comments_with_flag at {:?}",
@@ -385,7 +396,10 @@ impl<'a> TokenStream<'a> {
                 self.next()?;
                 Ok(result)
             }
-            Some(_token) => Err(crate::parser::document::error_builder::expected_error(self.source_mut(), "plain scalar")),
+            Some(_token) => Err(crate::parser::document::error_builder::expected_error(
+                self.source_mut(),
+                "plain scalar",
+            )),
             None => Err(crate::parser::document::error_builder::syntax_error(
                 self.source_mut(),
                 "Expected plain scalar, got EOF",
@@ -401,7 +415,10 @@ impl<'a> TokenStream<'a> {
                 self.next()?;
                 Ok(result)
             }
-            Some(_token) => Err(crate::parser::document::error_builder::expected_error(self.source_mut(), "quoted scalar")),
+            Some(_token) => Err(crate::parser::document::error_builder::expected_error(
+                self.source_mut(),
+                "quoted scalar",
+            )),
             None => Err(crate::parser::document::error_builder::syntax_error(
                 self.source_mut(),
                 "Expected quoted scalar, got EOF",
@@ -427,7 +444,10 @@ impl<'a> TokenStream<'a> {
                 self.next()?;
                 Ok((result, ScalarType::DoubleQuoted))
             }
-            Some(_token) => Err(crate::parser::document::error_builder::expected_error(self.source_mut(), "scalar")),
+            Some(_token) => Err(crate::parser::document::error_builder::expected_error(
+                self.source_mut(),
+                "scalar",
+            )),
             None => Err(crate::parser::document::error_builder::syntax_error(
                 self.source_mut(),
                 "Expected scalar, got EOF",
@@ -473,7 +493,10 @@ impl<'a> TokenStream<'a> {
                 let _ = self.consume_if(Token::Colon)?;
                 Ok(true)
             }
-            _ => Err(crate::parser::document::error_builder::expected_error(self.source_mut(), ": in flow mapping")),
+            _ => Err(crate::parser::document::error_builder::expected_error(
+                self.source_mut(),
+                ": in flow mapping",
+            )),
         }
     }
     pub fn consume_flow_sequence_end(&mut self) -> Result<bool, crate::error::YamlError> {
