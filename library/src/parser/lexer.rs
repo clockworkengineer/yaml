@@ -1176,16 +1176,6 @@ impl<'a> Lexer<'a> {
                     break;
                 }
                 Some(ch) => {
-                    // QB6E: YAML 1.2 does not allow literal newlines inside
-                    // double-quoted scalars. Newlines must be represented via
-                    // escape sequences (e.g., \n). Reject CR/LF inside a quoted
-                    // scalar to align with the official test suite expectation.
-                    if ch == CHAR_NEWLINE || ch == CHAR_CARRIAGE_RETURN {
-                        return Err(error_helpers::syntax_error(
-                            self.source,
-                            "YAML compliance error: Double-quoted strings cannot contain literal newlines; use \\n escape",
-                        ));
-                    }
                     content.push(ch);
                     self.source.next();
                 }
