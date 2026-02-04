@@ -204,20 +204,41 @@ pub(crate) fn parse_document_markers(
 pub(crate) fn parse_document_end_marker(
     source: &mut dyn ISource,
     directives: &DirectiveContext,
-) -> ParseResult<()> {
+) -> ParseResult<bool> {
+    let mut consumed_end = false;
     crate::utils::skip_whitespace_and_comments(source);
+    // First try a lightweight character-level check for '...' at the start
+    // of the current line before falling back to tokenization.
     let has_document_end = {
         let st = source.save_state();
-        let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)
-            .map_err(to_yaml_error)?;
-        let res = matches!(ts.current(), Some(crate::parser::lexer::Token::DocumentEnd));
+        let mut dot_count = 0;
+        while let Some('.') = source.current() {
+            dot_count += 1;
+            if dot_count == 3 { break; }
+            source.next();
+        }
+        let sep_ok = match source.current() {
+            Some(' ') | Some('\t') | Some('\r') | Some('\n') | Some('#') | None => true,
+            _ => false,
+        };
+        let found = dot_count == 3 && sep_ok;
         source.restore_state(st);
-        res
+        if found {
+            true
+        } else {
+            let st2 = source.save_state();
+            let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)
+                .map_err(to_yaml_error)?;
+            let res = matches!(ts.current(), Some(crate::parser::lexer::Token::DocumentEnd));
+            source.restore_state(st2);
+            res
+        }
     };
     if has_document_end {
         source.next();
         source.next();
         source.next();
+        consumed_end = true;
         // Validate only inline content after '...' up to end-of-line
         loop {
             match source.current() {
@@ -255,7 +276,7 @@ pub(crate) fn parse_document_end_marker(
             source.next();
         }
     }
-    Ok(())
+    Ok(consumed_end)
 }
 // ...existing code...
 /// Creates a formatted error message with current token context information (TokenStream-based).

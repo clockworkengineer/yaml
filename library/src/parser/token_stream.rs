@@ -318,6 +318,13 @@ impl<'a> TokenStream<'a> {
                             "Duplicate tag found",
                         ));
                     }
+                    // Validate explicit tag handle usage against current document directives.
+                    if let Err(e) = self._directives.validate_tag_handle_usage(tag_str.as_str()) {
+                        return Err(crate::parser::document::error_builder::syntax_error(
+                            self.source_mut(),
+                            &e.to_string(),
+                        ));
+                    }
                     // Preserve raw tag handle; resolve later in value parsing
                     decorators.tag = Some(tag_str.clone());
                     self.next()?;

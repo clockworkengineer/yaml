@@ -62,6 +62,7 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
     let mut docs: Vec<Node> = Vec::new();
     let mut saw_marker = false;
     let mut any_content = false;
+    let mut last_doc_ended = false;
     let mut _doc_count = 0;
     // Print the input for debug
     #[cfg(debug_assertions)]
@@ -75,6 +76,29 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
             "Stream parsing"
         );
         crate::utils::skip_whitespace_and_comments(source);
+        // If we see a directive line here and we've already parsed content
+        // without an explicit document end marker, reject (RHX7).
+        crate::utils::skip_whitespace_and_comments(source);
+        if any_content {
+            if let Some('%') = source.current() {
+                let st_dir = source.save_state();
+                let mut head = String::new();
+                for _ in 0..5 {
+                    if let Some(ch) = source.current() {
+                        head.push(ch);
+                        source.next();
+                    } else {
+                        break;
+                    }
+                }
+                source.restore_state(st_dir);
+                if head.starts_with("%YAML ") {
+                    return Err(to_yaml_error(
+                        "%YAML directive must appear at the very start of the stream or before the first document",
+                    ));
+                }
+            }
+        }
         // Parse and merge directives using helper
         let directives = handle_directives(source)?;
         check_explicit_directives(source, &directives)?;
@@ -140,6 +164,35 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
         log::debug!("parse: parse_document_markers result: {:?}", marker_res);
         if let Err(err) = marker_res {
             return Err(err);
+        }
+        // Harden QLJ7: after processing the document start marker, perform an
+        // additional token-level check for an explicit tag with an undeclared
+        // handle on the same line. This duplicates the helper’s char-level
+        // validation to catch any edge tokenization paths.
+        if has_document_start {
+            let st_chk = source.save_state();
+            let early_err = {
+                if let Ok(mut ts_chk) =
+                    crate::parser::token_stream::TokenStream::new(source, &directives, false)
+                {
+                    let _ = ts_chk.skip_trivia();
+                    if let Some(crate::parser::lexer::Token::Tag(tag_str)) = ts_chk.current() {
+                        if let Err(e) = directives.validate_tag_handle_usage(&tag_str) {
+                            Some(to_yaml_error(e.to_string()))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            };
+            source.restore_state(st_chk);
+            if let Some(err) = early_err {
+                return Err(err);
+            }
         }
         if has_document_start {
             if saw_marker && !any_content {
@@ -282,16 +335,18 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
                 return Err(err);
             }
         }
-        parse_document_end_marker(source, &directives).map_err(to_yaml_error)?;
+        let prev_doc_ended = parse_document_end_marker(source, &directives)?;
+        last_doc_ended = prev_doc_ended;
         if !source.more() {
             break;
         }
         // Decide whether to start another document.
         // Start when we see either:
         //  - an explicit '---' marker ahead, or
-        //  - a directive line ("%YAML ", "%TAG ") preceding the next '---'.
-        // This preserves XLQ9 behavior (avoid treating stray content as a new
-        // document) while allowing directive lines between documents (e.g., 5TYM).
+        //  - a directive line ("%YAML ", "%TAG ") preceding the next '---' ONLY
+        //    if the previous document ended explicitly with '...'.
+        // This preserves XLQ9 behavior while enforcing RHX7 (no mid-stream directives
+        // unless the previous document used the end marker).
         let st_ahead = source.save_state();
         // Character-level peek for directive lines
         crate::utils::skip_whitespace_and_comments(source);
