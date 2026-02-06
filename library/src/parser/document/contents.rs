@@ -7,16 +7,8 @@ macro_rules! parse_err {
         YamlError::from(helpers::parse_error_token($stream, $msg))
     };
 }
-/// Helper for indentation validation
-fn validate_indent(actual: usize, expected: usize, context: &str) -> Result<(), YamlError> {
-    if actual < expected {
-        return Err(parse_err!(format!(
-            "{} at invalid indentation: expected >= {}, got {}",
-            context, expected, actual
-        )));
-    }
-    Ok(())
-}
+// Indentation validation is centralized in indentation.rs to keep policy changes in one place.
+use crate::parser::document::indentation::{ensure_indent_at_least, ensure_indent_at_least_no_source};
 use crate::error::YamlError;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
@@ -262,6 +254,8 @@ pub fn parse_document_contents(
                 return parse_scalar_or_value(source, directives, indent_level, ctx);
             }
             let seq_indent = source.get_current_indent_level();
+            // Validate indentation without borrowing source to avoid conflicts with TokenStream
+            ensure_indent_at_least_no_source(seq_indent, indent_level, "Sequence item")?;
             let mut stream =
                 crate::parser::token_stream::TokenStream::new(source, directives, false)?;
             match stream.current() {
@@ -269,7 +263,6 @@ pub fn parse_document_contents(
                     return Ok(Node::None);
                 }
                 Some(crate::parser::lexer::Token::Dash) => {
-                    validate_indent(seq_indent, indent_level, "Sequence item")?;
                     let ctx_seq =
                         ctx.child_block_context(seq_indent, CollectionType::BlockSequence);
                     let seq =
@@ -294,7 +287,7 @@ pub fn parse_document_contents(
             if is_doc_end(source, directives)? {
                 return Ok(Node::None);
             }
-            validate_indent(map_indent, indent_level, "Mapping key")?;
+            ensure_indent_at_least(source, map_indent, indent_level, "Mapping key")?;
             if matches!(head_kind, BlockHeadKind::BlockMapping) {
                 Ok(parse_mapping(source, map_indent, directives)?)
             } else {
@@ -380,10 +373,7 @@ pub fn parse_document_contents(
                                 directives,
                                 false,
                             )?;
-                            Err(crate::parser::document::error_builder::syntax_error(
-                                ts_err.source_mut(),
-                                "Invalid anchor usage: anchor cannot directly precede a sequence indicator on the same line; attach the anchor to the node (e.g., '- &name value')",
-                            ))
+                            Err(crate::parser::document::anchor_errors::AnchorErrors::anchor_cannot_precede_dash_same_line(&mut ts_err))
                         }
                         Some(crate::parser::lexer::Token::Plain(s)) => {
                             if s.trim_start().starts_with('-') {
@@ -393,10 +383,7 @@ pub fn parse_document_contents(
                                         directives,
                                         false,
                                     )?;
-                                Err(crate::parser::document::error_builder::syntax_error(
-                                    ts_err.source_mut(),
-                                    "Invalid anchor usage: anchor cannot directly precede a sequence indicator on the same line; attach the anchor to the node (e.g., '- &name value')",
-                                ))
+                                Err(crate::parser::document::anchor_errors::AnchorErrors::anchor_cannot_precede_dash_same_line(&mut ts_err))
                             } else {
                                 Ok(
                                     crate::parser::document::tokens::value::parse_value_with_tokens(

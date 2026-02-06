@@ -30,3 +30,56 @@ Planned DRY extensions:
 - Adopt `visit_mut` to centralize recursion in additional modules that traverse `Node` trees (e.g., merge handling, validation passes, stringify helpers).
 - Incremental application with tests after each file-level refactor to ensure no functional regressions.
 - Replace ad-hoc mapping dedupe patterns with the shared `dedupe_mapping_pairs_by_last_occurrence()` helper where applicable.
+
+## Centralized Indentation Policy
+
+To reduce duplication and make future indentation rule changes safer, indentation validation was centralized in [library/src/parser/document/indentation.rs](library/src/parser/document/indentation.rs).
+
+- Added `ensure_indent_at_least(...)` for source-context errors when validating indent constraints.
+- Added `ensure_indent_at_least_no_source(...)` to validate without borrowing the source (prevents borrow conflicts alongside `TokenStream`).
+- Scaffolded `ensure_valid_child_indent(...)` using `ParsingContext` for future child-indent policies.
+
+Integrations:
+- Sequence head handling in [library/src/parser/document/contents.rs](library/src/parser/document/contents.rs) now uses the no-source variant before constructing a `TokenStream`.
+- Mapping head handling uses the source-context variant to retain detailed error messages.
+
+Behavior note: This is a behavior-neutral refactor; it does not alter acceptance/rejection of YAML inputs. It only consolidates policy and error construction to ease future fixes.
+
+## Centralized Flow Punctuation
+
+To remove duplication around common flow collection errors, flow punctuation error construction was centralized in [library/src/parser/document/flow_punctuation.rs](library/src/parser/document/flow_punctuation.rs).
+
+  - Sequence: "Expected comma or ] in flow sequence"
+  - Mapping: "Expected comma or } in flow mapping"
+
+Integrations:
+
+Behavior note: This refactor is strictly behavior-neutral. Messages and decision points remain identical; the centralization aims to make future punctuation policy adjustments safer and localized.
+
+## Centralized Anchor/Alias Errors
+
+To reduce duplication and keep anchor/alias error messages consistent, error construction was centralized in [library/src/parser/document/anchor_errors.rs](library/src/parser/document/anchor_errors.rs).
+
+
+Integrations:
+
+## Centralized directive errors
+
+- Added `library/src/parser/document/directive_errors.rs` to unify construction of directive-related errors and messages while preserving exact current strings.
+- Routed the following through `DirectiveErrors` (behavior-neutral):
+  - Duplicate `%YAML` directive
+  - Missing YAML version after `%YAML`
+  - Invalid YAML major/minor version (generic and numeric variants)
+  - Malformed `%TAG` directive format
+  - Undefined tag handle usage without `%TAG` declaration
+  - "Directive must be followed by a document"
+  - Mid-stream directive disallowance message when previous document didn't end with `...`
+- Updated call sites in `parser/directives.rs` and `parser/document/parse.rs` accordingly.
+
+## Centralized block scalar errors
+
+- Added `library/src/parser/document/block_scalar_errors.rs` to consolidate error construction for block scalar parsing:
+  - Invalid block scalar header: unexpected text after `|` or `>`
+  - Invalid block scalar indentation indicator: must be a single digit 1–9
+  - Literal block scalar indentation validation: blank lines before content more indented than the first content line
+- Updated call sites in [library/src/parser/document/scalar.rs](library/src/parser/document/scalar.rs) to use these helpers. Messages and behavior remain identical.

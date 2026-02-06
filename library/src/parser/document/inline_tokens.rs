@@ -159,9 +159,9 @@ pub fn parse_inline_sequence_with_tokens(
             _ => {
                 if !expect_item {
                     // Found value without comma separator
-                    return Err(crate::parser::document::error_builder::syntax_error(
-                        stream.source_mut(),
-                        "Expected comma or ] in flow sequence",
+                    return Err(crate::parser::document::flow_punctuation::expected_separator_or_end_error(
+                        stream,
+                        crate::parser::document::flow_punctuation::FlowContext::Sequence,
                     ));
                 }
 
@@ -349,9 +349,9 @@ pub fn parse_inline_mapping_with_tokens(
                         continue;
                     }
                     // Otherwise, found key-value without required separator
-                    return Err(crate::parser::document::error_builder::syntax_error(
-                        stream.source_mut(),
-                        "Expected comma or } in flow mapping",
+                    return Err(crate::parser::document::flow_punctuation::expected_separator_or_end_error(
+                        stream,
+                        crate::parser::document::flow_punctuation::FlowContext::Mapping,
                     ));
                 }
 

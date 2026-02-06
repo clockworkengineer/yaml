@@ -6,6 +6,7 @@ use crate::parser::ParseResult;
 use crate::parser::document::helpers::{
     self, handle_directives, parse_document_end_marker, parse_document_markers, to_yaml_error,
 };
+use crate::parser::document::directive_errors::DirectiveErrors;
 use crate::parser::document::main_loop::parse_document;
 use crate::{loop_guard_check, loop_guard_init};
 
@@ -32,7 +33,7 @@ fn check_explicit_directives(
             let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
             return Err(helpers::parse_error_token(
                 &ts,
-                "Directive must be followed by a document",
+                DirectiveErrors::must_be_followed_by_document_msg(),
             ));
         }
         source.restore_state(st);
@@ -94,7 +95,7 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
                 source.restore_state(st_dir);
                 if head.starts_with("%YAML ") || head.starts_with("%TAG ") {
                     return Err(to_yaml_error(
-                        "Directives are not allowed after content unless the previous document ended with '...'",
+                        DirectiveErrors::directives_not_allowed_midstream_msg(),
                     ));
                 }
             }

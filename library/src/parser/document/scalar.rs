@@ -15,9 +15,8 @@ fn parse_scalar_dispatch(
                     .chars()
                     .all(|c| c == '+' || c == '-' || c.is_ascii_digit())
                 {
-                    return Err(syntax_error(
+                    return Err(crate::parser::document::block_scalar_errors::BlockScalarErrors::invalid_header_unexpected_text(
                         stream.source_mut(),
-                        "Invalid block scalar header: unexpected text immediately after '|' or '>'",
                     ));
                 }
             }
@@ -44,9 +43,8 @@ fn parse_scalar_dispatch(
         let has_explicit_indent_indicator = !digits.is_empty();
         if !digits.is_empty() {
             if digits.len() != 1 || digits.chars().next().unwrap() == '0' {
-                return Err(syntax_error(
+                return Err(crate::parser::document::block_scalar_errors::BlockScalarErrors::invalid_indent_indicator(
                     stream.source_mut(),
-                    "Invalid block scalar indentation indicator: must be a single digit from 1-9",
                 ));
             }
         }
@@ -251,11 +249,11 @@ fn parse_block_scalar(
     if indicator == '|' && !has_explicit_indent_indicator {
         if let Some(first_indent) = first_content_indent {
             if blank_lines_before_content >= 1 && max_blank_indent_before_content > first_indent {
-                let msg = format!(
-                    "Invalid indentation in literal block scalar: blank lines before content are more indented than the content (blank max: {}, first content indent: {})",
-                    max_blank_indent_before_content, first_indent
-                );
-                return Err(indentation_error(stream.source_mut(), &msg));
+                return Err(crate::parser::document::block_scalar_errors::BlockScalarErrors::invalid_literal_blank_indent(
+                    stream.source_mut(),
+                    max_blank_indent_before_content,
+                    first_indent,
+                ));
             }
         }
     }

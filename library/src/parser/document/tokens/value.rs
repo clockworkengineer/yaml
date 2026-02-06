@@ -343,10 +343,11 @@ pub fn parse_value_with_tokens(
             && decorators.anchor.is_some()
             && stream.current_flow_depth() == 0
         {
-            return Err(syntax_error(
-                stream.source_mut(),
-                "Invalid anchor usage: anchor cannot directly precede a sequence indicator; attach the anchor to the node (e.g., '- &name value')",
-            ));
+            return Err(
+                crate::parser::document::anchor_errors::AnchorErrors::anchor_cannot_precede_dash_block(
+                    stream,
+                ),
+            );
         }
         match stream.current() {
             Some(Token::Eof)
@@ -538,16 +539,18 @@ pub fn parse_value_with_tokens(
             // If the decorated value resolved to an alias, treat this as a
             // structural error rather than accepting an anchored alias.
             if matches!(result, Node::Alias(_)) {
-                return Err(mapping_key_error_yaml(
-                    stream.source_mut(),
-                    "Invalid anchored alias: anchors cannot be applied to alias nodes",
-                ));
+                return Err(
+                    crate::parser::document::anchor_errors::AnchorErrors::invalid_anchored_alias(
+                        stream,
+                    ),
+                );
             }
             if matches!(result, Node::Anchored(_, _)) {
-                return Err(mapping_key_error_yaml(
-                    stream.source_mut(),
-                    "A node cannot have multiple anchors",
-                ));
+                return Err(
+                    crate::parser::document::anchor_errors::AnchorErrors::multiple_anchors(
+                        stream,
+                    ),
+                );
             }
             result = Node::Anchored(Box::new(result), anchor_name);
         }
