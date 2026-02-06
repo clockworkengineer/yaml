@@ -89,3 +89,13 @@ Integrations:
 - Added [library/src/parser/document/comment_errors.rs](library/src/parser/document/comment_errors.rs) to centralize construction of comment-related parsing errors.
 - Routed the quoted-scalar comment spacing check in [library/src/parser/lexer.rs](library/src/parser/lexer.rs) through `CommentErrors::comment_must_be_separated_from_quoted_scalar_by_whitespace(...)`.
 - Behavior is unchanged; the exact message string is preserved while moving construction to a single place for future maintenance.
+
+## Centralized tab/indentation errors
+
+- Added [library/src/parser/document/indentation_errors.rs](library/src/parser/document/indentation_errors.rs) to centralize tab/indentation error construction.
+- Provided helpers:
+  - `tabs_not_allowed_yaml_syntax(...)` → "Tabs are not allowed as indentation in YAML" (Syntax category), used by lexer checks.
+  - `tabs_not_allowed_flow_collections(...)` → "Tabs are not allowed as indentation in YAML flow collections" (Syntax category), used for flow indentation validations.
+  - `tabs_not_allowed_yaml_block(...)` → wraps `tab_indentation_error_yaml(...)` (Indentation category) for block-context validations.
+- Routed call sites in [library/src/parser/lexer.rs](library/src/parser/lexer.rs) and [library/src/parser/document/contents.rs](library/src/parser/document/contents.rs) to use these helpers.
+- Behavior and exact messages remain identical to previous strings; only construction is centralized.
