@@ -146,31 +146,6 @@ pub fn parse_mapping_with_tokens(
 }
 
 impl MappingParseContext {
-    /// Policy helper: determine if an indentation increase is allowed
-    /// after the last parsed pair. YAML permits an indented block value
-    /// only when the previous key did not have an inline scalar value
-    /// (i.e., the last value is `Node::None`). Centralizing this rule
-    /// aids future fixes across mapping parsing paths.
-    fn can_increase_indent_after_last_pair(&self) -> bool {
-        self.stack
-            .last()
-            .and_then(|(_, pairs)| pairs.last())
-            .map(|(_, v)| matches!(v, Node::None))
-            .unwrap_or(false)
-    }
-
-    /// Helper: detect if the last value was a plain (unquoted) scalar.
-    /// This allows indentation to be treated as scalar continuation in
-    /// tests like 36F6, where a plain value on the same line is followed
-    /// by indented plain lines.
-    fn last_value_is_plain_scalar(&self) -> bool {
-        self.stack
-            .last()
-            .and_then(|(_, pairs)| pairs.last())
-            .map(|(_, v)| matches!(v, Node::Str(_, crate::nodes::node::QuoteType::Unquoted, _)))
-            .unwrap_or(false)
-    }
-
     /// Main mapping parse loop as a method. Handles comments, dedent, and pair parsing.
     fn parse_mapping_loop(
         &mut self,
@@ -319,7 +294,12 @@ impl MappingParseContext {
         saw_comment_between_entries: bool,
     ) -> crate::parser::ParseResult<Option<Option<(Node, Node)>>> {
         if let Some(Token::Indent(level)) = token {
-            let last_value_is_empty = self.can_increase_indent_after_last_pair();
+            let last_value_is_empty = self
+                .stack
+                .last()
+                .and_then(|(_, pairs)| pairs.last())
+                .map(|(_, v)| matches!(v, Node::None))
+                .unwrap_or(false);
             if level > current_indent {
                 if !last_value_is_empty && saw_comment_between_entries {
                     use crate::error::enhanced::{EnhancedError, ErrorCode};
@@ -329,22 +309,6 @@ impl MappingParseContext {
                     ))
                     .with_code(ErrorCode::E007)
                     .with_note("Check for misplaced comments or indentation.");
-                    return Err(err.to_string().into());
-                }
-                // Enforce U44R and related cases: increasing indentation is
-                // only valid when the previous key expects a block value
-                // on the next line (i.e., its value is Node::None). If the
-                // last pair already has a completed scalar value, treat a
-                // direct indent increase as an invalid, inconsistent key
-                // indentation rather than silently starting a nested mapping.
-                if !last_value_is_empty && !self.last_value_is_plain_scalar() {
-                    use crate::error::enhanced::{EnhancedError, ErrorCode};
-                    let err = EnhancedError::new(mapping_key_error_yaml(
-                        stream.source_mut(),
-                        "Invalid indentation for mapping entry: block indentation is only allowed when the previous key has no inline value",
-                    ))
-                    .with_code(ErrorCode::E010)
-                    .with_note("Align sibling keys or use ':' to begin a nested block value.");
                     return Err(err.to_string().into());
                 }
                 self.stack.push((level, Vec::new()));
