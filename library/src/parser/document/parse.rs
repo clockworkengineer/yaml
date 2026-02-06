@@ -76,6 +76,29 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
             "Stream parsing"
         );
         crate::utils::skip_whitespace_and_comments(source);
+        // RHX7 enforcement: If we see a directive line here after having
+        // parsed content, and the previous document did not end with '...',
+        // this is an invalid mid-stream directive.
+        if any_content && !last_doc_ended {
+            if let Some('%') = source.current() {
+                let st_dir = source.save_state();
+                let mut head = String::new();
+                for _ in 0..5 {
+                    if let Some(ch) = source.current() {
+                        head.push(ch);
+                        source.next();
+                    } else {
+                        break;
+                    }
+                }
+                source.restore_state(st_dir);
+                if head.starts_with("%YAML ") || head.starts_with("%TAG ") {
+                    return Err(to_yaml_error(
+                        "Directives are not allowed after content unless the previous document ended with '...'",
+                    ));
+                }
+            }
+        }
         // Parse and merge directives using helper
         let directives = handle_directives(source)?;
         check_explicit_directives(source, &directives)?;
