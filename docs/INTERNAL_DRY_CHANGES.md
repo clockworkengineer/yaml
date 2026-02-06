@@ -83,3 +83,9 @@ Integrations:
   - Invalid block scalar indentation indicator: must be a single digit 1–9
   - Literal block scalar indentation validation: blank lines before content more indented than the first content line
 - Updated call sites in [library/src/parser/document/scalar.rs](library/src/parser/document/scalar.rs) to use these helpers. Messages and behavior remain identical.
+
+## Centralized comment spacing errors
+
+- Added [library/src/parser/document/comment_errors.rs](library/src/parser/document/comment_errors.rs) to centralize construction of comment-related parsing errors.
+- Routed the quoted-scalar comment spacing check in [library/src/parser/lexer.rs](library/src/parser/lexer.rs) through `CommentErrors::comment_must_be_separated_from_quoted_scalar_by_whitespace(...)`.
+- Behavior is unchanged; the exact message string is preserved while moving construction to a single place for future maintenance.
