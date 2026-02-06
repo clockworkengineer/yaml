@@ -17,6 +17,7 @@ pub mod flow_punctuation;
 pub mod anchor_errors;
 pub mod directive_errors;
 pub mod block_scalar_errors;
+pub mod comment_errors;
 mod loop_guards;
 mod main_loop;
 mod mapping;
