@@ -196,7 +196,7 @@ fn skip_trivia_with_ctx(source: &mut dyn ISource, ctx: &ParsingContext) -> crate
     if !ctx.in_flow {
         match crate::utils::skip_whitespace_and_comments_validate_tabs(source) {
             Ok(()) => Ok(()),
-            Err(_e) => Err(crate::parser::document::error_builder::tab_indentation_error_yaml(source)),
+            Err(_e) => Err(crate::parser::document::indentation_errors::IndentationErrors::tabs_not_allowed_yaml_block(source)),
         }
     } else {
         crate::utils::skip_whitespace_and_comments(source);

@@ -238,10 +238,8 @@ impl<'a> Lexer<'a> {
                                 _ => false,
                             };
                             if saw_tab && nested_indicator {
-                                return Err(error_helpers::forbidden_error(
+                                return Err(crate::parser::document::indentation_errors::IndentationErrors::tabs_not_allowed_yaml_syntax(
                                     self.source,
-                                    "Tabs",
-                                    "as indentation in YAML",
                                 ));
                             }
                         }
@@ -261,10 +259,8 @@ impl<'a> Lexer<'a> {
                             }
                             self.source.restore_state(state);
                             if saw_tab {
-                                return Err(error_helpers::forbidden_error(
+                                return Err(crate::parser::document::indentation_errors::IndentationErrors::tabs_not_allowed_yaml_syntax(
                                     self.source,
-                                    "Tabs",
-                                    "as indentation in YAML",
                                 ));
                             }
                         }
@@ -285,10 +281,8 @@ impl<'a> Lexer<'a> {
                                 }
                                 self.source.restore_state(state);
                                 if saw_tab {
-                                    return Err(error_helpers::forbidden_error(
+                                    return Err(crate::parser::document::indentation_errors::IndentationErrors::tabs_not_allowed_yaml_syntax(
                                         self.source,
-                                        "Tabs",
-                                        "as indentation in YAML",
                                     ));
                                 }
                             }
@@ -635,10 +629,8 @@ impl<'a> Lexer<'a> {
                         | Some(CHAR_CARRIAGE_RETURN)
                         | None
                 ) {
-                    return Err(error_helpers::forbidden_error(
+                    return Err(crate::parser::document::indentation_errors::IndentationErrors::tabs_not_allowed_flow_collections(
                         self.source,
-                        "Tabs",
-                        "as indentation in YAML flow collections",
                     ));
                 }
             }
@@ -696,10 +688,8 @@ impl<'a> Lexer<'a> {
                         self.peek_next_non_whitespace(),
                         Some(CHAR_NEWLINE) | Some(CHAR_CARRIAGE_RETURN) | None
                     ) {
-                        return Err(error_helpers::forbidden_error(
+                        return Err(crate::parser::document::indentation_errors::IndentationErrors::tabs_not_allowed_yaml_syntax(
                             self.source,
-                            "Tabs",
-                            "as indentation in YAML",
                         ));
                     }
                 }
