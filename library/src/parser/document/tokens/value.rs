@@ -5,9 +5,7 @@
 
 use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
 use crate::parser::directives::DirectiveContext;
-use crate::parser::document::error_builder::{
-    mapping_key_error_yaml, syntax_error,
-};
+use crate::parser::document::error_builder::syntax_error;
 use crate::error::{YamlError, ErrorKind};
 const MAX_NESTING_DEPTH: usize = 128;
 use crate::parser::lexer::Token;

@@ -1,3 +1,4 @@
+pub mod anchor_errors;
 ///
 /// Modules for parsing YAML documents.
 ///
@@ -6,23 +7,22 @@
 /// managing document boundaries and normalization of parsed nodes.
 ///
 mod anchors;
-mod contents;
-pub mod context;
-pub mod error_builder;
-mod explicit_key;
-pub mod helpers;
-mod inline_tokens;
-pub mod indentation;
-pub mod flow_punctuation;
-pub mod anchor_errors;
-pub mod directive_errors;
 pub mod block_scalar_errors;
 pub mod comment_errors;
+mod contents;
+pub mod context;
+pub mod directive_errors;
+pub mod error_builder;
+mod explicit_key;
+pub mod flow_punctuation;
+pub mod helpers;
+pub mod indentation;
 pub mod indentation_errors;
-pub mod mapping_errors;
+mod inline_tokens;
 mod loop_guards;
 mod main_loop;
 mod mapping;
+pub mod mapping_errors;
 pub mod node_utils;
 mod parse;
 mod scalar;

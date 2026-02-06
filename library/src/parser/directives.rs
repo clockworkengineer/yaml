@@ -1,4 +1,4 @@
-use crate::error::{YamlError, ErrorKind};
+use crate::error::YamlError;
 use crate::parser::document::directive_errors::DirectiveErrors;
 /// Parses YAML directives (%YAML, %TAG) at the start of a document.
 /// Returns a DirectiveContext or error string.

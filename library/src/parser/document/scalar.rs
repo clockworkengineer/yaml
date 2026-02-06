@@ -242,7 +242,7 @@ fn parse_block_scalar(
             _ => break,
         }
     }
-    use crate::parser::document::error_builder::indentation_error;
+    
     // Loosen blank line indentation rules: allow any number/indentation of blank lines before first content line
     // Only enforce indentation rules on actual content lines, not on blank lines before content
     let indicator = block_header.chars().next().unwrap();

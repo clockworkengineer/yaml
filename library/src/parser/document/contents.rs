@@ -8,7 +8,6 @@ macro_rules! parse_err {
     };
 }
 // Indentation validation is centralized in indentation.rs to keep policy changes in one place.
-use crate::parser::document::indentation::{ensure_indent_at_least, ensure_indent_at_least_no_source};
 use crate::error::YamlError;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
@@ -18,6 +17,9 @@ use crate::parser::document::context::{CollectionType, ParsingContext};
 use crate::parser::document::explicit_key::parse_multiple_explicit_keys;
 use crate::parser::document::helpers;
 use crate::parser::document::helpers::BlockHeadKind;
+use crate::parser::document::indentation::{
+    ensure_indent_at_least, ensure_indent_at_least_no_source,
+};
 use crate::parser::document::mapping::parse_mapping;
 use crate::parser::document::value::parse_value;
 
@@ -192,7 +194,10 @@ fn handle_multiple_explicit_keys(
 
 /// Helper to skip whitespace and comments with context-aware tab validation.
 /// In block context, validates that tabs are not used for indentation after newlines.
-fn skip_trivia_with_ctx(source: &mut dyn ISource, ctx: &ParsingContext) -> crate::parser::ParseResult<()> {
+fn skip_trivia_with_ctx(
+    source: &mut dyn ISource,
+    ctx: &ParsingContext,
+) -> crate::parser::ParseResult<()> {
     if !ctx.in_flow {
         match crate::utils::skip_whitespace_and_comments_validate_tabs(source) {
             Ok(()) => Ok(()),
@@ -369,20 +374,15 @@ pub fn parse_document_contents(
                         }
                         Some(crate::parser::lexer::Token::Dash) => {
                             let mut ts_err = crate::parser::token_stream::TokenStream::new(
-                                source,
-                                directives,
-                                false,
+                                source, directives, false,
                             )?;
                             Err(crate::parser::document::anchor_errors::AnchorErrors::anchor_cannot_precede_dash_same_line(&mut ts_err))
                         }
                         Some(crate::parser::lexer::Token::Plain(s)) => {
                             if s.trim_start().starts_with('-') {
-                                let mut ts_err =
-                                    crate::parser::token_stream::TokenStream::new(
-                                        source,
-                                        directives,
-                                        false,
-                                    )?;
+                                let mut ts_err = crate::parser::token_stream::TokenStream::new(
+                                    source, directives, false,
+                                )?;
                                 Err(crate::parser::document::anchor_errors::AnchorErrors::anchor_cannot_precede_dash_same_line(&mut ts_err))
                             } else {
                                 Ok(
