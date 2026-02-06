@@ -420,10 +420,11 @@ pub fn parse_value_with_tokens(
             && stream.current_flow_depth() == 0
             && matches!(stream.current(), Some(Token::Plain(s)) if s.trim_start().starts_with('-'))
         {
-            return Err(syntax_error(
-                stream.source_mut(),
-                "Invalid anchor usage: anchor cannot directly precede a sequence indicator; attach the anchor to the node (e.g., '- &name value')",
-            ));
+            return Err(
+                crate::parser::document::anchor_errors::AnchorErrors::anchor_cannot_precede_dash_block(
+                    stream,
+                ),
+            );
         }
 
         let mut result = if tag_is_set {

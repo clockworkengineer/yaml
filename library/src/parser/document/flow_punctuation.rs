@@ -47,3 +47,60 @@ pub fn ensure_separator_or_end(
         _ => Err(expected_separator_or_end_error(stream, ctx)),
     }
 }
+
+/// Centralized error: Unexpected extra closing bracket ']' in a flow sequence.
+pub fn unexpected_extra_closing_bracket_in_flow_sequence(
+    stream: &mut TokenStream,
+) -> crate::error::YamlError {
+    crate::parser::document::error_builder::syntax_error(
+        stream.source_mut(),
+        "Unexpected extra closing bracket ']' in flow sequence",
+    )
+}
+
+/// Centralized error: Leading or double comma in flow sequence is not allowed.
+pub fn leading_or_double_comma_in_flow_sequence(
+    stream: &mut TokenStream,
+) -> crate::error::YamlError {
+    crate::parser::document::error_builder::syntax_error(
+        stream.source_mut(),
+        "Leading or double comma in flow sequence is not allowed",
+    )
+}
+
+/// Centralized error: Unexpected EOF in flow mapping (unclosed '{').
+pub fn unexpected_eof_in_flow_mapping_unclosed(
+    stream: &mut TokenStream,
+) -> crate::error::YamlError {
+    crate::parser::document::error_builder::syntax_error(
+        stream.source_mut(),
+        "Syntax error: Unexpected end of input in flow mapping (unclosed '{')",
+    )
+}
+
+/// Centralized error: Unexpected EOF in flow sequence.
+///
+/// Mirrors existing behavior and message text used in callers
+/// to keep error output identical while centralizing construction.
+pub fn unexpected_eof_in_flow_sequence(
+    _stream: &mut TokenStream,
+) -> crate::error::YamlError {
+    // Note: For flow sequence EOF, existing code uses the generic EOF helper
+    // without source context. Preserve exact message for neutrality.
+    crate::parser::document::error_builder::eof_error("flow sequence")
+}
+
+/// Centralized error: Invalid bare '-' entries inside a flow sequence.
+///
+/// Some YAML suite cases expect that a flow sequence containing only bare
+/// dash scalars (e.g., `[-, -]`) is rejected rather than treated as valid
+/// scalar entries. This keeps the exact existing message while centralizing
+/// construction.
+pub fn invalid_bare_dash_entries_in_flow_sequence(
+    stream: &mut TokenStream,
+) -> crate::error::YamlError {
+    crate::parser::document::error_builder::mapping_key_error_yaml(
+        stream.source_mut(),
+        "Invalid use of '-' indicators inside flow sequence",
+    )
+}

@@ -53,6 +53,14 @@ To remove duplication around common flow collection errors, flow punctuation err
   - Mapping: "Expected comma or } in flow mapping"
 
 Integrations:
+  - Inline parsers now leverage `ensure_separator_or_end(...)` to validate the token following a flow item/entry, while keeping consumption logic unchanged.
+  - Centralized additional flow-context errors:
+    - `unexpected_extra_closing_bracket_in_flow_sequence(...)`
+    - `leading_or_double_comma_in_flow_sequence(...)`
+    - `unexpected_eof_in_flow_mapping_unclosed(...)`
+    - `invalid_bare_dash_entries_in_flow_sequence(...)` (keeps "Invalid use of '-' indicators inside flow sequence")
+    All messages remain identical to previous strings.
+- Centralized EOF handling for flow sequence unclosed `[` via `flow_punctuation::unexpected_eof_in_flow_sequence()`; replaced direct `eof_error("flow sequence")` call in `inline_tokens.rs` without changing message text.
 
 Behavior note: This refactor is strictly behavior-neutral. Messages and decision points remain identical; the centralization aims to make future punctuation policy adjustments safer and localized.
 
@@ -87,7 +95,7 @@ Integrations:
 ## Centralized comment spacing errors
 
 - Added [library/src/parser/document/comment_errors.rs](library/src/parser/document/comment_errors.rs) to centralize construction of comment-related parsing errors.
-- Routed the quoted-scalar comment spacing check in [library/src/parser/lexer.rs](library/src/parser/lexer.rs) through `CommentErrors::comment_must_be_separated_from_quoted_scalar_by_whitespace(...)`.
+- Routed the quoted-scalar comment spacing checks in [library/src/parser/lexer.rs](library/src/parser/lexer.rs) through `CommentErrors::comment_must_be_separated_from_quoted_scalar_by_whitespace(...)` (both single-quoted and double-quoted closures).
 - Behavior is unchanged; the exact message string is preserved while moving construction to a single place for future maintenance.
 
 ## Centralized tab/indentation errors
@@ -99,3 +107,18 @@ Integrations:
   - `tabs_not_allowed_yaml_block(...)` → wraps `tab_indentation_error_yaml(...)` (Indentation category) for block-context validations.
 - Routed call sites in [library/src/parser/lexer.rs](library/src/parser/lexer.rs) and [library/src/parser/document/contents.rs](library/src/parser/document/contents.rs) to use these helpers.
 - Behavior and exact messages remain identical to previous strings; only construction is centralized.
+
+## Centralized mapping errors
+
+- Added [library/src/parser/document/mapping_errors.rs](library/src/parser/document/mapping_errors.rs) to centralize construction of common mapping-specific errors while preserving exact strings and enhanced formatting:
+  - `mapping_key_without_value_expected_value_after_colon(...)` → "YAML compliance error: Mapping key without value (expected value after colon)" with code E001
+  - `invalid_indentation_after_comment_in_mapping_value(...)` → "Invalid indentation after comment: indented content cannot extend a completed scalar mapping value" with code E007 and note
+  - `inconsistent_dedent_within_mapping_value_for_keys(...)` → "Invalid indentation for nested mapping key: inconsistent dedent within mapping value" with code E009 and note
+- Updated call sites in [library/src/parser/document/tokens/mapping.rs](library/src/parser/document/tokens/mapping.rs) to route through these helpers. Behavior and message formatting (including error codes and notes) remain identical.
+
+### Mapping-specific anchor errors
+
+- Added mapping-specific anchor error helpers while preserving exact messages and enhanced formatting:
+  - `invalid_anchored_alias_key_on_alias_nodes(...)` → "Invalid anchored alias key: anchors cannot be applied to alias nodes" with code E004 and note "Anchors are not allowed on alias nodes."
+  - `multiple_anchors_on_mapping_key(...)` → "A mapping key cannot have multiple anchors" with code E005 and note "A key can only have one anchor."
+- Refactored `apply_decorators_to_key()` in [library/src/parser/document/tokens/mapping.rs](library/src/parser/document/tokens/mapping.rs) to call these helpers instead of constructing errors inline.

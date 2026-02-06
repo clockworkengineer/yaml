@@ -44,12 +44,8 @@ fn parse_indented_mapping_value(
     }
     // YAML compliance error: Mapping key without value (expected value after colon)
     if !explicit_key && matches!(stream.current(), Some(Token::Eof) | None) {
-        use crate::error::enhanced::{EnhancedError, ErrorCode};
-        let err = EnhancedError::new(crate::parser::document::error_builder::syntax_error(
-            stream.source_mut(),
-            "YAML compliance error: Mapping key without value (expected value after colon)",
-        ))
-        .with_code(ErrorCode::E001);
+        let err = crate::parser::document::mapping_errors::
+            mapping_key_without_value_expected_value_after_colon(stream);
         return Err(err.to_string().into());
     }
     Ok(Node::None)
@@ -302,13 +298,8 @@ impl MappingParseContext {
                 .unwrap_or(false);
             if level > current_indent {
                 if !last_value_is_empty && saw_comment_between_entries {
-                    use crate::error::enhanced::{EnhancedError, ErrorCode};
-                    let err = EnhancedError::new(mapping_key_error_yaml(
-                        stream.source_mut(),
-                        "Invalid indentation after comment: indented content cannot extend a completed scalar mapping value",
-                    ))
-                    .with_code(ErrorCode::E007)
-                    .with_note("Check for misplaced comments or indentation.");
+                    let err = crate::parser::document::mapping_errors::
+                        invalid_indentation_after_comment_in_mapping_value(stream);
                     return Err(err.to_string().into());
                 }
                 self.stack.push((level, Vec::new()));
@@ -321,13 +312,8 @@ impl MappingParseContext {
                 // indicates inconsistent key indentation and should be
                 // rejected, rather than silently unwinding.
                 if level > self.base_indent {
-                    use crate::error::enhanced::{EnhancedError, ErrorCode};
-                    let err = EnhancedError::new(mapping_key_error_yaml(
-                        stream.source_mut(),
-                        "Invalid indentation for nested mapping key: inconsistent dedent within mapping value",
-                    ))
-                    .with_code(ErrorCode::E009)
-                    .with_note("Ensure all keys under the nested mapping use the same indentation.");
+                    let err = crate::parser::document::mapping_errors::
+                        inconsistent_dedent_within_mapping_value_for_keys(stream);
                     return Err(err.to_string().into());
                 }
                 self.dedent_unwind_mapping_stack(level);
@@ -504,23 +490,11 @@ fn apply_decorators_to_key(
     }
     if let Some(anchor) = decorators.anchor {
         if matches!(key_node, Node::Alias(_)) {
-            use crate::error::enhanced::{EnhancedError, ErrorCode};
-            let err = EnhancedError::new(mapping_key_error_yaml(
-                stream.source_mut(),
-                "Invalid anchored alias key: anchors cannot be applied to alias nodes",
-            ))
-            .with_code(ErrorCode::E004)
-            .with_note("Anchors are not allowed on alias nodes.");
+            let err = crate::parser::document::mapping_errors::invalid_anchored_alias_key_on_alias_nodes(stream);
             return Err(err.to_string().into());
         }
         if matches!(key_node, Node::Anchored(_, _)) {
-            use crate::error::enhanced::{EnhancedError, ErrorCode};
-            let err = EnhancedError::new(mapping_key_error_yaml(
-                stream.source_mut(),
-                "A mapping key cannot have multiple anchors",
-            ))
-            .with_code(ErrorCode::E005)
-            .with_note("A key can only have one anchor.");
+            let err = crate::parser::document::mapping_errors::multiple_anchors_on_mapping_key(stream);
             return Err(err.to_string().into());
         }
         key_node = Node::Anchored(Box::new(key_node), anchor);

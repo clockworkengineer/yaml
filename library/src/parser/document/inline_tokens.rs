@@ -123,17 +123,14 @@ pub fn parse_inline_sequence_with_tokens(
         skip_inline_trivia(stream)?;
 
         match stream.current() {
-            Some(Token::FlowSequenceEnd) => {
+                Some(Token::FlowSequenceEnd) => {
                 // Closing bracket - done
                 let _ = stream.consume_flow_sequence_end()?;
                 // If at top-level (depth == 0), check for extra closing bracket (4H7K)
                 if depth == 0 {
                     skip_inline_trivia(stream)?;
                     if matches!(stream.current(), Some(Token::FlowSequenceEnd)) {
-                        return Err(crate::parser::document::error_builder::syntax_error(
-                            stream.source_mut(),
-                            "Unexpected extra closing bracket ']' in flow sequence",
-                        ));
+                            return Err(crate::parser::document::flow_punctuation::unexpected_extra_closing_bracket_in_flow_sequence(stream));
                     }
                 }
                 break;
@@ -141,10 +138,7 @@ pub fn parse_inline_sequence_with_tokens(
             Some(Token::Comma) => {
                 if expect_item {
                     // Comma found when expecting an item: leading or double comma
-                    return Err(crate::parser::document::error_builder::syntax_error(
-                        stream.source_mut(),
-                        "Leading or double comma in flow sequence is not allowed",
-                    ));
+                        return Err(crate::parser::document::flow_punctuation::leading_or_double_comma_in_flow_sequence(stream));
                 }
                 // Allow trailing comma: set to expect next item, but do not error
                 // If immediately followed by ']', the loop will close cleanly
@@ -152,17 +146,23 @@ pub fn parse_inline_sequence_with_tokens(
                 expect_item = true;
             }
             None | Some(Token::Eof) => {
-                return Err(crate::parser::document::error_builder::eof_error(
-                    "flow sequence",
-                ));
+                return Err(
+                    crate::parser::document::flow_punctuation::unexpected_eof_in_flow_sequence(
+                        stream,
+                    ),
+                );
             }
             _ => {
                 if !expect_item {
                     // Found value without comma separator
-                    return Err(crate::parser::document::flow_punctuation::expected_separator_or_end_error(
+                    // DRY: use centralized helper to emit identical error
+                    if let Err(e) = crate::parser::document::flow_punctuation::ensure_separator_or_end(
                         stream,
                         crate::parser::document::flow_punctuation::FlowContext::Sequence,
-                    ));
+                        Token::FlowSequenceEnd,
+                    ) {
+                        return Err(e);
+                    }
                 }
 
                 // Parse what might be a value or the key of an implicit mapping.
@@ -248,9 +248,8 @@ pub fn parse_inline_sequence_with_tokens(
         if let (Node::Str(s1, ..), Node::Str(s2, ..)) = (&items[0], &items[1]) {
             if s1 == "-" && s2 == "-" {
                 return Err(
-                    crate::parser::document::error_builder::mapping_key_error_yaml(
-                        stream.source_mut(),
-                        "Invalid use of '-' indicators inside flow sequence",
+                    crate::parser::document::flow_punctuation::invalid_bare_dash_entries_in_flow_sequence(
+                        stream,
                     ),
                 );
             }
@@ -330,29 +329,30 @@ pub fn parse_inline_mapping_with_tokens(
             }
             None | Some(Token::Eof) => {
                 // Regression fix: produce a syntax error with 'Syntax error' in the message for unclosed flow mapping
-                return Err(crate::parser::document::error_builder::syntax_error(
-                    stream.source_mut(),
-                    "Syntax error: Unexpected end of input in flow mapping (unclosed '{')",
-                ));
+                return Err(crate::parser::document::flow_punctuation::unexpected_eof_in_flow_mapping_unclosed(stream));
             }
             _ => {
                 if !expect_entry {
                     // After a key-value pair, allow either a comma separator or closing brace.
-                    // If we see a closing '}' here, end the mapping gracefully.
-                    if matches!(stream.current(), Some(Token::FlowMappingEnd)) {
-                        let _ = stream.consume_flow_mapping_end()?;
-                        break;
-                    }
-                    if matches!(stream.current(), Some(Token::Comma)) {
-                        let _ = stream.consume_if(Token::Comma)?;
-                        expect_entry = true;
-                        continue;
-                    }
-                    // Otherwise, found key-value without required separator
-                    return Err(crate::parser::document::flow_punctuation::expected_separator_or_end_error(
+                    // DRY: use centralized helper to validate next token is separator or end
+                    match crate::parser::document::flow_punctuation::ensure_separator_or_end(
                         stream,
                         crate::parser::document::flow_punctuation::FlowContext::Mapping,
-                    ));
+                        Token::FlowMappingEnd,
+                    ) {
+                        Err(e) => return Err(e),
+                        Ok(()) => {
+                            if matches!(stream.current(), Some(Token::FlowMappingEnd)) {
+                                let _ = stream.consume_flow_mapping_end()?;
+                                break;
+                            }
+                            if matches!(stream.current(), Some(Token::Comma)) {
+                                let _ = stream.consume_if(Token::Comma)?;
+                                expect_entry = true;
+                                continue;
+                            }
+                        }
+                    }
                 }
 
                 // Parse the mapping key. Special-case an empty key in flow

@@ -19,6 +19,7 @@ pub mod directive_errors;
 pub mod block_scalar_errors;
 pub mod comment_errors;
 pub mod indentation_errors;
+pub mod mapping_errors;
 mod loop_guards;
 mod main_loop;
 mod mapping;

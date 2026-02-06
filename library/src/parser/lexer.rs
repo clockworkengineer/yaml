@@ -1157,9 +1157,8 @@ impl<'a> Lexer<'a> {
                     // can report a clear syntax error instead of
                     // silently treating it as a valid comment.
                     if let Some(CHAR_HASH) = self.source.current() {
-                        return Err(error_helpers::syntax_error(
+                        return Err(crate::parser::document::comment_errors::CommentErrors::comment_must_be_separated_from_quoted_scalar_by_whitespace(
                             self.source,
-                            "YAML syntax error: comment must be separated from quoted scalar by whitespace",
                         ));
                     }
                     break;
