@@ -122,3 +122,10 @@ Integrations:
   - `invalid_anchored_alias_key_on_alias_nodes(...)` → "Invalid anchored alias key: anchors cannot be applied to alias nodes" with code E004 and note "Anchors are not allowed on alias nodes."
   - `multiple_anchors_on_mapping_key(...)` → "A mapping key cannot have multiple anchors" with code E005 and note "A key can only have one anchor."
 - Refactored `apply_decorators_to_key()` in [library/src/parser/document/tokens/mapping.rs](library/src/parser/document/tokens/mapping.rs) to call these helpers instead of constructing errors inline.
+
+## Flow context: post-closer validations
+
+- Centralized flow-closer adjacent content validations:
+  - `CommentErrors::comment_must_be_preceded_by_whitespace_after_flow_closer(...)` for comments immediately after `}` or `]` without whitespace.
+  - `flow_punctuation::invalid_content_immediately_after_flow_closer(...)` for invalid non-whitespace characters directly following a flow closer.
+- Routed `lexer.validate_post_flow_closer()` to these helpers. Messages remain identical.
