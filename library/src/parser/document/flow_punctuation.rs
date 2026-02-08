@@ -1,6 +1,8 @@
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
 use crate::parser::{ParseResult};
+use crate::io::traits::ISource;
+use crate::error::YamlError;
 
 /// Flow contexts that share punctuation expectations
 pub enum FlowContext {
@@ -102,5 +104,24 @@ pub fn invalid_bare_dash_entries_in_flow_sequence(
     crate::parser::document::error_builder::mapping_key_error_yaml(
         stream.source_mut(),
         "Invalid use of '-' indicators inside flow sequence",
+    )
+}
+
+/// Centralized error: Invalid immediate content following a flow closer ('}' or ']').
+///
+/// When a non-whitespace character directly follows a flow closer, certain characters
+/// are allowed (newline, ',', ']', '}', '#', ':'). Otherwise, emit a syntax error
+/// indicating that whitespace or a newline is required.
+pub fn invalid_content_immediately_after_flow_closer(
+    source: &mut dyn ISource,
+    closer: char,
+    found: char,
+) -> YamlError {
+    crate::parser::document::error_builder::syntax_error(
+        source,
+        &format!(
+            "YAML syntax error: Invalid content '{}' immediately after '{}' - whitespace or newline required",
+            found, closer
+        ),
     )
 }

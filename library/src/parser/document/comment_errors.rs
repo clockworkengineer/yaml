@@ -17,4 +17,19 @@ impl CommentErrors {
             "YAML syntax error: comment must be separated from quoted scalar by whitespace",
         )
     }
+
+    /// A comment character '#' immediately after a flow closer ('}' or ']')
+    /// without separating whitespace is invalid.
+    pub fn comment_must_be_preceded_by_whitespace_after_flow_closer(
+        source: &mut dyn ISource,
+        closer: char,
+    ) -> YamlError {
+        syntax_error(
+            source,
+            &format!(
+                "YAML syntax error: comment must be preceded by whitespace after '{}' in flow collection",
+                closer
+            ),
+        )
+    }
 }

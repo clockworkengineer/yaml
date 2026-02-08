@@ -768,12 +768,9 @@ impl<'a> Lexer<'a> {
         }
         if let Some('#') = self.source.current() {
             if !seen_whitespace {
-                return Err(error_helpers::syntax_error(
+                return Err(crate::parser::document::comment_errors::CommentErrors::comment_must_be_preceded_by_whitespace_after_flow_closer(
                     self.source,
-                    &format!(
-                        "YAML syntax error: comment must be preceded by whitespace after '{}' in flow collection",
-                        closer
-                    ),
+                    closer,
                 ));
             }
         }
@@ -790,12 +787,10 @@ impl<'a> Lexer<'a> {
             {
                 // Check if it's alphanumeric which clearly indicates invalid adjacent content
                 if c.is_alphanumeric() {
-                    return Err(error_helpers::syntax_error(
+                    return Err(crate::parser::document::flow_punctuation::invalid_content_immediately_after_flow_closer(
                         self.source,
-                        &format!(
-                            "YAML syntax error: Invalid content '{}' immediately after '{}' - whitespace or newline required",
-                            c, closer
-                        ),
+                        closer,
+                        c,
                     ));
                 }
             }
