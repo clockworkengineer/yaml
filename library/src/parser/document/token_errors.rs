@@ -51,3 +51,27 @@ pub fn parser_did_not_advance_structure(source: &mut dyn ISource, context: &str)
         ),
     )
 }
+
+/// Centralized helper: expected plain scalar but found EOF.
+pub fn expected_plain_scalar_eof(source: &mut dyn ISource) -> YamlError {
+    crate::parser::document::error_builder::syntax_error(
+        source,
+        "Expected plain scalar, got EOF",
+    )
+}
+
+/// Centralized helper: expected quoted scalar but found EOF.
+pub fn expected_quoted_scalar_eof(source: &mut dyn ISource) -> YamlError {
+    crate::parser::document::error_builder::syntax_error(
+        source,
+        "Expected quoted scalar, got EOF",
+    )
+}
+
+/// Centralized helper: expected scalar but found EOF.
+pub fn expected_scalar_eof(source: &mut dyn ISource) -> YamlError {
+    crate::parser::document::error_builder::syntax_error(
+        source,
+        "Expected scalar, got EOF",
+    )
+}

@@ -169,13 +169,13 @@ impl<'a> TokenStream<'a> {
                 self.next()?;
                 Ok(())
             }
-            Some(_token) => Err(crate::parser::document::error_builder::expected_error(
+            Some(_token) => Err(crate::parser::document::token_errors::expected_specific_token(
                 self.source_mut(),
-                &format!("token {:?}", expected),
+                expected.clone(),
             )),
-            None => Err(crate::parser::document::error_builder::expected_error(
+            None => Err(crate::parser::document::token_errors::expected_specific_token(
                 self.source_mut(),
-                &format!("token {:?}", expected),
+                expected.clone(),
             )),
         }
     }
@@ -396,13 +396,11 @@ impl<'a> TokenStream<'a> {
                 self.next()?;
                 Ok(result)
             }
-            Some(_token) => Err(crate::parser::document::error_builder::expected_error(
+            Some(_token) => Err(crate::parser::document::token_errors::expected_plain_scalar(
                 self.source_mut(),
-                "plain scalar",
             )),
-            None => Err(crate::parser::document::error_builder::syntax_error(
+            None => Err(crate::parser::document::token_errors::expected_plain_scalar_eof(
                 self.source_mut(),
-                "Expected plain scalar, got EOF",
             )),
         }
     }
@@ -415,13 +413,11 @@ impl<'a> TokenStream<'a> {
                 self.next()?;
                 Ok(result)
             }
-            Some(_token) => Err(crate::parser::document::error_builder::expected_error(
+            Some(_token) => Err(crate::parser::document::token_errors::expected_quoted_scalar(
                 self.source_mut(),
-                "quoted scalar",
             )),
-            None => Err(crate::parser::document::error_builder::syntax_error(
+            None => Err(crate::parser::document::token_errors::expected_quoted_scalar_eof(
                 self.source_mut(),
-                "Expected quoted scalar, got EOF",
             )),
         }
     }
@@ -444,13 +440,11 @@ impl<'a> TokenStream<'a> {
                 self.next()?;
                 Ok((result, ScalarType::DoubleQuoted))
             }
-            Some(_token) => Err(crate::parser::document::error_builder::expected_error(
+            Some(_token) => Err(crate::parser::document::token_errors::expected_scalar(
                 self.source_mut(),
-                "scalar",
             )),
-            None => Err(crate::parser::document::error_builder::syntax_error(
+            None => Err(crate::parser::document::token_errors::expected_scalar_eof(
                 self.source_mut(),
-                "Expected scalar, got EOF",
             )),
         }
     }
