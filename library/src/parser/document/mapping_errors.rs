@@ -47,10 +47,10 @@ pub fn inconsistent_dedent_within_mapping_value_for_keys(
 ///
 /// Returns an EnhancedError with code E004 and note, matching existing behavior and text.
 pub fn invalid_anchored_alias_key_on_alias_nodes(stream: &mut TokenStream) -> EnhancedError {
-    EnhancedError::new(crate::parser::document::error_builder::mapping_key_error_yaml(
-        stream.source_mut(),
-        "Invalid anchored alias key: anchors cannot be applied to alias nodes",
-    ))
+    // Route through AnchorErrors to centralize the message text.
+    // Behavior-neutral: underlying builder and final message remain identical.
+    let base = crate::parser::document::anchor_errors::AnchorErrors::invalid_anchored_alias(stream);
+    EnhancedError::new(base)
     .with_code(ErrorCode::E004)
     .with_note("Anchors are not allowed on alias nodes.")
 }
