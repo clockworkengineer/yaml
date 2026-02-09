@@ -75,3 +75,12 @@ pub fn expected_scalar_eof(source: &mut dyn ISource) -> YamlError {
         "Expected scalar, got EOF",
     )
 }
+
+/// Centralized error: Empty token name (e.g., empty tag/anchor/alias)
+///
+/// Behavior-neutral: constructs the same syntax error using the provided
+/// message text (e.g., "Empty tag name"). This keeps the exact output
+/// unchanged while routing construction through this helper.
+pub fn empty_token_name(source: &mut dyn ISource, message: &'static str) -> YamlError {
+    crate::parser::document::error_builder::syntax_error(source, message)
+}
