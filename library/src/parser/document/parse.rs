@@ -284,6 +284,21 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
                     _ => true,
                 });
                 if nodes.len() > 1 && all_complete {
+                    // TD5N: If a document consists of a top-level block sequence
+                    // immediately followed by a top-level plain scalar without an
+                    // explicit '---' separator, this is invalid. Return a structured
+                    // error instead of splitting into multiple documents.
+                    if let (Some(Node::Array(items)), Some(Node::Str(_, crate::nodes::node::QuoteType::Unquoted, _))) =
+                        (nodes.get(0), nodes.get(1))
+                    {
+                        let prev_all_plain = items.len() >= 2
+                            && items.iter().all(|it| matches!(it, Node::Str(_, crate::nodes::node::QuoteType::Unquoted, _)));
+                        if prev_all_plain {
+                            return Err(crate::parser::document::token_errors::document_unexpected_plain_after_top_level_sequence(
+                                source,
+                            ));
+                        }
+                    }
                     // If multiple nodes are returned but all except one are empty structures,
                     // keep only the non-empty one to avoid emitting spurious empty documents
                     let mut non_empty: Vec<&Node> = nodes

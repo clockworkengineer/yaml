@@ -84,14 +84,16 @@ fn parse_document_main_loop(
                 // document separator, reject early.
                 if node_start_indent == indent_level {
                     if let Some(prev) = document_nodes.last() {
-                        if let Node::Array(items) = prev {
-                            let prev_all_plain = items.len() >= 2
-                                && items.iter().all(|it| match it {
-                                    Node::Str(_, QuoteType::Unquoted, _) => true,
-                                    _ => false,
-                                });
-                            if prev_all_plain {
-                                if matches!(source.current(), Some(ch) if ch.is_alphanumeric()) {
+                        if let Node::Array(_items) = prev {
+                            // Token-level check: if the next token is a Plain scalar
+                            // at the same top-level indent, reject (TD5N).
+                            let st = source.save_state();
+                            if let Ok(mut ts) =
+                                crate::parser::token_stream::TokenStream::new(source, directives, false)
+                            {
+                                let _ = ts.skip_trivia();
+                                if matches!(ts.current(), Some(crate::parser::lexer::Token::Plain(_))) {
+                                    source.restore_state(st);
                                     return Err(
                                         crate::parser::document::token_errors::document_unexpected_plain_after_top_level_sequence(
                                             source,
@@ -99,6 +101,7 @@ fn parse_document_main_loop(
                                     );
                                 }
                             }
+                            source.restore_state(st);
                         }
                     }
                 }
@@ -109,14 +112,9 @@ fn parse_document_main_loop(
                 // usages in our integration tests.
                 if !node.is_blank() {
                     if let Some(prev) = document_nodes.last() {
-                        if let Node::Array(items) = prev {
+                        if let Node::Array(_items) = prev {
                             let at_top_level = node_start_indent == indent_level;
-                            let prev_all_plain = items.len() >= 2
-                                && items.iter().all(|it| match it {
-                                    Node::Str(_, QuoteType::Unquoted, _) => true,
-                                    _ => false,
-                                });
-                            if at_top_level && prev_all_plain {
+                            if at_top_level {
                                 if let Node::Str(_, QuoteType::Unquoted, _) = &node {
                                     return Err(
                                         crate::parser::document::token_errors::document_unexpected_plain_after_top_level_sequence(
@@ -259,6 +257,9 @@ pub fn parse_document(
             }
         }
     }
+    // TD5N structural validation handled in stream parse when consolidating
+    // top-level nodes; avoid document-level checks that can falsely flag
+    // valid explicit-key constructs like LX3P.
     let normalized_nodes = normalize_document_nodes(&document_nodes);
     let doc_node = Document(normalized_nodes);
     #[cfg(feature = "debug-trace")]
