@@ -101,10 +101,12 @@ pub(crate) fn parse_explicit_mapping_entry(
     if !is_explicit_key_start(stream) {
         // Use stream.current() for error context since TokenStream.lexer is private
         let cur = stream.current().cloned();
-        return Err(error_helpers::syntax_error(
-            stream.source_mut(),
-            &format!("Expected '?' token for explicit key, got {:?}", cur),
-        ));
+        return Err(
+            crate::parser::document::mapping_errors::expected_explicit_key_token(
+                stream,
+                cur,
+            ),
+        );
     }
     stream.next()?;
     stream.skip_trivia()?;

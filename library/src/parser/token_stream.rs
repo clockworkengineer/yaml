@@ -324,17 +324,18 @@ impl<'a> TokenStream<'a> {
             match self.current() {
                 Some(Token::Tag(tag_str)) => {
                     if decorators.tag.is_some() {
-                        return Err(crate::parser::document::error_builder::syntax_error(
+                        return Err(crate::parser::document::token_errors::duplicate_tag_found(
                             self.source_mut(),
-                            "Duplicate tag found",
                         ));
                     }
                     // Validate explicit tag handle usage against current document directives.
                     if let Err(e) = self._directives.validate_tag_handle_usage(tag_str.as_str()) {
-                        return Err(crate::parser::document::error_builder::syntax_error(
-                            self.source_mut(),
-                            &e.to_string(),
-                        ));
+                        return Err(
+                            crate::parser::document::token_errors::invalid_tag_handle_usage(
+                                self.source_mut(),
+                                &e.to_string(),
+                            ),
+                        );
                     }
                     // Preserve raw tag handle; resolve later in value parsing
                     decorators.tag = Some(tag_str.clone());
@@ -342,10 +343,11 @@ impl<'a> TokenStream<'a> {
                 }
                 Some(Token::Anchor(name)) => {
                     if decorators.anchor.is_some() {
-                        return Err(crate::parser::document::error_builder::syntax_error(
-                            self.source_mut(),
-                            "Duplicate anchor found",
-                        ));
+                        return Err(
+                            crate::parser::document::token_errors::duplicate_anchor_found(
+                                self.source_mut(),
+                            ),
+                        );
                     }
                     decorators.anchor = Some(name.clone());
                     self.next()?;

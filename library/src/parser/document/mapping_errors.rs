@@ -1,5 +1,6 @@
 use crate::parser::token_stream::TokenStream;
 use crate::error::enhanced::{EnhancedError, ErrorCode};
+use crate::error::YamlError;
 
 /// Centralized error: Mapping key without value (expected value after colon)
 ///
@@ -65,4 +66,25 @@ pub fn multiple_anchors_on_mapping_key(stream: &mut TokenStream) -> EnhancedErro
     ))
     .with_code(ErrorCode::E005)
     .with_note("A key can only have one anchor.")
+}
+
+/// Centralized error: Invalid content immediately after quoted scalar within mapping value
+///
+/// Behavior-neutral: preserves exact message text and error type.
+pub fn invalid_trailing_plain_text_after_quoted_scalar(stream: &mut TokenStream) -> YamlError {
+    crate::parser::document::error_builder::syntax_error(
+        stream.source_mut(),
+        "Invalid content immediately after quoted scalar: trailing plain text on the same line is not allowed",
+    )
+}
+
+/// Centralized error: Expected '?' token for explicit key, got {cur}
+pub fn expected_explicit_key_token(
+    stream: &mut TokenStream,
+    cur: Option<crate::parser::lexer::Token>,
+) -> YamlError {
+    crate::parser::document::error_builder::syntax_error(
+        stream.source_mut(),
+        &format!("Expected '?' token for explicit key, got {:?}", cur),
+    )
 }

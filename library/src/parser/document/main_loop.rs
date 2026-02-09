@@ -92,11 +92,11 @@ fn parse_document_main_loop(
                                 });
                             if prev_all_plain {
                                 if matches!(source.current(), Some(ch) if ch.is_alphanumeric()) {
-                                    use crate::parser::document::error_builder::structure_error;
-                                    return Err(structure_error(
-                                        source,
-                                        "Unexpected plain scalar after top-level sequence; missing '---' between documents",
-                                    ));
+                                    return Err(
+                                        crate::parser::document::token_errors::document_unexpected_plain_after_top_level_sequence(
+                                            source,
+                                        ),
+                                    );
                                 }
                             }
                         }
@@ -118,11 +118,11 @@ fn parse_document_main_loop(
                                 });
                             if at_top_level && prev_all_plain {
                                 if let Node::Str(_, QuoteType::Unquoted, _) = &node {
-                                    use crate::parser::document::error_builder::structure_error;
-                                    return Err(structure_error(
-                                        source,
-                                        "Unexpected plain scalar after top-level sequence; missing '---' between documents",
-                                    ));
+                                    return Err(
+                                        crate::parser::document::token_errors::document_unexpected_plain_after_top_level_sequence(
+                                            source,
+                                        ),
+                                    );
                                 }
                             }
                         }

@@ -923,10 +923,11 @@ impl<'a> Lexer<'a> {
                 }
                 None => {
                     lexer_debug!("Unterminated single-quoted string: reached EOF");
-                    return Err(error_helpers::syntax_error(
-                        self.source,
-                        "YAML compliance error: Unterminated single-quoted string (unexpected EOF)",
-                    ));
+                    return Err(
+                        crate::parser::document::token_errors::unterminated_single_quoted_eof(
+                            self.source,
+                        ),
+                    );
                 }
             }
         }
@@ -1049,10 +1050,11 @@ impl<'a> Lexer<'a> {
                                         self.source.next();
                                     }
                                     _ => {
-                                        return Err(error_helpers::syntax_error(
-                                            self.source,
-                                            "YAML compliance error: Invalid \\x escape sequence, expected 2 hex digits",
-                                        ));
+                                        return Err(
+                                            crate::parser::document::token_errors::invalid_escape_x_expected_2_hex(
+                                                self.source,
+                                            ),
+                                        );
                                     }
                                 }
                             }
@@ -1070,10 +1072,11 @@ impl<'a> Lexer<'a> {
                                         self.source.next();
                                     }
                                     _ => {
-                                        return Err(error_helpers::syntax_error(
-                                            self.source,
-                                            "YAML compliance error: Invalid \\u escape sequence, expected 4 hex digits",
-                                        ));
+                                        return Err(
+                                            crate::parser::document::token_errors::invalid_escape_u_expected_4_hex(
+                                                self.source,
+                                            ),
+                                        );
                                     }
                                 }
                             }
@@ -1081,13 +1084,12 @@ impl<'a> Lexer<'a> {
                             match char::from_u32(code) {
                                 Some(ch) => content.push(ch),
                                 None => {
-                                    return Err(error_helpers::syntax_error(
-                                        self.source,
-                                        &format!(
-                                            "YAML compliance error: Invalid unicode codepoint U+{:04X}",
-                                            code
+                                    return Err(
+                                        crate::parser::document::token_errors::invalid_unicode_codepoint_u4(
+                                            self.source,
+                                            code,
                                         ),
-                                    ));
+                                    );
                                 }
                             }
                         }
@@ -1102,10 +1104,11 @@ impl<'a> Lexer<'a> {
                                         self.source.next();
                                     }
                                     _ => {
-                                        return Err(error_helpers::syntax_error(
-                                            self.source,
-                                            "YAML compliance error: Invalid \\U escape sequence, expected 8 hex digits",
-                                        ));
+                                        return Err(
+                                            crate::parser::document::token_errors::invalid_escape_U_expected_8_hex(
+                                                self.source,
+                                            ),
+                                        );
                                     }
                                 }
                             }
@@ -1113,34 +1116,33 @@ impl<'a> Lexer<'a> {
                             match char::from_u32(code) {
                                 Some(ch) => content.push(ch),
                                 None => {
-                                    return Err(error_helpers::syntax_error(
-                                        self.source,
-                                        &format!(
-                                            "YAML compliance error: Invalid unicode codepoint U+{:08X}",
-                                            code
+                                    return Err(
+                                        crate::parser::document::token_errors::invalid_unicode_codepoint_u8(
+                                            self.source,
+                                            code,
                                         ),
-                                    ));
+                                    );
                                 }
                             }
                         }
                         // Invalid escape sequences - reject per YAML 1.2 spec
                         Some(c) => {
-                            return Err(error_helpers::syntax_error(
-                                self.source,
-                                &format!(
-                                    "YAML compliance error: Invalid escape sequence '\\{}' in double-quoted string",
-                                    c
+                            return Err(
+                                crate::parser::document::token_errors::invalid_escape_generic(
+                                    self.source,
+                                    c,
                                 ),
-                            ));
+                            );
                         }
                         None => {
                             lexer_debug!(
                                 "Unterminated double-quoted string: reached EOF after escape"
                             );
-                            return Err(error_helpers::syntax_error(
-                                self.source,
-                                "YAML compliance error: Unterminated double-quoted string (unexpected EOF after escape)",
-                            ));
+                            return Err(
+                                crate::parser::document::token_errors::unterminated_double_quoted_eof_after_escape(
+                                    self.source,
+                                ),
+                            );
                         }
                     }
                 }
@@ -1164,10 +1166,11 @@ impl<'a> Lexer<'a> {
                 }
                 None => {
                     lexer_debug!("Unterminated double-quoted string: reached EOF");
-                    return Err(error_helpers::syntax_error(
-                        self.source,
-                        "YAML compliance error: Unterminated double-quoted string (unexpected EOF)",
-                    ));
+                    return Err(
+                        crate::parser::document::token_errors::unterminated_double_quoted_eof(
+                            self.source,
+                        ),
+                    );
                 }
             }
         }

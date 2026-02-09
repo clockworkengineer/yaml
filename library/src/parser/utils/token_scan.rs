@@ -25,10 +25,7 @@ where
         name.pop();
     }
     if name.is_empty() {
-        return Err(crate::parser::document::error_builder::syntax_error(
-            source,
-            empty_error,
-        ));
+        return Err(crate::parser::document::token_errors::empty_token_name(source, empty_error));
     }
     Ok(token_constructor(name))
 }

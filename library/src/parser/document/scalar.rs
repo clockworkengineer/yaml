@@ -295,10 +295,12 @@ pub(crate) fn parse_scalar_with_tokens(
         Some(Token::SingleQuoted(s)) => parse_single_quoted_scalar(stream, &s),
         Some(Token::DoubleQuoted(s)) => parse_double_quoted_scalar(stream, &s),
         Some(Token::Plain(s)) => parse_scalar_dispatch(stream, &s, directives),
-        _ => Err(syntax_error(
-            stream.source_mut(),
-            &format!("Expected a scalar token, got {}", current_token_str),
-        )),
+        _ => Err(
+            crate::parser::document::token_errors::expected_scalar_token(
+                stream.source_mut(),
+                &current_token_str,
+            ),
+        ),
     }
 }
 // Module: parser/document/scalar.rs

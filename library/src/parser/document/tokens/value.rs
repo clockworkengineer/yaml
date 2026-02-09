@@ -367,7 +367,10 @@ pub fn parse_value_with_tokens(
                     // a local tag resolution.
                     directives
                         .validate_tag_handle_usage(tag_raw_ref)
-                        .map_err(|e| syntax_error(stream.source_mut(), &e.to_string()))?;
+                        .map_err(|e| crate::parser::document::token_errors::invalid_tag_handle_usage(
+                            stream.source_mut(),
+                            &e.to_string(),
+                        ))?;
                     let resolved = directives.resolve_tag(tag_raw_ref);
                     if let Some(coerced) = try_coerce_tag(&resolved, result.clone()) {
                         result = coerced;
@@ -445,7 +448,10 @@ pub fn parse_value_with_tokens(
             // QLJ7: Enforce that explicit handles are declared via %TAG
             directives
                 .validate_tag_handle_usage(tag_raw_ref)
-                .map_err(|e| syntax_error(stream.source_mut(), &e.to_string()))?;
+                .map_err(|e| crate::parser::document::token_errors::invalid_tag_handle_usage(
+                    stream.source_mut(),
+                    &e.to_string(),
+                ))?;
             let tag_resolved = directives.resolve_tag(tag_raw_ref);
             if tag_resolved == "!!str"
                 || tag_resolved == "!str"
@@ -684,10 +690,18 @@ fn parse_value_content(
             Ok(Node::None)
         }
         Some(token) => {
-            let token_str = format!("Unexpected token in value: {:?}", token);
+            let tok = token.clone();
             #[cfg(feature = "debug-trace")]
-            log::debug!("value_tokens: error -> {}", token_str);
-            Err(syntax_error(stream.source_mut(), &token_str))
+            log::debug!(
+                "value_tokens: error -> Unexpected token in value: {:?}",
+                tok
+            );
+            Err(
+                crate::parser::document::token_errors::unexpected_token_in_value(
+                    stream.source_mut(),
+                    &tok,
+                ),
+            )
         }
     }
 }

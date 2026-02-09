@@ -557,10 +557,7 @@ fn parse_mapping_value(
                 use crate::nodes::node::QuoteType;
                 if matches!(quote, QuoteType::Single | QuoteType::Double) {
                     if matches!(stream.current(), Some(Token::Plain(_))) {
-                        return Err(crate::parser::document::error_builder::syntax_error(
-                            stream.source_mut(),
-                            "Invalid content immediately after quoted scalar: trailing plain text on the same line is not allowed",
-                        ));
+                        return Err(crate::parser::document::mapping_errors::invalid_trailing_plain_text_after_quoted_scalar(stream));
                     }
                 }
             }
