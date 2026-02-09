@@ -493,9 +493,8 @@ impl<'a> TokenStream<'a> {
                 let _ = self.consume_if(Token::Colon)?;
                 Ok(true)
             }
-            _ => Err(crate::parser::document::error_builder::expected_error(
+            _ => Err(crate::parser::document::flow_punctuation::expected_colon_in_flow_mapping(
                 self.source_mut(),
-                ": in flow mapping",
             )),
         }
     }

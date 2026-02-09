@@ -125,3 +125,11 @@ pub fn invalid_content_immediately_after_flow_closer(
         ),
     )
 }
+
+/// Centralized error: Expected ':' in flow mapping.
+///
+/// Wraps the existing `expected_error` message text used by callers to ensure
+/// behavior-neutral DRY routing for colon expectations in flow mappings.
+pub fn expected_colon_in_flow_mapping(source: &mut dyn ISource) -> YamlError {
+    crate::parser::document::error_builder::expected_error(source, ": in flow mapping")
+}

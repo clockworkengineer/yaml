@@ -51,6 +51,7 @@ To remove duplication around common flow collection errors, flow punctuation err
 
   - Sequence: "Expected comma or ] in flow sequence"
   - Mapping: "Expected comma or } in flow mapping"
+  - Expected ':' in flow mappings via `flow_punctuation::expected_colon_in_flow_mapping`, with callers (e.g., `TokenStream::consume_single_colon`) routed to the helper to preserve message text while reducing duplication
 
 Integrations:
   - Inline parsers now leverage `ensure_separator_or_end(...)` to validate the token following a flow item/entry, while keeping consumption logic unchanged.
@@ -60,7 +61,6 @@ Integrations:
     - `unexpected_eof_in_flow_mapping_unclosed(...)`
     - `invalid_bare_dash_entries_in_flow_sequence(...)` (keeps "Invalid use of '-' indicators inside flow sequence")
     All messages remain identical to previous strings.
-- Centralized EOF handling for flow sequence unclosed `[` via `flow_punctuation::unexpected_eof_in_flow_sequence()`; replaced direct `eof_error("flow sequence")` call in `inline_tokens.rs` without changing message text.
 
 Behavior note: This refactor is strictly behavior-neutral. Messages and decision points remain identical; the centralization aims to make future punctuation policy adjustments safer and localized.
 
