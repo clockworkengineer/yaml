@@ -132,6 +132,29 @@ fn parse_document_main_loop(
             }
         }
     }
+    // Final TD5N guard: if the document ends immediately after a top-level
+    // block sequence and the next non-trivia content at the same indent is a
+    // plain scalar (without an explicit '---' separator), reject.
+    if let Some(Node::Array(_)) = document_nodes.last() {
+        // Peek ahead using TokenStream without consuming the source
+        let st = source.save_state();
+        if let Ok(mut ts) = crate::parser::token_stream::TokenStream::new(source, directives, false) {
+            let _ = ts.skip_trivia();
+            if matches!(ts.current(), Some(crate::parser::lexer::Token::Plain(_))) {
+                // Ensure we are at the same top-level indent
+                let ahead_indent = source.get_current_indent_level();
+                if ahead_indent == indent_level {
+                    source.restore_state(st);
+                    return Err(
+                        crate::parser::document::token_errors::document_unexpected_plain_after_top_level_sequence(
+                            source,
+                        ),
+                    );
+                }
+            }
+        }
+        source.restore_state(st);
+    }
     Ok(document_nodes)
 }
 
@@ -309,5 +332,19 @@ mod tests {
             "8XDJ should now be rejected as invalid at the document level, but got: {:?}",
             doc
         );
+    }
+
+    #[test]
+    fn debug_td5n_document_nodes() {
+        let yaml = b"- item1\n- item2\ninvalid\n";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let doc = parse_document(&mut source, 0, &directives).unwrap();
+        if let Document(nodes) = doc {
+            println!("TD5N document nodes: {:#?}", nodes);
+            assert!(nodes.len() >= 1);
+        } else {
+            panic!("Expected Document node");
+        }
     }
 }

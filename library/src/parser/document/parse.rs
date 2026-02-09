@@ -221,6 +221,57 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
         }
         // Ensure we start the document after any trailing blank lines/comments following markers
         crate::utils::skip_whitespace_and_comments(source);
+        // Early TD5N detection: If the upcoming document starts with a top-level
+        // block sequence of plain scalars and is immediately followed by a
+        // top-level plain scalar without an explicit '---', reject narrowly.
+        {
+            let st_td5n = source.save_state();
+            let mut td5n_seq_items = 0usize;
+            if let Ok(mut ts_chk) =
+                crate::parser::token_stream::TokenStream::new(source, &directives, false)
+            {
+                // Scan consecutive top-level "- <plain>" items
+                loop {
+                    let _ = ts_chk.skip_trivia();
+                    match ts_chk.current() {
+                        Some(crate::parser::lexer::Token::Dash) => {
+                            // Consume '-' and optional spaces/newlines
+                            let _ = ts_chk.next();
+                            // After dash, allow optional Indent at same level (0) and Plain
+                            // Skip only newlines/comments here to stay on same logical line or next item line
+                            let _ = ts_chk.skip_newlines_and_comments();
+                            match ts_chk.current() {
+                                Some(crate::parser::lexer::Token::Plain(_)) => {
+                                    td5n_seq_items += 1;
+                                    // Consume the plain token
+                                    let _ = ts_chk.next();
+                                    // Continue scanning for next dash at same level
+                                    continue;
+                                }
+                                _ => {
+                                    break;
+                                }
+                            }
+                        }
+                        _ => break,
+                    }
+                }
+                // After scanning sequence items, if we saw at least two items,
+                // check for an immediate top-level plain scalar without dash.
+                let _ = ts_chk.skip_trivia();
+                if td5n_seq_items >= 2 {
+                    if matches!(ts_chk.current(), Some(crate::parser::lexer::Token::Plain(_))) {
+                        source.restore_state(st_td5n);
+                        return Err(
+                            crate::parser::document::token_errors::document_unexpected_plain_after_top_level_sequence(
+                                source,
+                            ),
+                        );
+                    }
+                }
+            }
+            source.restore_state(st_td5n);
+        }
         let document = parse_document(source, 0, &directives);
 
         // After parsing document, check for invalid trailing content before doc end
