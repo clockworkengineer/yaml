@@ -502,20 +502,14 @@ fn ensure_progress(
             stream.current(),
             None | Some(crate::parser::lexer::Token::Eof)
         ) {
-            return Err(crate::parser::document::error_builder::syntax_error(
+            return Err(crate::parser::document::token_errors::parser_did_not_advance_syntax(
                 stream.source_mut(),
-                &format!(
-                    "Syntax error: Parser did not advance when parsing {} (possible malformed input)",
-                    context
-                ),
+                context,
             ));
         } else {
-            return Err(crate::parser::document::error_builder::structure_error(
+            return Err(crate::parser::document::token_errors::parser_did_not_advance_structure(
                 stream.source_mut(),
-                &format!(
-                    "Parser did not advance when parsing {} (possible malformed input)",
-                    context
-                ),
+                context,
             ));
         }
     }
