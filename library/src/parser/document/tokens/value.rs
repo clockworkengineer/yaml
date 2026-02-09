@@ -347,6 +347,19 @@ pub fn parse_value_with_tokens(
                 ),
             );
         }
+        // U99R: Disallow a comma immediately after a tag in block context.
+        // In block (non-flow) context, ',' is not a valid value separator.
+        // "- !!str, xxx" should be a syntax error, not an empty value.
+        if matches!(stream.current(), Some(Token::Comma))
+            && stream.current_flow_depth() == 0
+            && match decorators.tag.as_ref() { Some(t) => !t.starts_with("!<"), None => true }
+        {
+            return Err(
+                crate::parser::document::token_errors::unexpected_comma_after_tag_in_block_value(
+                    stream.source_mut(),
+                ),
+            );
+        }
         match stream.current() {
             Some(Token::Eof)
             | Some(Token::Dash)

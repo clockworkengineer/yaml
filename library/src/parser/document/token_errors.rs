@@ -206,3 +206,11 @@ pub fn document_unexpected_plain_after_top_level_sequence(
         "Unexpected plain scalar after top-level sequence; missing '---' between documents",
     )
 }
+
+/// Unexpected comma after a tag in block context (invalid punctuation)
+pub fn unexpected_comma_after_tag_in_block_value(source: &mut dyn ISource) -> YamlError {
+    crate::parser::document::error_builder::syntax_error(
+        source,
+        "Unexpected comma after tag in block context",
+    )
+}
