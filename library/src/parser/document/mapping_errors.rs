@@ -30,6 +30,23 @@ pub fn invalid_indentation_after_comment_in_mapping_value(
     .with_note("Check for misplaced comments or indentation.")
 }
 
+/// Centralized error: Invalid indentation extending a completed mapping value
+///
+/// This occurs when additional indentation appears after a key whose value is
+/// already complete on the same line. YAML requires nested content to follow
+/// a key with an omitted value; indented content cannot extend a completed
+/// scalar value.
+pub fn invalid_indentation_extending_completed_mapping_value(
+    stream: &mut TokenStream,
+) -> EnhancedError {
+    EnhancedError::new(crate::parser::document::error_builder::mapping_key_error_yaml(
+        stream.source_mut(),
+        "Invalid indentation: indented content cannot extend a completed mapping value",
+    ))
+    .with_code(ErrorCode::E010)
+    .with_note("Ensure nested content follows keys with omitted values (e.g., 'key:\n  nested: 1').")
+}
+
 /// Centralized error: Inconsistent dedent within nested mapping value for keys
 ///
 /// Returns an EnhancedError with code E009, matching existing behavior and text.
@@ -42,6 +59,21 @@ pub fn inconsistent_dedent_within_mapping_value_for_keys(
     ))
     .with_code(ErrorCode::E009)
     .with_note("Ensure all keys under the nested mapping use the same indentation.")
+}
+
+/// Centralized error: Dedent below base indent within a mapping value
+///
+/// This indicates a key appearing at an indentation less than the parent mapping's
+/// base indent, which is invalid for YAML block mappings.
+pub fn inconsistent_dedent_below_base_indent_in_mapping(
+    stream: &mut TokenStream,
+) -> EnhancedError {
+    EnhancedError::new(crate::parser::document::error_builder::mapping_key_error_yaml(
+        stream.source_mut(),
+        "Invalid indentation for mapping key: dedent below the base indent is not allowed",
+    ))
+    .with_code(ErrorCode::E009)
+    .with_note("Keys in a block mapping must align at or above the parent mapping's indent.")
 }
 
 /// Centralized error: Invalid anchored alias key (anchors cannot be applied to alias nodes)

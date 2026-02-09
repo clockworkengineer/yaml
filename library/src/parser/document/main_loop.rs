@@ -162,6 +162,10 @@ pub fn parse_document(
     crate::utils::skip_whitespace_and_comments(source);
     let document_nodes = parse_document_main_loop(source, indent_level, directives)?;
 
+    // (Reverted) TD5N post-parse guard removed to preserve baseline behavior; top-level
+    // sequence followed by a plain scalar remains allowed unless caught by existing
+    // in-loop checks.
+
     // QLJ7: Validate that any explicit tag handles used within this document
     // are defined via a %TAG directive for this document. Tag handles do not
     // carry over across documents.

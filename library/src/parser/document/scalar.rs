@@ -163,6 +163,9 @@ fn parse_block_scalar(
     let mut blank_lines_before_content: usize = 0;
     let mut pending_indent_for_line: Option<usize> = None;
     let mut saw_plain_current_line: bool = false;
+    // Track if a comment appears before the first content line; used only
+    // for diagnostics in debug builds.
+    let mut comment_before_first_content: bool = false;
     loop {
         match stream.current() {
             Some(Token::Indent(level)) => {
@@ -234,6 +237,9 @@ fn parse_block_scalar(
                 saw_plain_current_line = false;
             }
             Some(Token::Comment(_)) => {
+                if first_content_indent.is_none() {
+                    comment_before_first_content = true;
+                }
                 stream.next()?;
             }
             Some(Token::Eof) => {

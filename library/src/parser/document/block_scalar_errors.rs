@@ -7,6 +7,7 @@ use crate::parser::document::error_builder::{indentation_error, syntax_error};
 pub struct BlockScalarErrors;
 
 impl BlockScalarErrors {
+
     /// Unexpected trailing text immediately after '|' or '>' in block scalar header.
     pub fn invalid_header_unexpected_text(source: &mut dyn ISource) -> YamlError {
         syntax_error(
@@ -35,4 +36,5 @@ impl BlockScalarErrors {
         );
         indentation_error(source, &msg)
     }
+
 }

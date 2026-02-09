@@ -27,6 +27,7 @@ pub mod node_utils;
 mod parse;
 mod scalar;
 mod sequence;
+pub mod token_errors;
 mod tokens;
 mod value;
 
