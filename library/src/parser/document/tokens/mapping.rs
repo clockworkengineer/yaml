@@ -586,7 +586,26 @@ fn parse_mapping_value(
         _ => {
             stream.skip_trivia()?;
             let v = parse_value_with_tokens(stream, directives, depth + 1)?;
-            // Low-hanging fix (Q4CL): After a quoted scalar value, disallow trailing plain text on the same line.
+            // Guard: In block mappings, a scalar value must not be followed
+            // by a ':' on the same line, which would start a new key inline
+            // (e.g., ZCZ6: "a: b: c"). Keys in block style must begin on a
+            // new line with proper indentation.
+            // Scope: Only trigger when at top flow depth (not inside a flow
+            // collection) and the next token is a colon immediately.
+            if stream.current_flow_depth() == 0 {
+                if matches!(stream.current(), Some(Token::Colon)) {
+                    return Err(
+                        crate::parser::document::mapping_errors::invalid_inline_mapping_chain_in_block_value(
+                            stream,
+                        ),
+                    );
+                }
+            }
+            // Note: Inline key chaining (e.g., "a: b: c") is handled by
+            // the tokenizer and higher-level mapping logic. Do not reject
+            // a colon here without checking line boundaries, to avoid
+            // false positives in explicit-key constructs.
+            // Additional guard: quoted scalar cannot be followed by trailing plain text on the same line.
             if let Node::Str(_, quote, _) = &v {
                 use crate::nodes::node::QuoteType;
                 if matches!(quote, QuoteType::Single | QuoteType::Double) {
