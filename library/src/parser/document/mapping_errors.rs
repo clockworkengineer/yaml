@@ -110,18 +110,6 @@ pub fn invalid_trailing_plain_text_after_quoted_scalar(stream: &mut TokenStream)
     )
 }
 
-/// Centralized error: Invalid inline mapping chain in block value
-///
-/// Occurs when a scalar value in a block mapping is followed by a ':'
-/// on the same line, which would start a new key inline. YAML requires
-/// new keys to begin on a new line with proper indentation in block style.
-pub fn invalid_inline_mapping_chain_in_block_value(stream: &mut TokenStream) -> YamlError {
-    crate::parser::document::error_builder::syntax_error(
-        stream.source_mut(),
-        "Invalid block mapping: colon after scalar value on the same line is not allowed",
-    )
-}
-
 /// Centralized error: Expected '?' token for explicit key, got {cur}
 pub fn expected_explicit_key_token(
     stream: &mut TokenStream,
