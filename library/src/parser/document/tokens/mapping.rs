@@ -471,6 +471,14 @@ impl MappingParseContext {
 
         // Default: parse value
         let value = parse_mapping_value(stream, directives, cur_indent, depth, explicit_key, &key)?;
+        // Option 1: Reject nested ':' immediately after a scalar mapping value
+        // on the same line. Exempt block scalars (|, >). Limit to plain/quoted
+        // scalars to avoid false positives for inline collections.
+        if matches!(value, Node::Str(_, _, BlockStyle::None)) {
+            if stream.is_colon_on_same_line() {
+                return Err(crate::parser::document::mapping_errors::nested_key_separator_in_block_value_same_line(stream));
+            }
+        }
         #[cfg(feature = "debug-trace")]
         log::debug!("mapping_pair: return pair = ({:?}, {:?})", key, value);
         Ok((key, value))
@@ -523,11 +531,15 @@ fn apply_decorators_to_key(
     }
     if let Some(anchor) = decorators.anchor {
         if matches!(key_node, Node::Alias(_)) {
-            let err = crate::parser::document::mapping_errors::invalid_anchored_alias_key_on_alias_nodes(stream);
+            let err =
+                crate::parser::document::mapping_errors::invalid_anchored_alias_key_on_alias_nodes(
+                    stream,
+                );
             return Err(err.to_string().into());
         }
         if matches!(key_node, Node::Anchored(_, _)) {
-            let err = crate::parser::document::mapping_errors::multiple_anchors_on_mapping_key(stream);
+            let err =
+                crate::parser::document::mapping_errors::multiple_anchors_on_mapping_key(stream);
             return Err(err.to_string().into());
         }
         key_node = Node::Anchored(Box::new(key_node), anchor);

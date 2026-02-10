@@ -112,6 +112,16 @@ pub fn invalid_trailing_plain_text_after_quoted_scalar(stream: &mut TokenStream)
 
 // Note: Nested ':' after a value on the same line is currently tolerated for
 // compatibility with some suite cases and examples using permissive parsing.
+/// Centralized error: Nested key separator ':' encountered immediately after a block mapping value on the same line
+///
+/// Rejects patterns like `a: b: c` or `a: 'b': c` in block context, which
+/// incorrectly introduce a second key-value separator on the same line.
+pub fn nested_key_separator_in_block_value_same_line(stream: &mut TokenStream) -> YamlError {
+    crate::parser::document::error_builder::syntax_error(
+        stream.source_mut(),
+        "Invalid mapping value: unexpected ':' immediately after value on the same line",
+    )
+}
 
 /// Centralized error: Expected '?' token for explicit key, got {cur}
 pub fn expected_explicit_key_token(

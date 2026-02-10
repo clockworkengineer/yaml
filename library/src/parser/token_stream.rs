@@ -26,6 +26,10 @@ pub struct TokenStream<'a> {
     // Track the last token that was consumed; useful for distinguishing
     // standalone comment lines from inline comments.
     last_token: Option<Token>,
+    // Line tracking: current logical line index (increments on Newline)
+    current_line_index: usize,
+    // Line index of the last consumed content scalar (Plain/Quoted)
+    last_content_line_index: Option<usize>,
 }
 
 // Env-controlled logging for token stream internals
@@ -68,6 +72,8 @@ impl<'a> TokenStream<'a> {
             // and is updated as we consume tokens via `next()`.
             flow_depth: 0,
             last_token: None,
+            current_line_index: 0,
+            last_content_line_index: None,
         };
         #[cfg(feature = "debug-trace")]
         ts_log(format!("token_stream: new -> current = {:?}", ts.current()));
@@ -108,6 +114,20 @@ impl<'a> TokenStream<'a> {
                     // Leaving a flow collection; if depth reaches 0,
                     // revert to block (non-flow) context.
                     self.flow_depth = (self.flow_depth - 1).max(0);
+                }
+                Token::Newline => {
+                    // Advance logical line index when consuming a newline.
+                    self.current_line_index = self.current_line_index.saturating_add(1);
+                }
+                Token::Plain(_)
+                | Token::SingleQuoted(_)
+                | Token::DoubleQuoted(_) => {
+                    // Record the line index of the last content scalar.
+                    self.last_content_line_index = Some(self.current_line_index);
+                }
+                Token::DocumentStart | Token::DocumentEnd => {
+                    // Reset content association at document boundaries.
+                    self.last_content_line_index = None;
                 }
                 _ => {}
             }
@@ -388,6 +408,36 @@ impl<'a> TokenStream<'a> {
     /// Check if we're at end of stream
     pub fn at_eof(&self) -> bool {
         matches!(self.current(), Some(Token::Eof) | None)
+    }
+
+    /// Returns true if the current token is a `:` that appears on the
+    /// same logical line as the previously consumed content token.
+    ///
+    /// This relies on `last_token` tracking and treats any intervening
+    /// line boundary tokens (`Newline`, `Indent`) as evidence that the
+    /// colon is on a subsequent line. Document markers also reset the
+    /// line association.
+    #[inline]
+    pub fn is_colon_on_same_line(&self) -> bool {
+        if !matches!(self.current(), Some(Token::Colon)) {
+            return false;
+        }
+        // Do not treat flow contexts as candidates for nested ':' detection.
+        if self.in_flow() {
+            return false;
+        }
+        // Require that the most recent content scalar was consumed on the
+        // same logical line as the current colon AND that the immediately
+        // preceding token was a scalar (plain or quoted). This avoids
+        // misclassifying flow punctuation or explicit-key constructs.
+        let same_line = matches!(self.last_content_line_index, Some(idx) if idx == self.current_line_index);
+        if !same_line {
+            return false;
+        }
+        matches!(
+            self.last_token,
+            Some(Token::Plain(_)) | Some(Token::SingleQuoted(_)) | Some(Token::DoubleQuoted(_))
+        )
     }
 
     /// Consume a plain scalar token

@@ -123,14 +123,14 @@ pub fn parse_inline_sequence_with_tokens(
         skip_inline_trivia(stream)?;
 
         match stream.current() {
-                Some(Token::FlowSequenceEnd) => {
+            Some(Token::FlowSequenceEnd) => {
                 // Closing bracket - done
                 let _ = stream.consume_flow_sequence_end()?;
                 // If at top-level (depth == 0), check for extra closing bracket (4H7K)
                 if depth == 0 {
                     skip_inline_trivia(stream)?;
                     if matches!(stream.current(), Some(Token::FlowSequenceEnd)) {
-                            return Err(crate::parser::document::flow_punctuation::unexpected_extra_closing_bracket_in_flow_sequence(stream));
+                        return Err(crate::parser::document::flow_punctuation::unexpected_extra_closing_bracket_in_flow_sequence(stream));
                     }
                 }
                 break;
@@ -138,7 +138,7 @@ pub fn parse_inline_sequence_with_tokens(
             Some(Token::Comma) => {
                 if expect_item {
                     // Comma found when expecting an item: leading or double comma
-                        return Err(crate::parser::document::flow_punctuation::leading_or_double_comma_in_flow_sequence(stream));
+                    return Err(crate::parser::document::flow_punctuation::leading_or_double_comma_in_flow_sequence(stream));
                 }
                 // Allow trailing comma: set to expect next item, but do not error
                 // If immediately followed by ']', the loop will close cleanly
@@ -156,11 +156,13 @@ pub fn parse_inline_sequence_with_tokens(
                 if !expect_item {
                     // Found value without comma separator
                     // DRY: use centralized helper to emit identical error
-                    if let Err(e) = crate::parser::document::flow_punctuation::ensure_separator_or_end(
-                        stream,
-                        crate::parser::document::flow_punctuation::FlowContext::Sequence,
-                        Token::FlowSequenceEnd,
-                    ) {
+                    if let Err(e) =
+                        crate::parser::document::flow_punctuation::ensure_separator_or_end(
+                            stream,
+                            crate::parser::document::flow_punctuation::FlowContext::Sequence,
+                            Token::FlowSequenceEnd,
+                        )
+                    {
                         return Err(e);
                     }
                 }
@@ -501,15 +503,19 @@ fn ensure_progress(
             stream.current(),
             None | Some(crate::parser::lexer::Token::Eof)
         ) {
-            return Err(crate::parser::document::token_errors::parser_did_not_advance_syntax(
-                stream.source_mut(),
-                context,
-            ));
+            return Err(
+                crate::parser::document::token_errors::parser_did_not_advance_syntax(
+                    stream.source_mut(),
+                    context,
+                ),
+            );
         } else {
-            return Err(crate::parser::document::token_errors::parser_did_not_advance_structure(
-                stream.source_mut(),
-                context,
-            ));
+            return Err(
+                crate::parser::document::token_errors::parser_did_not_advance_structure(
+                    stream.source_mut(),
+                    context,
+                ),
+            );
         }
     }
     Ok(())
