@@ -754,45 +754,47 @@ impl<'a> Lexer<'a> {
 
     /// Validate what may follow immediately after a flow closer ('}' or ']')
     /// Consumes any horizontal whitespace; enforces that a comment must be preceded by whitespace.
-    /// Also validates that immediate non-whitespace characters are allowed flow delimiters or line breaks.
+    /// Also validates that the next non-whitespace character is an allowed delimiter or line break.
+    ///
+    /// YAML 1.2 requires that after a flow closer, the next significant character
+    /// be one of: newline, ',', another flow closer ('}', ']'), '#', or ':' (for
+    /// cases like "[a]: 1" where the flow collection is a mapping key). Any other
+    /// immediate content on the same line is invalid, even if separated by spaces.
     fn validate_post_flow_closer(&mut self, closer: char) -> Result<(), crate::error::YamlError> {
-        // Allow any horizontal whitespace before comment
-        let mut seen_whitespace = false;
+        // Allow horizontal whitespace
+        let mut saw_whitespace = false;
         while let Some(c) = self.source.current() {
             if c == ' ' || c == '\t' {
-                seen_whitespace = true;
+                saw_whitespace = true;
                 self.source.next();
             } else {
                 break;
             }
         }
+        // If a comment follows, it must be preceded by whitespace
         if let Some('#') = self.source.current() {
-            if !seen_whitespace {
+            if !saw_whitespace {
                 return Err(crate::parser::document::comment_errors::CommentErrors::comment_must_be_preceded_by_whitespace_after_flow_closer(
                     self.source,
                     closer,
                 ));
             }
         }
-        // Validate next non-whitespace char - must be newline, flow indicator, or EOF
+        // Validate next non-whitespace character regardless of whether whitespace was seen
         if let Some(c) = self.source.current() {
-            if !seen_whitespace
-                && c != '\n'
-                && c != '\r'
-                && c != ','
-                && c != ']'
-                && c != '}'
-                && c != '#'
-                && c != ':'
-            {
-                // Check if it's alphanumeric which clearly indicates invalid adjacent content
-                if c.is_alphanumeric() {
-                    return Err(crate::parser::document::flow_punctuation::invalid_content_immediately_after_flow_closer(
-                        self.source,
-                        closer,
-                        c,
-                    ));
-                }
+            let is_allowed = c == '\n'
+                || c == '\r'
+                || c == ','
+                || c == ']'
+                || c == '}'
+                || c == '#'
+                || c == ':';
+            if !is_allowed {
+                return Err(crate::parser::document::flow_punctuation::invalid_content_immediately_after_flow_closer(
+                    self.source,
+                    closer,
+                    c,
+                ));
             }
         }
         Ok(())

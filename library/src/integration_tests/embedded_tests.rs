@@ -43,6 +43,12 @@ enabled: true
 int32_val: 42
 int64_val: 9223372036854775807
 float_val: 3.14159
+"#;
+        let mut source = BufferSource::new(yaml.as_bytes());
+        match parse(&mut source) {
+            Ok(doc) => {
+                // Unwrap to the first top-level node
+                let mut node = &doc;
                 loop {
                     match node {
                         Node::Document(nodes) | Node::Documents(nodes) => {
@@ -55,68 +61,27 @@ float_val: 3.14159
                         _ => break,
                     }
                 }
-                #[cfg(feature = "debug-trace")]
-                println!("DEBUG: Unwrapped node type: {:?}", node);
-                // Print keys and their types/lengths
-                if let Node::Mapping(pairs) = node {
-                    for (_k, _v) in pairs {
-                        #[cfg(feature = "debug-trace")]
-                        println!(
-                            "DEBUG: Key: {:?}, Value: {:?}, Value len: {:?}",
-                            _k,
-                            _v,
-                            _v.len()
-                        );
-                    }
+                // Validate numeric conversions
+                if let Some(n) = node.get_key("int32_val") {
+                    assert_eq!(n.as_i32(), Some(42));
+                } else {
+                    panic!("Missing key: int32_val");
                 }
-                // Check array
-                if let Some(arr) = node.get_key("array") {
-                    #[cfg(feature = "debug-trace")]
-                    println!("DEBUG: array: {:?}, len: {:?}", arr, arr.len());
-                    assert!(arr.is_sequence());
-                    assert!(!arr.is_mapping());
-                    assert_eq!(arr.len(), Some(3));
-                    assert!(!arr.is_empty());
+                if let Some(n) = node.get_key("int64_val") {
+                    // 9223372036854775807 does not fit in i32
+                    assert_eq!(n.as_i32(), None);
+                } else {
+                    panic!("Missing key: int64_val");
                 }
-                // Check mapping
-                if let Some(map) = node.get_key("mapping") {
-                    #[cfg(feature = "debug-trace")]
-                    println!("DEBUG: mapping: {:?}, len: {:?}", map, map.len());
-                    assert!(!map.is_sequence());
-                    assert!(map.is_mapping());
-                    assert_eq!(map.len(), Some(2));
-                    assert!(!map.is_empty());
-                }
-                // Check empty array
-                if let Some(empty_arr) = node.get_key("empty_array") {
-                    #[cfg(feature = "debug-trace")]
-                    println!(
-                        "DEBUG: empty_array: {:?}, len: {:?}",
-                        empty_arr,
-                        empty_arr.len()
-                    );
-                    assert!(empty_arr.is_sequence());
-                    assert_eq!(empty_arr.len(), Some(0));
-                    assert!(empty_arr.is_empty());
-                }
-                // Check empty mapping
-                if let Some(empty_map) = node.get_key("empty_mapping") {
-                    #[cfg(feature = "debug-trace")]
-                    println!(
-                        "DEBUG: empty_mapping: {:?}, len: {:?}",
-                        empty_map,
-                        empty_map.len()
-                    );
-                    assert!(empty_map.is_mapping());
-                    assert_eq!(empty_map.len(), Some(0));
-                    assert!(empty_map.is_empty());
+                if let Some(n) = node.get_key("float_val") {
+                    let v = n.as_f32().expect("float_val should be convertible to f32");
+                    assert!((v - 3.14159f32).abs() < 0.0001);
+                } else {
+                    panic!("Missing key: float_val");
                 }
             }
             Err(e) => panic!("Parse error: {}", e),
         }
-    }
-        assert_eq!(arr.get(1).and_then(|n| n.as_i32()), Some(999));
-        assert_eq!(arr.get(2).and_then(|n| n.as_i32()), Some(30));
     }
 
     #[test]
