@@ -62,7 +62,11 @@ fn parse_single_quoted_scalar(
 ) -> crate::parser::ParseResult<Node> {
     use crate::nodes::node::{BlockStyle, Node, QuoteType};
     stream.next()?;
-    Ok(Node::Str(s.to_string(), QuoteType::Single, BlockStyle::None))
+    Ok(Node::Str(
+        s.to_string(),
+        QuoteType::Single,
+        BlockStyle::None,
+    ))
 }
 
 // Extracted double-quoted scalar parsing logic
@@ -248,7 +252,7 @@ fn parse_block_scalar(
             _ => break,
         }
     }
-    
+
     // Loosen blank line indentation rules: allow any number/indentation of blank lines before first content line
     // Only enforce indentation rules on actual content lines, not on blank lines before content
     let indicator = block_header.chars().next().unwrap();

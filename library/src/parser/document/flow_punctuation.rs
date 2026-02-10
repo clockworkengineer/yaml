@@ -1,8 +1,8 @@
+use crate::error::YamlError;
+use crate::io::traits::ISource;
+use crate::parser::ParseResult;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
-use crate::parser::{ParseResult};
-use crate::io::traits::ISource;
-use crate::error::YamlError;
 
 /// Flow contexts that share punctuation expectations
 pub enum FlowContext {
@@ -19,18 +19,14 @@ pub fn expected_separator_or_end_error(
     ctx: FlowContext,
 ) -> crate::error::YamlError {
     match ctx {
-        FlowContext::Sequence => {
-            crate::parser::document::error_builder::syntax_error(
-                stream.source_mut(),
-                "Expected comma or ] in flow sequence",
-            )
-        }
-        FlowContext::Mapping => {
-            crate::parser::document::error_builder::syntax_error(
-                stream.source_mut(),
-                "Expected comma or } in flow mapping",
-            )
-        }
+        FlowContext::Sequence => crate::parser::document::error_builder::syntax_error(
+            stream.source_mut(),
+            "Expected comma or ] in flow sequence",
+        ),
+        FlowContext::Mapping => crate::parser::document::error_builder::syntax_error(
+            stream.source_mut(),
+            "Expected comma or } in flow mapping",
+        ),
     }
 }
 
@@ -84,9 +80,7 @@ pub fn unexpected_eof_in_flow_mapping_unclosed(
 ///
 /// Mirrors existing behavior and message text used in callers
 /// to keep error output identical while centralizing construction.
-pub fn unexpected_eof_in_flow_sequence(
-    _stream: &mut TokenStream,
-) -> crate::error::YamlError {
+pub fn unexpected_eof_in_flow_sequence(_stream: &mut TokenStream) -> crate::error::YamlError {
     // Note: For flow sequence EOF, existing code uses the generic EOF helper
     // without source context. Preserve exact message for neutrality.
     crate::parser::document::error_builder::eof_error("flow sequence")

@@ -226,11 +226,22 @@ impl<'a> Lexer<'a> {
                             }
                             let c1 = self.source.current();
                             // Peek one more to distinguish nested '-' from scalar starting with '-'
-                            let c2 = if c1.is_some() { self.peek_ahead(1) } else { None };
+                            let c2 = if c1.is_some() {
+                                self.peek_ahead(1)
+                            } else {
+                                None
+                            };
                             self.source.restore_state(state);
                             let nested_indicator = match c1 {
                                 Some('-') => match c2 {
-                                    Some(n) if n == CHAR_SPACE || n == CHAR_TAB || n == CHAR_NEWLINE || n == CHAR_CARRIAGE_RETURN => true,
+                                    Some(n)
+                                        if n == CHAR_SPACE
+                                            || n == CHAR_TAB
+                                            || n == CHAR_NEWLINE
+                                            || n == CHAR_CARRIAGE_RETURN =>
+                                    {
+                                        true
+                                    }
                                     None => true,
                                     _ => false,
                                 },
@@ -782,13 +793,8 @@ impl<'a> Lexer<'a> {
         }
         // Validate next non-whitespace character regardless of whether whitespace was seen
         if let Some(c) = self.source.current() {
-            let is_allowed = c == '\n'
-                || c == '\r'
-                || c == ','
-                || c == ']'
-                || c == '}'
-                || c == '#'
-                || c == ':';
+            let is_allowed =
+                c == '\n' || c == '\r' || c == ',' || c == ']' || c == '}' || c == '#' || c == ':';
             if !is_allowed {
                 return Err(crate::parser::document::flow_punctuation::invalid_content_immediately_after_flow_closer(
                     self.source,

@@ -595,6 +595,7 @@ fn parse_mapping_value(
                     }
                 }
             }
+            // Note: Nested ':' after a value on the same line is handled in downstream parsing.
             #[cfg(feature = "debug-trace")]
             log::debug!("mapping_pair: parsed value = {:?}", v);
             Ok(v)

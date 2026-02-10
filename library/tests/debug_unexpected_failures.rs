@@ -1,5 +1,5 @@
-use yaml_lib::parse;
 use yaml_lib::BufferSource;
+use yaml_lib::parse;
 
 #[test]
 fn debug_ugm3_should_succeed() {

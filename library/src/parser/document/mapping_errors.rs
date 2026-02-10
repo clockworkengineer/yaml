@@ -110,6 +110,9 @@ pub fn invalid_trailing_plain_text_after_quoted_scalar(stream: &mut TokenStream)
     )
 }
 
+// Note: Nested ':' after a value on the same line is currently tolerated for
+// compatibility with some suite cases and examples using permissive parsing.
+
 /// Centralized error: Expected '?' token for explicit key, got {cur}
 pub fn expected_explicit_key_token(
     stream: &mut TokenStream,

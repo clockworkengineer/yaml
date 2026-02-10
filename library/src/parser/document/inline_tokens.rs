@@ -239,20 +239,19 @@ pub fn parse_inline_sequence_with_tokens(
         items.len()
     );
     // Special-case invalid flow sequence entries that are bare '-' scalars.
-    // The YAML test suite case G5U8 (`- [-, -]`) expects this shape to be
-    // rejected rather than interpreted as valid scalars inside a flow
-    // sequence. To keep the rule narrowly scoped and avoid impacting other
-    // valid inputs, only the exact pattern of a two-element flow sequence
-    // where both elements are the bare string "-" is treated as an error.
-    if items.len() == 2 {
-        if let (Node::Str(s1, ..), Node::Str(s2, ..)) = (&items[0], &items[1]) {
-            if s1 == "-" && s2 == "-" {
-                return Err(
-                    crate::parser::document::flow_punctuation::invalid_bare_dash_entries_in_flow_sequence(
-                        stream,
-                    ),
-                );
-            }
+    // Extend rule to reject any flow sequence where all entries are the bare
+    // string "-" (including single-entry sequences like `[-]`).
+    if !items.is_empty() {
+        let all_bare_dashes = items.iter().all(|n| match n {
+            Node::Str(s, ..) => s == "-",
+            _ => false,
+        });
+        if all_bare_dashes {
+            return Err(
+                crate::parser::document::flow_punctuation::invalid_bare_dash_entries_in_flow_sequence(
+                    stream,
+                ),
+            );
         }
     }
     Ok(make_array_node(items))

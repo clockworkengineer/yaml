@@ -54,26 +54,17 @@ pub fn parser_did_not_advance_structure(source: &mut dyn ISource, context: &str)
 
 /// Centralized helper: expected plain scalar but found EOF.
 pub fn expected_plain_scalar_eof(source: &mut dyn ISource) -> YamlError {
-    crate::parser::document::error_builder::syntax_error(
-        source,
-        "Expected plain scalar, got EOF",
-    )
+    crate::parser::document::error_builder::syntax_error(source, "Expected plain scalar, got EOF")
 }
 
 /// Centralized helper: expected quoted scalar but found EOF.
 pub fn expected_quoted_scalar_eof(source: &mut dyn ISource) -> YamlError {
-    crate::parser::document::error_builder::syntax_error(
-        source,
-        "Expected quoted scalar, got EOF",
-    )
+    crate::parser::document::error_builder::syntax_error(source, "Expected quoted scalar, got EOF")
 }
 
 /// Centralized helper: expected scalar but found EOF.
 pub fn expected_scalar_eof(source: &mut dyn ISource) -> YamlError {
-    crate::parser::document::error_builder::syntax_error(
-        source,
-        "Expected scalar, got EOF",
-    )
+    crate::parser::document::error_builder::syntax_error(source, "Expected scalar, got EOF")
 }
 
 /// Centralized error: Empty token name (e.g., empty tag/anchor/alias)
@@ -198,9 +189,7 @@ pub fn expected_scalar_token(source: &mut dyn ISource, current: &str) -> YamlErr
 }
 
 /// Document structure error: missing '---' between documents
-pub fn document_unexpected_plain_after_top_level_sequence(
-    source: &mut dyn ISource,
-) -> YamlError {
+pub fn document_unexpected_plain_after_top_level_sequence(source: &mut dyn ISource) -> YamlError {
     crate::parser::document::error_builder::structure_error(
         source,
         "Unexpected plain scalar after top-level sequence; missing '---' between documents",
