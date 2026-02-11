@@ -839,6 +839,50 @@ mod tests {
         }
     }
 
+    // Targeted YAML suite parity tests (ignored until enforcement fix is in place)
+    #[test]
+    #[ignore]
+    fn test_nested_colon_after_quoted_value_rejected() {
+        // ZL4Z: a: 'b': c -> should be rejected (nested ':' after quoted value)
+        let yaml = b"a: 'b': c\n";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+
+        let result = parse_mapping_with_tokens(&mut stream, 0, &directives, 0);
+        assert!(result.is_err(), "Expected error for nested ':' after quoted value, got: {:?}", result);
+    }
+
+    #[test]
+    #[ignore]
+    fn test_nested_colon_in_block_mapping_rejected() {
+        // ZCZ6: a: b: c: d -> should be rejected (nested ':' sequence in block mapping)
+        let yaml = b"a: b: c: d\n";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+
+        let result = parse_mapping_with_tokens(&mut stream, 0, &directives, 0);
+        assert!(result.is_err(), "Expected error for nested ':' in block mapping, got: {:?}", result);
+    }
+
+    #[test]
+    #[ignore]
+    fn test_invalid_indentation_zvh3_like_rejected() {
+        // ZVH3: misaligned sequence under mapping
+        let yaml = b"- key: value\n - item1\n";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+
+        // Top-level should be a sequence, but misaligned indent should be rejected
+        use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
+        let ctx_seq = crate::parser::document::context::ParsingContext::new(0)
+            .child_block_context(0, crate::parser::document::context::CollectionType::BlockSequence);
+        let result = parse_sequence_with_tokens(&mut stream, 0, 0, &directives, &ctx_seq, 0);
+        assert!(result.is_err(), "Expected error for ZVH3-like misindent sequence, got: {:?}", result);
+    }
+
     #[test]
     fn test_decorated_empty_keys_tag_and_anchor() {
         // Decorated empty keys should produce empty-string keys wrapped by tag/anchor
