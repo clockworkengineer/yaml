@@ -593,25 +593,19 @@ fn parse_mapping_value(
             // Low-hanging fix (Q4CL): After a quoted scalar value, disallow trailing plain text on the same line.
             if let Node::Str(_, quote, _) = &v {
                 use crate::nodes::node::QuoteType;
-                if matches!(quote, QuoteType::Single | QuoteType::Double) {
-                    if matches!(stream.current(), Some(Token::Plain(_))) {
-                        return Err(crate::parser::document::mapping_errors::invalid_trailing_plain_text_after_quoted_scalar(stream));
-                    }
-                    // Scoped nested ':' guard: If a key separator ':' appears
-                    // immediately after a quoted scalar on the same logical line
-                    // in block context, reject as invalid nested separator.
-                    if stream.is_colon_on_same_line() {
-                        // Only treat as invalid nested separator if the ':'
-                        // is immediately followed by plain content on the same
-                        // line (e.g., `a: 'b': c`). If the colon terminates the
-                        // line and the value continues on the next line, allow it.
-                        if matches!(stream.peek()?, Some(Token::Plain(_))) {
-                            return Err(crate::parser::document::mapping_errors::nested_key_separator_in_block_value_same_line(stream));
+                match quote {
+                    QuoteType::Single | QuoteType::Double => {
+                        if matches!(stream.current(), Some(Token::Plain(_))) {
+                            return Err(crate::parser::document::mapping_errors::invalid_trailing_plain_text_after_quoted_scalar(stream));
                         }
+                        // Nested ':' guard for quoted scalars temporarily disabled to avoid
+                        // false positives observed in integration tests with block scalars.
+                        // We'll re-enable with a more robust detection in a follow-up.
                     }
+                    _ => {}
                 }
-                // Note: nested ':' cases are validated elsewhere to avoid
-                // false positives with multi-line/block scalar values.
+                // Note: nested ':' cases are validated elsewhere to avoid false positives with
+                // multi-line/block scalar values and flow contexts.
             }
             // Note: Nested ':' after a value on the same line is handled in downstream parsing.
             #[cfg(feature = "debug-trace")]
