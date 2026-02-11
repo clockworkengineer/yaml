@@ -598,9 +598,14 @@ fn parse_mapping_value(
                         if matches!(stream.current(), Some(Token::Plain(_))) {
                             return Err(crate::parser::document::mapping_errors::invalid_trailing_plain_text_after_quoted_scalar(stream));
                         }
-                        // Nested ':' guard for quoted scalars temporarily disabled to avoid
-                        // false positives observed in integration tests with block scalars.
-                        // We'll re-enable with a more robust detection in a follow-up.
+                        // Re-enable scoped nested ':' guard for quoted scalars:
+                        // If a ':' appears immediately after the quoted value on the same
+                        // logical line and is followed by same-line plain content, reject.
+                        if stream.is_colon_on_same_line() {
+                            if matches!(stream.peek()?, Some(Token::Plain(_))) {
+                                return Err(crate::parser::document::mapping_errors::nested_key_separator_in_block_value_same_line(stream));
+                            }
+                        }
                     }
                     _ => {}
                 }
