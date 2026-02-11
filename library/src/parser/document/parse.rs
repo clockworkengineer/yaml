@@ -16,93 +16,54 @@ fn check_explicit_directives(
     source: &mut dyn ISource,
     directives: &crate::parser::directives::DirectiveContext,
 ) -> ParseResult<()> {
+    // Consider explicit directives present if a YAML version is set
+    // or any tag prefixes have been declared.
+    // Consider directives explicit only if a YAML version is set or
+    // more than the default tag handles are present (explicit %TAG).
     let has_explicit_directives =
         directives.yaml_version.is_some() || directives.tag_prefixes.len() > 2;
-    if has_explicit_directives {
-        let st = source.save_state();
-        let mut ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-        ts.skip_trivia()?;
-        use crate::parser::lexer::Token;
-        if helpers::is_token(&ts, &Token::DocumentStart) {
-            // ok
-        } else if helpers::is_token(&ts, &Token::DocumentEnd)
-            || helpers::is_token(&ts, &Token::Eof)
-            || ts.current().is_none()
-        {
+    if !has_explicit_directives {
+        return Ok(());
+    }
+    // Peek the next token after directives; if it's EOF or a document end,
+    // then the directives are not followed by a document.
+    let st = source.save_state();
+    let mut ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+    ts.skip_trivia()?;
+    use crate::parser::lexer::Token;
+    match ts.current() {
+        Some(Token::DocumentEnd) | Some(Token::Eof) | None => {
             source.restore_state(st);
-            let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-            return Err(helpers::parse_error_token(
-                &ts,
+            return Err(to_yaml_error(
                 DirectiveErrors::must_be_followed_by_document_msg(),
             ));
         }
-        source.restore_state(st);
+        _ => {}
     }
+    source.restore_state(st);
     Ok(())
 }
 
-/// Main entry point for parsing YAML content from a source.
-///
-/// Parses one or more YAML documents from the source, handling document
-/// separators and creating a Documents node containing all parsed documents.
-/// Empty or blank documents are filtered out automatically.
-///
-/// Also parses directives (%YAML and %TAG) that appear before each document.
-///
-/// # Arguments
-///
-/// * `source` - A mutable reference to a source implementing ISource trait
-///
-/// # Returns
-///
-/// Result containing a Documents Node with all parsed documents or an error string
+    /// Parses a YAML stream into one or more documents.
+    pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
+        // Accumulates parsed documents
+        let mut docs: Vec<Node> = Vec::new();
+        // Track whether we've seen a '---' marker and any content
+        let mut saw_marker: bool = false;
+        let mut any_content: bool = false;
+        // Track if the previous document ended explicitly with '...'
+        let mut last_doc_ended: bool = false;
+        // Internal document counter for debug/tracing
+        let mut _doc_count: usize = 0;
 
-pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
-    #[cfg(feature = "debug-trace")]
-    log::debug!("parse: begin stream");
-    let mut docs: Vec<Node> = Vec::new();
-    let mut saw_marker = false;
-    let mut any_content = false;
-    let mut last_doc_ended = false;
-    let mut _doc_count = 0;
-    // Print the input for debug
-    #[cfg(debug_assertions)]
-    eprintln!("DEBUG: Starting parse() with YAML input");
-    // Protect the top-level document loop against infinite iteration
-    loop_guard_init!(stream_loop_counter);
-    while source.more() {
-        loop_guard_check!(
-            stream_loop_counter,
-            crate::parser::document::loop_guards::MAX_LOOP_ITERATIONS,
-            "Stream parsing"
-        );
-        crate::utils::skip_whitespace_and_comments(source);
-        // RHX7 enforcement: If we see a directive line here after having
-        // parsed content, and the previous document did not end with '...',
-        // this is an invalid mid-stream directive.
-        if any_content && !last_doc_ended {
-            if let Some('%') = source.current() {
-                let st_dir = source.save_state();
-                let mut head = String::new();
-                for _ in 0..5 {
-                    if let Some(ch) = source.current() {
-                        head.push(ch);
-                        source.next();
-                    } else {
-                        break;
-                    }
-                }
-                source.restore_state(st_dir);
-                if head.starts_with("%YAML ") || head.starts_with("%TAG ") {
-                    return Err(to_yaml_error(
-                        DirectiveErrors::directives_not_allowed_midstream_msg(),
-                    ));
-                }
-            }
-        }
-        // Parse and merge directives using helper
-        let directives = handle_directives(source)?;
-        check_explicit_directives(source, &directives)?;
+        // Main document loop
+        loop {
+            // Skip leading whitespace/comments before handling directives or markers
+            crate::utils::skip_whitespace_and_comments(source);
+
+            // Parse and merge directives using helper, then validate placement
+            let directives = handle_directives(source)?;
+            check_explicit_directives(source, &directives)?;
 
         // Detect if there is a document start marker (---) at the current position
         let has_document_start = {
@@ -221,6 +182,24 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
         }
         // Ensure we start the document after any trailing blank lines/comments following markers
         crate::utils::skip_whitespace_and_comments(source);
+        // If there is no explicit document start and no content ahead,
+        // treat this as an empty stream/document rather than error.
+        if !has_document_start {
+            let st_empty = source.save_state();
+            if let Ok(mut ts0) =
+                crate::parser::token_stream::TokenStream::new(source, &directives, false)
+            {
+                let _ = ts0.skip_trivia();
+                match ts0.current() {
+                    None | Some(crate::parser::lexer::Token::Eof) => {
+                        source.restore_state(st_empty);
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            source.restore_state(st_empty);
+        }
         // Early TD5N detection: If the upcoming document starts with a top-level
         // block sequence of plain scalars and is immediately followed by a
         // top-level plain scalar without an explicit '---', reject narrowly.
@@ -421,28 +400,20 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
         if let Some('%') = source.current() {
             // Save/restore around the small peek to avoid consuming st_ahead
             let st_dir = source.save_state();
-            let mut head = String::new();
-            for _ in 0..5 {
-                if let Some(ch) = source.current() {
-                    head.push(ch);
-                    source.next();
-                } else {
+            // Read the directive keyword up to first whitespace
+            let mut word = String::new();
+            while let Some(ch) = source.current() {
+                if ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n' {
                     break;
                 }
+                word.push(ch);
+                source.next();
             }
             source.restore_state(st_dir);
-            if head.starts_with("%YAML ") || head.starts_with("%TAG ") {
-                // Allow directives before the next '---' only if the previous
-                // document ended explicitly with '...'. Otherwise, this is a
-                // mid-stream directive and should trigger an error (RHX7).
-                if last_doc_ended {
-                    has_next_doc = true;
-                } else {
-                    // Do not start a new document here; leave directives
-                    // unparsed to avoid false positives. The next iteration
-                    // will exit the stream without error.
-                    has_next_doc = false;
-                }
+            if word == "%YAML" || word == "%TAG" {
+                // Allow directives ahead; enforcement will occur when parsing the
+                // next document's directives and markers.
+                has_next_doc = true;
             }
         }
         if !has_next_doc {

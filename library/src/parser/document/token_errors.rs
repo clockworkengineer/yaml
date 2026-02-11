@@ -203,3 +203,16 @@ pub fn unexpected_comma_after_tag_in_block_value(source: &mut dyn ISource) -> Ya
         "Unexpected comma after tag in block context",
     )
 }
+
+/// Unescaped newline encountered inside a double-quoted scalar
+///
+/// YAML test suite cases (e.g., QB6E) expect that raw line breaks
+/// within double-quoted scalars are invalid unless escaped via
+/// backslash line folding. Emit a syntax error to align with suite
+/// expectations.
+pub fn newline_in_double_quoted_not_allowed(source: &mut dyn ISource) -> YamlError {
+    crate::parser::document::error_builder::syntax_error(
+        source,
+        "YAML compliance error: Unescaped newline inside double-quoted string is not allowed",
+    )
+}
