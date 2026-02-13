@@ -26,6 +26,10 @@ pub struct TokenStream<'a> {
     // Track the last token that was consumed; useful for distinguishing
     // standalone comment lines from inline comments.
     last_token: Option<Token>,
+    // Line tracking: current logical line index (increments on Newline)
+    current_line_index: usize,
+    // Line index of the last consumed content scalar (Plain/Quoted)
+    last_content_line_index: Option<usize>,
 }
 
 // Env-controlled logging for token stream internals
@@ -47,7 +51,6 @@ fn ts_log(msg: String) {
     log::trace!("{}", msg);
 }
 
-#[allow(dead_code)]
 impl<'a> TokenStream<'a> {
     /// Create a new token stream and load the first token
     ///
@@ -68,6 +71,8 @@ impl<'a> TokenStream<'a> {
             // and is updated as we consume tokens via `next()`.
             flow_depth: 0,
             last_token: None,
+            current_line_index: 0,
+            last_content_line_index: None,
         };
         #[cfg(feature = "debug-trace")]
         ts_log(format!("token_stream: new -> current = {:?}", ts.current()));
@@ -108,6 +113,20 @@ impl<'a> TokenStream<'a> {
                     // Leaving a flow collection; if depth reaches 0,
                     // revert to block (non-flow) context.
                     self.flow_depth = (self.flow_depth - 1).max(0);
+                }
+                Token::Newline => {
+                    // Advance logical line index when consuming a newline.
+                    self.current_line_index = self.current_line_index.saturating_add(1);
+                }
+                Token::Plain(_)
+                | Token::SingleQuoted(_)
+                | Token::DoubleQuoted(_) => {
+                    // Record the line index of the last content scalar.
+                    self.last_content_line_index = Some(self.current_line_index);
+                }
+                Token::DocumentStart | Token::DocumentEnd => {
+                    // Reset content association at document boundaries.
+                    self.last_content_line_index = None;
                 }
                 _ => {}
             }
@@ -169,8 +188,14 @@ impl<'a> TokenStream<'a> {
                 self.next()?;
                 Ok(())
             }
-            Some(_token) => Err(crate::parser::document::error_builder::expected_error(self.source_mut(), &format!("token {:?}", expected))),
-            None => Err(crate::parser::document::error_builder::expected_error(self.source_mut(), &format!("token {:?}", expected))),
+            Some(_token) => Err(crate::parser::document::token_errors::expected_specific_token(
+                self.source_mut(),
+                expected.clone(),
+            )),
+            None => Err(crate::parser::document::token_errors::expected_specific_token(
+                self.source_mut(),
+                expected.clone(),
+            )),
         }
     }
 
@@ -188,7 +213,10 @@ impl<'a> TokenStream<'a> {
 
     /// Internal DRY helper: advance while predicate matches current token
     #[inline]
-    fn advance_while(&mut self, mut predicate: impl FnMut(&Token) -> bool) -> Result<(), crate::error::YamlError> {
+    fn advance_while(
+        &mut self,
+        mut predicate: impl FnMut(&Token) -> bool,
+    ) -> Result<(), crate::error::YamlError> {
         while self.current().map_or(false, |t| predicate(t)) {
             self.next()?;
         }
@@ -254,7 +282,9 @@ impl<'a> TokenStream<'a> {
     /// inline comment at the end of a content line, and a comment line
     /// appearing before an indented block (as in 8XDJ).
     #[inline]
-    pub fn skip_newlines_and_comments_with_flag(&mut self) -> Result<bool, crate::error::YamlError> {
+    pub fn skip_newlines_and_comments_with_flag(
+        &mut self,
+    ) -> Result<bool, crate::error::YamlError> {
         #[cfg(feature = "debug-trace")]
         ts_log(format!(
             "token_stream: skip_newlines_and_comments_with_flag at {:?}",
@@ -313,10 +343,18 @@ impl<'a> TokenStream<'a> {
             match self.current() {
                 Some(Token::Tag(tag_str)) => {
                     if decorators.tag.is_some() {
-                        return Err(crate::parser::document::error_builder::syntax_error(
+                        return Err(crate::parser::document::token_errors::duplicate_tag_found(
                             self.source_mut(),
-                            "Duplicate tag found",
                         ));
+                    }
+                    // Validate explicit tag handle usage against current document directives.
+                    if let Err(e) = self._directives.validate_tag_handle_usage(tag_str.as_str()) {
+                        return Err(
+                            crate::parser::document::token_errors::invalid_tag_handle_usage(
+                                self.source_mut(),
+                                &e.to_string(),
+                            ),
+                        );
                     }
                     // Preserve raw tag handle; resolve later in value parsing
                     decorators.tag = Some(tag_str.clone());
@@ -324,10 +362,11 @@ impl<'a> TokenStream<'a> {
                 }
                 Some(Token::Anchor(name)) => {
                     if decorators.anchor.is_some() {
-                        return Err(crate::parser::document::error_builder::syntax_error(
-                            self.source_mut(),
-                            "Duplicate anchor found",
-                        ));
+                        return Err(
+                            crate::parser::document::token_errors::duplicate_anchor_found(
+                                self.source_mut(),
+                            ),
+                        );
                     }
                     decorators.anchor = Some(name.clone());
                     self.next()?;
@@ -370,6 +409,36 @@ impl<'a> TokenStream<'a> {
         matches!(self.current(), Some(Token::Eof) | None)
     }
 
+    /// Returns true if the current token is a `:` that appears on the
+    /// same logical line as the previously consumed content token.
+    ///
+    /// This relies on `last_token` tracking and treats any intervening
+    /// line boundary tokens (`Newline`, `Indent`) as evidence that the
+    /// colon is on a subsequent line. Document markers also reset the
+    /// line association.
+    #[inline]
+    pub fn is_colon_on_same_line(&self) -> bool {
+        if !matches!(self.current(), Some(Token::Colon)) {
+            return false;
+        }
+        // Do not treat flow contexts as candidates for nested ':' detection.
+        if self.in_flow() {
+            return false;
+        }
+        // Require that the most recent content scalar was consumed on the
+        // same logical line as the current colon AND that the immediately
+        // preceding token was a scalar (plain or quoted). This avoids
+        // misclassifying flow punctuation or explicit-key constructs.
+        let same_line = matches!(self.last_content_line_index, Some(idx) if idx == self.current_line_index);
+        if !same_line {
+            return false;
+        }
+        matches!(
+            self.last_token,
+            Some(Token::Plain(_)) | Some(Token::SingleQuoted(_)) | Some(Token::DoubleQuoted(_))
+        )
+    }
+
     /// Consume a plain scalar token
     pub fn consume_plain_scalar(&mut self) -> Result<String, crate::error::YamlError> {
         match self.current() {
@@ -378,10 +447,11 @@ impl<'a> TokenStream<'a> {
                 self.next()?;
                 Ok(result)
             }
-            Some(_token) => Err(crate::parser::document::error_builder::expected_error(self.source_mut(), "plain scalar")),
-            None => Err(crate::parser::document::error_builder::syntax_error(
+            Some(_token) => Err(crate::parser::document::token_errors::expected_plain_scalar(
                 self.source_mut(),
-                "Expected plain scalar, got EOF",
+            )),
+            None => Err(crate::parser::document::token_errors::expected_plain_scalar_eof(
+                self.source_mut(),
             )),
         }
     }
@@ -394,10 +464,11 @@ impl<'a> TokenStream<'a> {
                 self.next()?;
                 Ok(result)
             }
-            Some(_token) => Err(crate::parser::document::error_builder::expected_error(self.source_mut(), "quoted scalar")),
-            None => Err(crate::parser::document::error_builder::syntax_error(
+            Some(_token) => Err(crate::parser::document::token_errors::expected_quoted_scalar(
                 self.source_mut(),
-                "Expected quoted scalar, got EOF",
+            )),
+            None => Err(crate::parser::document::token_errors::expected_quoted_scalar_eof(
+                self.source_mut(),
             )),
         }
     }
@@ -420,10 +491,11 @@ impl<'a> TokenStream<'a> {
                 self.next()?;
                 Ok((result, ScalarType::DoubleQuoted))
             }
-            Some(_token) => Err(crate::parser::document::error_builder::expected_error(self.source_mut(), "scalar")),
-            None => Err(crate::parser::document::error_builder::syntax_error(
+            Some(_token) => Err(crate::parser::document::token_errors::expected_scalar(
                 self.source_mut(),
-                "Expected scalar, got EOF",
+            )),
+            None => Err(crate::parser::document::token_errors::expected_scalar_eof(
+                self.source_mut(),
             )),
         }
     }
@@ -466,7 +538,9 @@ impl<'a> TokenStream<'a> {
                 let _ = self.consume_if(Token::Colon)?;
                 Ok(true)
             }
-            _ => Err(crate::parser::document::error_builder::expected_error(self.source_mut(), ": in flow mapping")),
+            _ => Err(crate::parser::document::flow_punctuation::expected_colon_in_flow_mapping(
+                self.source_mut(),
+            )),
         }
     }
     pub fn consume_flow_sequence_end(&mut self) -> Result<bool, crate::error::YamlError> {
@@ -492,7 +566,6 @@ impl<'a> TokenStream<'a> {
 
 /// Type of scalar value
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)]
 pub enum ScalarType {
     Plain,
     SingleQuoted,

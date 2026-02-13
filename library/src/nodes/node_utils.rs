@@ -1,13 +1,11 @@
 use super::node::{BlockStyle, QuoteType};
 
 /// Construct a tagged node from an inner node and tag string.
-#[allow(dead_code)]
 pub fn make_tagged_node(inner: Node, tag: String) -> Node {
     Node::Tagged(Box::new(inner), tag)
 }
 
 /// Construct an anchored node from an inner node and anchor name.
-#[allow(dead_code)]
 pub fn make_anchored_node(inner: Node, name: String) -> Node {
     Node::Anchored(Box::new(inner), name)
 }
@@ -18,13 +16,11 @@ pub fn make_mapping_node(pairs: Vec<(Node, Node)>) -> Node {
 }
 
 /// Construct an array node from items.
-#[allow(dead_code)]
 pub fn make_array_node(items: Vec<Node>) -> Node {
     Node::Array(items)
 }
 
 /// Construct a block scalar node (literal | or folded >)
-#[allow(dead_code)]
 pub fn make_block_scalar_node(content: String, is_folded: bool) -> Node {
     let style = if is_folded {
         BlockStyle::Folded
@@ -65,7 +61,6 @@ pub fn is_boolean_node(node: &Node) -> bool {
     matches!(node, Node::Boolean(_))
 }
 
-#[allow(dead_code)]
 pub fn is_none_node(node: &Node) -> bool {
     matches!(node, Node::None)
 }

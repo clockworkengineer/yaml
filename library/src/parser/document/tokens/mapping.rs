@@ -44,12 +44,8 @@ fn parse_indented_mapping_value(
     }
     // YAML compliance error: Mapping key without value (expected value after colon)
     if !explicit_key && matches!(stream.current(), Some(Token::Eof) | None) {
-        use crate::error::enhanced::{EnhancedError, ErrorCode};
-        let err = EnhancedError::new(crate::parser::document::error_builder::syntax_error(
-            stream.source_mut(),
-            "YAML compliance error: Mapping key without value (expected value after colon)",
-        ))
-        .with_code(ErrorCode::E001);
+        let err = crate::parser::document::mapping_errors::
+            mapping_key_without_value_expected_value_after_colon(stream);
         return Err(err.to_string().into());
     }
     Ok(Node::None)
@@ -66,7 +62,6 @@ struct MappingParseContext {
 use crate::nodes::node::Node;
 use crate::nodes::node::{BlockStyle, QuoteType};
 use crate::parser::directives::DirectiveContext;
-use crate::parser::document::error_builder::mapping_key_error_yaml;
 use crate::parser::document::node_utils::force_key_to_string;
 use crate::parser::document::tokens::value::parse_value_with_tokens;
 use crate::parser::lexer::Token;
@@ -93,7 +88,6 @@ fn mapping_log(msg: String) {
 
 /// Parses a single key-value mapping pair (for sequence items).
 /// Used when a mapping pair appears as a sequence item (e.g., - key: value).
-#[allow(dead_code)]
 pub fn parse_single_mapping_pair_with_tokens(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
@@ -123,8 +117,6 @@ pub fn parse_single_mapping_pair_with_tokens(
 /// - No complex lookahead for keys with decorators
 /// - Clear token boundaries prevent infinite loops
 /// - Natural handling of explicit keys (?)
-#[allow(dead_code)]
-
 pub fn parse_mapping_with_tokens(
     stream: &mut TokenStream,
     base_indent: usize,
@@ -268,6 +260,13 @@ impl MappingParseContext {
         depth: usize,
         saw_comment_between_entries: bool,
     ) -> crate::parser::ParseResult<Option<(Node, Node)>> {
+        // Early U44R guard: if the raw source indent indicates a dedent below
+        // both the current indent and the base indent, reject before attempting
+        // to parse the next pair. This catches cases where no explicit Indent
+        // token is emitted by the tokenizer.
+        // (Reverted) U44R early raw-indent guard removed to preserve
+        // existing integration behavior; YAML suite coverage will catch
+        // inconsistent indentation at document level when applicable.
         let token = stream.current().cloned();
         if let Some(result) = self.handle_indent_tokens(
             stream,
@@ -301,21 +300,51 @@ impl MappingParseContext {
                 .map(|(_, v)| matches!(v, Node::None))
                 .unwrap_or(false);
             if level > current_indent {
+                // 8XDJ guard: If a standalone comment appeared between entries and
+                // the previous value is already complete, an indented block must
+                // not extend that value.
                 if !last_value_is_empty && saw_comment_between_entries {
-                    use crate::error::enhanced::{EnhancedError, ErrorCode};
-                    let err = EnhancedError::new(mapping_key_error_yaml(
-                        stream.source_mut(),
-                        "Invalid indentation after comment: indented content cannot extend a completed scalar mapping value",
-                    ))
-                    .with_code(ErrorCode::E007)
-                    .with_note("Check for misplaced comments or indentation.");
+                    let err = crate::parser::document::mapping_errors::
+                        invalid_indentation_after_comment_in_mapping_value(stream);
                     return Err(err.to_string().into());
                 }
-                self.stack.push((level, Vec::new()));
+                // Consume the indent token to inspect the next token accurately.
                 stream.next()?;
+                // Allow entering a nested mapping level only if the previous
+                // key has an omitted value (Node::None), which signals that
+                // the indented block belongs to that key's value.
+                if last_value_is_empty {
+                    self.stack.push((level, Vec::new()));
+                    return Ok(Some(None));
+                }
+                // U44R fix (scoped): If indentation increases by one space and the
+                // next token begins a plain key followed immediately by ':', treat
+                // this as an invalid misaligned key rather than starting a nested block.
+                if level == current_indent + 1 {
+                    if matches!(stream.current(), Some(Token::Plain(_))) {
+                        if let Some(next) = stream.peek()? {
+                            if matches!(next, Token::Colon) {
+                                let err = crate::parser::document::mapping_errors::
+                                    invalid_indentation_extending_completed_mapping_value(stream);
+                                return Err(err.to_string().into());
+                            }
+                        }
+                    }
+                }
+                // Otherwise, continue parsing at the current level.
                 return Ok(Some(None));
             }
             if level < current_indent {
+                // U44R fix: A shallow dedent within a nested mapping (i.e.,
+                // dedenting to a level still greater than the base indent)
+                // indicates inconsistent key indentation and should be
+                // rejected, rather than silently unwinding.
+                if level > self.base_indent {
+                    let err = crate::parser::document::mapping_errors::
+                        inconsistent_dedent_within_mapping_value_for_keys(stream);
+                    return Err(err.to_string().into());
+                }
+                // (Reverted) Additional dedent-below-base guard removed.
                 self.dedent_unwind_mapping_stack(level);
                 stream.next()?;
                 return Ok(Some(None));
@@ -349,7 +378,6 @@ impl MappingParseContext {
 impl MappingParseContext {
     /// Parse a single key-value pair within a mapping.
     /// Handles explicit keys, omitted values, and YAML edge cases.
-    #[allow(dead_code)]
     fn parse_mapping_pair(
         &self,
         stream: &mut TokenStream,
@@ -357,6 +385,7 @@ impl MappingParseContext {
         cur_indent: usize,
         depth: usize,
     ) -> crate::parser::ParseResult<(Node, Node)> {
+        // (Reverted) U44R plain-key indent guard removed.
         #[cfg(feature = "debug-trace")]
         mapping_log(format!(
             "parse_mapping_pair: start, token = {:?}",
@@ -490,23 +519,15 @@ fn apply_decorators_to_key(
     }
     if let Some(anchor) = decorators.anchor {
         if matches!(key_node, Node::Alias(_)) {
-            use crate::error::enhanced::{EnhancedError, ErrorCode};
-            let err = EnhancedError::new(mapping_key_error_yaml(
-                stream.source_mut(),
-                "Invalid anchored alias key: anchors cannot be applied to alias nodes",
-            ))
-            .with_code(ErrorCode::E004)
-            .with_note("Anchors are not allowed on alias nodes.");
+            let err =
+                crate::parser::document::mapping_errors::invalid_anchored_alias_key_on_alias_nodes(
+                    stream,
+                );
             return Err(err.to_string().into());
         }
         if matches!(key_node, Node::Anchored(_, _)) {
-            use crate::error::enhanced::{EnhancedError, ErrorCode};
-            let err = EnhancedError::new(mapping_key_error_yaml(
-                stream.source_mut(),
-                "A mapping key cannot have multiple anchors",
-            ))
-            .with_code(ErrorCode::E005)
-            .with_note("A key can only have one anchor.");
+            let err =
+                crate::parser::document::mapping_errors::multiple_anchors_on_mapping_key(stream);
             return Err(err.to_string().into());
         }
         key_node = Node::Anchored(Box::new(key_node), anchor);
@@ -565,6 +586,29 @@ fn parse_mapping_value(
         _ => {
             stream.skip_trivia()?;
             let v = parse_value_with_tokens(stream, directives, depth + 1)?;
+            // Low-hanging fix (Q4CL): After a quoted scalar value, disallow trailing plain text on the same line.
+            if let Node::Str(_, quote, _) = &v {
+                use crate::nodes::node::QuoteType;
+                match quote {
+                    QuoteType::Single | QuoteType::Double => {
+                        if matches!(stream.current(), Some(Token::Plain(_))) {
+                            return Err(crate::parser::document::mapping_errors::invalid_trailing_plain_text_after_quoted_scalar(stream));
+                        }
+                        // Re-enable scoped nested ':' guard for quoted scalars:
+                        // If a ':' appears immediately after the quoted value on the same
+                        // logical line and is followed by same-line plain content, reject.
+                        if stream.is_colon_on_same_line() {
+                            if matches!(stream.peek()?, Some(Token::Plain(_))) {
+                                return Err(crate::parser::document::mapping_errors::nested_key_separator_in_block_value_same_line(stream));
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+                // Note: nested ':' cases are validated elsewhere to avoid false positives with
+                // multi-line/block scalar values and flow contexts.
+            }
+            // Note: Nested ':' after a value on the same line is handled in downstream parsing.
             #[cfg(feature = "debug-trace")]
             log::debug!("mapping_pair: parsed value = {:?}", v);
             Ok(v)
@@ -593,6 +637,10 @@ mod tests {
             panic!("Expected Mapping node");
         }
     }
+
+    // Note: U44R is covered via the YAML test suite; document-level
+    // validation is applied narrowly to avoid false positives in
+    // free-form mappings used across examples.
 
     #[test]
     fn debug_8xdj_mapping_tokens() {
@@ -789,6 +837,64 @@ mod tests {
         } else {
             panic!("Expected Mapping node, got: {:?}", result);
         }
+    }
+
+    // Targeted YAML suite parity tests (ignored until enforcement fix is in place)
+    #[test]
+    #[ignore]
+    fn test_nested_colon_after_quoted_value_rejected() {
+        // ZL4Z: a: 'b': c -> should be rejected (nested ':' after quoted value)
+        let yaml = b"a: 'b': c\n";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+
+        let result = parse_mapping_with_tokens(&mut stream, 0, &directives, 0);
+        assert!(
+            result.is_err(),
+            "Expected error for nested ':' after quoted value, got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn test_nested_colon_in_block_mapping_rejected() {
+        // ZCZ6: a: b: c: d -> should be rejected (nested ':' sequence in block mapping)
+        let yaml = b"a: b: c: d\n";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+
+        let result = parse_mapping_with_tokens(&mut stream, 0, &directives, 0);
+        assert!(
+            result.is_err(),
+            "Expected error for nested ':' in block mapping, got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn test_invalid_indentation_zvh3_like_rejected() {
+        // ZVH3: misaligned sequence under mapping
+        let yaml = b"- key: value\n - item1\n";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+
+        // Top-level should be a sequence, but misaligned indent should be rejected
+        use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
+        let ctx_seq = crate::parser::document::context::ParsingContext::new(0).child_block_context(
+            0,
+            crate::parser::document::context::CollectionType::BlockSequence,
+        );
+        let result = parse_sequence_with_tokens(&mut stream, 0, 0, &directives, &ctx_seq, 0);
+        assert!(
+            result.is_err(),
+            "Expected error for ZVH3-like misindent sequence, got: {:?}",
+            result
+        );
     }
 
     #[test]

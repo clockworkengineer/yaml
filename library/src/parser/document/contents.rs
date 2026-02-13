@@ -7,16 +7,7 @@ macro_rules! parse_err {
         YamlError::from(helpers::parse_error_token($stream, $msg))
     };
 }
-/// Helper for indentation validation
-fn validate_indent(actual: usize, expected: usize, context: &str) -> Result<(), YamlError> {
-    if actual < expected {
-        return Err(parse_err!(format!(
-            "{} at invalid indentation: expected >= {}, got {}",
-            context, expected, actual
-        )));
-    }
-    Ok(())
-}
+// Indentation validation is centralized in indentation.rs to keep policy changes in one place.
 use crate::error::YamlError;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
@@ -26,6 +17,9 @@ use crate::parser::document::context::{CollectionType, ParsingContext};
 use crate::parser::document::explicit_key::parse_multiple_explicit_keys;
 use crate::parser::document::helpers;
 use crate::parser::document::helpers::BlockHeadKind;
+use crate::parser::document::indentation::{
+    ensure_indent_at_least, ensure_indent_at_least_no_source,
+};
 use crate::parser::document::mapping::parse_mapping;
 use crate::parser::document::value::parse_value;
 
@@ -198,9 +192,21 @@ fn handle_multiple_explicit_keys(
     Ok(parse_multiple_explicit_keys(source, current_indent).map_err(YamlError::from)?)
 }
 
-/// Helper to skip whitespace and comments in the source
-fn skip_trivia(source: &mut dyn ISource) {
-    crate::utils::skip_whitespace_and_comments(source);
+/// Helper to skip whitespace and comments with context-aware tab validation.
+/// In block context, validates that tabs are not used for indentation after newlines.
+fn skip_trivia_with_ctx(
+    source: &mut dyn ISource,
+    ctx: &ParsingContext,
+) -> crate::parser::ParseResult<()> {
+    if !ctx.in_flow {
+        match crate::utils::skip_whitespace_and_comments_validate_tabs(source) {
+            Ok(()) => Ok(()),
+            Err(_e) => Err(crate::parser::document::indentation_errors::IndentationErrors::tabs_not_allowed_yaml_block(source)),
+        }
+    } else {
+        crate::utils::skip_whitespace_and_comments(source);
+        Ok(())
+    }
 }
 
 /// Parses the contents of a YAML document based on the current character and context.
@@ -224,7 +230,7 @@ pub fn parse_document_contents(
     directives: &DirectiveContext,
     ctx: &ParsingContext,
 ) -> ParseResult<Node> {
-    skip_trivia(source);
+    skip_trivia_with_ctx(source, ctx)?;
     crate::parser::document::helpers::validate_indentation_and_whitespace(source, directives, ctx)?;
     let head_kind = helpers::classify_block_head(source, directives, ctx);
 
@@ -253,6 +259,8 @@ pub fn parse_document_contents(
                 return parse_scalar_or_value(source, directives, indent_level, ctx);
             }
             let seq_indent = source.get_current_indent_level();
+            // Validate indentation without borrowing source to avoid conflicts with TokenStream
+            ensure_indent_at_least_no_source(seq_indent, indent_level, "Sequence item")?;
             let mut stream =
                 crate::parser::token_stream::TokenStream::new(source, directives, false)?;
             match stream.current() {
@@ -260,7 +268,6 @@ pub fn parse_document_contents(
                     return Ok(Node::None);
                 }
                 Some(crate::parser::lexer::Token::Dash) => {
-                    validate_indent(seq_indent, indent_level, "Sequence item")?;
                     let ctx_seq =
                         ctx.child_block_context(seq_indent, CollectionType::BlockSequence);
                     let seq =
@@ -285,7 +292,7 @@ pub fn parse_document_contents(
             if is_doc_end(source, directives)? {
                 return Ok(Node::None);
             }
-            validate_indent(map_indent, indent_level, "Mapping key")?;
+            ensure_indent_at_least(source, map_indent, indent_level, "Mapping key")?;
             if matches!(head_kind, BlockHeadKind::BlockMapping) {
                 Ok(parse_mapping(source, map_indent, directives)?)
             } else {
@@ -293,7 +300,7 @@ pub fn parse_document_contents(
             }
         }
         Some(c) if c == '#' => {
-            skip_trivia(source);
+            skip_trivia_with_ctx(source, ctx)?;
             parse_document_contents(source, indent_level, directives, ctx)
         }
         Some(c) if c == '{' => {
@@ -324,10 +331,14 @@ pub fn parse_document_contents(
                 crate::parser::token_stream::TokenStream::new(source, directives, false)?;
             match stream.current() {
                 Some(crate::parser::lexer::Token::Tag(_)) => {
-                    stream.next()?;
-                    stream.skip_trivia()?;
-                    let is_mapping_key =
-                        matches!(stream.current(), Some(crate::parser::lexer::Token::Colon));
+                    // Do not consume the tag here; allow value parser to
+                    // handle decorators (tag/anchor) and enforce validation.
+                    // Determine if this represents a mapping key by peeking
+                    // ahead for a colon after the tag.
+                    let is_mapping_key = match stream.peek() {
+                        Ok(Some(crate::parser::lexer::Token::Colon)) => true,
+                        _ => false,
+                    };
                     if is_mapping_key {
                         Ok(parse_mapping(source, indent_level, directives)?)
                     } else {
@@ -355,19 +366,42 @@ pub fn parse_document_contents(
             match stream.current() {
                 Some(crate::parser::lexer::Token::Anchor(_)) => {
                     stream.next()?;
-                    stream.skip_trivia()?;
-                    let is_mapping_key =
-                        matches!(stream.current(), Some(crate::parser::lexer::Token::Colon));
-                    if is_mapping_key {
-                        Ok(parse_mapping(source, indent_level, directives)?)
-                    } else {
-                        Ok(
+                    // After '&anchor', decide next action based on immediate token,
+                    // without skipping trivia so we can distinguish same-line vs newline.
+                    match stream.current() {
+                        Some(crate::parser::lexer::Token::Colon) => {
+                            Ok(parse_mapping(source, indent_level, directives)?)
+                        }
+                        Some(crate::parser::lexer::Token::Dash) => {
+                            let mut ts_err = crate::parser::token_stream::TokenStream::new(
+                                source, directives, false,
+                            )?;
+                            Err(crate::parser::document::anchor_errors::AnchorErrors::anchor_cannot_precede_dash_same_line(&mut ts_err))
+                        }
+                        Some(crate::parser::lexer::Token::Plain(s)) => {
+                            if s.trim_start().starts_with('-') {
+                                let mut ts_err = crate::parser::token_stream::TokenStream::new(
+                                    source, directives, false,
+                                )?;
+                                Err(crate::parser::document::anchor_errors::AnchorErrors::anchor_cannot_precede_dash_same_line(&mut ts_err))
+                            } else {
+                                Ok(
+                                    crate::parser::document::tokens::value::parse_value_with_tokens(
+                                        &mut stream,
+                                        directives,
+                                        0,
+                                    )?,
+                                )
+                            }
+                        }
+                        // Newline or anything else: defer to value parser
+                        _ => Ok(
                             crate::parser::document::tokens::value::parse_value_with_tokens(
                                 &mut stream,
                                 directives,
                                 0,
                             )?,
-                        )
+                        ),
                     }
                 }
                 _ => Ok(

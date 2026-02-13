@@ -11,7 +11,6 @@ use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::parser::ParseResult;
 use crate::parser::document::node_utils::normalize_node_to_str;
-use crate::parser::utils::error_helpers;
 use crate::{loop_guard_check, loop_guard_init};
 
 /// Helper for DRY loop guard usage in explicit key parsing.
@@ -85,14 +84,12 @@ use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
 
 /// Checks if the current token starts an explicit key (Token::QuestionMark)
-#[allow(dead_code)]
 pub(crate) fn is_explicit_key_start(stream: &mut TokenStream) -> bool {
     matches!(stream.current(), Some(Token::QuestionMark))
 }
 
 /// Parses an explicit mapping key-value pair using tokens
 /// Returns (key_node, value_node)
-#[allow(dead_code)]
 pub(crate) fn parse_explicit_mapping_entry(
     stream: &mut TokenStream,
     directives: &crate::parser::directives::DirectiveContext,
@@ -101,10 +98,9 @@ pub(crate) fn parse_explicit_mapping_entry(
     if !is_explicit_key_start(stream) {
         // Use stream.current() for error context since TokenStream.lexer is private
         let cur = stream.current().cloned();
-        return Err(error_helpers::syntax_error(
-            stream.source_mut(),
-            &format!("Expected '?' token for explicit key, got {:?}", cur),
-        ));
+        return Err(
+            crate::parser::document::mapping_errors::expected_explicit_key_token(stream, cur),
+        );
     }
     stream.next()?;
     stream.skip_trivia()?;
@@ -154,8 +150,6 @@ pub(crate) fn parse_explicit_mapping_entry(
 
 /// Collect consecutive explicit key entries ('? key' lines) into mapping pairs.
 /// Stops when the next token is not a question mark or structure changes.
-#[allow(dead_code)]
-
 pub(crate) fn collect_explicit_keys_block(
     stream: &mut TokenStream,
     directives: &crate::parser::directives::DirectiveContext,

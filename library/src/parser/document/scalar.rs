@@ -15,9 +15,8 @@ fn parse_scalar_dispatch(
                     .chars()
                     .all(|c| c == '+' || c == '-' || c.is_ascii_digit())
                 {
-                    return Err(syntax_error(
+                    return Err(crate::parser::document::block_scalar_errors::BlockScalarErrors::invalid_header_unexpected_text(
                         stream.source_mut(),
-                        "Invalid block scalar header: unexpected text immediately after '|' or '>'",
                     ));
                 }
             }
@@ -44,9 +43,8 @@ fn parse_scalar_dispatch(
         let has_explicit_indent_indicator = !digits.is_empty();
         if !digits.is_empty() {
             if digits.len() != 1 || digits.chars().next().unwrap() == '0' {
-                return Err(syntax_error(
+                return Err(crate::parser::document::block_scalar_errors::BlockScalarErrors::invalid_indent_indicator(
                     stream.source_mut(),
-                    "Invalid block scalar indentation indicator: must be a single digit from 1-9",
                 ));
             }
         }
@@ -169,6 +167,9 @@ fn parse_block_scalar(
     let mut blank_lines_before_content: usize = 0;
     let mut pending_indent_for_line: Option<usize> = None;
     let mut saw_plain_current_line: bool = false;
+    // Track if a comment appears before the first content line; used only
+    // for diagnostics in debug builds.
+    let mut _comment_before_first_content: bool = false;
     loop {
         match stream.current() {
             Some(Token::Indent(level)) => {
@@ -177,6 +178,24 @@ fn parse_block_scalar(
             }
             Some(Token::Plain(line)) => {
                 let indent = pending_indent_for_line.unwrap_or(0);
+                // Do not treat an unindented top-level line as block scalar content.
+                // This prevents cases like Y79Y/001 (a tab-only line followed by
+                // a top-level mapping key) from being misclassified as the first
+                // content line of the scalar. In such cases, the scalar should be
+                // considered empty and parsing should continue with the following
+                // top-level content (e.g., "bar: 1").
+                if first_content_indent.is_none() && indent == 0 {
+                    // Heuristic: only treat the upcoming top-level line as
+                    // not part of the scalar (thus ending the block) when
+                    // we've seen at least two columns of indentation on the
+                    // preceding blank-only lines. This distinguishes Y79Y/001
+                    // (space+tab blank line → valid empty scalar) from Y79Y/000
+                    // (tab-only blank line → remains an error under our
+                    // existing validation rules).
+                    if max_blank_indent_before_content >= 2 {
+                        break;
+                    }
+                }
                 if first_content_indent.is_none() {
                     first_content_indent = Some(indent);
                 }
@@ -222,6 +241,9 @@ fn parse_block_scalar(
                 saw_plain_current_line = false;
             }
             Some(Token::Comment(_)) => {
+                if first_content_indent.is_none() {
+                    _comment_before_first_content = true;
+                }
                 stream.next()?;
             }
             Some(Token::Eof) => {
@@ -230,18 +252,18 @@ fn parse_block_scalar(
             _ => break,
         }
     }
-    use crate::parser::document::error_builder::indentation_error;
+
     // Loosen blank line indentation rules: allow any number/indentation of blank lines before first content line
     // Only enforce indentation rules on actual content lines, not on blank lines before content
     let indicator = block_header.chars().next().unwrap();
     if indicator == '|' && !has_explicit_indent_indicator {
         if let Some(first_indent) = first_content_indent {
             if blank_lines_before_content >= 1 && max_blank_indent_before_content > first_indent {
-                let msg = format!(
-                    "Invalid indentation in literal block scalar: blank lines before content are more indented than the content (blank max: {}, first content indent: {})",
-                    max_blank_indent_before_content, first_indent
-                );
-                return Err(indentation_error(stream.source_mut(), &msg));
+                return Err(crate::parser::document::block_scalar_errors::BlockScalarErrors::invalid_literal_blank_indent(
+                    stream.source_mut(),
+                    max_blank_indent_before_content,
+                    first_indent,
+                ));
             }
         }
     }
@@ -263,7 +285,6 @@ fn parse_block_scalar(
     }
     Ok(Node::Str(full, QuoteType::Unquoted, style))
 }
-use crate::parser::document::error_builder::syntax_error;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
 // Recursion guard removed
@@ -283,10 +304,12 @@ pub(crate) fn parse_scalar_with_tokens(
         Some(Token::SingleQuoted(s)) => parse_single_quoted_scalar(stream, &s),
         Some(Token::DoubleQuoted(s)) => parse_double_quoted_scalar(stream, &s),
         Some(Token::Plain(s)) => parse_scalar_dispatch(stream, &s, directives),
-        _ => Err(syntax_error(
-            stream.source_mut(),
-            &format!("Expected a scalar token, got {}", current_token_str),
-        )),
+        _ => Err(
+            crate::parser::document::token_errors::expected_scalar_token(
+                stream.source_mut(),
+                &current_token_str,
+            ),
+        ),
     }
 }
 // Module: parser/document/scalar.rs

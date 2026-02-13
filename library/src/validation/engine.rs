@@ -71,16 +71,6 @@ impl ValidationContext {
         self.path.pop();
     }
 
-    /// Get current path as string
-    #[allow(dead_code)]
-    fn current_path(&self) -> String {
-        if self.path.is_empty() {
-            "$".to_string()
-        } else {
-            format!("$.{}", self.path.join("."))
-        }
-    }
-
     /// Record an error and log it
     fn add_error(&mut self, error: impl std::fmt::Display) {
         let error = ValidationError::Custom(error.to_string());
@@ -267,32 +257,6 @@ impl SchemaValidator {
             _ => {}
         }
     }
-}
-
-/// Get human-readable name for node type
-#[allow(dead_code)]
-fn node_type_name(node: &Node) -> &'static str {
-    match node {
-        Node::Boolean(_) => "Boolean",
-        Node::Number(_) => "Number",
-        Node::Str(_, _, _) => "String",
-        Node::Array(_) => "Array",
-        Node::Set(_) => "Set",
-        Node::Mapping(_) => "Mapping",
-        Node::Comment(_) => "Comment",
-        Node::Document(_) => "Document",
-        Node::Anchored(_, _) => "Anchored",
-        Node::Tagged(_, _) => "Tagged",
-        Node::Alias(_) => "Alias",
-        Node::Documents(_) => "Documents",
-        Node::None => "Null",
-    }
-}
-
-/// Convert node to string representation for uniqueness checking
-#[allow(dead_code)]
-fn node_to_string(node: &Node) -> String {
-    node.to_string_lossy()
 }
 
 #[cfg(test)]

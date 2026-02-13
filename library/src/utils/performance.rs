@@ -201,7 +201,6 @@ impl DocumentStats {
 #[derive(Debug)]
 pub struct Timer {
     start: Instant,
-    #[allow(dead_code)]
     label: String,
 }
 

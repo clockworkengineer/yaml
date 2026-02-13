@@ -130,10 +130,7 @@ pub fn parse_inline_sequence_with_tokens(
                 if depth == 0 {
                     skip_inline_trivia(stream)?;
                     if matches!(stream.current(), Some(Token::FlowSequenceEnd)) {
-                        return Err(crate::parser::document::error_builder::syntax_error(
-                            stream.source_mut(),
-                            "Unexpected extra closing bracket ']' in flow sequence",
-                        ));
+                        return Err(crate::parser::document::flow_punctuation::unexpected_extra_closing_bracket_in_flow_sequence(stream));
                     }
                 }
                 break;
@@ -141,10 +138,7 @@ pub fn parse_inline_sequence_with_tokens(
             Some(Token::Comma) => {
                 if expect_item {
                     // Comma found when expecting an item: leading or double comma
-                    return Err(crate::parser::document::error_builder::syntax_error(
-                        stream.source_mut(),
-                        "Leading or double comma in flow sequence is not allowed",
-                    ));
+                    return Err(crate::parser::document::flow_punctuation::leading_or_double_comma_in_flow_sequence(stream));
                 }
                 // Allow trailing comma: set to expect next item, but do not error
                 // If immediately followed by ']', the loop will close cleanly
@@ -152,17 +146,25 @@ pub fn parse_inline_sequence_with_tokens(
                 expect_item = true;
             }
             None | Some(Token::Eof) => {
-                return Err(crate::parser::document::error_builder::eof_error(
-                    "flow sequence",
-                ));
+                return Err(
+                    crate::parser::document::flow_punctuation::unexpected_eof_in_flow_sequence(
+                        stream,
+                    ),
+                );
             }
             _ => {
                 if !expect_item {
                     // Found value without comma separator
-                    return Err(crate::parser::document::error_builder::syntax_error(
-                        stream.source_mut(),
-                        "Expected comma or ] in flow sequence",
-                    ));
+                    // DRY: use centralized helper to emit identical error
+                    if let Err(e) =
+                        crate::parser::document::flow_punctuation::ensure_separator_or_end(
+                            stream,
+                            crate::parser::document::flow_punctuation::FlowContext::Sequence,
+                            Token::FlowSequenceEnd,
+                        )
+                    {
+                        return Err(e);
+                    }
                 }
 
                 // Parse what might be a value or the key of an implicit mapping.
@@ -239,21 +241,19 @@ pub fn parse_inline_sequence_with_tokens(
         items.len()
     );
     // Special-case invalid flow sequence entries that are bare '-' scalars.
-    // The YAML test suite case G5U8 (`- [-, -]`) expects this shape to be
-    // rejected rather than interpreted as valid scalars inside a flow
-    // sequence. To keep the rule narrowly scoped and avoid impacting other
-    // valid inputs, only the exact pattern of a two-element flow sequence
-    // where both elements are the bare string "-" is treated as an error.
-    if items.len() == 2 {
-        if let (Node::Str(s1, ..), Node::Str(s2, ..)) = (&items[0], &items[1]) {
-            if s1 == "-" && s2 == "-" {
-                return Err(
-                    crate::parser::document::error_builder::mapping_key_error_yaml(
-                        stream.source_mut(),
-                        "Invalid use of '-' indicators inside flow sequence",
-                    ),
-                );
-            }
+    // Extend rule to reject any flow sequence where all entries are the bare
+    // string "-" (including single-entry sequences like `[-]`).
+    if !items.is_empty() {
+        let all_bare_dashes = items.iter().all(|n| match n {
+            Node::Str(s, ..) => s == "-",
+            _ => false,
+        });
+        if all_bare_dashes {
+            return Err(
+                crate::parser::document::flow_punctuation::invalid_bare_dash_entries_in_flow_sequence(
+                    stream,
+                ),
+            );
         }
     }
     Ok(make_array_node(items))
@@ -330,29 +330,30 @@ pub fn parse_inline_mapping_with_tokens(
             }
             None | Some(Token::Eof) => {
                 // Regression fix: produce a syntax error with 'Syntax error' in the message for unclosed flow mapping
-                return Err(crate::parser::document::error_builder::syntax_error(
-                    stream.source_mut(),
-                    "Syntax error: Unexpected end of input in flow mapping (unclosed '{')",
-                ));
+                return Err(crate::parser::document::flow_punctuation::unexpected_eof_in_flow_mapping_unclosed(stream));
             }
             _ => {
                 if !expect_entry {
                     // After a key-value pair, allow either a comma separator or closing brace.
-                    // If we see a closing '}' here, end the mapping gracefully.
-                    if matches!(stream.current(), Some(Token::FlowMappingEnd)) {
-                        let _ = stream.consume_flow_mapping_end()?;
-                        break;
+                    // DRY: use centralized helper to validate next token is separator or end
+                    match crate::parser::document::flow_punctuation::ensure_separator_or_end(
+                        stream,
+                        crate::parser::document::flow_punctuation::FlowContext::Mapping,
+                        Token::FlowMappingEnd,
+                    ) {
+                        Err(e) => return Err(e),
+                        Ok(()) => {
+                            if matches!(stream.current(), Some(Token::FlowMappingEnd)) {
+                                let _ = stream.consume_flow_mapping_end()?;
+                                break;
+                            }
+                            if matches!(stream.current(), Some(Token::Comma)) {
+                                let _ = stream.consume_if(Token::Comma)?;
+                                expect_entry = true;
+                                continue;
+                            }
+                        }
                     }
-                    if matches!(stream.current(), Some(Token::Comma)) {
-                        let _ = stream.consume_if(Token::Comma)?;
-                        expect_entry = true;
-                        continue;
-                    }
-                    // Otherwise, found key-value without required separator
-                    return Err(crate::parser::document::error_builder::syntax_error(
-                        stream.source_mut(),
-                        "Expected comma or } in flow mapping",
-                    ));
                 }
 
                 // Parse the mapping key. Special-case an empty key in flow
@@ -502,21 +503,19 @@ fn ensure_progress(
             stream.current(),
             None | Some(crate::parser::lexer::Token::Eof)
         ) {
-            return Err(crate::parser::document::error_builder::syntax_error(
-                stream.source_mut(),
-                &format!(
-                    "Syntax error: Parser did not advance when parsing {} (possible malformed input)",
-                    context
+            return Err(
+                crate::parser::document::token_errors::parser_did_not_advance_syntax(
+                    stream.source_mut(),
+                    context,
                 ),
-            ));
+            );
         } else {
-            return Err(crate::parser::document::error_builder::structure_error(
-                stream.source_mut(),
-                &format!(
-                    "Parser did not advance when parsing {} (possible malformed input)",
-                    context
+            return Err(
+                crate::parser::document::token_errors::parser_did_not_advance_structure(
+                    stream.source_mut(),
+                    context,
                 ),
-            ));
+            );
         }
     }
     Ok(())

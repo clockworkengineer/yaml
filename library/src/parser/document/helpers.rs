@@ -70,6 +70,9 @@ pub(crate) fn to_yaml_error<E: std::fmt::Display>(err: E) -> YamlError {
     YamlError::new(crate::error::ErrorKind::ParseError, format!("{}", err))
 }
 /// Helper to check if the current token matches a given kind.
+///
+/// Note: currently unused; keep for potential future TokenStream-based
+/// refactors of document parsing logic.
 pub(crate) fn is_token(
     ts: &crate::parser::token_stream::TokenStream,
     kind: &crate::parser::lexer::Token,
@@ -116,6 +119,32 @@ pub(crate) fn parse_document_markers(
                 break;
             }
         }
+        // Before invoking the token stream, do a character-level tag handle check
+        // to reliably catch explicit handles like '!handle!Type' on the same line
+        // as the document start marker, even if tokenization classifies the text
+        // as Plain in some edge cases.
+        if matches!(source.current(), Some('!')) {
+            // Peek ahead to extract the raw tag up to whitespace or comment
+            let st_tag = source.save_state();
+            let mut tag_raw = String::new();
+            while let Some(ch) = source.current() {
+                if ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n' || ch == '#' {
+                    break;
+                }
+                tag_raw.push(ch);
+                source.next();
+            }
+            source.restore_state(st_tag);
+            if !tag_raw.is_empty() {
+                if let Err(e) = directives.validate_tag_handle_usage(&tag_raw) {
+                    // Build a token-stream-based error for consistent formatting
+                    let ts_err =
+                        crate::parser::token_stream::TokenStream::new(source, directives, false)
+                            .map_err(to_yaml_error)?;
+                    return Err(parse_error_token(&ts_err, &e.to_string()));
+                }
+            }
+        }
         // Use token stream to check for forbidden tokens before newline
         let st = source.save_state();
         let early_error = {
@@ -135,7 +164,14 @@ pub(crate) fn parse_document_markers(
                     Some(crate::parser::lexer::Token::Newline)
                     | Some(crate::parser::lexer::Token::Eof) => {}
                     Some(crate::parser::lexer::Token::Comment(_)) => {}
-                    Some(crate::parser::lexer::Token::Tag(_)) => {}
+                    Some(crate::parser::lexer::Token::Tag(tag_str)) => {
+                        // QLJ7: Validate explicit tag handle usage immediately after '---'.
+                        // If an explicit handle like '!prefix!' is used without a corresponding
+                        // %TAG directive for this document, report a syntax error.
+                        if let Err(e) = directives.validate_tag_handle_usage(&tag_str) {
+                            err = Some(parse_error_token(&ts, &e.to_string()));
+                        }
+                    }
                     Some(crate::parser::lexer::Token::Plain(_)) => {
                         if let Some(crate::parser::lexer::Token::Colon) = ts.peek().ok().flatten() {
                             err = Some(parse_error_token(
@@ -172,20 +208,41 @@ pub(crate) fn parse_document_markers(
 pub(crate) fn parse_document_end_marker(
     source: &mut dyn ISource,
     directives: &DirectiveContext,
-) -> ParseResult<()> {
+) -> ParseResult<bool> {
+    let mut consumed_end = false;
     crate::utils::skip_whitespace_and_comments(source);
+    // First try a lightweight character-level check for '...' at the start
+    // of the current line before falling back to tokenization.
     let has_document_end = {
         let st = source.save_state();
-        let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)
-            .map_err(to_yaml_error)?;
-        let res = matches!(ts.current(), Some(crate::parser::lexer::Token::DocumentEnd));
+        let mut dot_count = 0;
+        while let Some('.') = source.current() {
+            dot_count += 1;
+            if dot_count == 3 {
+                break;
+            }
+            source.next();
+        }
+        let sep_ok = match source.current() {
+            Some(' ') | Some('\t') | Some('\r') | Some('\n') | Some('#') | None => true,
+            _ => false,
+        };
+        let found = dot_count == 3 && sep_ok;
         source.restore_state(st);
-        res
+        found
     };
     if has_document_end {
-        source.next();
-        source.next();
-        source.next();
+        // Consume the '...' marker explicitly when present at the current position.
+        if source.current() == Some('.') {
+            source.next();
+        }
+        if source.current() == Some('.') {
+            source.next();
+        }
+        if source.current() == Some('.') {
+            source.next();
+        }
+        consumed_end = true;
         // Validate only inline content after '...' up to end-of-line
         loop {
             match source.current() {
@@ -223,7 +280,7 @@ pub(crate) fn parse_document_end_marker(
             source.next();
         }
     }
-    Ok(())
+    Ok(consumed_end)
 }
 // ...existing code...
 /// Creates a formatted error message with current token context information (TokenStream-based).
@@ -300,7 +357,6 @@ pub(crate) fn validate_indentation_and_whitespace(
 /// Backward-compatible wrapper that validates no tabs are used for indentation in block context.
 ///
 /// Assumes the current position is at an indentation point (start of a new line) in block context.
-#[allow(dead_code)]
 /// Token-based wrapper for validating no tab indentation at current position.
 pub(crate) fn validate_no_tab_indentation_tokens(
     stream: &TokenStream,
@@ -527,7 +583,6 @@ pub(crate) fn validate_trailing_content_after_document_end(
 /// The comment text as a String
 /// Consumes a Comment token from the TokenStream and returns its content.
 /// Returns an empty string if the current token is not a Comment.
-#[allow(dead_code)]
 pub(crate) fn parse_comment_token(stream: &mut crate::parser::token_stream::TokenStream) -> String {
     use crate::parser::lexer::Token;
     match stream.current() {
@@ -547,7 +602,6 @@ pub(crate) fn parse_comment_token(stream: &mut crate::parser::token_stream::Toke
 ///
 /// According to the YAML spec, a comment indicator (#) must be preceded by whitespace or be at the start of a line.
 /// This function checks the previous token in the TokenStream context.
-#[allow(dead_code)]
 pub(crate) fn validate_comment_spacing_token(
     stream: &crate::parser::token_stream::TokenStream,
 ) -> crate::parser::ParseResult<()> {

@@ -25,28 +25,11 @@ pub(crate) fn validate_indentation_tokens(
     if !ctx.should_validate_tab_indentation() {
         return Ok(());
     }
+    // At token level we don't mutate or inspect raw source; validation occurs
+    // at call sites that can safely snapshot and peek the underlying source.
+    // Keep this as a no-op hook for future token-encoded indentation metadata.
     if let Some(Token::Indent(_)) = stream.current() {
-        // In YAML, indentation is always spaces. Tabs are forbidden.
-        // If the lexer encodes tab usage in Indent tokens, we can extend this
-        // function to report an error when tabs are used for indentation.
-        // Until then, this function is effectively a no-op and serves as a
-        // centralized place to evolve indentation rules.
-        Ok(())
-    } else {
-        Ok(())
+        return Ok(());
     }
-}
-
-/// Convenience wrapper for validating indentation at the beginning of a line.
-///
-/// This is the canonical entry point for callers that already operate on
-/// a `TokenStream` positioned at a logical line start. It currently
-/// delegates directly to `validate_indentation_tokens`, but exists as a
-/// stable, self-documenting API for future indentation rule tweaks.
-#[allow(dead_code)]
-pub(crate) fn validate_indentation_at_line_start(
-    stream: &TokenStream,
-    ctx: &ParsingContext,
-) -> crate::parser::ParseResult<()> {
-    validate_indentation_tokens(stream, ctx)
+    Ok(())
 }

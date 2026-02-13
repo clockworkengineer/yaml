@@ -57,7 +57,7 @@ fn get_all_test_dirs(suite_dir: &Path) -> Vec<PathBuf> {
     test_dirs
 }
 
- /// Run all YAML test suite cases and assert pass rate >= 86%
+// Run all YAML test suite cases and assert pass rate >= 90%
 #[test]
 fn run_yaml_test_suite() {
     // Try multiple possible paths for the test suite
@@ -82,10 +82,18 @@ fn run_yaml_test_suite() {
     };
 
     let skip_list: Vec<&str> = vec![];
+    // Current known failing cases from the latest full run (38 total)
+    let known_failures: Vec<&str> = vec![
+        "00", "01", "06", "236B", "2CMS", "4HVU", "4JVG", "5LLU", "5TRB", "5U3A", "6S55", "7LBH",
+        "7MNF", "9C9N", "9CWY", "BF9H", "BS4K", "C2SP", "CXX2", "D49Q", "DK4H", "DMG6", "EB22",
+        "EW3V", "G7JE", "G9HC", "GDY7", "GT5M", "H7TQ", "JKF3", "KS4U", "QB6E", "QLJ7", "RHX7",
+        "RXY3", "S98Z", "ZCZ6", "ZVH3",
+    ];
     let mut passed = 0;
     let mut failed = 0;
     let mut skipped = 0;
     let mut failures = Vec::new();
+    let mut unexpected_failures = Vec::new();
 
     let mut test_dirs = get_all_test_dirs(suite_dir);
     if test_dirs.is_empty() {
@@ -172,6 +180,10 @@ fn run_yaml_test_suite() {
                 "{} (expected: {}, got: {})",
                 test.id, expected, got
             ));
+            if !known_failures.contains(&test.id.as_str()) {
+                println!("UNEXPECTED FAILURE: {}", test.id);
+                unexpected_failures.push(test.id.clone());
+            }
         }
     }
     println!("\n=== YAML Test Suite Results (All Tests) ===");
@@ -185,67 +197,25 @@ fn run_yaml_test_suite() {
             println!("{}. {}", i + 1, failure);
         }
     }
+    if !unexpected_failures.is_empty() {
+        println!("\n=== Unexpected Failures ===");
+        for (i, id) in unexpected_failures.iter().enumerate() {
+            println!("{}. {}", i + 1, id);
+        }
+    }
     let total_tests = passed + failed;
     if total_tests > 0 {
         let pass_rate = (passed as f64 / total_tests as f64) * 100.0;
         println!("\nPass Rate: {:.1}%", pass_rate);
         assert!(
-            pass_rate >= 86.0,
-            "YAML test suite pass rate is below 86%: {:.1}%",
+            unexpected_failures.is_empty(),
+            "Unexpected YAML test failures detected: {:?}",
+            unexpected_failures
+        );
+        assert!(
+            pass_rate >= 90.0,
+            "YAML test suite pass rate is below 90%: {:.1}%",
             pass_rate
         );
     }
 }
-
-// /// Test a specific YAML test case by ID
-// #[allow(dead_code)]
-// fn test_specific_case(test_id: &str) {
-//     let test_dir = Path::new("../tests/yaml-test-suite").join(test_id);
-
-//     if !test_dir.exists() {
-//         panic!("Test case {} not found at {:?}", test_id, test_dir);
-//     }
-
-//     let test = load_test_case(&test_dir).expect("Failed to load test case");
-
-//     println!("Testing: {} - {}", test.id, test.name);
-//     println!("Is error test: {}", test.has_error_file);
-//     println!("\nYAML:\n{}", test.yaml);
-
-//     let mut source = BufferSource::new(test.yaml.as_bytes());
-//     let result = parse(&mut source);
-
-//     match result {
-//         Ok(doc) => {
-//             println!("\n✓ Parsed successfully!");
-//             if test.has_error_file {
-//                 println!("  WARNING: This is an error test but parsing succeeded");
-//             }
-//             // Don't print the full doc as it can be very large
-//             println!("  Document type: {:?}", std::mem::discriminant(&doc));
-//         }
-//         Err(e) => {
-//             println!("\n✗ Parse failed: {}", e);
-//             if !test.has_error_file {
-//                 println!("  WARNING: This test should have succeeded");
-//             }
-//         }
-//     }
-// }
-
-// #[test]
-// #[ignore] // Run with: cargo test test_examples -- --ignored
-// fn test_examples() {
-//     // Test some specific examples
-//     let examples = vec![
-//         "229Q", // Spec Example 2.4. Sequence of Mappings
-//         "236B", // Spec Example 2.3. Mapping Scalars to Scalars
-//         "26DV", // Whitespace around colon
-//         "27NA", // Spec Example 2.5. Sequence of Sequences
-//     ];
-
-//     for id in examples {
-//         println!("\n=== Testing {} ===", id);
-//         test_specific_case(id);
-//     }
-// }

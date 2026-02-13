@@ -22,7 +22,6 @@ use std::collections::HashMap;
 /// # Returns
 ///
 /// Result indicating success or an error string for invalid anchors
-#[allow(dead_code)]
 pub(crate) fn collect_anchors(node: &Node, anchors: &mut HashMap<String, Node>) -> ParseResult<()> {
     anchors_helpers::traverse_with_error(node, |n| {
         if let Node::Anchored(inner, name) = n {
@@ -52,7 +51,6 @@ pub(crate) fn collect_anchors(node: &Node, anchors: &mut HashMap<String, Node>) 
 /// # Returns
 ///
 /// Result indicating success or an error string for undefined aliases
-#[allow(dead_code)]
 pub(crate) fn replace_aliases(node: &mut Node, anchors: &HashMap<String, Node>) -> ParseResult<()> {
     let mut err: Option<crate::error::YamlError> = None;
     let mut replacer = |n: &mut Node| match n {
@@ -88,7 +86,6 @@ pub(crate) fn replace_aliases(node: &mut Node, anchors: &HashMap<String, Node>) 
 /// # Returns
 ///
 /// Result indicating success or an error string for invalid merge operations
-#[allow(dead_code)]
 pub(crate) fn expand_merge_keys(
     node: &mut Node,
     anchors: &HashMap<String, Node>,
