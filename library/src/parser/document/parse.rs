@@ -3,10 +3,10 @@ use crate::nodes::node::Node;
 use crate::nodes::node::Node::Document;
 
 use crate::parser::ParseResult;
+use crate::parser::document::directive_errors::DirectiveErrors;
 use crate::parser::document::helpers::{
     self, handle_directives, parse_document_end_marker, parse_document_markers, to_yaml_error,
 };
-use crate::parser::document::directive_errors::DirectiveErrors;
 use crate::parser::document::main_loop::parse_document;
 use crate::{loop_guard_check, loop_guard_init};
 
@@ -44,91 +44,91 @@ fn check_explicit_directives(
     Ok(())
 }
 
-    /// Parses a YAML stream into one or more documents.
-    pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
-        // Accumulates parsed documents
-        let mut docs: Vec<Node> = Vec::new();
-        // Track whether we've seen a '---' marker and any content
-        let mut saw_marker: bool = false;
-        let mut any_content: bool = false;
-        // Internal document counter for debug/tracing
-        let mut _doc_count: usize = 0;
+/// Parses a YAML stream into one or more documents.
+pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
+    // Accumulates parsed documents
+    let mut docs: Vec<Node> = Vec::new();
+    // Track whether we've seen a '---' marker and any content
+    let mut saw_marker: bool = false;
+    let mut any_content: bool = false;
+    // Internal document counter for debug/tracing
+    let mut _doc_count: usize = 0;
 
-        // Pre-scan the stream once for the presence of any explicit
-        // document end marker ('...'). This is a coarse but effective
-        // signal for distinguishing streams like RHX7 (no '...') from
-        // multi-document streams that legitimately place directives
-        // after an explicit end marker (e.g., W4TN, 5TYM).
-        let has_doc_end_marker: bool = {
-            let st = source.save_state();
-            // Reset to the beginning of the stream for the scan.
-            source.reset();
-            let mut found = false;
-            let directives_scan = crate::parser::directives::DirectiveContext::new();
-            if let Ok(mut ts) =
-                crate::parser::token_stream::TokenStream::new(source, &directives_scan, false)
-            {
-                use crate::parser::lexer::Token;
-                loop {
-                    match ts.next() {
-                        Ok(Some(t)) => {
-                            if matches!(t, Token::DocumentEnd) {
-                                found = true;
-                                break;
-                            }
-                            if matches!(t, Token::Eof) {
-                                break;
-                            }
+    // Pre-scan the stream once for the presence of any explicit
+    // document end marker ('...'). This is a coarse but effective
+    // signal for distinguishing streams like RHX7 (no '...') from
+    // multi-document streams that legitimately place directives
+    // after an explicit end marker (e.g., W4TN, 5TYM).
+    let has_doc_end_marker: bool = {
+        let st = source.save_state();
+        // Reset to the beginning of the stream for the scan.
+        source.reset();
+        let mut found = false;
+        let directives_scan = crate::parser::directives::DirectiveContext::new();
+        if let Ok(mut ts) =
+            crate::parser::token_stream::TokenStream::new(source, &directives_scan, false)
+        {
+            use crate::parser::lexer::Token;
+            loop {
+                match ts.next() {
+                    Ok(Some(t)) => {
+                        if matches!(t, Token::DocumentEnd) {
+                            found = true;
+                            break;
                         }
-                        Ok(None) => break,
-                        Err(_) => break,
+                        if matches!(t, Token::Eof) {
+                            break;
+                        }
                     }
+                    Ok(None) => break,
+                    Err(_) => break,
+                }
+            }
+        }
+        source.restore_state(st);
+        found
+    };
+
+    // Main document loop
+    loop {
+        // Skip leading whitespace/comments before handling directives or markers
+        crate::utils::skip_whitespace_and_comments(source);
+
+        // Stream-level mid-stream directive guard (RHX7): if we have
+        // already parsed at least one document in a stream that does
+        // not contain any explicit '...' marker at all, then
+        // encountering a new directive line here (%YAML or %TAG)
+        // indicates an invalid mid-stream directive placement.
+        if !docs.is_empty() {
+            let st = source.save_state();
+            crate::utils::skip_whitespace_and_comments(source);
+            let mut directive_ahead = false;
+            if let Some('%') = source.current() {
+                let st_dir = source.save_state();
+                let mut word = String::new();
+                while let Some(ch) = source.current() {
+                    if ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n' {
+                        break;
+                    }
+                    word.push(ch);
+                    source.next();
+                }
+                source.restore_state(st_dir);
+                if word == "%YAML" || word == "%TAG" {
+                    directive_ahead = true;
                 }
             }
             source.restore_state(st);
-            found
-        };
-
-        // Main document loop
-        loop {
-            // Skip leading whitespace/comments before handling directives or markers
-            crate::utils::skip_whitespace_and_comments(source);
-
-            // Stream-level mid-stream directive guard (RHX7): if we have
-            // already parsed at least one document in a stream that does
-            // not contain any explicit '...' marker at all, then
-            // encountering a new directive line here (%YAML or %TAG)
-            // indicates an invalid mid-stream directive placement.
-            if !docs.is_empty() {
-                let st = source.save_state();
-                crate::utils::skip_whitespace_and_comments(source);
-                let mut directive_ahead = false;
-                if let Some('%') = source.current() {
-                    let st_dir = source.save_state();
-                    let mut word = String::new();
-                    while let Some(ch) = source.current() {
-                        if ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n' {
-                            break;
-                        }
-                        word.push(ch);
-                        source.next();
-                    }
-                    source.restore_state(st_dir);
-                    if word == "%YAML" || word == "%TAG" {
-                        directive_ahead = true;
-                    }
-                }
-                source.restore_state(st);
-                if directive_ahead && !has_doc_end_marker {
-                    return Err(to_yaml_error(
-                        DirectiveErrors::directives_not_allowed_midstream_msg(),
-                    ));
-                }
+            if directive_ahead && !has_doc_end_marker {
+                return Err(to_yaml_error(
+                    DirectiveErrors::directives_not_allowed_midstream_msg(),
+                ));
             }
+        }
 
-            // Parse and merge directives using helper, then validate placement
-            let directives = handle_directives(source)?;
-            check_explicit_directives(source, &directives)?;
+        // Parse and merge directives using helper, then validate placement
+        let directives = handle_directives(source)?;
+        check_explicit_directives(source, &directives)?;
 
         // Detect if there is a document start marker (---) at the current position
         let has_document_start = {
@@ -304,7 +304,10 @@ fn check_explicit_directives(
                 // check for an immediate top-level plain scalar without dash.
                 let _ = ts_chk.skip_trivia();
                 if td5n_seq_items >= 2 {
-                    if matches!(ts_chk.current(), Some(crate::parser::lexer::Token::Plain(_))) {
+                    if matches!(
+                        ts_chk.current(),
+                        Some(crate::parser::lexer::Token::Plain(_))
+                    ) {
                         source.restore_state(st_td5n);
                         return Err(
                             crate::parser::document::token_errors::document_unexpected_plain_after_top_level_sequence(
@@ -383,11 +386,18 @@ fn check_explicit_directives(
                     // immediately followed by a top-level plain scalar without an
                     // explicit '---' separator, this is invalid. Return a structured
                     // error instead of splitting into multiple documents.
-                    if let (Some(Node::Array(items)), Some(Node::Str(_, crate::nodes::node::QuoteType::Unquoted, _))) =
-                        (nodes.get(0), nodes.get(1))
+                    if let (
+                        Some(Node::Array(items)),
+                        Some(Node::Str(_, crate::nodes::node::QuoteType::Unquoted, _)),
+                    ) = (nodes.get(0), nodes.get(1))
                     {
                         let prev_all_plain = items.len() >= 2
-                            && items.iter().all(|it| matches!(it, Node::Str(_, crate::nodes::node::QuoteType::Unquoted, _)));
+                            && items.iter().all(|it| {
+                                matches!(
+                                    it,
+                                    Node::Str(_, crate::nodes::node::QuoteType::Unquoted, _)
+                                )
+                            });
                         if prev_all_plain {
                             return Err(crate::parser::document::token_errors::document_unexpected_plain_after_top_level_sequence(
                                 source,
@@ -488,8 +498,7 @@ fn check_explicit_directives(
         } else {
             // TokenStream-based check for explicit '---' ahead
             let dir = crate::parser::directives::DirectiveContext::new();
-            let mut ts_ahead =
-                crate::parser::token_stream::TokenStream::new(source, &dir, false)?;
+            let mut ts_ahead = crate::parser::token_stream::TokenStream::new(source, &dir, false)?;
             ts_ahead.skip_trivia()?;
             has_next_doc = matches!(
                 ts_ahead.current(),

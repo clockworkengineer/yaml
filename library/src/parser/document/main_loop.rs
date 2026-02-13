@@ -97,11 +97,14 @@ fn parse_document_main_loop(
                             // Token-level check: if the next token is a Plain scalar
                             // at the same top-level indent, reject (TD5N).
                             let st = source.save_state();
-                            if let Ok(mut ts) =
-                                crate::parser::token_stream::TokenStream::new(source, directives, false)
-                            {
+                            if let Ok(mut ts) = crate::parser::token_stream::TokenStream::new(
+                                source, directives, false,
+                            ) {
                                 let _ = ts.skip_trivia();
-                                if matches!(ts.current(), Some(crate::parser::lexer::Token::Plain(_))) {
+                                if matches!(
+                                    ts.current(),
+                                    Some(crate::parser::lexer::Token::Plain(_))
+                                ) {
                                     source.restore_state(st);
                                     return Err(
                                         crate::parser::document::token_errors::document_unexpected_plain_after_top_level_sequence(
@@ -147,7 +150,8 @@ fn parse_document_main_loop(
     if let Some(Node::Array(_)) = document_nodes.last() {
         // Peek ahead using TokenStream without consuming the source
         let st = source.save_state();
-        if let Ok(mut ts) = crate::parser::token_stream::TokenStream::new(source, directives, false) {
+        if let Ok(mut ts) = crate::parser::token_stream::TokenStream::new(source, directives, false)
+        {
             let _ = ts.skip_trivia();
             if matches!(ts.current(), Some(crate::parser::lexer::Token::Plain(_))) {
                 // Ensure we are at the same top-level indent
@@ -202,7 +206,9 @@ pub fn parse_document(
     fn validate_tags_rec(node: &Node, directives: &DirectiveContext) -> ParseResult<()> {
         match node {
             Node::Tagged(inner, tag_raw) => {
-                directives.validate_tag_handle_usage(tag_raw).map_err(|e| e)?;
+                directives
+                    .validate_tag_handle_usage(tag_raw)
+                    .map_err(|e| e)?;
                 validate_tags_rec(inner, directives)?;
             }
             Node::Mapping(pairs) => {
@@ -226,7 +232,10 @@ pub fn parse_document(
     for n in &document_nodes {
         // Convert validation error to a simple parse error without precise position
         if let Err(e) = validate_tags_rec(n, directives) {
-            return Err(crate::parser::document::helpers::to_yaml_error(format!("{}", e)));
+            return Err(crate::parser::document::helpers::to_yaml_error(format!(
+                "{}",
+                e
+            )));
         }
     }
 
@@ -275,7 +284,9 @@ pub fn parse_document(
             for (_, v) in pairs {
                 if let Node::Mapping(inner) = v {
                     if inner.len() >= 2 {
-                        if let (Node::Str(s, QuoteType::Unquoted, _), Node::None) = (&inner[0].0, &inner[0].1) {
+                        if let (Node::Str(s, QuoteType::Unquoted, _), Node::None) =
+                            (&inner[0].0, &inner[0].1)
+                        {
                             if s.contains(' ') {
                                 use crate::parser::document::error_builder::mapping_key_error_yaml;
                                 return Err(mapping_key_error_yaml(
