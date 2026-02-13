@@ -31,23 +31,7 @@ impl BlockScalarErrors {
     ) -> YamlError {
         let msg = alloc::format!(
             "Invalid indentation in literal block scalar: blank lines before content are more indented than the content (blank max: {}, first content indent: {})",
-            blank_max,
-            first_content_indent
-        );
-        indentation_error(source, &msg)
-    }
-
-    /// Folded block scalar: blank lines before content indented more than the content.
-    #[allow(dead_code)]
-    pub fn invalid_folded_blank_indent(
-        source: &mut dyn ISource,
-        blank_max: usize,
-        first_content_indent: usize,
-    ) -> YamlError {
-        let msg = alloc::format!(
-            "Invalid indentation in folded block scalar: blank lines before content are more indented than the content (blank max: {}, first content indent: {})",
-            blank_max,
-            first_content_indent
+            blank_max, first_content_indent
         );
         indentation_error(source, &msg)
     }

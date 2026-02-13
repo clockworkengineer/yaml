@@ -49,25 +49,4 @@ pub fn escape_for_xml(s: &str) -> String {
     out
 }
 
-/// Escapes special characters in a string for double-quoted YAML representation.
-///
-/// This is a thin wrapper around the existing `escape_double` logic in
-/// stringify/default.rs to make it available to other modules without
-/// duplicating behavior. For now, callers in YAML formatter continue to
-/// use their local helper; this API exists for potential future reuse.
-#[allow(dead_code)]
-pub fn escape_yaml_double<F>(s: &str, escape_impl: F) -> String
-where
-    F: Fn(&str) -> String,
-{
-    escape_impl(s)
-}
-
-/// Escapes single quotes in a string for single-quoted YAML representation.
-#[allow(dead_code)]
-pub fn escape_yaml_single<F>(s: &str, escape_impl: F) -> String
-where
-    F: Fn(&str) -> String,
-{
-    escape_impl(s)
-}
+// Legacy escape helpers removed: all callers use formatter-local functions.

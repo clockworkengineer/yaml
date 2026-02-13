@@ -29,7 +29,6 @@ pub(crate) fn parse_mapping(
     // Uses token type and boundaries, not raw string checks.
     use crate::parser::lexer::Token;
     // Checks if a value token can be safely represented as plain (unquoted) YAML.
-    #[allow(dead_code)]
     fn is_plain_safe_value_token(token: &Token) -> bool {
         match token {
             Token::Plain(value) => {
@@ -53,7 +52,6 @@ pub(crate) fn parse_mapping(
         }
     }
     // Checks if a key token can be safely represented as plain (unquoted) YAML.
-    #[allow(dead_code)]
     fn is_plain_safe_key_token(token: &Token) -> bool {
         match token {
             Token::Plain(value) => is_plain_safe_value_token(token) && !value.contains(':'),

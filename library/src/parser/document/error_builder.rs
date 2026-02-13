@@ -54,7 +54,6 @@ struct SourceContext {
 
 impl ErrorBuilder {
     /// Creates a new error builder with the specified category
-    #[allow(dead_code)]
     pub fn new(category: ErrorCategory) -> Self {
         Self {
             category,
@@ -185,7 +184,6 @@ pub fn eof_error(context: &str) -> YamlError {
 }
 
 /// Creates an EOF error with expected element
-#[allow(dead_code)]
 pub fn eof_expecting(expected: &str) -> YamlError {
     ErrorBuilder::new(ErrorCategory::Syntax)
         .message(format!(
@@ -196,7 +194,6 @@ pub fn eof_expecting(expected: &str) -> YamlError {
 }
 
 /// Creates an "expected X" error with source context
-#[allow(dead_code)]
 pub fn expected_error(source: &mut dyn ISource, expected: &str) -> YamlError {
     ErrorBuilder::new(ErrorCategory::Syntax)
         .message(format!("Expected {}", expected))
@@ -205,7 +202,6 @@ pub fn expected_error(source: &mut dyn ISource, expected: &str) -> YamlError {
 }
 
 /// Creates an "unexpected X" error with source context
-#[allow(dead_code)]
 pub fn unexpected_error(source: &mut dyn ISource, found: &str) -> YamlError {
     ErrorBuilder::new(ErrorCategory::Syntax)
         .message(format!("Unexpected {}", found))
@@ -214,7 +210,6 @@ pub fn unexpected_error(source: &mut dyn ISource, found: &str) -> YamlError {
 }
 
 /// Creates an empty anchor/alias error
-#[allow(dead_code)]
 pub fn empty_name_error(name_type: &str) -> YamlError {
     ErrorBuilder::new(ErrorCategory::Syntax)
         .message(format!("Empty {} name", name_type))
@@ -222,7 +217,6 @@ pub fn empty_name_error(name_type: &str) -> YamlError {
 }
 
 /// Creates an undefined reference error
-#[allow(dead_code)]
 pub fn undefined_reference(ref_type: &str, name: &str) -> YamlError {
     ErrorBuilder::new(ErrorCategory::Syntax)
         .message(format!("Undefined {} reference: {}", ref_type, name))
@@ -230,7 +224,6 @@ pub fn undefined_reference(ref_type: &str, name: &str) -> YamlError {
 }
 
 /// Creates a duplicate definition error
-#[allow(dead_code)]
 pub fn duplicate_error(item_type: &str, name: &str) -> YamlError {
     ErrorBuilder::new(ErrorCategory::Syntax)
         .message(format!("Duplicate {}: {}", item_type, name))
@@ -238,7 +231,6 @@ pub fn duplicate_error(item_type: &str, name: &str) -> YamlError {
 }
 
 /// Creates an inconsistent indentation error with details
-#[allow(dead_code)]
 pub fn inconsistent_indent_error(
     source: &mut dyn ISource,
     expected: usize,

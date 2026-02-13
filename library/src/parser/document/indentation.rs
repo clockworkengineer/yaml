@@ -61,7 +61,6 @@ pub fn ensure_indent_at_least_no_source(
 /// Uses `ParsingContext` parent indent to validate `child_indent` is deeper
 /// than its parent. This is not wired into existing code paths yet, but it
 /// provides a single API for future indentation policy tweaks.
-#[allow(dead_code)]
 pub fn ensure_valid_child_indent(
     source: &mut dyn ISource,
     ctx: &ParsingContext,

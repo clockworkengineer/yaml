@@ -38,7 +38,6 @@ pub struct ParsingContext {
     pub after_newline: bool,
 
     /// The type of collection context we're in (if any)
-    #[allow(dead_code)]
     pub collection_type: CollectionType,
 
     /// Reference to parent context for nested structure validation
@@ -48,7 +47,6 @@ pub struct ParsingContext {
 
 /// Types of collection contexts that affect parsing behavior
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)]
 pub enum CollectionType {
     /// Not in a collection (top-level document)
     None,
@@ -62,7 +60,6 @@ pub enum CollectionType {
     FlowMapping,
 }
 
-#[allow(dead_code)]
 impl ParsingContext {
     /// Creates a new root parsing context
     ///

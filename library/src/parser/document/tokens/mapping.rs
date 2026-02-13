@@ -88,7 +88,6 @@ fn mapping_log(msg: String) {
 
 /// Parses a single key-value mapping pair (for sequence items).
 /// Used when a mapping pair appears as a sequence item (e.g., - key: value).
-#[allow(dead_code)]
 pub fn parse_single_mapping_pair_with_tokens(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
@@ -118,8 +117,6 @@ pub fn parse_single_mapping_pair_with_tokens(
 /// - No complex lookahead for keys with decorators
 /// - Clear token boundaries prevent infinite loops
 /// - Natural handling of explicit keys (?)
-#[allow(dead_code)]
-
 pub fn parse_mapping_with_tokens(
     stream: &mut TokenStream,
     base_indent: usize,
@@ -381,7 +378,6 @@ impl MappingParseContext {
 impl MappingParseContext {
     /// Parse a single key-value pair within a mapping.
     /// Handles explicit keys, omitted values, and YAML edge cases.
-    #[allow(dead_code)]
     fn parse_mapping_pair(
         &self,
         stream: &mut TokenStream,
@@ -625,7 +621,6 @@ mod tests {
     use super::*;
     use crate::io::sources::buffer::Buffer;
     use crate::parser::directives::DirectiveContext;
-    
 
     #[test]
     fn test_simple_mapping() {
@@ -855,7 +850,11 @@ mod tests {
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
         let result = parse_mapping_with_tokens(&mut stream, 0, &directives, 0);
-        assert!(result.is_err(), "Expected error for nested ':' after quoted value, got: {:?}", result);
+        assert!(
+            result.is_err(),
+            "Expected error for nested ':' after quoted value, got: {:?}",
+            result
+        );
     }
 
     #[test]
@@ -868,7 +867,11 @@ mod tests {
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
         let result = parse_mapping_with_tokens(&mut stream, 0, &directives, 0);
-        assert!(result.is_err(), "Expected error for nested ':' in block mapping, got: {:?}", result);
+        assert!(
+            result.is_err(),
+            "Expected error for nested ':' in block mapping, got: {:?}",
+            result
+        );
     }
 
     #[test]
@@ -882,10 +885,16 @@ mod tests {
 
         // Top-level should be a sequence, but misaligned indent should be rejected
         use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
-        let ctx_seq = crate::parser::document::context::ParsingContext::new(0)
-            .child_block_context(0, crate::parser::document::context::CollectionType::BlockSequence);
+        let ctx_seq = crate::parser::document::context::ParsingContext::new(0).child_block_context(
+            0,
+            crate::parser::document::context::CollectionType::BlockSequence,
+        );
         let result = parse_sequence_with_tokens(&mut stream, 0, 0, &directives, &ctx_seq, 0);
-        assert!(result.is_err(), "Expected error for ZVH3-like misindent sequence, got: {:?}", result);
+        assert!(
+            result.is_err(),
+            "Expected error for ZVH3-like misindent sequence, got: {:?}",
+            result
+        );
     }
 
     #[test]

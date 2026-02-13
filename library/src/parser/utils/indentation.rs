@@ -33,17 +33,3 @@ pub(crate) fn validate_indentation_tokens(
     }
     Ok(())
 }
-
-/// Convenience wrapper for validating indentation at the beginning of a line.
-///
-/// This is the canonical entry point for callers that already operate on
-/// a `TokenStream` positioned at a logical line start. It currently
-/// delegates directly to `validate_indentation_tokens`, but exists as a
-/// stable, self-documenting API for future indentation rule tweaks.
-#[allow(dead_code)]
-pub(crate) fn validate_indentation_at_line_start(
-    stream: &TokenStream,
-    ctx: &ParsingContext,
-) -> crate::parser::ParseResult<()> {
-    validate_indentation_tokens(stream, ctx)
-}

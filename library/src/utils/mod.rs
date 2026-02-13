@@ -38,7 +38,6 @@ use crate::{Node, Numeric};
 /// # Safety
 ///
 /// Has a maximum iteration limit of 100,000 characters to prevent infinite loops
-#[allow(dead_code)]
 pub fn collect_until<F>(source: &mut dyn ISource, mut stop_pred: F) -> String
 where
     F: FnMut(char) -> bool,
@@ -120,7 +119,6 @@ pub fn skip_whitespace_and_comments(source: &mut dyn ISource) {
 /// # Returns
 ///
 /// `Ok(())` if successful, `Err(String)` if tabs found as indentation
-#[allow(dead_code)]
 pub fn skip_whitespace_and_comments_validate_tabs(source: &mut dyn ISource) -> Result<(), String> {
     let mut iterations = 0;
     const MAX_ITERATIONS: usize = 100_000;
@@ -193,41 +191,6 @@ pub fn skip_until_newline(source: &mut dyn ISource) {
     }
 }
 
-/// Consumes an inline comment and any following newline and whitespace.
-///
-/// If the current character is a hash (#), consumes all characters until a newline,
-/// then consumes the newline and any whitespace that follows. If the current character
-/// is not a hash, this function returns immediately without consuming anything.
-///
-/// # Arguments
-///
-/// * `source` - A mutable reference to a source implementing ISource trait
-#[allow(dead_code)]
-pub fn consume_inline_comment_and_newline(source: &mut dyn ISource) {
-    if source.current() != Some(CHAR_HASH) {
-        return;
-    }
-
-    while let Some(c) = source.current() {
-        if c == CHAR_NEWLINE {
-            break;
-        }
-        source.next();
-    }
-
-    if source.current() == Some(CHAR_NEWLINE) {
-        source.next();
-    }
-
-    while let Some(c) = source.current() {
-        if source.is_whitespace(c) {
-            source.next();
-        } else {
-            break;
-        }
-    }
-}
-
 /// Reads a line from the source and returns it as a trimmed string, excluding comments.
 ///
 /// Collects characters until a newline is encountered. If a hash (#) character is found,
@@ -241,7 +204,6 @@ pub fn consume_inline_comment_and_newline(source: &mut dyn ISource) {
 /// # Returns
 ///
 /// A trimmed String containing the line content without comments
-#[allow(dead_code)]
 pub fn read_line_trimmed_into_string(source: &mut dyn ISource) -> String {
     let s = collect_until(source, |c| c == CHAR_NEWLINE);
 
@@ -282,55 +244,6 @@ pub fn node_to_inline_string(node: &Node) -> String {
         }
         _ => format!("{node:?}"),
     }
-}
-
-/// Processes escape sequences in a double-quoted string.
-///
-/// Handles various escape sequences including Unicode escapes (\u), hex escapes (\x),
-/// and standard escape characters (\n, \r, \t, \b, \", \\). Unicode escapes are
-/// processed but not fully decoded (preserves as-is for most cases).
-///
-/// # Arguments
-///
-/// * `s` - A string slice containing the potentially escaped string
-///
-/// Validates that a double-quoted string contains only valid escape sequences
-///
-/// # Arguments
-///
-/// * `s` - The string content (without surrounding quotes) to validate
-///
-/// # Returns
-///
-/// Result with Ok(()) if valid, or Err with error message if invalid
-#[allow(dead_code)]
-pub fn validate_double_quoted_escapes(s: &str) -> Result<(), String> {
-    let mut chars = s.chars().peekable();
-
-    while let Some(c) = chars.next() {
-        if c == '\\' {
-            match chars.peek() {
-                Some('u') | Some('U') | Some('x') | Some('n') | Some('r') | Some('t')
-                | Some('b') | Some('"') | Some('\\') | Some('/') | Some(' ') | Some('0')
-                | Some('a') | Some('v') | Some('f') | Some('e') | Some('N') | Some('_')
-                | Some('L') | Some('P') => {
-                    // Valid escape
-                }
-                Some('\n') | Some('\r') | Some('\t') => {
-                    // Line continuation: \<newline> or \<tab> is valid (backslash escapes the line break)
-                    // This allows for line folding in double-quoted strings
-                    // Tab after backslash is treated as whitespace continuation
-                }
-                Some(other) => {
-                    return Err(format!("Invalid escape sequence: \\{}", other));
-                }
-                None => {
-                    return Err("Trailing backslash in string".to_string());
-                }
-            }
-        }
-    }
-    Ok(())
 }
 
 /// Unescapes a double-quoted string by processing escape sequences.

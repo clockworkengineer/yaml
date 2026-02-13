@@ -109,7 +109,6 @@ pub enum Token {
     DocumentEnd,
 
     /// Directive: %YAML or %TAG
-    #[allow(dead_code)]
     Directive(String),
 
     /// End of stream
@@ -177,7 +176,6 @@ impl<'a> Lexer<'a> {
     }
 
     /// Peek at the next token without consuming it
-    #[allow(dead_code)]
     #[inline]
     pub fn peek(&mut self) -> Result<Option<&Token>, crate::error::YamlError> {
         if self.peeked_token.is_none() {
@@ -888,7 +886,6 @@ impl<'a> Lexer<'a> {
     }
 
     /// Scan a directive: %YAML or %TAG
-    #[allow(dead_code)]
     fn scan_directive(&mut self) -> Result<Token, crate::error::YamlError> {
         self.source.next(); // consume '%'
 
@@ -1286,7 +1283,6 @@ impl<'a> Lexer<'a> {
     }
 
     /// Get the current indentation level (for error reporting)
-    #[allow(dead_code)]
     pub fn indent_level(&self) -> usize {
         self.source.get_current_indent_level()
     }

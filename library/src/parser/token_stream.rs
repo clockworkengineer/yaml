@@ -51,7 +51,6 @@ fn ts_log(msg: String) {
     log::trace!("{}", msg);
 }
 
-#[allow(dead_code)]
 impl<'a> TokenStream<'a> {
     /// Create a new token stream and load the first token
     ///
@@ -567,7 +566,6 @@ impl<'a> TokenStream<'a> {
 
 /// Type of scalar value
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)]
 pub enum ScalarType {
     Plain,
     SingleQuoted,
