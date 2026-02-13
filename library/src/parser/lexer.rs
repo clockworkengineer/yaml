@@ -1113,7 +1113,7 @@ impl<'a> Lexer<'a> {
                                     }
                                     _ => {
                                         return Err(
-                                            crate::parser::document::token_errors::invalid_escape_U_expected_8_hex(
+                                            crate::parser::document::token_errors::invalid_escape_u_expected_8_hex(
                                                 self.source,
                                             ),
                                         );

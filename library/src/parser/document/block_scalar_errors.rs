@@ -7,7 +7,6 @@ use crate::parser::document::error_builder::{indentation_error, syntax_error};
 pub struct BlockScalarErrors;
 
 impl BlockScalarErrors {
-
     /// Unexpected trailing text immediately after '|' or '>' in block scalar header.
     pub fn invalid_header_unexpected_text(source: &mut dyn ISource) -> YamlError {
         syntax_error(
@@ -32,12 +31,14 @@ impl BlockScalarErrors {
     ) -> YamlError {
         let msg = alloc::format!(
             "Invalid indentation in literal block scalar: blank lines before content are more indented than the content (blank max: {}, first content indent: {})",
-            blank_max, first_content_indent
+            blank_max,
+            first_content_indent
         );
         indentation_error(source, &msg)
     }
 
     /// Folded block scalar: blank lines before content indented more than the content.
+    #[allow(dead_code)]
     pub fn invalid_folded_blank_indent(
         source: &mut dyn ISource,
         blank_max: usize,
@@ -45,9 +46,9 @@ impl BlockScalarErrors {
     ) -> YamlError {
         let msg = alloc::format!(
             "Invalid indentation in folded block scalar: blank lines before content are more indented than the content (blank max: {}, first content indent: {})",
-            blank_max, first_content_indent
+            blank_max,
+            first_content_indent
         );
         indentation_error(source, &msg)
     }
-
 }

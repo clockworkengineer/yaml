@@ -169,7 +169,7 @@ fn parse_block_scalar(
     let mut saw_plain_current_line: bool = false;
     // Track if a comment appears before the first content line; used only
     // for diagnostics in debug builds.
-    let mut comment_before_first_content: bool = false;
+    let mut _comment_before_first_content: bool = false;
     loop {
         match stream.current() {
             Some(Token::Indent(level)) => {
@@ -242,7 +242,7 @@ fn parse_block_scalar(
             }
             Some(Token::Comment(_)) => {
                 if first_content_indent.is_none() {
-                    comment_before_first_content = true;
+                    _comment_before_first_content = true;
                 }
                 stream.next()?;
             }
@@ -285,7 +285,6 @@ fn parse_block_scalar(
     }
     Ok(Node::Str(full, QuoteType::Unquoted, style))
 }
-use crate::parser::document::error_builder::syntax_error;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
 // Recursion guard removed

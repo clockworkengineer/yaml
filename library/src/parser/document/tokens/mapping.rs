@@ -625,7 +625,7 @@ mod tests {
     use super::*;
     use crate::io::sources::buffer::Buffer;
     use crate::parser::directives::DirectiveContext;
-    use crate::parser::document::main_loop::parse_document;
+    
 
     #[test]
     fn test_simple_mapping() {

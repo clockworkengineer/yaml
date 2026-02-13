@@ -8,7 +8,6 @@ use crate::parser::document::helpers::{
     self, handle_directives, parse_document_end_marker, parse_document_markers, to_yaml_error,
 };
 use crate::parser::document::main_loop::parse_document;
-use crate::{loop_guard_check, loop_guard_init};
 
 /// Checks for explicit directives and ensures a document follows them.
 /// Returns an error if directives are not followed by a document.
@@ -470,7 +469,6 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
         let st_ahead = source.save_state();
         // Character-level peek for directive lines
         crate::utils::skip_whitespace_and_comments(source);
-        let mut has_next_doc = false;
         let mut directive_ahead = false;
         if let Some('%') = source.current() {
             // Save/restore around the small peek to avoid consuming st_ahead
@@ -490,21 +488,21 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
             }
         }
 
-        if directive_ahead {
+        let has_next_doc = if directive_ahead {
             // A directive line ahead always indicates the start of another
             // document. RHX7 (mid-stream directives after content) is enforced
             // inside the document main loop, not here.
-            has_next_doc = true;
+            true
         } else {
             // TokenStream-based check for explicit '---' ahead
             let dir = crate::parser::directives::DirectiveContext::new();
             let mut ts_ahead = crate::parser::token_stream::TokenStream::new(source, &dir, false)?;
             ts_ahead.skip_trivia()?;
-            has_next_doc = matches!(
+            matches!(
                 ts_ahead.current(),
                 Some(crate::parser::lexer::Token::DocumentStart)
-            );
-        }
+            )
+        };
         // Restore the original position after ahead checks
         source.restore_state(st_ahead);
         if !has_next_doc {

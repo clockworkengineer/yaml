@@ -70,6 +70,7 @@ pub(crate) fn to_yaml_error<E: std::fmt::Display>(err: E) -> YamlError {
     YamlError::new(crate::error::ErrorKind::ParseError, format!("{}", err))
 }
 /// Helper to check if the current token matches a given kind.
+#[allow(dead_code)]
 pub(crate) fn is_token(
     ts: &crate::parser::token_stream::TokenStream,
     kind: &crate::parser::lexer::Token,

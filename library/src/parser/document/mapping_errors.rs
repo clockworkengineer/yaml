@@ -61,21 +61,6 @@ pub fn inconsistent_dedent_within_mapping_value_for_keys(
     .with_note("Ensure all keys under the nested mapping use the same indentation.")
 }
 
-/// Centralized error: Dedent below base indent within a mapping value
-///
-/// This indicates a key appearing at an indentation less than the parent mapping's
-/// base indent, which is invalid for YAML block mappings.
-pub fn inconsistent_dedent_below_base_indent_in_mapping(
-    stream: &mut TokenStream,
-) -> EnhancedError {
-    EnhancedError::new(crate::parser::document::error_builder::mapping_key_error_yaml(
-        stream.source_mut(),
-        "Invalid indentation for mapping key: dedent below the base indent is not allowed",
-    ))
-    .with_code(ErrorCode::E009)
-    .with_note("Keys in a block mapping must align at or above the parent mapping's indent.")
-}
-
 /// Centralized error: Invalid anchored alias key (anchors cannot be applied to alias nodes)
 ///
 /// Returns an EnhancedError with code E004 and note, matching existing behavior and text.
