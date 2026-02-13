@@ -57,6 +57,21 @@ fn parse_document_main_loop(
         if is_document_marker(source, directives)? {
             break;
         }
+        // Treat top-level lines beginning with '%' specially: they may
+        // indicate the start of a new document's directive section and
+        // should be handled by the outer stream parser. However, '%' that
+        // appears at a deeper indentation (e.g., within a block scalar
+        // like PostScript content) must be treated as normal content.
+        if c == '%' {
+            let current_indent = source.get_current_indent_level();
+            if current_indent == indent_level {
+                // Top-level '%' line: stop this document and let the outer
+                // stream-level parser decide whether this is a valid
+                // directive context. Mid-stream directive placement (RHX7)
+                // is enforced at the stream level using document end state.
+                break;
+            }
+        }
         match c {
             '#' => {
                 crate::parser::utils::comments::validate_top_level_comment_followed_by_indented_content(
@@ -65,12 +80,6 @@ fn parse_document_main_loop(
                     indent_level,
                 )?;
                 continue;
-            }
-            '%' => {
-                // Encountered a '%' at top-level while parsing content. Break out and
-                // let the outer stream parser handle possible directives for the next
-                // document. RHX7 is enforced at the stream level (post-document check).
-                break;
             }
             _ => {
                 // Capture the starting indent of this node before parsing,
