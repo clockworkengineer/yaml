@@ -31,7 +31,8 @@ impl BlockScalarErrors {
     ) -> YamlError {
         let msg = alloc::format!(
             "Invalid indentation in literal block scalar: blank lines before content are more indented than the content (blank max: {}, first content indent: {})",
-            blank_max, first_content_indent
+            blank_max,
+            first_content_indent
         );
         indentation_error(source, &msg)
     }
