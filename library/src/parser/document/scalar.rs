@@ -1,55 +1,95 @@
 /// Shared helper for block scalar and plain scalar detection and parsing
 use crate::constants::{CHAR_DASH, CHAR_GREATER_THAN, CHAR_SPACE, CHAR_VERTICAL_BAR};
+use crate::error::YamlError;
+use crate::io::traits::ISource;
+
+/// Parsed view of a block scalar header ("|" or ">" line).
+///
+/// Currently we only need to know whether an explicit indent indicator
+/// was provided; additional fields can be added if future refactors
+/// need full chomping/indent metadata.
+struct ParsedBlockHeader {
+    has_explicit_indent_indicator: bool,
+}
+
+/// Parses a potential block scalar header line.
+///
+/// Returns:
+/// - Ok(None) when the line does not represent a valid block scalar header
+///   (so the caller should treat it as a plain scalar).
+/// - Ok(Some(ParsedBlockHeader)) when the header is valid.
+/// - Err(YamlError) when the header syntax is invalid and should be
+///   reported as a block scalar error (e.g., unexpected text immediately
+///   after the indicator, or an invalid explicit indent indicator).
+fn parse_block_header_line(
+    s: &str,
+    source: &mut dyn ISource,
+    check_unexpected_text: bool,
+) -> Result<Option<ParsedBlockHeader>, YamlError> {
+    let mut chars = s.chars();
+    let indicator = match chars.next() {
+        Some(c) if c == CHAR_VERTICAL_BAR || c == CHAR_GREATER_THAN => c,
+        _ => return Ok(None),
+    };
+
+    let rest = chars.as_str();
+
+    // For non-flow contexts, enforce the "unexpected text immediately
+    // after '|' or '>'" rule using the first non-whitespace token.
+    if check_unexpected_text {
+        let meta = rest.trim_start_matches(CHAR_SPACE);
+        if !meta.is_empty() {
+            if let Some(first_token) = meta.split_whitespace().next() {
+                let first_ok = first_token
+                    .chars()
+                    .all(|c| c == '+' || c == CHAR_DASH || c.is_ascii_digit());
+                if !first_ok {
+                    return Err(crate::parser::document::block_scalar_errors::BlockScalarErrors::invalid_header_unexpected_text(
+                        source,
+                    ));
+                }
+            }
+        }
+    }
+
+    // Determine if this line is a syntactically valid block header by
+    // ensuring all remaining characters belong to the allowed set.
+    let is_header = rest.chars().all(|c| {
+        c == CHAR_SPACE || c == '+' || c == CHAR_DASH || c.is_ascii_digit()
+    });
+    if !is_header {
+        return Ok(None);
+    }
+
+    // Validate explicit indent indicator (single digit 1-9) if present.
+    let header_meta = s[indicator.len_utf8()..].trim();
+    let digits: String = header_meta.chars().filter(|c| c.is_ascii_digit()).collect();
+    if !digits.is_empty() {
+        if digits.len() != 1 || digits.chars().next().unwrap() == '0' {
+            return Err(crate::parser::document::block_scalar_errors::BlockScalarErrors::invalid_indent_indicator(
+                source,
+            ));
+        }
+    }
+
+    Ok(Some(ParsedBlockHeader {
+        has_explicit_indent_indicator: !digits.is_empty(),
+    }))
+}
 
 fn parse_scalar_dispatch(
     stream: &mut TokenStream,
     s: &str,
     directives: &DirectiveContext,
 ) -> crate::parser::ParseResult<Node> {
-    // Special-case invalid block scalar header
-    if let Some(ind) = s.chars().next() {
-        if (ind == CHAR_VERTICAL_BAR || ind == CHAR_GREATER_THAN) && !stream.in_flow() {
-            let rest = &s[ind.len_utf8()..];
-            let meta = rest.trim_start_matches(CHAR_SPACE);
-            if !meta.is_empty() {
-                let first_token = meta.split_whitespace().next().unwrap_or("");
-                if !first_token
-                    .chars()
-                    .all(|c| c == '+' || c == CHAR_DASH || c.is_ascii_digit())
-                {
-                    return Err(crate::parser::document::block_scalar_errors::BlockScalarErrors::invalid_header_unexpected_text(
-                        stream.source_mut(),
-                    ));
-                }
-            }
-        }
-    }
-    // Block scalar detection
-    let is_block_header = {
-        let mut chars = s.chars();
-        if let Some(ind) = chars.next() {
-            if ind == CHAR_VERTICAL_BAR || ind == CHAR_GREATER_THAN {
-                let rest = chars.as_str();
-                rest.chars()
-                    .all(|c| c == CHAR_SPACE || c == '+' || c == CHAR_DASH || c.is_ascii_digit())
-            } else {
-                false
-            }
-        } else {
-            false
-        }
-    };
-    if is_block_header {
-        let header_meta = s[1..].trim();
-        let digits: String = header_meta.chars().filter(|c| c.is_ascii_digit()).collect();
-        let has_explicit_indent_indicator = !digits.is_empty();
-        if !digits.is_empty() {
-            if digits.len() != 1 || digits.chars().next().unwrap() == '0' {
-                return Err(crate::parser::document::block_scalar_errors::BlockScalarErrors::invalid_indent_indicator(
-                    stream.source_mut(),
-                ));
-            }
-        }
+    // Unified block scalar header parsing (non-flow contexts enforce stricter
+    // header validation than flow contexts, matching existing behavior).
+    let in_flow = stream.in_flow();
+    let header_info = parse_block_header_line(s, stream.source_mut(), !in_flow)?;
+    if let Some(ParsedBlockHeader {
+        has_explicit_indent_indicator,
+    }) = header_info
+    {
         let block_header = s;
         stream.next()?;
         return parse_block_scalar(stream, &block_header, has_explicit_indent_indicator);
