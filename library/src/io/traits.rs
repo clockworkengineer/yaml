@@ -1,5 +1,7 @@
 /// Trait defining the interface for reading and traversing YAML data from a source.
 /// Provides basic operations for sequential character-based reading.
+use crate::constants::{CHAR_SPACE, CHAR_TAB};
+
 pub trait ISource {
     /// Advances the reading position to the next character.
     fn next(&mut self);
@@ -19,12 +21,12 @@ pub trait ISource {
     fn restore_state(&mut self, state: SaveState);
 
     fn is_whitespace(&self, c: char) -> bool {
-        c == ' ' || c == '\t'
+        c == CHAR_SPACE || c == CHAR_TAB
     }
 
     /// Check if character is a tab (used for validation)
     fn is_tab(&self, c: char) -> bool {
-        c == '\t'
+        c == CHAR_TAB
     }
 
     fn get_current_indent_level(&self) -> usize;

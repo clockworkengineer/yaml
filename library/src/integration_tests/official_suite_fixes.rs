@@ -251,6 +251,57 @@ quoted: \"So does this
         );
     }
 
+    // Test H7J7 - Invalid anchored mapping value combining empty scalar and !!map
+    #[test]
+    fn test_h7j7_invalid_anchored_mapping_value() {
+        let yaml = b"key: &x\n!!map\n  a: b\n";
+        let mut source = BufferSource::new(yaml);
+        let result = parse(&mut source);
+
+        #[cfg(feature = "debug-trace")]
+        println!("H7J7 Result: {:?}", result);
+
+        assert!(
+            result.is_err(),
+            "H7J7 should now be rejected as invalid: {:?}",
+            result
+        );
+    }
+
+    // Test BU8L - Valid anchored mapping with !!map on separate line
+    #[test]
+    fn test_bu8l_valid_anchored_mapping_value() {
+        let yaml = b"key: &anchor\n !!map\n  a: b\n";
+        let mut source = BufferSource::new(yaml);
+        let result = parse(&mut source);
+
+        #[cfg(feature = "debug-trace")]
+        println!("BU8L Result: {:?}", result);
+
+        assert!(
+            result.is_ok(),
+            "BU8L should parse successfully as a valid anchored mapping: {:?}",
+            result.err()
+        );
+    }
+
+    // Test 8XDJ - Invalid mixed plain scalar and mapping entries at same indentation
+    #[test]
+    fn test_8xdj_invalid_plain_then_mapping_at_same_indent() {
+        let yaml = b"key: word1\n#  xxx\n  word2\n";
+        let mut source = BufferSource::new(yaml);
+        let result = parse(&mut source);
+
+        #[cfg(feature = "debug-trace")]
+        println!("8XDJ Result: {:?}", result);
+
+        assert!(
+            result.is_err(),
+            "8XDJ should now be rejected as invalid at the document level: {:?}",
+            result
+        );
+    }
+
     // Test 4FJ6 - Nested implicit complex keys
     #[test]
     fn test_4fj6_nested_implicit_keys() {

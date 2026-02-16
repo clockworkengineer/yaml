@@ -19,5 +19,15 @@ pub const CHAR_BACKSLASH: char = '\\';
 pub const CHAR_CARRIAGE_RETURN: char = '\r';
 pub const CHAR_TAB: char = '\t';
 
+pub const CHAR_DOT: char = '.';
+pub const CHAR_QUESTION_MARK: char = '?';
+pub const CHAR_PERCENT: char = '%';
+pub const CHAR_EXCLAMATION: char = '!';
+pub const CHAR_VERTICAL_BAR: char = '|';
+pub const CHAR_GREATER_THAN: char = '>';
+
 pub const STR_LITERAL_BLOCK: &str = "|";
+pub const STR_FOLDED_BLOCK: &str = ">";
+pub const STR_DOC_START: &str = "---";
+pub const STR_DOC_END: &str = "...";
 // ...existing code...

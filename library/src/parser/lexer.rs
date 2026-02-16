@@ -410,14 +410,14 @@ impl<'a> Lexer<'a> {
                 // Allow any horizontal whitespace before comment
                 let mut seen_whitespace = false;
                 while let Some(c) = self.source.current() {
-                    if c == ' ' || c == '\t' {
+                    if c == CHAR_SPACE || c == CHAR_TAB {
                         seen_whitespace = true;
                         self.source.next();
                     } else {
                         break;
                     }
                 }
-                if let Some('#') = self.source.current() {
+                if let Some(CHAR_HASH) = self.source.current() {
                     if !seen_whitespace {
                         #[cfg(debug_assertions)]
                         eprintln!(
@@ -464,7 +464,7 @@ impl<'a> Lexer<'a> {
                     }
                 }
             }
-            '-' => {
+            CHAR_DASH => {
                 // Could be: dash (sequence), document start (---), or plain scalar
                 let state = self.source.save_state();
                 self.source.next();
@@ -498,7 +498,7 @@ impl<'a> Lexer<'a> {
                     }
                 }
             }
-            '.' => {
+            CHAR_DOT => {
                 // Could be: document end (...) or plain scalar
                 let state = self.source.save_state();
                 self.source.next();
@@ -527,12 +527,12 @@ impl<'a> Lexer<'a> {
                     }
                 }
             }
-            '?' => {
+            CHAR_QUESTION_MARK => {
                 self.source.next();
                 self.last_was_linebreak = false;
                 Ok(Some(Token::QuestionMark))
             }
-            '%' => {
+            CHAR_PERCENT => {
                 // Treat '%' as part of a plain scalar for token-based
                 // parsing. Top-level YAML directives (e.g. %YAML, %TAG)
                 // are handled separately by the document parser using the
@@ -774,7 +774,7 @@ impl<'a> Lexer<'a> {
         // Allow horizontal whitespace
         let mut saw_whitespace = false;
         while let Some(c) = self.source.current() {
-            if c == ' ' || c == '\t' {
+            if c == CHAR_SPACE || c == CHAR_TAB {
                 saw_whitespace = true;
                 self.source.next();
             } else {
@@ -782,7 +782,7 @@ impl<'a> Lexer<'a> {
             }
         }
         // If a comment follows, it must be preceded by whitespace
-        if let Some('#') = self.source.current() {
+        if let Some(CHAR_HASH) = self.source.current() {
             if !saw_whitespace {
                 return Err(crate::parser::document::comment_errors::CommentErrors::comment_must_be_preceded_by_whitespace_after_flow_closer(
                     self.source,
@@ -792,8 +792,13 @@ impl<'a> Lexer<'a> {
         }
         // Validate next non-whitespace character regardless of whether whitespace was seen
         if let Some(c) = self.source.current() {
-            let is_allowed =
-                c == '\n' || c == '\r' || c == ',' || c == ']' || c == '}' || c == '#' || c == ':';
+            let is_allowed = c == CHAR_NEWLINE
+                || c == CHAR_CARRIAGE_RETURN
+                || c == CHAR_COMMA
+                || c == CHAR_RBRACKET
+                || c == CHAR_RBRACE
+                || c == CHAR_HASH
+                || c == CHAR_COLON;
             if !is_allowed {
                 return Err(crate::parser::document::flow_punctuation::invalid_content_immediately_after_flow_closer(
                     self.source,

@@ -1,4 +1,6 @@
 /// Shared helper for block scalar and plain scalar detection and parsing
+use crate::constants::{CHAR_DASH, CHAR_GREATER_THAN, CHAR_SPACE, CHAR_VERTICAL_BAR};
+
 fn parse_scalar_dispatch(
     stream: &mut TokenStream,
     s: &str,
@@ -6,14 +8,14 @@ fn parse_scalar_dispatch(
 ) -> crate::parser::ParseResult<Node> {
     // Special-case invalid block scalar header
     if let Some(ind) = s.chars().next() {
-        if (ind == '|' || ind == '>') && !stream.in_flow() {
+        if (ind == CHAR_VERTICAL_BAR || ind == CHAR_GREATER_THAN) && !stream.in_flow() {
             let rest = &s[ind.len_utf8()..];
-            let meta = rest.trim_start_matches(' ');
+            let meta = rest.trim_start_matches(CHAR_SPACE);
             if !meta.is_empty() {
                 let first_token = meta.split_whitespace().next().unwrap_or("");
                 if !first_token
                     .chars()
-                    .all(|c| c == '+' || c == '-' || c.is_ascii_digit())
+                    .all(|c| c == '+' || c == CHAR_DASH || c.is_ascii_digit())
                 {
                     return Err(crate::parser::document::block_scalar_errors::BlockScalarErrors::invalid_header_unexpected_text(
                         stream.source_mut(),
@@ -26,10 +28,10 @@ fn parse_scalar_dispatch(
     let is_block_header = {
         let mut chars = s.chars();
         if let Some(ind) = chars.next() {
-            if ind == '|' || ind == '>' {
+            if ind == CHAR_VERTICAL_BAR || ind == CHAR_GREATER_THAN {
                 let rest = chars.as_str();
                 rest.chars()
-                    .all(|c| c == ' ' || c == '+' || c == '-' || c.is_ascii_digit())
+                    .all(|c| c == CHAR_SPACE || c == '+' || c == CHAR_DASH || c.is_ascii_digit())
             } else {
                 false
             }

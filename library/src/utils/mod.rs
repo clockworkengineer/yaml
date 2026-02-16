@@ -359,7 +359,7 @@ pub fn unescape_double_quoted(s: &str) -> String {
                 Some('P') => result.push('\u{2029}'),
                 Some('\n') => {
                     while let Some(&c) = chars.peek() {
-                        if c == ' ' || c == '\t' {
+                        if c == crate::constants::CHAR_SPACE || c == crate::constants::CHAR_TAB {
                             chars.next();
                         } else {
                             break;
@@ -371,7 +371,7 @@ pub fn unescape_double_quoted(s: &str) -> String {
                         chars.next();
                     }
                     while let Some(&c) = chars.peek() {
-                        if c == ' ' || c == '\t' {
+                        if c == crate::constants::CHAR_SPACE || c == crate::constants::CHAR_TAB {
                             chars.next();
                         } else {
                             break;
@@ -380,7 +380,7 @@ pub fn unescape_double_quoted(s: &str) -> String {
                 }
                 Some('\t') => {
                     while let Some(&c) = chars.peek() {
-                        if c == ' ' || c == '\t' {
+                        if c == crate::constants::CHAR_SPACE || c == crate::constants::CHAR_TAB {
                             chars.next();
                         } else {
                             break;

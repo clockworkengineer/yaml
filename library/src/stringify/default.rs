@@ -99,8 +99,7 @@ fn escape_single(s: &str) -> String {
 /// # Returns
 ///
 /// A new String with normalized line endings
-
-use crate::nodes::node::{Node, QuoteType, BlockStyle};
+use crate::nodes::node::{BlockStyle, Node, QuoteType};
 
 fn normalize_newlines(s: &str) -> String {
     // Restore original CR removal logic for test compatibility
@@ -365,7 +364,11 @@ pub fn stringify(node: &Node, destination: &mut dyn IDestination) -> Result<(), 
             for doc in docs {
                 if let Node::Document(nodes) = doc {
                     if nodes.iter().all(|n| n.is_blank()) {
-                        destination.add_bytes("---\n");
+                        destination.add_bytes(&format!(
+                            "{}{}",
+                            crate::constants::STR_DOC_START,
+                            crate::constants::CHAR_NEWLINE
+                        ));
                         continue;
                     }
                 }
@@ -374,24 +377,40 @@ pub fn stringify(node: &Node, destination: &mut dyn IDestination) -> Result<(), 
                     if nodes.len() == 1 {
                         if let Node::Str(s, QuoteType::Unquoted, BlockStyle::Literal) = &nodes[0] {
                             let s = normalize_newlines(s);
-                            destination
-                                .add_bytes(&format!("--- {STR_LITERAL_BLOCK}{CHAR_NEWLINE}"));
+                            destination.add_bytes(&format!(
+                                "{} {}{}",
+                                crate::constants::STR_DOC_START,
+                                STR_LITERAL_BLOCK,
+                                CHAR_NEWLINE
+                            ));
                             for line in s.split(CHAR_NEWLINE) {
                                 destination.add_bytes(&format!("{line}{CHAR_NEWLINE}"));
                             }
-                            destination.add_bytes(&format!("...{CHAR_NEWLINE}"));
+                            destination.add_bytes(&format!(
+                                "{}{}",
+                                crate::constants::STR_DOC_END,
+                                CHAR_NEWLINE
+                            ));
                             continue;
                         }
                     }
                 }
 
-                destination.add_bytes("---\n");
+                destination.add_bytes(&format!(
+                    "{}{}",
+                    crate::constants::STR_DOC_START,
+                    crate::constants::CHAR_NEWLINE
+                ));
                 stringify_document(doc, destination)?;
                 // Add newline before ... if not already present
                 if destination.last() != Some(b'\n') {
                     destination.add_bytes("\n");
                 }
-                destination.add_bytes("...\n");
+                destination.add_bytes(&format!(
+                    "{}{}",
+                    crate::constants::STR_DOC_END,
+                    crate::constants::CHAR_NEWLINE
+                ));
             }
         }
         _ => {

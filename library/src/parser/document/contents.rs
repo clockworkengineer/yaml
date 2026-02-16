@@ -254,7 +254,7 @@ pub fn parse_document_contents(
     }
 
     match source.current() {
-        Some(c) if c == '-' => {
+        Some(c) if c == crate::constants::CHAR_DASH => {
             if ctx.in_flow || matches!(ctx.collection_type, CollectionType::BlockMapping) {
                 return parse_scalar_or_value(source, directives, indent_level, ctx);
             }
@@ -287,7 +287,7 @@ pub fn parse_document_contents(
                 _ => parse_scalar_or_value(source, directives, indent_level, ctx),
             }
         }
-        Some(c) if c == '.' => {
+        Some(c) if c == crate::constants::CHAR_DOT => {
             let map_indent = source.get_current_indent_level();
             if is_doc_end(source, directives)? {
                 return Ok(Node::None);
@@ -299,11 +299,11 @@ pub fn parse_document_contents(
                 parse_scalar_or_value(source, directives, indent_level, ctx)
             }
         }
-        Some(c) if c == '#' => {
+        Some(c) if c == crate::constants::CHAR_HASH => {
             skip_trivia_with_ctx(source, ctx)?;
             parse_document_contents(source, indent_level, directives, ctx)
         }
-        Some(c) if c == '{' => {
+        Some(c) if c == crate::constants::CHAR_LBRACE => {
             let mut stream =
                 crate::parser::token_stream::TokenStream::new(source, directives, true)?;
             Ok(
@@ -315,7 +315,7 @@ pub fn parse_document_contents(
                 )?,
             )
         }
-        Some(c) if c == '[' => {
+        Some(c) if c == crate::constants::CHAR_LBRACKET => {
             let mut stream =
                 crate::parser::token_stream::TokenStream::new(source, directives, true)?;
             Ok(
@@ -326,7 +326,7 @@ pub fn parse_document_contents(
                 )?,
             )
         }
-        Some(c) if c == '!' => {
+        Some(c) if c == crate::constants::CHAR_EXCLAMATION => {
             let mut stream =
                 crate::parser::token_stream::TokenStream::new(source, directives, false)?;
             match stream.current() {

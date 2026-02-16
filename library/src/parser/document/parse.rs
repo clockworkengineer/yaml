@@ -102,11 +102,15 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
             let st = source.save_state();
             crate::utils::skip_whitespace_and_comments(source);
             let mut directive_ahead = false;
-            if let Some('%') = source.current() {
+            if let Some(crate::constants::CHAR_PERCENT) = source.current() {
                 let st_dir = source.save_state();
                 let mut word = String::new();
                 while let Some(ch) = source.current() {
-                    if ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n' {
+                    if ch == crate::constants::CHAR_SPACE
+                        || ch == crate::constants::CHAR_TAB
+                        || ch == crate::constants::CHAR_CARRIAGE_RETURN
+                        || ch == crate::constants::CHAR_NEWLINE
+                    {
                         break;
                     }
                     word.push(ch);
@@ -148,27 +152,32 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
         if has_document_start {
             let st_pre_marker = source.save_state();
             // Consume '---' characters
-            if matches!(source.current(), Some('-')) {
+            if matches!(source.current(), Some(crate::constants::CHAR_DASH)) {
                 source.next();
             }
-            if matches!(source.current(), Some('-')) {
+            if matches!(source.current(), Some(crate::constants::CHAR_DASH)) {
                 source.next();
             }
-            if matches!(source.current(), Some('-')) {
+            if matches!(source.current(), Some(crate::constants::CHAR_DASH)) {
                 source.next();
             }
             while let Some(c) = source.current() {
-                if c == ' ' || c == '\t' {
+                if c == crate::constants::CHAR_SPACE || c == crate::constants::CHAR_TAB {
                     source.next();
                 } else {
                     break;
                 }
             }
-            if matches!(source.current(), Some('!')) {
+            if matches!(source.current(), Some(crate::constants::CHAR_EXCLAMATION)) {
                 let st_tag = source.save_state();
                 let mut tag_raw = String::new();
                 while let Some(ch) = source.current() {
-                    if ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n' || ch == '#' {
+                    if ch == crate::constants::CHAR_SPACE
+                        || ch == crate::constants::CHAR_TAB
+                        || ch == crate::constants::CHAR_CARRIAGE_RETURN
+                        || ch == crate::constants::CHAR_NEWLINE
+                        || ch == crate::constants::CHAR_HASH
+                    {
                         break;
                     }
                     tag_raw.push(ch);

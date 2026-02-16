@@ -114,7 +114,7 @@ pub(crate) fn parse_document_markers(
         // Tabs immediately after the marker act as separation, not indentation (K54U), so skip
         // horizontal whitespace at the character level before invoking the token stream.
         while let Some(c) = source.current() {
-            if c == ' ' || c == '\t' {
+            if c == crate::constants::CHAR_SPACE || c == crate::constants::CHAR_TAB {
                 source.next();
             } else {
                 break;
@@ -124,12 +124,17 @@ pub(crate) fn parse_document_markers(
         // to reliably catch explicit handles like '!handle!Type' on the same line
         // as the document start marker, even if tokenization classifies the text
         // as Plain in some edge cases.
-        if matches!(source.current(), Some('!')) {
+        if matches!(source.current(), Some(crate::constants::CHAR_EXCLAMATION)) {
             // Peek ahead to extract the raw tag up to whitespace or comment
             let st_tag = source.save_state();
             let mut tag_raw = String::new();
             while let Some(ch) = source.current() {
-                if ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n' || ch == '#' {
+                if ch == crate::constants::CHAR_SPACE
+                    || ch == crate::constants::CHAR_TAB
+                    || ch == crate::constants::CHAR_CARRIAGE_RETURN
+                    || ch == crate::constants::CHAR_NEWLINE
+                    || ch == crate::constants::CHAR_HASH
+                {
                     break;
                 }
                 tag_raw.push(ch);

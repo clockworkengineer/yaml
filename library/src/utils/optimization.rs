@@ -284,18 +284,21 @@ impl FastPathDetector {
 
     /// Check if a line is likely to be a simple key-value pair
     pub fn is_simple_mapping_line(s: &str) -> bool {
-        s.contains(':') && !s.contains('#') && !s.contains('[') && !s.contains('{')
+        s.contains(crate::constants::CHAR_COLON)
+            && !s.contains(crate::constants::CHAR_HASH)
+            && !s.contains(crate::constants::CHAR_LBRACKET)
+            && !s.contains(crate::constants::CHAR_LBRACE)
     }
 
     /// Detect if we can use a fast path for this document structure
     pub fn can_use_fast_path(content: &str) -> bool {
         // Simple heuristic: if document has no complex features, use fast path
-        !content.contains("---") // No document markers
-            && !content.contains("&") // No anchors
-            && !content.contains("*") // No aliases  
+        !content.contains(crate::constants::STR_DOC_START) // No document markers
+            && !content.contains(crate::constants::CHAR_AMPERSAND) // No anchors
+            && !content.contains(crate::constants::CHAR_ASTERISK) // No aliases
             && !content.contains("!!") // No explicit tags
-            && !content.contains("|") // No literal scalars
-            && !content.contains(">") // No folded scalars
+            && !content.contains(crate::constants::STR_LITERAL_BLOCK) // No literal scalars
+            && !content.contains(crate::constants::STR_FOLDED_BLOCK) // No folded scalars
     }
 }
 

@@ -325,36 +325,6 @@ mod tests {
     use crate::io::sources::buffer::Buffer;
 
     #[test]
-    fn debug_h7j7_document_shape() {
-        let yaml = b"key: &x\n!!map\n  a: b\n";
-        let mut source = Buffer::new(yaml);
-        let directives = DirectiveContext::new();
-        let doc = parse_document(&mut source, 0, &directives);
-        assert!(doc.is_err(), "H7J7 should now be rejected as invalid");
-    }
-
-    #[test]
-    fn debug_bu8l_document_shape() {
-        let yaml = b"key: &anchor\n !!map\n  a: b\n";
-        let mut source = Buffer::new(yaml);
-        let directives = DirectiveContext::new();
-        let doc = parse_document(&mut source, 0, &directives).unwrap();
-        println!("BU8L document shape: {:?}", doc);
-    }
-    #[test]
-    fn debug_8xdj_document_shape() {
-        let yaml = b"key: word1\n#  xxx\n  word2\n";
-        let mut source = Buffer::new(yaml);
-        let directives = DirectiveContext::new();
-        let doc = parse_document(&mut source, 0, &directives);
-        assert!(
-            doc.is_err(),
-            "8XDJ should now be rejected as invalid at the document level, but got: {:?}",
-            doc
-        );
-    }
-
-    #[test]
     fn debug_td5n_document_nodes() {
         let yaml = b"- item1\n- item2\ninvalid\n";
         let mut source = Buffer::new(yaml);
