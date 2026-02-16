@@ -149,3 +149,59 @@ Behavior: no change to which inputs are accepted or rejected; only test ergonomi
 ---
 
 All of the above are intended as **behavior-neutral** refactors. Each item should be implemented incrementally with `cargo test` runs (and, where appropriate, YAML test-suite runs) after each cluster of changes to guard against regressions.
+
+## Future DRY Refactor Ideas
+
+The following items are not yet planned work, but represent likely next-wave DRY cleanups for `yaml_lib` once the current plan is fully settled.
+
+### A. Unify stringify backends' traversal logic
+
+Goal: avoid reimplementing `Node` traversal in each stringify backend (JSON, XML, TOML, bencode) while keeping format-specific emission isolated.
+
+Suggested steps:
+- Introduce a small internal `Serializer`-style trait in `library/src/stringify/serializer.rs` (or similar) that exposes operations like "start mapping", "end mapping", "emit scalar", etc.
+- Add a shared `walk_node(node, visitor)` that handles the recursive descent over `Node` trees once, calling into the trait for format-specific output.
+- Update existing backends in `stringify/json.rs`, `stringify/xml.rs`, `stringify/toml.rs`, and `stringify/bencode.rs` to implement the trait and delegate traversal to the shared walker.
+
+Behavior: keep output formats byte-for-byte compatible; only centralize traversal and reduce duplication across backends.
+
+### B. Centralize public parse_* API funnels
+
+Goal: ensure all public parsing helpers go through a single internal funnel so error handling, configuration, and recovery are wired in one place.
+
+Suggested steps:
+- Add an internal `parse_from_source(source, config, maybe_recovery)` helper that encapsulates parser configuration, optional recovery wiring, and the call into `parser::document::parse`.
+- Implement `parse_string`, `parse_file`, `parse_with_config`, and `parse_string_with_recovery` (as documented in the Developer Guide) as thin wrappers around this helper.
+- Route any examples or utilities that directly construct sources + parse into these helpers where appropriate.
+
+Behavior: preserve existing public signatures and error behavior; this change should be invisible to callers but reduce chances of configuration drift.
+
+### C. DRY validation error construction and paths
+
+Goal: reduce repetition when building `ValidationError`s that combine a path, message, and error code.
+
+Suggested steps:
+- Add a small builder/helper in `validation/error.rs` that takes a path reference plus a description string (from `validation::messages`) and yields a fully-formed `ValidationError`.
+- Update `validation/engine.rs` and `validation/validators.rs` to construct errors exclusively via this helper instead of open-coding `ValidationError` creation.
+
+Behavior: no change to error contents (path, code, or message); the intent is purely to make new validators easier and less error-prone to implement.
+
+### D. Shared round-trip/property helpers
+
+Goal: centralize common "parse → stringify → parse" property testing flows so they can be reused across tests and examples.
+
+Suggested steps:
+- Extend `library/src/test_helpers.rs` with helpers like `roundtrip_node(node) -> Result<Node, YamlError>` and `assert_roundtrip_eq(node)`.
+- Refactor `testing/property.rs` (and any integration tests that manually do round-trip checks) to use these helpers.
+
+Behavior: round-trip semantics should remain identical; tests simply become shorter and more consistent.
+
+### E. Shared suite-runner harness for large test collections
+
+Goal: make it easier to run YAML test-suite style collections (timeout, `catch_unwind`, expected-success vs expected-error) in a reusable way.
+
+Suggested steps:
+- Extract the core "run-and-catch" logic from `tests/yaml_test_suite.rs` into a small internal testing module or helper function that takes an ID, input, expectation (error/success), known-failures set, and timeout.
+- Have `run_yaml_test_suite` configure suite paths, skip lists, and known failures, then delegate individual case execution to the shared helper.
+
+Behavior: per-case behavior and summary output stay the same; the driver code becomes easier to extend for future suites or variants.

@@ -14,7 +14,7 @@ use yaml_lib::test_helpers::parse_yaml;
 // Guard to temporarily silence panic output during the YAML test suite run.
 // This keeps the console output focused on per-case PASS/FAIL, while still
 // allowing us to detect panics via `catch_unwind`.
-struct PanicHookGuard(Option<Box<dyn Fn(&panic::PanicInfo) + Send + Sync + 'static>>);
+struct PanicHookGuard(Option<Box<dyn Fn(&panic::PanicHookInfo) + Send + Sync + 'static>>);
 
 impl PanicHookGuard {
     fn new_silent() -> Self {
