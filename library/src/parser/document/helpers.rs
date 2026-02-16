@@ -116,6 +116,33 @@ pub(crate) fn classify_doc_marker(
     }
 }
 
+/// Peeks ahead on the current line after a document start marker ("---")
+/// to extract a raw tag string up to whitespace, newline, or comment.
+///
+/// The source position is restored before returning. Returns Some(tag)
+/// when non-empty content starting at the current position is found,
+/// or None when there is no tag-like content.
+#[inline]
+pub(crate) fn peek_tag_after_doc_start(
+    source: &mut dyn ISource,
+) -> Option<String> {
+    let st_tag = source.save_state();
+    let mut tag_raw = String::new();
+    while let Some(ch) = source.current() {
+        if is_horizontal_space(ch) || is_line_terminator(ch) || is_comment_start(ch) {
+            break;
+        }
+        tag_raw.push(ch);
+        source.next();
+    }
+    source.restore_state(st_tag);
+    if tag_raw.is_empty() {
+        None
+    } else {
+        Some(tag_raw)
+    }
+}
+
 /// Checks for and processes the document start marker (---).
 /// Returns an error if invalid content is found after the marker.
 pub(crate) fn parse_document_markers(
@@ -150,21 +177,7 @@ pub(crate) fn parse_document_markers(
         // as the document start marker, even if tokenization classifies the text
         // as Plain in some edge cases.
         if matches!(source.current(), Some(crate::constants::CHAR_EXCLAMATION)) {
-            // Peek ahead to extract the raw tag up to whitespace or comment
-            let st_tag = source.save_state();
-            let mut tag_raw = String::new();
-            while let Some(ch) = source.current() {
-                if is_horizontal_space(ch)
-                    || is_line_terminator(ch)
-                    || is_comment_start(ch)
-                {
-                    break;
-                }
-                tag_raw.push(ch);
-                source.next();
-            }
-            source.restore_state(st_tag);
-            if !tag_raw.is_empty() {
+            if let Some(tag_raw) = peek_tag_after_doc_start(source) {
                 if let Err(e) = directives.validate_tag_handle_usage(&tag_raw) {
                     // Build a token-stream-based error for consistent formatting
                     let ts_err =

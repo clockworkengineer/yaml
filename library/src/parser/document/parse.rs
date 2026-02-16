@@ -8,7 +8,7 @@ use crate::parser::document::helpers::{
     self, handle_directives, parse_document_end_marker, parse_document_markers, to_yaml_error,
 };
 use crate::parser::document::main_loop::parse_document;
-use crate::utils::{is_comment_start, is_horizontal_space, is_line_terminator};
+use crate::utils::{is_horizontal_space, is_line_terminator};
 
 /// Checks for explicit directives and ensures a document follows them.
 /// Returns an error if directives are not followed by a document.
@@ -166,20 +166,9 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
                 }
             }
             if matches!(source.current(), Some(crate::constants::CHAR_EXCLAMATION)) {
-                let st_tag = source.save_state();
-                let mut tag_raw = String::new();
-                while let Some(ch) = source.current() {
-                    if is_horizontal_space(ch)
-                        || is_line_terminator(ch)
-                        || is_comment_start(ch)
-                    {
-                        break;
-                    }
-                    tag_raw.push(ch);
-                    source.next();
-                }
-                source.restore_state(st_tag);
-                if !tag_raw.is_empty() {
+                if let Some(tag_raw) =
+                    crate::parser::document::helpers::peek_tag_after_doc_start(source)
+                {
                     if let Err(e) = directives.validate_tag_handle_usage(&tag_raw) {
                         // Build a simple parse error without borrowing the source twice
                         source.restore_state(st_pre_marker);
