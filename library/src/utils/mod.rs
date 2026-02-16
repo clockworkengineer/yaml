@@ -20,9 +20,29 @@ pub mod streaming;
 pub mod anchors_helpers;
 pub mod anchors_helpers2;
 
-use crate::constants::{CHAR_HASH, CHAR_NEWLINE, CHAR_TAB};
+use crate::constants::{
+    CHAR_CARRIAGE_RETURN, CHAR_HASH, CHAR_NEWLINE, CHAR_SPACE, CHAR_TAB,
+};
 use crate::io::traits::ISource;
 use crate::{Node, Numeric};
+
+/// Returns true if the character is a line terminator ("\n" or "\r").
+#[inline]
+pub fn is_line_terminator(c: char) -> bool {
+    c == CHAR_NEWLINE || c == CHAR_CARRIAGE_RETURN
+}
+
+/// Returns true if the character is horizontal whitespace (space or tab).
+#[inline]
+pub fn is_horizontal_space(c: char) -> bool {
+    c == CHAR_SPACE || c == CHAR_TAB
+}
+
+/// Returns true if the character starts a comment ("#").
+#[inline]
+pub fn is_comment_start(c: char) -> bool {
+    c == CHAR_HASH
+}
 
 /// Collects characters from the source until the stop predicate returns true.
 ///
@@ -80,7 +100,7 @@ pub fn skip_whitespace_and_comments(source: &mut dyn ISource) {
 
     loop {
         while let Some(c) = source.current() {
-            if source.is_whitespace(c) || c == CHAR_NEWLINE || c == '\r' {
+            if source.is_whitespace(c) || is_line_terminator(c) {
                 source.next();
                 iterations += 1;
                 if iterations >= MAX_ITERATIONS {
@@ -90,9 +110,9 @@ pub fn skip_whitespace_and_comments(source: &mut dyn ISource) {
                 break;
             }
         }
-        if source.current() == Some(CHAR_HASH) {
+        if source.current().map_or(false, is_comment_start) {
             while let Some(c) = source.current() {
-                if c == CHAR_NEWLINE {
+                if is_line_terminator(c) {
                     source.next(); // consume the newline after comment
                     break;
                 }
@@ -126,7 +146,7 @@ pub fn skip_whitespace_and_comments_validate_tabs(source: &mut dyn ISource) -> R
 
     loop {
         while let Some(c) = source.current() {
-            if c == CHAR_NEWLINE || c == '\r' {
+            if is_line_terminator(c) {
                 source.next();
                 after_newline = true;
                 iterations += 1;
@@ -152,9 +172,9 @@ pub fn skip_whitespace_and_comments_validate_tabs(source: &mut dyn ISource) -> R
                 break;
             }
         }
-        if source.current() == Some(CHAR_HASH) {
+        if source.current().map_or(false, is_comment_start) {
             while let Some(c) = source.current() {
-                if c == CHAR_NEWLINE {
+                if is_line_terminator(c) {
                     source.next(); // consume the newline after comment
                     after_newline = true;
                     break;

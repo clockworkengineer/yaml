@@ -451,7 +451,7 @@ pub fn parse_document_contents(
                 pairs.push((Node::None, value_node));
 
                 crate::utils::skip_until_newline(source);
-                if source.current() == Some('\n') {
+                if source.current().map_or(false, crate::utils::is_line_terminator) {
                     source.next();
                 }
                 crate::utils::skip_whitespace_and_comments(source);

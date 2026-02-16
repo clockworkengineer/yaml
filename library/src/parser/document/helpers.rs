@@ -87,6 +87,7 @@ use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::parser::ParseResult;
 use crate::parser::document::context::ParsingContext;
+use crate::utils::{is_comment_start, is_horizontal_space, is_line_terminator};
 
 /// Checks for and processes the document start marker (---).
 /// Returns an error if invalid content is found after the marker.
@@ -114,7 +115,7 @@ pub(crate) fn parse_document_markers(
         // Tabs immediately after the marker act as separation, not indentation (K54U), so skip
         // horizontal whitespace at the character level before invoking the token stream.
         while let Some(c) = source.current() {
-            if c == crate::constants::CHAR_SPACE || c == crate::constants::CHAR_TAB {
+            if is_horizontal_space(c) {
                 source.next();
             } else {
                 break;
@@ -129,11 +130,9 @@ pub(crate) fn parse_document_markers(
             let st_tag = source.save_state();
             let mut tag_raw = String::new();
             while let Some(ch) = source.current() {
-                if ch == crate::constants::CHAR_SPACE
-                    || ch == crate::constants::CHAR_TAB
-                    || ch == crate::constants::CHAR_CARRIAGE_RETURN
-                    || ch == crate::constants::CHAR_NEWLINE
-                    || ch == crate::constants::CHAR_HASH
+                if is_horizontal_space(ch)
+                    || is_line_terminator(ch)
+                    || is_comment_start(ch)
                 {
                     break;
                 }
@@ -202,7 +201,7 @@ pub(crate) fn parse_document_markers(
             return Err(e);
         }
         // Move to next line if needed
-        if source.current() == Some('\n') || source.current() == Some('\r') {
+        if source.current().map_or(false, is_line_terminator) {
             source.next();
         }
     }
@@ -230,7 +229,10 @@ pub(crate) fn parse_document_end_marker(
             source.next();
         }
         let sep_ok = match source.current() {
-            Some(' ') | Some('\t') | Some('\r') | Some('\n') | Some('#') | None => true,
+            Some(c) if is_horizontal_space(c) || is_line_terminator(c) || is_comment_start(c) => {
+                true
+            }
+            None => true,
             _ => false,
         };
         let found = dot_count == 3 && sep_ok;
@@ -252,19 +254,20 @@ pub(crate) fn parse_document_end_marker(
         // Validate only inline content after '...' up to end-of-line
         loop {
             match source.current() {
-                Some(' ') | Some('\t') => {
+                Some(c) if is_horizontal_space(c) => {
                     source.next();
                 }
-                Some('#') => {
+                Some(c) if is_comment_start(c) => {
                     // Inline comment: consume until end of line
-                    while let Some(c) = source.current() {
-                        if c == '\n' || c == '\r' {
+                    while let Some(c2) = source.current() {
+                        if is_line_terminator(c2) {
                             break;
                         }
                         source.next();
                     }
                 }
-                Some('\n') | Some('\r') | None => break,
+                Some(c) if is_line_terminator(c) => break,
+                None => break,
                 Some(_) => {
                     let ts =
                         crate::parser::token_stream::TokenStream::new(source, directives, false)
@@ -282,7 +285,7 @@ pub(crate) fn parse_document_end_marker(
             if source.current() == Some('\n') {
                 source.next();
             }
-        } else if source.current() == Some('\n') {
+        } else if source.current().map_or(false, is_line_terminator) {
             source.next();
         }
     }
@@ -537,20 +540,21 @@ pub(crate) fn validate_no_inline_content_after_document_end(
 ) -> crate::parser::ParseResult<()> {
     loop {
         match stream.source_mut().current() {
-            Some(' ') | Some('\t') => {
+            Some(c) if is_horizontal_space(c) => {
                 stream.source_mut().next();
             }
-            Some('#') => {
+            Some(c) if is_comment_start(c) => {
                 // Inline comment: consume until end of line
-                while let Some(c) = stream.source_mut().current() {
-                    if c == '\n' || c == '\r' {
+                while let Some(c2) = stream.source_mut().current() {
+                    if is_line_terminator(c2) {
                         break;
                     }
                     stream.source_mut().next();
                 }
                 break;
             }
-            Some('\n') | Some('\r') | None => break,
+            Some(c) if is_line_terminator(c) => break,
+            None => break,
             Some(c) => {
                 return Err(parse_error_token(
                     stream,

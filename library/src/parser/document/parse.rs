@@ -8,6 +8,7 @@ use crate::parser::document::helpers::{
     self, handle_directives, parse_document_end_marker, parse_document_markers, to_yaml_error,
 };
 use crate::parser::document::main_loop::parse_document;
+use crate::utils::{is_comment_start, is_horizontal_space, is_line_terminator};
 
 /// Checks for explicit directives and ensures a document follows them.
 /// Returns an error if directives are not followed by a document.
@@ -106,11 +107,7 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
                 let st_dir = source.save_state();
                 let mut word = String::new();
                 while let Some(ch) = source.current() {
-                    if ch == crate::constants::CHAR_SPACE
-                        || ch == crate::constants::CHAR_TAB
-                        || ch == crate::constants::CHAR_CARRIAGE_RETURN
-                        || ch == crate::constants::CHAR_NEWLINE
-                    {
+                    if is_horizontal_space(ch) || is_line_terminator(ch) {
                         break;
                     }
                     word.push(ch);
@@ -162,7 +159,7 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
                 source.next();
             }
             while let Some(c) = source.current() {
-                if c == crate::constants::CHAR_SPACE || c == crate::constants::CHAR_TAB {
+                if is_horizontal_space(c) {
                     source.next();
                 } else {
                     break;
@@ -172,11 +169,9 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
                 let st_tag = source.save_state();
                 let mut tag_raw = String::new();
                 while let Some(ch) = source.current() {
-                    if ch == crate::constants::CHAR_SPACE
-                        || ch == crate::constants::CHAR_TAB
-                        || ch == crate::constants::CHAR_CARRIAGE_RETURN
-                        || ch == crate::constants::CHAR_NEWLINE
-                        || ch == crate::constants::CHAR_HASH
+                    if is_horizontal_space(ch)
+                        || is_line_terminator(ch)
+                        || is_comment_start(ch)
                     {
                         break;
                     }
@@ -485,7 +480,7 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
             // Read the directive keyword up to first whitespace
             let mut word = String::new();
             while let Some(ch) = source.current() {
-                if ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n' {
+                if crate::utils::is_horizontal_space(ch) || crate::utils::is_line_terminator(ch) {
                     break;
                 }
                 word.push(ch);

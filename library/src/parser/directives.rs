@@ -1,6 +1,6 @@
-use crate::constants::{CHAR_CARRIAGE_RETURN, CHAR_NEWLINE};
 use crate::error::YamlError;
 use crate::parser::document::directive_errors::DirectiveErrors;
+use crate::utils::is_line_terminator;
 /// Parses YAML directives (%YAML, %TAG) at the start of a document.
 /// Returns a DirectiveContext or error string.
 /// YAML directive parsing (%YAML and %TAG)
@@ -16,7 +16,7 @@ pub fn parse_directives(
     fn parse_line(source: &mut dyn crate::io::traits::ISource) -> String {
         let mut line = String::new();
         while let Some(c) = source.current() {
-            if c == CHAR_NEWLINE || c == CHAR_CARRIAGE_RETURN {
+            if is_line_terminator(c) {
                 break;
             }
             line.push(c);
@@ -24,7 +24,7 @@ pub fn parse_directives(
         }
         // Skip newline
         if let Some(c) = source.current() {
-            if c == CHAR_NEWLINE || c == CHAR_CARRIAGE_RETURN {
+            if is_line_terminator(c) {
                 source.next();
             }
         }
