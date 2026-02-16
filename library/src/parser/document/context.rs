@@ -42,6 +42,7 @@ pub struct ParsingContext {
 
     /// Reference to parent context for nested structure validation
     /// Using Option<Box<>> to keep struct size manageable while allowing arbitrary nesting
+    #[allow(dead_code)]
     pub parent: Option<Box<ParsingContext>>,
 }
 
@@ -53,10 +54,13 @@ pub enum CollectionType {
     /// Inside a block sequence (lines starting with -)
     BlockSequence,
     /// Inside a block mapping (key: value pairs)
+    #[allow(dead_code)]
     BlockMapping,
     /// Inside a flow sequence ([...])
+    #[allow(dead_code)]
     FlowSequence,
     /// Inside a flow mapping ({...})
+    #[allow(dead_code)]
     FlowMapping,
 }
 
@@ -111,6 +115,7 @@ impl ParsingContext {
     /// # Returns
     ///
     /// A new ParsingContext in flow mode
+    #[allow(dead_code)]
     pub fn child_flow_context(&self, collection_type: CollectionType) -> Self {
         Self {
             indent_level: self.indent_level,
@@ -125,6 +130,7 @@ impl ParsingContext {
     ///
     /// This is important for tab validation - tabs immediately after newlines
     /// are considered indentation and are forbidden per YAML 1.2 spec.
+    #[allow(dead_code)]
     pub fn mark_newline_consumed(&mut self) {
         self.after_newline = true;
     }
@@ -132,6 +138,7 @@ impl ParsingContext {
     /// Updates the context to indicate non-whitespace content was found
     ///
     /// After content is found, tabs are no longer indentation (they're part of content)
+    #[allow(dead_code)]
     pub fn mark_content_found(&mut self) {
         self.after_newline = false;
     }
@@ -154,6 +161,7 @@ impl ParsingContext {
     /// # Returns
     ///
     /// Reference to parent context, or None if this is root
+    #[allow(dead_code)]
     pub fn parent_context(&self) -> Option<&ParsingContext> {
         self.parent.as_ref().map(|b| b.as_ref())
     }
@@ -167,6 +175,7 @@ impl ParsingContext {
     /// # Returns
     ///
     /// true if indent is valid (more than parent), false otherwise
+    #[allow(dead_code)]
     pub fn is_valid_child_indent(&self, current_indent: usize) -> bool {
         if let Some(parent) = self.parent_context() {
             current_indent > parent.indent_level

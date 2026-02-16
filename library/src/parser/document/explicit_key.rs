@@ -148,6 +148,7 @@ pub(crate) fn parse_explicit_mapping_entry(
     Ok((key_node, value_node))
 }
 
+#[allow(dead_code)]
 /// Collect consecutive explicit key entries ('? key' lines) into mapping pairs.
 /// Stops when the next token is not a question mark or structure changes.
 pub(crate) fn collect_explicit_keys_block(

@@ -96,6 +96,7 @@ pub fn force_key_to_string(key: Node) -> Node {
 
 /// Dedupe mapping by last key occurrence, preserving relative order of surviving pairs.
 /// Keys are compared using inline string representation.
+#[allow(dead_code)]
 pub fn dedupe_mapping_pairs_by_last_occurrence(pairs: Vec<(Node, Node)>) -> Vec<(Node, Node)> {
     use std::collections::HashMap as Map;
     let mut last_index: Map<String, usize> = Map::new();

@@ -8,6 +8,7 @@ use crate::utils::anchors_helpers;
 use crate::utils::anchors_helpers2;
 use std::collections::HashMap;
 
+#[allow(dead_code)]
 /// Recursively collects all anchor definitions from a YAML document tree.
 ///
 /// Traverses the node tree and builds a map of anchor names to their
@@ -37,6 +38,7 @@ pub(crate) fn collect_anchors(node: &Node, anchors: &mut HashMap<String, Node>) 
     })
 }
 
+#[allow(dead_code)]
 /// Recursively replaces all alias references with their corresponding anchor values.
 ///
 /// Traverses the node tree and replaces any Alias nodes with the actual
@@ -72,6 +74,7 @@ pub(crate) fn replace_aliases(node: &mut Node, anchors: &HashMap<String, Node>) 
     if let Some(e) = err { Err(e) } else { Ok(()) }
 }
 
+#[allow(dead_code)]
 /// Expands YAML merge keys (<<) by incorporating referenced mapping values.
 ///
 /// Processes merge key syntax in mappings, which allows inheriting key-value

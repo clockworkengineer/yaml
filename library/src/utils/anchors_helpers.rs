@@ -5,6 +5,7 @@ use crate::nodes::node::Node;
 use crate::parser::ParseResult;
 
 /// Traverses a node tree, applying a closure to each node, propagating errors.
+#[allow(dead_code)]
 pub fn traverse_with_error<F>(node: &Node, mut f: F) -> ParseResult<()>
 where
     F: FnMut(&Node) -> Option<String>,

@@ -88,6 +88,7 @@ fn mapping_log(msg: String) {
 
 /// Parses a single key-value mapping pair (for sequence items).
 /// Used when a mapping pair appears as a sequence item (e.g., - key: value).
+#[allow(dead_code)]
 pub fn parse_single_mapping_pair_with_tokens(
     stream: &mut TokenStream,
     directives: &DirectiveContext,

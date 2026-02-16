@@ -4,6 +4,7 @@ use crate::nodes::node::Node;
 
 /// Pre-order traversal over the YAML `Node` tree.
 /// Calls `f` on each node, then recurses into children.
+#[allow(dead_code)]
 pub fn visit(node: &Node, f: &mut impl FnMut(&Node)) {
     f(node);
     match node {
@@ -33,6 +34,7 @@ pub fn visit(node: &Node, f: &mut impl FnMut(&Node)) {
 /// Pre-order mutable traversal over the YAML `Node` tree.
 /// Calls `f` on each node (allowing mutation), then recurses into children
 /// of the potentially mutated node.
+#[allow(dead_code)]
 pub fn visit_mut(node: &mut Node, f: &mut impl FnMut(&mut Node)) {
     f(node);
     match node {

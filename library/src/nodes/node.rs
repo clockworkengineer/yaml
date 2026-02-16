@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 /// Shared trait for node/string conversion and cloning
 pub trait NodeStringConvert {
     /// Convert node to string (lossy)

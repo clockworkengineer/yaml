@@ -307,6 +307,7 @@ pub struct NodeBuilder {
     /// Reusable string buffer
     string_buffer: String,
     /// Reusable vec buffer for sequences
+    #[allow(dead_code)]
     vec_buffer: Vec<Node>,
 }
 

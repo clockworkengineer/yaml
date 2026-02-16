@@ -225,6 +225,7 @@ impl<'a> TokenStream<'a> {
 
     /// Skip whitespace tokens (newlines, indents)
     #[inline]
+    #[allow(dead_code)]
     pub fn skip_whitespace(&mut self) -> Result<(), crate::error::YamlError> {
         #[cfg(feature = "debug-trace")]
         ts_log(format!(
@@ -236,6 +237,7 @@ impl<'a> TokenStream<'a> {
 
     /// Skip comments
     #[inline]
+    #[allow(dead_code)]
     pub fn skip_comments(&mut self) -> Result<(), crate::error::YamlError> {
         #[cfg(feature = "debug-trace")]
         ts_log(format!(
@@ -247,6 +249,7 @@ impl<'a> TokenStream<'a> {
 
     /// Skip whitespace and comments
     #[inline]
+    #[allow(dead_code)]
     pub fn skip_whitespace_and_comments(&mut self) -> Result<(), crate::error::YamlError> {
         #[cfg(feature = "debug-trace")]
         ts_log(format!(
@@ -258,12 +261,14 @@ impl<'a> TokenStream<'a> {
 
     /// Alias for skipping all trivia (whitespace + comments) to encourage DRY usage
     #[inline]
+    #[allow(dead_code)]
     pub fn skip_trivia(&mut self) -> Result<(), crate::error::YamlError> {
         self.skip_whitespace_and_comments()
     }
 
     /// Skip only newlines and comments, preserving `Indent` tokens for dedent detection.
     #[inline]
+    #[allow(dead_code)]
     pub fn skip_newlines_and_comments(&mut self) -> Result<(), crate::error::YamlError> {
         #[cfg(feature = "debug-trace")]
         ts_log(format!(
@@ -282,6 +287,7 @@ impl<'a> TokenStream<'a> {
     /// inline comment at the end of a content line, and a comment line
     /// appearing before an indented block (as in 8XDJ).
     #[inline]
+    #[allow(dead_code)]
     pub fn skip_newlines_and_comments_with_flag(
         &mut self,
     ) -> Result<bool, crate::error::YamlError> {
@@ -384,6 +390,7 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Check if we're at the start of a flow collection
+    #[allow(dead_code)]
     pub fn at_flow_start(&self) -> bool {
         matches!(
             self.current(),
@@ -392,6 +399,7 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Check if we're at the start of a quoted string
+    #[allow(dead_code)]
     pub fn at_quoted_string(&self) -> bool {
         matches!(
             self.current(),
@@ -400,11 +408,13 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Check if we're at a sequence indicator
+    #[allow(dead_code)]
     pub fn at_sequence_indicator(&self) -> bool {
         matches!(self.current(), Some(Token::Dash))
     }
 
     /// Check if we're at end of stream
+    #[allow(dead_code)]
     pub fn at_eof(&self) -> bool {
         matches!(self.current(), Some(Token::Eof) | None)
     }
@@ -440,6 +450,7 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Consume a plain scalar token
+    #[allow(dead_code)]
     pub fn consume_plain_scalar(&mut self) -> Result<String, crate::error::YamlError> {
         match self.current() {
             Some(Token::Plain(s)) => {
@@ -457,6 +468,7 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Consume a quoted scalar token (single or double quoted)
+    #[allow(dead_code)]
     pub fn consume_quoted_scalar(&mut self) -> Result<String, crate::error::YamlError> {
         match self.current() {
             Some(Token::SingleQuoted(s)) | Some(Token::DoubleQuoted(s)) => {
@@ -501,11 +513,13 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Get the current indentation level
+    #[allow(dead_code)]
     pub fn indent_level(&self) -> usize {
         self.lexer.indent_level()
     }
 
     /// Check if the next token (after whitespace) is a colon
+    #[allow(dead_code)]
     pub fn has_colon_ahead(&mut self) -> Result<bool, crate::error::YamlError> {
         // Save position
         let _current_state = self.current().cloned();

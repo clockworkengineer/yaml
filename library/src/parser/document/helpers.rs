@@ -73,6 +73,7 @@ pub(crate) fn to_yaml_error<E: std::fmt::Display>(err: E) -> YamlError {
 ///
 /// Note: currently unused; keep for potential future TokenStream-based
 /// refactors of document parsing logic.
+#[allow(dead_code)]
 pub(crate) fn is_token(
     ts: &crate::parser::token_stream::TokenStream,
     kind: &crate::parser::lexer::Token,
@@ -358,6 +359,7 @@ pub(crate) fn validate_indentation_and_whitespace(
 ///
 /// Assumes the current position is at an indentation point (start of a new line) in block context.
 /// Token-based wrapper for validating no tab indentation at current position.
+#[allow(dead_code)]
 pub(crate) fn validate_no_tab_indentation_tokens(
     stream: &TokenStream,
     ctx: &ParsingContext,
@@ -583,6 +585,7 @@ pub(crate) fn validate_trailing_content_after_document_end(
 /// The comment text as a String
 /// Consumes a Comment token from the TokenStream and returns its content.
 /// Returns an empty string if the current token is not a Comment.
+#[allow(dead_code)]
 pub(crate) fn parse_comment_token(stream: &mut crate::parser::token_stream::TokenStream) -> String {
     use crate::parser::lexer::Token;
     match stream.current() {
@@ -602,6 +605,7 @@ pub(crate) fn parse_comment_token(stream: &mut crate::parser::token_stream::Toke
 ///
 /// According to the YAML spec, a comment indicator (#) must be preceded by whitespace or be at the start of a line.
 /// This function checks the previous token in the TokenStream context.
+#[allow(dead_code)]
 pub(crate) fn validate_comment_spacing_token(
     stream: &crate::parser::token_stream::TokenStream,
 ) -> crate::parser::ParseResult<()> {
@@ -642,6 +646,7 @@ pub(crate) fn validate_comment_spacing_token(
 /// # Returns
 ///
 /// A String containing the inline representation
+#[allow(dead_code)]
 pub(crate) fn node_to_inline_string(node: &Node) -> String {
     crate::utils::node_to_inline_string(node)
 }

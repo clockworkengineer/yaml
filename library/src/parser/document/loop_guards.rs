@@ -9,10 +9,12 @@ pub const MAX_LOOP_ITERATIONS: usize = 100_000;
 
 /// Default maximum number of items in a sequence.
 /// This prevents memory exhaustion from extremely large sequences.
+#[allow(dead_code)]
 pub const MAX_SEQUENCE_ITEMS: usize = 50_000;
 
 /// Default maximum number of pairs in a mapping.
 /// This prevents memory exhaustion from extremely large mappings.
+#[allow(dead_code)]
 pub const MAX_MAPPING_PAIRS: usize = 50_000;
 
 /// Macro to create and check loop iteration guard.

@@ -225,6 +225,7 @@ pub fn read_line_trimmed_into_string(source: &mut dyn ISource) -> String {
 /// # Returns
 ///
 /// A String containing the inline representation of the node
+#[allow(dead_code)]
 pub fn node_to_inline_string(node: &Node) -> String {
     match node {
         Node::Str(s, _, _) => s.clone(),

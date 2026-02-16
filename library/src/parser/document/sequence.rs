@@ -18,6 +18,7 @@ use crate::{combined_loop_guard, loop_guard_init};
 use crate::io::traits::ISource;
 
 /// Parses a YAML sequence (array) with the specified indentation level.
+#[allow(dead_code)]
 pub(crate) fn parse_sequence(
     source: &mut dyn ISource,
     indent_level: usize,
@@ -38,6 +39,7 @@ pub(crate) fn parse_sequence(
 }
 
 // Helper for nested sequence parsing to avoid double mutable borrow
+#[allow(dead_code)]
 fn parse_sequence_inner(
     stream: &mut TokenStream,
     indent_level: usize,
