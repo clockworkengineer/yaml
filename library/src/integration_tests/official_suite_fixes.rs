@@ -10,6 +10,40 @@ use crate::{BufferSource, Node, parse};
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    /// Helper: parse YAML and expect success, returning the root node.
+    ///
+    /// Panics with a descriptive label if parsing fails. Used by tests that
+    /// need to inspect the resulting node tree.
+    fn parse_expect_ok(yaml: &[u8], label: &str) -> Node {
+        let mut source = BufferSource::new(yaml);
+        let result = parse(&mut source);
+
+        #[cfg(feature = "debug-trace")]
+        println!("{} Result: {:?}", label, result);
+
+        match result {
+            Ok(node) => node,
+            Err(e) => panic!("{}: {:?}", label, e),
+        }
+    }
+
+    /// Helper: assert that parsing succeeds, used for simple success cases.
+    fn assert_parses(yaml: &[u8], label: &str) {
+        let _ = parse_expect_ok(yaml, label);
+    }
+
+    /// Helper: assert that parsing fails, used for negative test cases.
+    fn assert_fails(yaml: &[u8], label: &str) {
+        let mut source = BufferSource::new(yaml);
+        let result = parse(&mut source);
+
+        #[cfg(feature = "debug-trace")]
+        println!("{} Result: {:?}", label, result);
+
+        assert!(result.is_err(), "{}: {:?}", label, result);
+    }
     // #[test]
     // fn test_4hvu_sequence_indentation_standalone() {
     //     let yaml = b"- item1\n- item2\n  - subitem1\n  - subitem2\n";
@@ -67,20 +101,8 @@ mod tests {
     fn test_5trb_unterminated_quoted_scalar() {
         // This YAML has an invalid quoted scalar (unterminated)
         let yaml = b"key: \"unterminated quoted scalar\n";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source);
-
-        #[cfg(feature = "debug-trace")]
-        println!("5TRB Result: {:?}", result);
-
-        // Fail the test if parsing does NOT return an error
-        assert!(
-            result.is_err(),
-            "5TRB should fail to parse, but succeeded: {:?}",
-            result
-        );
+        assert_fails(yaml, "5TRB should fail to parse, but succeeded");
     }
-    use super::*;
 
     // Test 236B - Indentation/structure: Invalid mapping/sequence structure (should error)
     // #[test]
@@ -110,31 +132,23 @@ mod tests {
   hr:   63
   avg:  0.288
 ";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source);
+        let node = parse_expect_ok(yaml, "Failed to parse 229Q");
 
-        #[cfg(feature = "debug-trace")]
-        println!("229Q Result: {:?}", result);
-
-        if let Ok(node) = result {
-            // Should be a Document with an Array containing 2 Mappings
-            if let Node::Document(docs) = node {
-                if let Some(Node::Array(items)) = docs.first() {
-                    assert_eq!(items.len(), 2, "Should have 2 items in sequence");
-                    // Each item should be a mapping with 3 keys
-                    for (i, item) in items.iter().enumerate() {
-                        if let Node::Mapping(pairs) = item {
-                            assert_eq!(pairs.len(), 3, "Item {} should have 3 key-value pairs", i);
-                        } else {
-                            panic!("Item {} should be a Mapping, got {:?}", i, item);
-                        }
+        // Should be a Document with an Array containing 2 Mappings
+        if let Node::Document(docs) = node {
+            if let Some(Node::Array(items)) = docs.first() {
+                assert_eq!(items.len(), 2, "Should have 2 items in sequence");
+                // Each item should be a mapping with 3 keys
+                for (i, item) in items.iter().enumerate() {
+                    if let Node::Mapping(pairs) = item {
+                        assert_eq!(pairs.len(), 3, "Item {} should have 3 key-value pairs", i);
+                    } else {
+                        panic!("Item {} should be a Mapping, got {:?}", i, item);
                     }
-                } else {
-                    panic!("Expected Array as first document element");
                 }
+            } else {
+                panic!("Expected Array as first document element");
             }
-        } else {
-            panic!("Failed to parse 229Q: {:?}", result.err());
         }
     }
 
@@ -146,17 +160,7 @@ mod tests {
 key2  :  value2
 key3:value3
 ";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source);
-
-        #[cfg(feature = "debug-trace")]
-        println!("26DV Result: {:?}", result);
-
-        assert!(
-            result.is_ok(),
-            "Should parse whitespace around colons: {:?}",
-            result.err()
-        );
+        assert_parses(yaml, "Should parse whitespace around colons");
     }
 
     // Test 2CMS - Invalid mapping in plain multiline (false positive)
@@ -167,18 +171,8 @@ key3:value3
   multiline scalar
   that continues
 ";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source);
-
-        #[cfg(feature = "debug-trace")]
-        println!("2CMS Result: {:?}", result);
-
-        // If this is marked as false positive, we should succeed
-        assert!(
-            result.is_ok(),
-            "2CMS should parse (false positive): {:?}",
-            result.err()
-        );
+                // If this is marked as false positive, we should succeed
+                assert_parses(yaml, "2CMS should parse (false positive)");
     }
 
     // Test 36F6 - Multiline plain scalar with empty line
@@ -207,19 +201,9 @@ key3:value3
     fn test_3rln_tabs_in_double_quoted() {
         let yaml = b"key: \"\t\tvalue\"
 ";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source);
+        let node = parse_expect_ok(yaml, "Should handle tabs in double-quoted strings");
 
-        #[cfg(feature = "debug-trace")]
-        println!("3RLN Result: {:?}", result);
-
-        assert!(
-            result.is_ok(),
-            "Should handle tabs in double-quoted strings: {:?}",
-            result.err()
-        );
-
-        if let Ok(Node::Document(docs)) = result {
+        if let Node::Document(docs) = node {
             if let Some(Node::Mapping(pairs)) = docs.first() {
                 if let Some((_, Node::Str(value, _, _))) = pairs.first() {
                     assert!(value.contains('\t'), "Should preserve tab characters");
@@ -238,50 +222,23 @@ key3:value3
 quoted: \"So does this
   quoted scalar.\\n\"
 ";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source);
-
-        #[cfg(feature = "debug-trace")]
-        println!("4CQQ Result: {:?}", result);
-
-        assert!(
-            result.is_ok(),
-            "Should parse multiline flow scalars: {:?}",
-            result.err()
-        );
+        assert_parses(yaml, "Should parse multiline flow scalars");
     }
 
     // Test H7J7 - Invalid anchored mapping value combining empty scalar and !!map
     #[test]
     fn test_h7j7_invalid_anchored_mapping_value() {
         let yaml = b"key: &x\n!!map\n  a: b\n";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source);
-
-        #[cfg(feature = "debug-trace")]
-        println!("H7J7 Result: {:?}", result);
-
-        assert!(
-            result.is_err(),
-            "H7J7 should now be rejected as invalid: {:?}",
-            result
-        );
+        assert_fails(yaml, "H7J7 should now be rejected as invalid");
     }
 
     // Test BU8L - Valid anchored mapping with !!map on separate line
     #[test]
     fn test_bu8l_valid_anchored_mapping_value() {
         let yaml = b"key: &anchor\n !!map\n  a: b\n";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source);
-
-        #[cfg(feature = "debug-trace")]
-        println!("BU8L Result: {:?}", result);
-
-        assert!(
-            result.is_ok(),
-            "BU8L should parse successfully as a valid anchored mapping: {:?}",
-            result.err()
+        assert_parses(
+            yaml,
+            "BU8L should parse successfully as a valid anchored mapping",
         );
     }
 
@@ -289,16 +246,9 @@ quoted: \"So does this
     #[test]
     fn test_8xdj_invalid_plain_then_mapping_at_same_indent() {
         let yaml = b"key: word1\n#  xxx\n  word2\n";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source);
-
-        #[cfg(feature = "debug-trace")]
-        println!("8XDJ Result: {:?}", result);
-
-        assert!(
-            result.is_err(),
-            "8XDJ should now be rejected as invalid at the document level: {:?}",
-            result
+        assert_fails(
+            yaml,
+            "8XDJ should now be rejected as invalid at the document level",
         );
     }
 
@@ -331,18 +281,8 @@ quoted: \"So does this
   - subitem1
   - subitem2
 ";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source);
-
-        #[cfg(feature = "debug-trace")]
-        println!("4HVU Result: {:?}", result);
-
         // If marked as false positive, we should succeed
-        assert!(
-            result.is_ok(),
-            "4HVU should parse (false positive): {:?}",
-            result.err()
-        );
+        assert_parses(yaml, "4HVU should parse (false positive)");
     }
 
     // Test 4ZYM - Spec Example 6.4. Line Prefixes
@@ -357,17 +297,7 @@ literal: |
   text
   lines
 ";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source);
-
-        #[cfg(feature = "debug-trace")]
-        println!("4ZYM Result: {:?}", result);
-
-        assert!(
-            result.is_ok(),
-            "Should handle line prefixes: {:?}",
-            result.err()
-        );
+        assert_parses(yaml, "Should handle line prefixes");
     }
 
     // Additional test for basic block scalar validation
@@ -378,16 +308,9 @@ literal: |
 - c: 3
   d: 4
 ";
-        let mut source = BufferSource::new(yaml);
-        let result = parse(&mut source);
+        let node = parse_expect_ok(yaml, "Basic sequence of mappings should work");
 
-        assert!(
-            result.is_ok(),
-            "Basic sequence of mappings should work: {:?}",
-            result.err()
-        );
-
-        if let Ok(Node::Document(docs)) = result {
+        if let Node::Document(docs) = node {
             if let Some(Node::Array(items)) = docs.first() {
                 assert_eq!(items.len(), 2, "Should have 2 items");
             }

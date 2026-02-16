@@ -4,8 +4,8 @@ use crate::nodes::node::Node::Document;
 use crate::nodes::node::QuoteType;
 use crate::parser::ParseResult;
 use crate::parser::directives::DirectiveContext;
-use crate::parser::document::helpers::{classify_doc_marker, DocMarkerKind};
 use crate::parser::document::contents::parse_document_contents;
+use crate::parser::document::helpers::{DocMarkerKind, classify_doc_marker};
 use crate::parser::utils::visit::visit;
 
 /// Checks if the current position is at a document marker (--- or ...).
@@ -15,7 +15,10 @@ fn is_document_marker(
 ) -> ParseResult<bool> {
     let st = source.save_state();
     let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-    let res = matches!(classify_doc_marker(&ts), Some(DocMarkerKind::Start | DocMarkerKind::End));
+    let res = matches!(
+        classify_doc_marker(&ts),
+        Some(DocMarkerKind::Start | DocMarkerKind::End)
+    );
     source.restore_state(st);
     Ok(res)
 }
@@ -217,7 +220,10 @@ pub fn parse_document(
         });
         if let Some(e) = first_error {
             // Convert validation error to a simple parse error without precise position
-            return Err(crate::parser::document::helpers::to_yaml_error(format!("{}", e)));
+            return Err(crate::parser::document::helpers::to_yaml_error(format!(
+                "{}",
+                e
+            )));
         }
     }
 

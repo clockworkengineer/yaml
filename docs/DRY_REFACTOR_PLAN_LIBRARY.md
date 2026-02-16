@@ -131,13 +131,20 @@ Behavior: description strings remain text-identical to previous formats, and bot
 
 Goal: reduce boilerplate in `integration_tests/official_suite_fixes.rs` so new suite-based regression tests are cheaper to add.
 
-Suggested steps:
-- Introduce small helpers or macros in the same module, e.g.:
-  - `fn assert_parses(yaml: &[u8])` that wraps `BufferSource::new`, `parse`, and `assert!(result.is_ok(), ...)`.
-  - `fn assert_fails(yaml: &[u8], label: &str)` that wraps the `is_err()` assertion and includes the label in the message.
-- Refactor existing tests like `test_5trb_unterminated_quoted_scalar`, `test_229q_sequence_of_mappings`, `test_26dv_whitespace_around_colon`, `test_2cms_plain_multiline`, etc. to use these helpers.
+Status: Implemented.
 
-Behavior: no change to which inputs are accepted or rejected; only test ergonomics improve.
+Implementation summary:
+- Added shared helpers inside the `tests` module of `integration_tests/official_suite_fixes.rs`:
+  - `fn parse_expect_ok(yaml: &[u8], label: &str) -> Node` wraps `BufferSource::new`, `parse`, optional debug printing, and panics with the provided label if parsing fails; used by tests that need to inspect the resulting node tree.
+  - `fn assert_parses(yaml: &[u8], label: &str)` calls `parse_expect_ok` and discards the result for simple "should parse" checks.
+  - `fn assert_fails(yaml: &[u8], label: &str)` wraps `parse` and asserts `is_err()`, including the label in the failure message.
+- Refactored existing official-suite fix tests to use these helpers where appropriate:
+  - Negative cases like `test_5trb_unterminated_quoted_scalar`, `test_h7j7_invalid_anchored_mapping_value`, and `test_8xdj_invalid_plain_then_mapping_at_same_indent` now call `assert_fails`.
+  - Positive parse-only cases like `test_26dv_whitespace_around_colon`, `test_2cms_plain_multiline`, `test_4cqq_multiline_flow_scalars`, `test_4hvu_sequence_indentation`, `test_4zym_line_prefixes`, and `test_bu8l_valid_anchored_mapping_value` now call `assert_parses`.
+  - Structure-inspecting cases like `test_229q_sequence_of_mappings`, `test_3rln_tabs_in_double_quoted`, and `test_basic_sequence_of_mappings` now use `parse_expect_ok` and then assert on the returned `Node`.
+- Left exploratory/logging-only tests (e.g., `test_36f6_multiline_with_empty_line`, `test_4fj6_nested_implicit_keys`) unchanged to preserve their current diagnostic behavior.
+
+Behavior: no change to which inputs are accepted or rejected; only test ergonomics and consistency of debug output improve. Full `cargo test` and the YAML test suite both pass with these changes.
 
 ---
 
