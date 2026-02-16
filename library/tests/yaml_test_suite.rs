@@ -11,6 +11,29 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use yaml_lib::test_helpers::parse_yaml;
 
+// Guard to temporarily silence panic output during the YAML test suite run.
+// This keeps the console output focused on per-case PASS/FAIL, while still
+// allowing us to detect panics via `catch_unwind`.
+struct PanicHookGuard(Option<Box<dyn Fn(&panic::PanicInfo) + Send + Sync + 'static>>);
+
+impl PanicHookGuard {
+    fn new_silent() -> Self {
+        let default_hook = panic::take_hook();
+        panic::set_hook(Box::new(|_| {
+            // Suppress panic messages during the suite run.
+        }));
+        PanicHookGuard(Some(default_hook))
+    }
+}
+
+impl Drop for PanicHookGuard {
+    fn drop(&mut self) {
+        if let Some(hook) = self.0.take() {
+            panic::set_hook(hook);
+        }
+    }
+}
+
 #[derive(Debug)]
 struct TestCase {
     id: String,
@@ -60,6 +83,10 @@ fn get_all_test_dirs(suite_dir: &Path) -> Vec<PathBuf> {
 // Run all YAML test suite cases and assert pass rate >= 90%
 #[test]
 fn run_yaml_test_suite() {
+    // Silence panic output while this test runs; we still track panics
+    // via `catch_unwind`, but avoid noisy backtraces in the output.
+    let _panic_hook_guard = PanicHookGuard::new_silent();
+
     // Try multiple possible paths for the test suite
     let possible_paths = vec![
         Path::new("c:/Projects/yaml/yaml-test-suite"),
