@@ -8,6 +8,7 @@ use crate::parser::directives::DirectiveContext;
 use crate::parser::document::tokens::value::parse_value_with_tokens;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
+use crate::parser::document::flow_punctuation;
 
 /// Parse a block sequence using tokens
 ///
@@ -186,21 +187,12 @@ pub fn parse_sequence_with_tokens(
                     if let Some((_, items)) = stack.last_mut() {
                         items.push(value);
                     }
-                    loop {
-                        // Don't skip Indent tokens - needed for dedent detection
-                        stream.skip_newlines_and_comments()?;
-                        match stream.current() {
-                            Some(Token::Comma) => {
-                                stream.next()?;
-                                continue;
-                            }
-                            Some(Token::FlowMappingEnd) | Some(Token::FlowSequenceEnd) => {
-                                stream.next()?;
-                                continue;
-                            }
-                            _ => break,
-                        }
-                    }
+                    // Delegate trailing comma/closer consumption to centralized
+                    // helper to keep flow punctuation behavior in one place while
+                    // preserving existing semantics for block sequences.
+                    flow_punctuation::consume_trailing_separators_and_closers_in_block_sequence(
+                        stream,
+                    )?;
                     // Preserve behavior: only skip newlines here
                     while matches!(stream.current(), Some(Token::Newline)) {
                         stream.next()?;

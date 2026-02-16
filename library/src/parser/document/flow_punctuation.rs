@@ -46,6 +46,39 @@ pub fn ensure_separator_or_end(
     }
 }
 
+/// Consume any trailing comma or flow closer tokens after an inline flow
+/// collection that appears as a value inside a block sequence.
+///
+/// This mirrors the legacy behavior in the block sequence token parser:
+/// after parsing a nested flow sequence/mapping, the parser would:
+/// - Skip newlines/comments (but not Indent tokens)
+/// - Consume any number of `,`, `]`, or `}` tokens
+/// - Stop as soon as another token (e.g., `-`, `Indent`) is seen, without
+///   raising a punctuation error.
+///
+/// Keeping this logic here allows flow punctuation policy to be adjusted
+/// centrally without changing observable behavior for existing inputs.
+pub fn consume_trailing_separators_and_closers_in_block_sequence(
+    stream: &mut TokenStream,
+) -> ParseResult<()> {
+    loop {
+        // Don't skip Indent tokens - needed for dedent detection by callers
+        stream.skip_newlines_and_comments()?;
+        match stream.current() {
+            Some(Token::Comma) => {
+                stream.next()?;
+                continue;
+            }
+            Some(Token::FlowMappingEnd) | Some(Token::FlowSequenceEnd) => {
+                stream.next()?;
+                continue;
+            }
+            _ => break,
+        }
+    }
+    Ok(())
+}
+
 /// Centralized error: Unexpected extra closing bracket ']' in a flow sequence.
 pub fn unexpected_extra_closing_bracket_in_flow_sequence(
     stream: &mut TokenStream,

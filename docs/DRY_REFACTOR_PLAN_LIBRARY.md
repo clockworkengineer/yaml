@@ -77,16 +77,18 @@ Behavior: keep the same error variants and texts via `block_scalar_errors.rs`; t
 
 Goal: ensure all flow-collection punctuation checks (comma / closer / ':' expectations) go through `flow_punctuation.rs` rather than per-site conditionals.
 
-Suggested steps:
-- Audit the following files for any remaining custom logic:
-  - `parser/document/inline_tokens.rs` (flow mappings/sequences).
-  - `parser/document/tokens/sequence.rs`.
-  - `parser/document/tokens/mapping.rs`.
-- Where existing code performs: "after finishing an item, require comma or closing brace/bracket", replace with:
-  - `flow_punctuation::ensure_separator_or_end(stream, FlowContext::Sequence | FlowContext::Mapping, closing_token)`.
-- Ensure the error messages match the legacy text exactly (the helpers already preserve this).
+Status: Implemented.
 
-Behavior: no intended changes; this simply guarantees one place to evolve punctuation rules.
+Implementation summary:
+- `parser/document/flow_punctuation.rs` centralizes flow punctuation behavior via:
+  - `FlowContext` and `ensure_separator_or_end` for "comma or closing brace/bracket" checks in inline sequences/mappings.
+  - `consume_trailing_separators_and_closers_in_block_sequence`, which mirrors the legacy post-item loop in the block sequence parser and consumes trailing `,`, `]`, and `}` tokens without changing semantics.
+- `parser/document/inline_tokens.rs` uses `ensure_separator_or_end` for:
+  - Inline flow sequences when a value appears without a preceding comma.
+  - Inline flow mappings after each key-value pair (requiring comma or `}`).
+- `parser/document/tokens/sequence.rs` now calls `consume_trailing_separators_and_closers_in_block_sequence` after parsing an inline flow collection as a sequence item, instead of open-coded loops.
+
+Behavior: no intended changes; this guarantees one place to evolve punctuation rules while matching existing error messages and control flow.
 
 ## 6. Shared Node Traversal Helpers
 
