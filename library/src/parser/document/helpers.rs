@@ -89,6 +89,33 @@ use crate::parser::ParseResult;
 use crate::parser::document::context::ParsingContext;
 use crate::utils::{is_comment_start, is_horizontal_space, is_line_terminator};
 
+/// Simple classifier for document markers in the TokenStream.
+///
+/// This keeps all DocumentStart / DocumentEnd detection in one place so
+/// callers do not need to pattern match on the raw tokens themselves.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) enum DocMarkerKind {
+    Start,
+    End,
+}
+
+/// Classifies the current token as a document marker, if applicable.
+///
+/// Returns Some(DocMarkerKind::Start) when the current token is
+/// Token::DocumentStart, Some(DocMarkerKind::End) for Token::DocumentEnd,
+/// and None for all other tokens.
+#[inline]
+pub(crate) fn classify_doc_marker(
+    ts: &crate::parser::token_stream::TokenStream,
+) -> Option<DocMarkerKind> {
+    use crate::parser::lexer::Token;
+    match ts.current() {
+        Some(Token::DocumentStart) => Some(DocMarkerKind::Start),
+        Some(Token::DocumentEnd) => Some(DocMarkerKind::End),
+        _ => None,
+    }
+}
+
 /// Checks for and processes the document start marker (---).
 /// Returns an error if invalid content is found after the marker.
 pub(crate) fn parse_document_markers(
@@ -100,10 +127,7 @@ pub(crate) fn parse_document_markers(
         let st = source.save_state();
         let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)
             .map_err(to_yaml_error)?;
-        let res = matches!(
-            ts.current(),
-            Some(crate::parser::lexer::Token::DocumentStart)
-        );
+        let res = matches!(classify_doc_marker(&ts), Some(DocMarkerKind::Start));
         source.restore_state(st);
         res
     };

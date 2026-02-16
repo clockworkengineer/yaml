@@ -135,8 +135,8 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
             let st = source.save_state();
             let ts = crate::parser::token_stream::TokenStream::new(source, &directives, false)?;
             let res = matches!(
-                ts.current(),
-                Some(crate::parser::lexer::Token::DocumentStart)
+                crate::parser::document::helpers::classify_doc_marker(&ts),
+                Some(crate::parser::document::helpers::DocMarkerKind::Start)
             );
             source.restore_state(st);
             res

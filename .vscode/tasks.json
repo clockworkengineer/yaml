@@ -362,6 +362,19 @@
 				"$rustc"
 			],
 			"group": "build"
+		},
+		{
+			"label": "cargo check (verify build) after step2",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"check"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$rustc"
+			],
+			"group": "build"
 		}
 	]
 }

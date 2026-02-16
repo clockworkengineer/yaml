@@ -16,7 +16,7 @@ use crate::parser::directives::DirectiveContext;
 use crate::parser::document::context::{CollectionType, ParsingContext};
 use crate::parser::document::explicit_key::parse_multiple_explicit_keys;
 use crate::parser::document::helpers;
-use crate::parser::document::helpers::BlockHeadKind;
+use crate::parser::document::helpers::{classify_doc_marker, BlockHeadKind, DocMarkerKind};
 use crate::parser::document::indentation::{
     ensure_indent_at_least, ensure_indent_at_least_no_source,
 };
@@ -178,7 +178,7 @@ fn token_dispatch(
 fn is_doc_end(source: &mut dyn ISource, directives: &DirectiveContext) -> ParseResult<bool> {
     let st = source.save_state();
     let ts = crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-    let res = matches!(ts.current(), Some(crate::parser::lexer::Token::DocumentEnd));
+    let res = matches!(classify_doc_marker(&ts), Some(DocMarkerKind::End));
     source.restore_state(st);
     Ok(res)
 }
