@@ -12,6 +12,7 @@ use alloc::vec::Vec;
 use alloc::string::String;
 
 use crate::nodes::node::Node;
+use crate::parser::utils::visit::visit_with_depth;
 
 /// Statistics about a YAML document structure
 #[derive(Clone, Debug, Default)]
@@ -83,71 +84,53 @@ impl DocumentStats {
     /// ```
     pub fn from_node(node: &Node) -> Self {
         let mut stats = Self::new();
-        stats.analyze_node(node, 0);
+        visit_with_depth(node, 0, &mut |node, depth| {
+            stats.total_nodes += 1;
+
+            if depth > stats.max_depth {
+                stats.max_depth = depth;
+            }
+
+            match node {
+                Node::Str(s, _, _) => {
+                    stats.string_count += 1;
+                    stats.total_string_bytes += s.len();
+                }
+                Node::Number(_) => {
+                    stats.number_count += 1;
+                }
+                Node::Boolean(_) => {
+                    stats.boolean_count += 1;
+                }
+                Node::Array(items) => {
+                    stats.array_count += 1;
+                    if items.len() > stats.largest_array {
+                        stats.largest_array = items.len();
+                    }
+                }
+                Node::Mapping(pairs) => {
+                    stats.mapping_count += 1;
+                    if pairs.len() > stats.largest_mapping {
+                        stats.largest_mapping = pairs.len();
+                    }
+                }
+                Node::Set(_) => {
+                    stats.set_count += 1;
+                }
+                Node::Document(_) | Node::Documents(_) => {}
+                Node::Anchored(_, _) => {
+                    stats.anchor_count += 1;
+                }
+                Node::Tagged(_, _) => {
+                    stats.tagged_count += 1;
+                }
+                Node::Alias(_) => {
+                    stats.alias_count += 1;
+                }
+                Node::Comment(_) | Node::None => {}
+            }
+        });
         stats
-    }
-
-    fn analyze_node(&mut self, node: &Node, depth: usize) {
-        self.total_nodes += 1;
-
-        if depth > self.max_depth {
-            self.max_depth = depth;
-        }
-
-        match node {
-            Node::Str(s, _, _) => {
-                self.string_count += 1;
-                self.total_string_bytes += s.len();
-            }
-            Node::Number(_) => {
-                self.number_count += 1;
-            }
-            Node::Boolean(_) => {
-                self.boolean_count += 1;
-            }
-            Node::Array(items) => {
-                self.array_count += 1;
-                if items.len() > self.largest_array {
-                    self.largest_array = items.len();
-                }
-                for item in items {
-                    self.analyze_node(item, depth + 1);
-                }
-            }
-            Node::Mapping(pairs) => {
-                self.mapping_count += 1;
-                if pairs.len() > self.largest_mapping {
-                    self.largest_mapping = pairs.len();
-                }
-                for (key, value) in pairs {
-                    self.analyze_node(key, depth + 1);
-                    self.analyze_node(value, depth + 1);
-                }
-            }
-            Node::Set(items) => {
-                self.set_count += 1;
-                for item in items {
-                    self.analyze_node(item, depth + 1);
-                }
-            }
-            Node::Document(nodes) | Node::Documents(nodes) => {
-                for n in nodes {
-                    self.analyze_node(n, depth + 1);
-                }
-            }
-            Node::Anchored(inner, _) => {
-                self.anchor_count += 1;
-                self.analyze_node(inner, depth + 1);
-            }
-            Node::Tagged(inner, _) => {
-                self.tagged_count += 1;
-                self.analyze_node(inner, depth + 1);
-            }
-            Node::Alias(_) => {
-                self.alias_count += 1;
-            }
-            Node::Comment(_) | Node::None => {}
-        }
     }
 
     /// Calculate estimated memory usage in bytes

@@ -94,19 +94,21 @@ Behavior: no intended changes; this guarantees one place to evolve punctuation r
 
 Goal: avoid repeating ad-hoc recursive matches over `Node` in different subsystems (tag validation, stats, validation engine, etc.).
 
-Current call sites that walk `Node` trees:
-- Tag validation in `parser/document/main_loop.rs` (`validate_tags_rec`).
-- Validation engine in `validation/engine.rs` (collecting paths, applying schema).
-- Metrics/stats in `utils/performance.rs` (`DocumentStats::from_node`).
+Status: Implemented for primary internal traversals.
 
-Suggested steps:
-- Confirm and reuse the existing visitor utilities noted in `INTERNAL_DRY_CHANGES.md` (`parser::utils::visit::{visit, visit_mut}` and `node_utils` helpers).
-- For modules that still implement their own recursion over `Node`, refactor to:
-  - Use `visit` for read-only traversals.
-  - Use `visit_mut` where mutation is needed (e.g., anchor resolution, merge expansion).
-- Keep domain logic (e.g., tag validation, stats accumulation) in small closures passed into the visitor rather than spreading recursion across modules.
+Implementation summary:
+- Confirmed and extended the shared visitor utilities in `parser::utils::visit`:
+  - Existing `visit` (read-only pre-order traversal) and `visit_mut` (mutable traversal) remain the core APIs.
+  - Added `visit_with_depth(node, depth, f)` for depth-aware read-only traversals used by statistics code.
+- Metrics/stats in `utils/performance.rs`:
+  - `DocumentStats::from_node` now uses `visit_with_depth` instead of a bespoke recursive `analyze_node` helper.
+  - All counters (`total_nodes`, `max_depth`, per-type counts, largest array/mapping, string bytes) are updated inside the visitor closure, keeping behavior identical.
+- Tag validation in `parser/document/main_loop.rs`:
+  - Replaced the manual `validate_tags_rec` recursion with a call to `visit`.
+  - During traversal, when encountering `Node::Tagged(_, tag_raw)`, the closure calls `DirectiveContext::validate_tag_handle_usage(tag_raw)` and records the first error, preserving QLJ7 semantics and messages.
+- Other existing traversals (anchor collection/replacement, merge expansion, etc.) already use `visit` / `visit_mut` per `INTERNAL_DRY_CHANGES.md` and were left unchanged.
 
-Behavior: visiting order and covered node variants must remain the same; tests should confirm no behavior change.
+Behavior: visiting order and covered node variants remain the same; `cargo check` and the YAML test suite both pass, confirming no behavior change.
 
 ## 7. Validation Error Message DRY
 

@@ -16,7 +16,7 @@ use crate::parser::directives::DirectiveContext;
 use crate::parser::document::context::{CollectionType, ParsingContext};
 use crate::parser::document::explicit_key::parse_multiple_explicit_keys;
 use crate::parser::document::helpers;
-use crate::parser::document::helpers::{classify_doc_marker, BlockHeadKind, DocMarkerKind};
+use crate::parser::document::helpers::{BlockHeadKind, DocMarkerKind, classify_doc_marker};
 use crate::parser::document::indentation::{
     ensure_indent_at_least, ensure_indent_at_least_no_source,
 };
@@ -451,7 +451,10 @@ pub fn parse_document_contents(
                 pairs.push((Node::None, value_node));
 
                 crate::utils::skip_until_newline(source);
-                if source.current().map_or(false, crate::utils::is_line_terminator) {
+                if source
+                    .current()
+                    .map_or(false, crate::utils::is_line_terminator)
+                {
                     source.next();
                 }
                 crate::utils::skip_whitespace_and_comments(source);

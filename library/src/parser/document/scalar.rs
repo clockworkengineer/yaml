@@ -54,9 +54,9 @@ fn parse_block_header_line(
 
     // Determine if this line is a syntactically valid block header by
     // ensuring all remaining characters belong to the allowed set.
-    let is_header = rest.chars().all(|c| {
-        c == CHAR_SPACE || c == '+' || c == CHAR_DASH || c.is_ascii_digit()
-    });
+    let is_header = rest
+        .chars()
+        .all(|c| c == CHAR_SPACE || c == '+' || c == CHAR_DASH || c.is_ascii_digit());
     if !is_header {
         return Ok(None);
     }

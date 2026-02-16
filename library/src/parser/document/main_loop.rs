@@ -6,6 +6,7 @@ use crate::parser::ParseResult;
 use crate::parser::directives::DirectiveContext;
 use crate::parser::document::helpers::{classify_doc_marker, DocMarkerKind};
 use crate::parser::document::contents::parse_document_contents;
+use crate::parser::utils::visit::visit;
 
 /// Checks if the current position is at a document marker (--- or ...).
 fn is_document_marker(
@@ -200,40 +201,23 @@ pub fn parse_document(
 
     // QLJ7: Validate that any explicit tag handles used within this document
     // are defined via a %TAG directive for this document. Tag handles do not
-    // carry over across documents.
-    fn validate_tags_rec(node: &Node, directives: &DirectiveContext) -> ParseResult<()> {
-        match node {
-            Node::Tagged(inner, tag_raw) => {
-                directives
-                    .validate_tag_handle_usage(tag_raw)
-                    .map_err(|e| e)?;
-                validate_tags_rec(inner, directives)?;
-            }
-            Node::Mapping(pairs) => {
-                for (k, v) in pairs {
-                    validate_tags_rec(k, directives)?;
-                    validate_tags_rec(v, directives)?;
-                }
-            }
-            Node::Array(items) => {
-                for it in items {
-                    validate_tags_rec(it, directives)?;
-                }
-            }
-            Node::Anchored(inner, _) => {
-                validate_tags_rec(inner, directives)?;
-            }
-            _ => {}
-        }
-        Ok(())
-    }
+    // carry over across documents. Use the shared visitor to traverse the
+    // node tree while preserving existing error messages and behavior.
     for n in &document_nodes {
-        // Convert validation error to a simple parse error without precise position
-        if let Err(e) = validate_tags_rec(n, directives) {
-            return Err(crate::parser::document::helpers::to_yaml_error(format!(
-                "{}",
-                e
-            )));
+        let mut first_error: Option<crate::error::YamlError> = None;
+        visit(n, &mut |node: &Node| {
+            if first_error.is_some() {
+                return;
+            }
+            if let Node::Tagged(_, tag_raw) = node {
+                if let Err(e) = directives.validate_tag_handle_usage(tag_raw) {
+                    first_error = Some(e);
+                }
+            }
+        });
+        if let Some(e) = first_error {
+            // Convert validation error to a simple parse error without precise position
+            return Err(crate::parser::document::helpers::to_yaml_error(format!("{}", e)));
         }
     }
 
