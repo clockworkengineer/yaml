@@ -10,6 +10,7 @@ use regex::Regex;
 
 use crate::nodes::node::{Node, Numeric};
 use crate::validation::error::ValidationError;
+use crate::validation::messages;
 use crate::validation::schema::SchemaType;
 
 /// Result of a validation operation
@@ -69,7 +70,7 @@ impl Validator for TypeValidator {
     }
 
     fn description(&self) -> String {
-        format!("Type must be {:?}", self.expected_type)
+        messages::type_must_be(&self.expected_type)
     }
 }
 
@@ -134,10 +135,10 @@ impl Validator for RangeValidator {
 
     fn description(&self) -> String {
         match (self.min, self.max) {
-            (Some(min), Some(max)) => format!("Value must be between {} and {}", min, max),
-            (Some(min), None) => format!("Value must be at least {}", min),
-            (None, Some(max)) => format!("Value must be at most {}", max),
-            (None, None) => "No range restriction".to_string(),
+            (Some(min), Some(max)) => messages::value_must_be_between(min, max),
+            (Some(min), None) => messages::value_must_be_at_least(min),
+            (None, Some(max)) => messages::value_must_be_at_most(max),
+            (None, None) => messages::no_range_restriction(),
         }
     }
 }
@@ -197,10 +198,10 @@ impl Validator for LengthValidator {
 
     fn description(&self) -> String {
         match (self.min, self.max) {
-            (Some(min), Some(max)) => format!("Length must be between {} and {}", min, max),
-            (Some(min), None) => format!("Length must be at least {}", min),
-            (None, Some(max)) => format!("Length must be at most {}", max),
-            (None, None) => "No length restriction".to_string(),
+            (Some(min), Some(max)) => messages::length_must_be_between(min, max),
+            (Some(min), None) => messages::length_must_be_at_least(min),
+            (None, Some(max)) => messages::length_must_be_at_most(max),
+            (None, None) => messages::no_length_restriction(),
         }
     }
 }
@@ -313,7 +314,7 @@ impl Validator for EnumValidator {
     }
 
     fn description(&self) -> String {
-        format!("Must be one of: {}", self.allowed.join(", "))
+        messages::must_be_one_of(&self.allowed)
     }
 }
 

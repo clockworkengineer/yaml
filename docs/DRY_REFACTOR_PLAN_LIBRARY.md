@@ -114,16 +114,18 @@ Behavior: visiting order and covered node variants remain the same; `cargo check
 
 Goal: keep wording and formatting of validation error messages consistent and centralized.
 
-Current pattern:
-- `validation/error.rs` and `validation/validators.rs` contain repeated string templates like:
-  - "Value must be between {} and {}" / "Length must be between {} and {}".
-  - "Must be one of: {}".
+Status: Implemented for validator descriptions.
 
-Suggested steps:
-- Add a small `validation/messages.rs` (similar in spirit to `error/messages.rs`) with string constants or helper constructors for these recurring phrases.
-- Update validators to use these helpers while preserving exact current texts to avoid surprising users/tests.
+Implementation summary:
+- Added `validation/messages.rs` with helpers that preserve existing wording:
+  - `type_must_be`, `value_must_be_between`, `value_must_be_at_least`, `value_must_be_at_most`, `no_range_restriction`.
+  - `length_must_be_between`, `length_must_be_at_least`, `length_must_be_at_most`, `no_length_restriction`.
+  - `must_be_one_of` for enum descriptions.
+- Updated `validation/validators.rs` to use these helpers in `description()` implementations for:
+  - `TypeValidator`, `RangeValidator`, `LengthValidator`, and `EnumValidator`.
+- Left `validation/error.rs` unchanged; its `Display` implementation for `ValidationError` was already centralized and not duplicated elsewhere.
 
-Behavior: should be behavior-neutral in terms of both messages and validation outcomes.
+Behavior: description strings remain text-identical to previous formats, and both `cargo check` and the YAML test suite pass without changes in validation outcomes.
 
 ## 8. Official Suite Fix Test Harness Helpers
 
