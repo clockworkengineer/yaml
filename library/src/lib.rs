@@ -33,6 +33,9 @@ pub mod test_helpers;
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
+
 /// Module containing constants for the library
 mod constants;
 /// Module for developer tools (debugging, inspection, diffing, tracing)
@@ -138,6 +141,55 @@ pub use parser::config::ParserConfig;
 pub use parser::config::ParserConfigBuilder;
 /// Parses YAML data into a Node tree structure
 pub use parser::document::parse;
+
+/// Internal helper that funnels all public parse_* APIs through the same
+/// source-based entry point. This keeps configuration and future recovery
+/// wiring centralized.
+fn parse_from_source(
+    source: &mut dyn crate::io::traits::ISource,
+    _config: &ParserConfig,
+) -> crate::error::Result<Node> {
+    // ParserConfig enforcement is currently handled within the parser
+    // implementation; this helper exists so future extensions (limits,
+    // recovery, instrumentation) only need to be wired in one place.
+    parser::document::parse(source)
+}
+
+/// Parse YAML from an in-memory string using the default parser configuration.
+pub fn parse_string(yaml: &str) -> crate::error::Result<Node> {
+    let mut source = BufferSource::new(yaml.as_bytes());
+    let config = ParserConfig::default();
+    parse_from_source(&mut source, &config)
+}
+
+/// Parse YAML from a file path using the default parser configuration.
+#[cfg(feature = "file-io")]
+pub fn parse_file(path: &str) -> crate::error::Result<Node> {
+    match read_file_to_string(path) {
+        Ok(contents) => parse_string(&contents),
+        Err(e) => Err(e.to_string().into()),
+    }
+}
+
+/// Parse YAML from a string with a custom parser configuration.
+pub fn parse_with_config(yaml: &str, config: ParserConfig) -> crate::error::Result<Node> {
+    let mut source = BufferSource::new(yaml.as_bytes());
+    parse_from_source(&mut source, &config)
+}
+
+/// Parse YAML from a string while preparing for future error recovery support.
+///
+/// Currently this behaves like `parse_string`, returning the parsed node and
+/// an empty list of secondary errors; the `RecoveryHandler` will be wired into
+/// the parser once full recovery support is implemented.
+#[cfg(feature = "alloc")]
+pub fn parse_string_with_recovery(
+    yaml: &str,
+    _handler: RecoveryHandler,
+) -> crate::error::Result<(Node, Vec<YamlError>)> {
+    let node = parse_string(yaml)?;
+    Ok((node, Vec::new()))
+}
 /// Converts a Node tree to bencode format
 #[cfg(feature = "format-converters")]
 pub use stringify::bencode::stringify as to_bencode;

@@ -4,12 +4,17 @@
 
 use alloc::boxed::Box;
 use alloc::string::String;
+use alloc::vec::Vec;
 
+use crate::io::traits::IDestination;
 use crate::nodes::node::Node;
 use crate::stringify::format::{FormatContext, FormatOptions};
 
 /// Result type for serialization operations
 pub type SerializeResult = Result<String, String>;
+
+/// Result type for streaming serialization operations
+pub type StreamResult = Result<(), String>;
 
 /// Trait for custom node serializers
 pub trait Serializer {
@@ -27,6 +32,140 @@ pub trait Serializer {
     /// Get serializer priority (higher = checked first)
     fn priority(&self) -> i32 {
         0
+    }
+}
+
+/// Trait implemented by concrete format writers (JSON, XML, TOML, bencode).
+///
+/// This trait focuses on **how** individual node types are emitted, while the
+/// traversal over the `Node` tree is handled by `walk_node` below. Backends
+/// that previously performed their own recursive descent can now delegate that
+/// logic to the shared walker while keeping their output identical.
+pub trait FormatWriter {
+    /// Underlying output destination
+    fn dest(&mut self) -> &mut dyn IDestination;
+
+    /// Emit a YAML `null` value
+    fn write_null(&mut self) -> StreamResult;
+
+    /// Emit a boolean value
+    fn write_bool(&mut self, value: bool) -> StreamResult;
+
+    /// Emit a numeric node
+    fn write_number(&mut self, num: &crate::nodes::node::Numeric) -> StreamResult;
+
+    /// Emit a string scalar
+    fn write_string(&mut self, value: &str) -> StreamResult;
+
+    /// Emit an array-like collection
+    fn start_array(&mut self, len: usize) -> StreamResult;
+    fn array_value_separator(&mut self, index: usize) -> StreamResult;
+    fn end_array(&mut self) -> StreamResult;
+
+    /// Emit a set-like collection; many formats treat sets like arrays but
+    /// some (e.g. XML) may want a different representation.
+    fn start_set(&mut self, len: usize) -> StreamResult;
+    fn set_value_separator(&mut self, index: usize) -> StreamResult;
+    fn end_set(&mut self) -> StreamResult;
+
+    /// Emit a mapping/dictionary-like collection
+    fn start_mapping(&mut self, len: usize) -> StreamResult;
+    fn write_mapping_key(&mut self, key: &Node) -> StreamResult;
+    fn mapping_key_value_separator(&mut self) -> StreamResult;
+    fn mapping_entry_separator(&mut self, index: usize) -> StreamResult;
+    fn end_mapping(&mut self) -> StreamResult;
+
+    /// Emit a standalone comment node if the format supports it. The default
+    /// implementation is a no-op so formats that ignore comments can skip it.
+    fn write_comment(&mut self, _comment: &str) -> StreamResult {
+        Ok(())
+    }
+
+    /// Begin a logical document wrapper when serializing `Node::Document` or
+    /// `Node::Documents` containers. Most formats either inline or treat these
+    /// as arrays and can leave the default no-op implementation.
+    fn start_document(&mut self, _index: usize, _total: usize) -> StreamResult {
+        Ok(())
+    }
+
+    /// End a logical document wrapper.
+    fn end_document(&mut self, _index: usize, _total: usize) -> StreamResult {
+        Ok(())
+    }
+}
+
+/// Shared recursive walker over `Node` trees.
+///
+/// This function centralizes the traversal logic used by all stringify
+/// backends. Format-specific behavior is expressed through the `FormatWriter`
+/// trait; the order in which nodes are visited matches the legacy per-backend
+/// implementations so existing byte-level expectations remain valid.
+pub fn walk_node<W: FormatWriter>(writer: &mut W, node: &Node) -> StreamResult {
+    use crate::nodes::node::Node as N;
+
+    match node {
+        N::None => writer.write_null(),
+        N::Boolean(b) => writer.write_bool(*b),
+        N::Str(s, _qt, _style) => writer.write_string(s),
+        N::Number(num) => writer.write_number(num),
+        N::Array(items) => {
+            writer.start_array(items.len())?;
+            for (i, it) in items.iter().enumerate() {
+                if i > 0 {
+                    writer.array_value_separator(i)?;
+                }
+                walk_node(writer, it)?;
+            }
+            writer.end_array()
+        }
+        N::Set(items) => {
+            writer.start_set(items.len())?;
+            for (i, it) in items.iter().enumerate() {
+                if i > 0 {
+                    writer.set_value_separator(i)?;
+                }
+                walk_node(writer, it)?;
+            }
+            writer.end_set()
+        }
+        N::Mapping(pairs) => {
+            writer.start_mapping(pairs.len())?;
+            for (idx, (k, v)) in pairs.iter().enumerate() {
+                if idx > 0 {
+                    writer.mapping_entry_separator(idx)?;
+                }
+                writer.write_mapping_key(k)?;
+                writer.mapping_key_value_separator()?;
+                walk_node(writer, v)?;
+            }
+            writer.end_mapping()
+        }
+        N::Document(nodes) => {
+            if nodes.len() == 1 {
+                writer.start_document(0, 1)?;
+                walk_node(writer, &nodes[0])?;
+                writer.end_document(0, 1)
+            } else {
+                for (i, n) in nodes.iter().enumerate() {
+                    writer.start_document(i, nodes.len())?;
+                    walk_node(writer, n)?;
+                    writer.end_document(i, nodes.len())?;
+                }
+                Ok(())
+            }
+        }
+        N::Tagged(inner, _tag) => walk_node(writer, inner),
+        N::Anchored(inner, _name) => walk_node(writer, inner),
+        N::Alias(_name) => writer.write_null(),
+        N::Documents(docs) => {
+            for (i, d) in docs.iter().enumerate() {
+                writer.start_document(i, docs.len())?;
+                walk_node(writer, d)?;
+                writer.end_document(i, docs.len())?;
+            }
+            Ok(())
+        }
+        N::Comment(c) => writer.write_comment(c),
     }
 }
 
@@ -106,7 +245,7 @@ impl Serializer for TypeSerializer {
 
 /// Registry for custom serializers
 pub struct SerializerRegistry {
-    serializers: alloc::vec::Vec<Box<dyn Serializer>>,
+    serializers: Vec<Box<dyn Serializer>>,
 }
 
 impl SerializerRegistry {
