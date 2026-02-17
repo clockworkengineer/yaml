@@ -80,6 +80,78 @@ fn get_all_test_dirs(suite_dir: &Path) -> Vec<PathBuf> {
     test_dirs
 }
 
+/// Result of running a single YAML test-suite case
+enum SuiteCaseStatus {
+    /// Case completed within the timeout and matched the expected outcome
+    Passed(Duration),
+    /// Case exceeded the timeout and was skipped
+    Timeout(Duration),
+    /// Case completed but did not match the expected outcome
+    Failed {
+        duration: Duration,
+        expected: &'static str,
+        got: &'static str,
+    },
+}
+
+/// Run a single YAML suite case with panic catching and timeout handling.
+///
+/// This centralizes the "run-and-catch" logic so that other large suites can
+/// reuse the same behavior (timeout, panic suppression, and expected vs
+/// actual outcome classification).
+fn run_yaml_suite_case(
+    yaml: &str,
+    should_error: bool,
+    timeout: Duration,
+) -> SuiteCaseStatus {
+    let start_time = Instant::now();
+    let result = panic::catch_unwind(|| {
+        if should_error {
+            // Should error
+            let mut errored = false;
+            let parse_result = panic::catch_unwind(|| {
+                parse_yaml(yaml);
+            });
+            if parse_result.is_err() {
+                errored = true;
+            }
+            if errored { Err(()) } else { Ok(()) }
+        } else {
+            // Should succeed
+            let _ = parse_yaml(yaml);
+            Ok(())
+        }
+    });
+    let elapsed = start_time.elapsed();
+
+    if elapsed > timeout {
+        return SuiteCaseStatus::Timeout(elapsed);
+    }
+
+    let expected = if should_error { "error" } else { "success" };
+    let got = match result {
+        Ok(Ok(())) => "success",
+        Ok(Err(())) => "error",
+        _ => "error",
+    };
+
+    let test_passed = match (got, should_error) {
+        ("success", false) => true,
+        ("error", true) => true,
+        _ => false,
+    };
+
+    if test_passed {
+        SuiteCaseStatus::Passed(elapsed)
+    } else {
+        SuiteCaseStatus::Failed {
+            duration: elapsed,
+            expected,
+            got,
+        }
+    }
+}
+
 // Run all YAML test suite cases and assert pass rate >= 90%
 #[test]
 fn run_yaml_test_suite() {
@@ -133,6 +205,7 @@ fn run_yaml_test_suite() {
     println!("Running all {} YAML test suite tests...", total_dirs);
     let mut test_num = 0;
     let test_limit = 402;
+    let timeout = Duration::from_millis(200);
     for (idx, test_dir) in test_dirs.iter().enumerate() {
         if idx >= test_limit {
             println!(
@@ -156,60 +229,33 @@ fn run_yaml_test_suite() {
         test_num += 1;
         println!("[{}/{}] Testing: {}", test_num, test_limit, test.id);
         std::io::Write::flush(&mut std::io::stdout()).unwrap();
-        let start_time = Instant::now();
-        let result = panic::catch_unwind(|| {
-            if test.has_error_file {
-                // Should error
-                let mut errored = false;
-                let parse_result = std::panic::catch_unwind(|| {
-                    parse_yaml(&test.yaml);
-                });
-                if parse_result.is_err() {
-                    errored = true;
-                }
-                if errored { Err(()) } else { Ok(()) }
-            } else {
-                // Should succeed
-                let _ = parse_yaml(&test.yaml);
-                Ok(())
-            }
-        });
-        let elapsed = start_time.elapsed();
         print!("  Result: ");
         std::io::Write::flush(&mut std::io::stdout()).unwrap();
-        if elapsed > Duration::from_millis(200) {
-            skipped += 1;
-            println!("TIMEOUT (took {:?})", elapsed);
-            continue;
-        }
-        let test_passed = match result {
-            Ok(Ok(())) if !test.has_error_file => true,
-            Ok(Err(())) if test.has_error_file => true,
-            _ => false,
-        };
-        if test_passed {
-            passed += 1;
-            println!("PASS");
-        } else {
-            failed += 1;
-            let expected = if test.has_error_file {
-                "error"
-            } else {
-                "success"
-            };
-            let got = match result {
-                Ok(Ok(())) => "success",
-                Ok(Err(())) => "error",
-                _ => "error",
-            };
-            println!("FAIL (expected: {}, got: {})", expected, got);
-            failures.push(format!(
-                "{} (expected: {}, got: {})",
-                test.id, expected, got
-            ));
-            if !known_failures.contains(&test.id.as_str()) {
-                println!("UNEXPECTED FAILURE: {}", test.id);
-                unexpected_failures.push(test.id.clone());
+        match run_yaml_suite_case(&test.yaml, test.has_error_file, timeout) {
+            SuiteCaseStatus::Timeout(elapsed) => {
+                skipped += 1;
+                println!("TIMEOUT (took {:?})", elapsed);
+                continue;
+            }
+            SuiteCaseStatus::Passed(_elapsed) => {
+                passed += 1;
+                println!("PASS");
+            }
+            SuiteCaseStatus::Failed {
+                duration: _elapsed,
+                expected,
+                got,
+            } => {
+                failed += 1;
+                println!("FAIL (expected: {}, got: {})", expected, got);
+                failures.push(format!(
+                    "{} (expected: {}, got: {})",
+                    test.id, expected, got
+                ));
+                if !known_failures.contains(&test.id.as_str()) {
+                    println!("UNEXPECTED FAILURE: {}", test.id);
+                    unexpected_failures.push(test.id.clone());
+                }
             }
         }
     }
