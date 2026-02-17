@@ -1,6 +1,7 @@
 //! Common test helpers for YAML library integration/unit tests
 
 use crate::{Node, parse, BufferSource};
+use crate::error::YamlError;
 
 /// Parse YAML from a string or byte slice, panicking on error.
 pub fn parse_yaml(input: impl AsRef<[u8]>) -> Node {
@@ -31,4 +32,37 @@ pub fn node_to_yaml_string(node: &Node) -> String {
     let mut buf = BufferDestination::new();
     stringify(node, &mut buf).expect("Stringify failed");
     buf.to_string()
+}
+
+/// Perform a single round-trip (stringify -> parse) on a node.
+///
+/// This is intended for tests and property-based checks where we want to
+/// verify that running through the full stringify/parse pipeline does not
+/// crash and preserves structure.
+#[cfg(feature = "stringify")]
+pub fn roundtrip_node(node: &Node) -> Result<Node, YamlError> {
+    use crate::BufferDestination;
+    use crate::stringify;
+
+    // Stringify the node to YAML
+    let mut buf = BufferDestination::new();
+    stringify(node, &mut buf)?;
+    let yaml = buf.to_string();
+
+    // Parse back into a Node
+    let mut source = BufferSource::new(yaml.as_bytes());
+    parse(&mut source)
+}
+
+/// Assert that a node is unchanged by a single stringify/parse round-trip.
+#[cfg(feature = "stringify")]
+pub fn assert_roundtrip_eq(node: &Node) {
+    match roundtrip_node(node) {
+        Ok(roundtripped) => {
+            assert_nodes_eq(node, &roundtripped);
+        }
+        Err(err) => {
+            panic!("Round-trip failed: {}", err);
+        }
+    }
 }

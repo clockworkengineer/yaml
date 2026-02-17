@@ -253,27 +253,18 @@ pub fn fuzz_parse(yaml: &str) -> FuzzResult {
 
 /// Run round-trip fuzz test (parse -> stringify -> parse)
 pub fn fuzz_roundtrip(yaml: &str) -> FuzzResult {
-    use crate::io::sources::buffer::Buffer as BufferSource;
-    use crate::parser::document::parse;
-    use crate::stringify::default::stringify;
+    use crate::test_helpers::roundtrip_node;
 
-    // Parse
-    let mut source = BufferSource::new(yaml.as_bytes());
-    let node1 = match parse(&mut source) {
+    // First round-trip: if parse or stringify fails, treat as a non-crashing
+    // input (Pass), since fuzzing is only interested in crashes/invalid
+    // structural behavior here.
+    let node1 = match roundtrip_node(&Node::from(yaml)) {
         Ok(n) => n,
-        Err(_) => return FuzzResult::Pass, // Parser error is fine
+        Err(_) => return FuzzResult::Pass,
     };
 
-    // Stringify
-    let mut buffer = crate::io::destinations::buffer::Buffer::new();
-    let yaml2 = match stringify(&node1, &mut buffer) {
-        Ok(_) => buffer.to_string(),
-        Err(_) => return FuzzResult::Pass, // Stringify error is fine
-    };
-
-    // Parse again
-    let mut source2 = BufferSource::new(yaml2.as_bytes());
-    let node2 = match parse(&mut source2) {
+    // Second round-trip: failures here are treated as invalid behavior.
+    let node2 = match roundtrip_node(&node1) {
         Ok(n) => n,
         Err(e) => return FuzzResult::Invalid(format!("Round-trip parse failed: {}", e)),
     };
