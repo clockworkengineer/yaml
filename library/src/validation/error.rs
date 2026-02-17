@@ -1,5 +1,8 @@
 //! Error types for validation
 
+use alloc::string::String;
+use alloc::vec::Vec;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum ValidationError {
     TypeMismatch {
@@ -64,3 +67,38 @@ impl std::fmt::Display for ValidationError {
 }
 
 impl std::error::Error for ValidationError {}
+
+/// Fully-formed validation failure combining a path within the document
+/// and a concrete ValidationError describing what went wrong at that path.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ValidationIssue {
+    /// Path segments from the root to the failing location
+    pub path: Vec<String>,
+    /// Underlying validation error at that location
+    pub error: ValidationError,
+}
+
+impl ValidationIssue {
+    /// Build a new issue from a path reference and an underlying error.
+    pub fn new(path: &[String], error: ValidationError) -> Self {
+        Self {
+            path: path.to_vec(),
+            error,
+        }
+    }
+
+    /// Human-readable message combining error description and path.
+    pub fn message(&self) -> String {
+        if self.path.is_empty() {
+            self.error.to_string()
+        } else {
+            format!("{} at {}", self.error, self.path.join("."))
+        }
+    }
+}
+
+impl std::fmt::Display for ValidationIssue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message())
+    }
+}

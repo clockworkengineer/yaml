@@ -14,8 +14,7 @@ use crate::validation::messages;
 use crate::validation::schema::SchemaType;
 
 /// Result of a validation operation
-use crate::error::YamlError;
-pub type ValidationResult = Result<(), YamlError>;
+pub type ValidationResult = Result<(), ValidationError>;
 
 /// Trait for validators that can check nodes against rules
 pub trait Validator {
@@ -63,8 +62,7 @@ impl Validator for TypeValidator {
                 crate::validation::engine::ValidationContextCore::fail_type_mismatch(
                     &self.expected_type,
                     node,
-                )
-                .into(),
+                ),
             )
         }
     }
@@ -103,8 +101,7 @@ impl Validator for RangeValidator {
                 return Err(ValidationError::InvalidNodeType {
                     validator: "RangeValidator".to_string(),
                     found: node_type_name(node).to_string(),
-                }
-                .into());
+                });
             }
         };
 
@@ -113,8 +110,7 @@ impl Validator for RangeValidator {
                 return Err(
                     crate::validation::engine::ValidationContextCore::fail_range(
                         value, self.min, self.max,
-                    )
-                    .into(),
+                    ),
                 );
             }
         }
@@ -124,8 +120,7 @@ impl Validator for RangeValidator {
                 return Err(
                     crate::validation::engine::ValidationContextCore::fail_range(
                         value, self.min, self.max,
-                    )
-                    .into(),
+                    ),
                 );
             }
         }
@@ -166,8 +161,7 @@ impl Validator for LengthValidator {
                 return Err(ValidationError::InvalidNodeType {
                     validator: "LengthValidator".to_string(),
                     found: node_type_name(node).to_string(),
-                }
-                .into());
+                });
             }
         };
 
@@ -177,8 +171,7 @@ impl Validator for LengthValidator {
                     length,
                     min: self.min,
                     max: self.max,
-                }
-                .into());
+                });
             }
         }
 
@@ -188,8 +181,7 @@ impl Validator for LengthValidator {
                     length,
                     min: self.min,
                     max: self.max,
-                }
-                .into());
+                });
             }
         }
 
@@ -239,15 +231,13 @@ impl Validator for PatternValidator {
                 Err(ValidationError::PatternMismatch {
                     pattern: self.pattern.clone(),
                     value: s.to_string(),
-                }
-                .into())
+                })
             }
         } else {
             Err(ValidationError::InvalidNodeType {
                 validator: "PatternValidator".to_string(),
                 found: node_type_name(node).to_string(),
-            }
-            .into())
+            })
         }
     }
 
@@ -301,15 +291,13 @@ impl Validator for EnumValidator {
                     Err(ValidationError::EnumMismatch {
                         allowed: self.allowed.clone(),
                         value,
-                    }
-                    .into())
+                    })
                 }
             }
             None => Err(ValidationError::InvalidNodeType {
                 validator: "EnumValidator".to_string(),
                 found: node_type_name(node).to_string(),
-            }
-            .into()),
+            }),
         }
     }
 
@@ -364,16 +352,14 @@ impl Validator for RequiredValidator {
                     Err(
                         crate::validation::engine::ValidationContextCore::fail_required(
                             &self.field_name,
-                        )
-                        .into(),
+                        ),
                     )
                 }
             }
             _ => Err(ValidationError::InvalidNodeType {
                 validator: "RequiredValidator".to_string(),
                 found: node_type_name(node).to_string(),
-            }
-            .into()),
+            }),
         }
     }
 

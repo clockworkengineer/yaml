@@ -28,9 +28,9 @@ use alloc::vec::Vec;
 use log::warn;
 
 use crate::error::YamlError;
-use crate::nodes::node::{Node};
+use crate::nodes::node::Node;
 use crate::nodes::node::NodeStringConvert;
-use crate::validation::error::ValidationError;
+use crate::validation::error::{ValidationError, ValidationIssue};
 use crate::validation::schema::{PropertySchema, Schema, SchemaType};
 use crate::validation::validators::{
     EnumValidator, LengthValidator, PatternValidator, RangeValidator, TypeValidator, Validator,
@@ -42,7 +42,7 @@ pub struct ValidationContext {
     /// Current path in document
     path: Vec<String>,
     /// Accumulated errors
-    errors: Vec<ValidationError>,
+    errors: Vec<ValidationIssue>,
     /// Whether to stop on first error
     fail_fast: bool,
 }
@@ -72,10 +72,10 @@ impl ValidationContext {
     }
 
     /// Record an error and log it
-    fn add_error(&mut self, error: impl std::fmt::Display) {
-        let error = ValidationError::Custom(error.to_string());
-        warn!("Validation error: {:?}", error);
-        self.errors.push(error);
+    fn add_error(&mut self, error: ValidationError) {
+        let issue = ValidationIssue::new(&self.path, error);
+        warn!("Validation error: {:?}", issue);
+        self.errors.push(issue);
     }
 
     /// Check if we should stop validation
@@ -84,7 +84,7 @@ impl ValidationContext {
     }
 
     /// Get all errors
-    pub fn errors(&self) -> &[ValidationError] {
+    pub fn errors(&self) -> &[ValidationIssue] {
         &self.errors
     }
 
@@ -118,7 +118,8 @@ impl SchemaValidator {
         if ctx.is_valid() {
             Ok(())
         } else {
-            // Convert Vec<ValidationError> to a single YamlError with details
+            // Convert collected ValidationIssue values to a single YamlError
+            // with detailed messages (including paths).
             let msg = ctx
                 .errors
                 .iter()
