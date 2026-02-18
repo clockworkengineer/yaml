@@ -43,6 +43,17 @@ pub fn parse_directives(
                 if parts.len() < 2 {
                     return Err(DirectiveErrors::missing_yaml_version());
                 }
+                // Allow comments after version (YAML 1.2/1.1 spec)
+                if parts.len() > 2 {
+                    // If the third part is a comment, allow it; otherwise, error
+                    let third = parts[2];
+                    if !third.starts_with('#') {
+                        return Err(YamlError::new(
+                            crate::error::ErrorKind::ParseError,
+                            "Invalid %YAML directive: extra content after version is not allowed",
+                        ));
+                    }
+                }
                 let version = parts[1];
                 let mut split = version.split('.');
                 let major = split
@@ -122,14 +133,15 @@ impl DirectiveContext {
             return Err(DirectiveErrors::duplicate_yaml_directive());
         }
 
-        // Validate version (only 1.1 and 1.2 are standard)
+        // Only YAML major version 1 is supported (error on others)
         if major != 1 {
             return Err(DirectiveErrors::invalid_yaml_major_version_num(major));
         }
-        // Per YAML spec, parsers should accept future minor versions
-        // We support 1.1 and 1.2, but don't error on higher minor versions
-        // (just use 1.2 behavior)
-
+        // Accept but warn on future minor versions (treat as 1.2 behavior)
+        if minor > 2 {
+            #[cfg(feature = "std")]
+            eprintln!("Warning: Unrecognized YAML minor version {}. Proceeding as YAML 1.2.", minor);
+        }
         self.yaml_version = Some((major, minor));
         Ok(())
     }
