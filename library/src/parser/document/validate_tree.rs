@@ -2,7 +2,7 @@
 // This function should be called after parsing to ensure the node tree is valid
 // according to YAML spec and test suite requirements.
 
-use crate::error::{ErrorKind, YamlError};
+use crate::error::YamlError;
 use crate::nodes::node::Node;
 
 /// Recursively validate a parsed YAML node tree.
