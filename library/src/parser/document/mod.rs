@@ -1,4 +1,5 @@
 pub mod anchor_errors;
+pub mod validate_tree;
 ///
 /// Modules for parsing YAML documents.
 ///

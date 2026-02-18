@@ -410,6 +410,8 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
                     if non_empty.len() == 1 {
                         _doc_count += 1;
                         let doc = Document(vec![(*non_empty.pop().unwrap()).clone()]);
+                        // Strict validation pass
+                        crate::parser::document::validate_tree::validate_yaml_tree(&doc)?;
                         #[cfg(feature = "debug-trace")]
                         log::debug!("parse: Parsed document #{}: {:#?}", _doc_count, doc);
                         docs.push(doc);
@@ -417,6 +419,10 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
                         for node in nodes {
                             _doc_count += 1;
                             let single_doc = Document(vec![node.clone()]);
+                            // Strict validation pass
+                            crate::parser::document::validate_tree::validate_yaml_tree(
+                                &single_doc,
+                            )?;
                             #[cfg(feature = "debug-trace")]
                             log::debug!(
                                 "parse: Parsed document #{}: {:#?}",
@@ -429,6 +435,8 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
                 } else {
                     _doc_count += 1;
                     let doc = Document(nodes);
+                    // Strict validation pass
+                    crate::parser::document::validate_tree::validate_yaml_tree(&doc)?;
                     #[cfg(feature = "debug-trace")]
                     log::debug!("parse: Parsed document #{}: {:#?}", _doc_count, doc);
                     docs.push(doc);
