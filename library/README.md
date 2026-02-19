@@ -4,15 +4,15 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ![Tests](https://img.shields.io/badge/internal_tests-362%20passing-green.svg)
-![YAML 1.2](https://img.shields.io/badge/YAML_1.2-~80%25-yellow.svg)
+![YAML 1.2](https://img.shields.io/badge/YAML_1.2-90.5%25%20(364%2F402)-yellow.svg)
 
-A comprehensive, high-performance YAML library for Rust with strong YAML 1.2 specification compliance (~80%), excellent ergonomics, advanced error handling, validation, and extensive format conversion capabilities.
+A comprehensive, high-performance YAML library for Rust with strong YAML 1.2 specification compliance (90.5%, 364/402 tests passing as of Feb 2026), excellent ergonomics, advanced error handling, validation, and extensive format conversion capabilities.
 
 ## ✨ Features
 
 
 ### 🏅 **Core YAML Support**
-- **~80% YAML 1.2 specification compliance** (320/402 tests passing)
+- **90.5% YAML 1.2 specification compliance** (364/402 tests passing)
 - **Unicode-aware parsing** with BOM detection
 - **Multi-document streams** support
 - **Anchors and aliases** including on mapping keys, with circular reference detection
@@ -47,10 +47,20 @@ A comprehensive, high-performance YAML library for Rust with strong YAML 1.2 spe
 - **Memory-efficient** node representation
 - **Thread-safe** operations
 - **Error recovery** and detailed diagnostics
-- **Comprehensive test suite** (362+ internal tests, 320/402 YAML 1.2 official tests)
+- **Comprehensive test suite** (362+ internal tests, 364/402 YAML 1.2 official tests, 90.5% pass rate)
 - **JSON Schema-style validation** for YAML documents
 - **Error codes and suggestions** for programmatic error handling
+
 ## 🛡️ Error Handling & Validation
+
+### Centralized Error Handling (Contributor Note)
+
+All parser and lexer error messages must use the centralized helpers in `parser/document/error_builder.rs` (e.g., `syntax_error`, `structure_error`, `limit_error`, `forbidden_error`).
+
+**Do not return raw error strings.**
+
+This ensures all errors are consistent, include context, and are easy to maintain. See the module-level docs in `error_builder.rs` for usage examples and extension guidelines.
+
 
 ### Error Handling
 - **Error codes (E001-E015)** for programmatic handling
