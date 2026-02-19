@@ -440,6 +440,48 @@
 				"$rustc"
 			],
 			"group": "build"
+		},
+		{
+			"label": "run_yaml_test_suite",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"--package",
+				"yaml_lib",
+				"yaml_test_suite::run_yaml_test_suite",
+				"--",
+				"--nocapture"
+			],
+			"group": "test"
+		},
+		{
+			"label": "run_yaml_test_suite",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"--package",
+				"yaml_lib",
+				"yaml_test_suite::run_yaml_test_suite",
+				"--",
+				"--nocapture"
+			],
+			"group": "test"
+		},
+		{
+			"label": "run_yaml_test_suite",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"--package",
+				"yaml_lib",
+				"yaml_test_suite::run_yaml_test_suite",
+				"--",
+				"--nocapture"
+			],
+			"group": "test"
 		}
 	]
 }

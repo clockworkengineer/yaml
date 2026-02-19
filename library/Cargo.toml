@@ -4,6 +4,7 @@ version = "0.1.7"
 edition = "2024"
 description = "YAML library implementation."
 license = "MIT"
+repository = "https://github.com/clockworkengineer/yaml_lib"
 
 [features]
 default = ["std", "alloc", "stringify", "format-converters", "file-io"]

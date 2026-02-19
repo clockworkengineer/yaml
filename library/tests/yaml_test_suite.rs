@@ -154,7 +154,7 @@ fn run_yaml_suite_case(
 
 // Run all YAML test suite cases and assert pass rate >= 90%
 #[test]
-fn run_yaml_test_suite() {
+pub fn run_yaml_test_suite() {
     // Silence panic output while this test runs; we still track panics
     // via `catch_unwind`, but avoid noisy backtraces in the output.
     let _panic_hook_guard = PanicHookGuard::new_silent();
