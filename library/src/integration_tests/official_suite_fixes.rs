@@ -44,6 +44,17 @@ mod tests {
 
         assert!(result.is_err(), "{}: {:?}", label, result);
     }
+
+    // Standalone test for DMG6 - Wrong indentation in mapping (should fail to parse)
+    #[test]
+    fn test_dmg6_wrong_indentation_in_mapping() {
+        // This YAML is from the DMG6 test case (should fail to parse)
+        let yaml = b"key:\n  ok: 1\n wrong: 2\n";
+        assert_fails(
+            yaml,
+            "DMG6 should fail to parse due to wrong indentation in mapping",
+        );
+    }
     // #[test]
     // fn test_4hvu_sequence_indentation_standalone() {
     //     let yaml = b"- item1\n- item2\n  - subitem1\n  - subitem2\n";
@@ -171,8 +182,8 @@ key3:value3
   multiline scalar
   that continues
 ";
-                // If this is marked as false positive, we should succeed
-                assert_parses(yaml, "2CMS should parse (false positive)");
+        // If this is marked as false positive, we should succeed
+        assert_parses(yaml, "2CMS should parse (false positive)");
     }
 
     // Test 36F6 - Multiline plain scalar with empty line

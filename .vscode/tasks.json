@@ -482,6 +482,18 @@
 				"--nocapture"
 			],
 			"group": "test"
+		},
+		{
+			"label": "run DMG6 standalone test",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"test_dmg6_wrong_indentation_in_mapping",
+				"--",
+				"--nocapture"
+			],
+			"group": "test"
 		}
 	]
 }
