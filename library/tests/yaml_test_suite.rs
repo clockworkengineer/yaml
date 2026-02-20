@@ -99,11 +99,7 @@ enum SuiteCaseStatus {
 /// This centralizes the "run-and-catch" logic so that other large suites can
 /// reuse the same behavior (timeout, panic suppression, and expected vs
 /// actual outcome classification).
-fn run_yaml_suite_case(
-    yaml: &str,
-    should_error: bool,
-    timeout: Duration,
-) -> SuiteCaseStatus {
+fn run_yaml_suite_case(yaml: &str, should_error: bool, timeout: Duration) -> SuiteCaseStatus {
     let start_time = Instant::now();
     let result = panic::catch_unwind(|| {
         if should_error {
@@ -182,11 +178,12 @@ pub fn run_yaml_test_suite() {
 
     let skip_list: Vec<&str> = vec![];
     // Current known failing cases from the latest full run (38 total)
+    // Update this list to only include test IDs that are currently known to fail.
     let known_failures: Vec<&str> = vec![
-        "00", "01", "06", "236B", "2CMS", "4HVU", "4JVG", "5LLU", "5TRB", "5U3A", "6S55", "7LBH",
-        "7MNF", "9C9N", "9CWY", "BF9H", "BS4K", "C2SP", "CXX2", "D49Q", "DK4H", "DMG6", "EB22",
-        "EW3V", "G7JE", "G9HC", "GDY7", "GT5M", "H7TQ", "JKF3", "KS4U", "QB6E", "QLJ7", "RHX7",
-        "RXY3", "S98Z", "ZCZ6", "ZVH3",
+        "236B", "2CMS", "4HVU", "4JVG", "5LLU", "5TRB", "5U3A", "6S55", "7LBH", "7MNF", "9C9N",
+        "9CWY", "01", "BF9H", "BS4K", "C2SP", "CXX2", "D49Q", "DK4H", "06", "DMG6", "EB22", "EW3V",
+        "G7JE", "G9HC", "GDY7", "GT5M", "JKF3", "KS4U", "QB6E", "QLJ7", "RHX7", "RXY3", "S98Z",
+        "00", "ZCZ6", "ZVH3",
     ];
     let mut passed = 0;
     let mut failed = 0;
