@@ -151,6 +151,25 @@ impl MappingParseContext {
             self.handle_dedent(stream);
             let current_indent = self.get_current_indent();
             let token = stream.current().cloned();
+
+            // DMG6 fix: Check if the current line's indentation matches expectations.
+            // Keys in a mapping must be at the base indent level of that mapping.
+            if matches!(token, Some(Token::Plain(_))) && self.stack.len() == 1 {
+                let line_indent = stream.line_indent();
+                if line_indent < self.base_indent && depth > 0 {
+                    // Key is less indented than this mapping's base - it belongs to a parent.
+                    // Exit this mapping (only if not at root level).
+                    let (_, pairs) = self.stack.pop().unwrap();
+                    return Ok(Node::Mapping(pairs));
+                } else if line_indent > self.base_indent && self.base_indent == 0 && depth == 0 {
+                    // Key is more indented than the base for a root-level mapping (base_indent==0, depth==0).
+                    // This is invalid. This catches DMG6-style errors.
+                    let err = crate::parser::document::mapping_errors::
+                        inconsistent_dedent_within_mapping_value_for_keys(stream);
+                    return Err(err.to_string().into());
+                }
+            }
+
             if let Some(result) = self.handle_special_tokens(stream, current_indent, &token)? {
                 return Ok(result);
             }
@@ -207,6 +226,8 @@ impl MappingParseContext {
     ) -> crate::parser::ParseResult<Option<Node>> {
         match token {
             Some(Token::Indent(level)) if *level < current_indent => {
+                // When we see an indent less than current, we should exit this mapping.
+                // The validity of the indent level will be checked by the parent mapping.
                 self.dedent_unwind_mapping_stack(*level);
                 let (_, pairs) = self.stack.last().unwrap();
                 return Ok(Some(Node::Mapping(pairs.clone())));
@@ -386,6 +407,7 @@ impl MappingParseContext {
         cur_indent: usize,
         depth: usize,
     ) -> crate::parser::ParseResult<(Node, Node)> {
+        // Indentation validation is now handled in the main loop before calling this function.
         // (Reverted) U44R plain-key indent guard removed.
         #[cfg(feature = "debug-trace")]
         mapping_log(format!(

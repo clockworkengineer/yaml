@@ -518,6 +518,11 @@ impl<'a> TokenStream<'a> {
         self.lexer.indent_level()
     }
 
+    /// Returns the indentation level of the current line (number of leading spaces/tabs).
+    pub fn line_indent(&self) -> usize {
+        self.lexer.line_indent()
+    }
+
     /// Check if the next token (after whitespace) is a colon
     #[allow(dead_code)]
     pub fn has_colon_ahead(&mut self) -> Result<bool, crate::error::YamlError> {

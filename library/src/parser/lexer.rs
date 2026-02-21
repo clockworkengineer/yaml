@@ -1293,6 +1293,11 @@ impl<'a> Lexer<'a> {
     pub fn indent_level(&self) -> usize {
         self.source.get_current_indent_level()
     }
+
+    /// Returns the indentation level of the current line (number of leading spaces/tabs).
+    pub fn line_indent(&self) -> usize {
+        self.last_indent
+    }
 }
 
 #[cfg(test)]
