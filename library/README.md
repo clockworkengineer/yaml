@@ -81,7 +81,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-yaml_lib = "0.1.7"
+yaml_lib = "0.1.8"
 ```
 
 ## 🚀 Quick Start

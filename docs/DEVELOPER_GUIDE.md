@@ -35,14 +35,14 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-yaml_lib = "0.1.7"
+yaml_lib = "0.1.8"
 ```
 
 ### Feature Flags
 
 ```toml
 [dependencies.yaml_lib]
-version = "0.1.7"
+version = "0.1.8"
 features = [
     "std",              # Standard library (default)
     "alloc",            # Allocation support (default)

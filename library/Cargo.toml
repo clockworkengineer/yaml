@@ -1,6 +1,6 @@
 [package]
 name = "yaml_lib"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2024"
 description = "YAML library implementation."
 repository = "https://github.com/clockworkengineer/yaml"
