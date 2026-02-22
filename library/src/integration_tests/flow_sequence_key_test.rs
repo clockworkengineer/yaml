@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod test_flow_sequence_as_key {
+mod tests {
     use crate::{BufferSource, parse};
 
     #[test]

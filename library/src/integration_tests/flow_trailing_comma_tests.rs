@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod test_flow_trailing_comma {
+mod tests {
     use crate::{BufferSource, parse};
 
     #[test]

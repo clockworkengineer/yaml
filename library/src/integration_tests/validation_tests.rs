@@ -1,11 +1,9 @@
 //! Integration tests for validation and error detection
 
-use crate::io::sources::buffer::Buffer;
-use crate::parser::document::parse;
-
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::io::sources::buffer::Buffer;
+    use crate::parser::document::parse;
 
     // ...existing code...
 

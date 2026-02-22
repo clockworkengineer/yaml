@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod test_flow_mapping_linebreak {
+mod tests {
     use crate::{BufferSource, parse};
     use crate::nodes::node::{Node, Document};
 

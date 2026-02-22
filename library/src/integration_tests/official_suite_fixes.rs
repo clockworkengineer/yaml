@@ -3,14 +3,14 @@
 //! These tests recreate the failing test cases from the official YAML 1.2 test suite
 //! to allow debugging and fixing without needing the full test suite data.
 
-use crate::{BufferSource, Node, parse};
+
 // Standalone test for 4HVU - Wrong indentation in Sequence (false positive)
 
 // Standalone test for 2CMS - Invalid mapping in plain multiline (false positive)
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::{BufferSource, Node, parse};
 
     /// Helper: parse YAML and expect success, returning the root node.
     ///

@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod test_document_marker_validation {
+mod tests {
     use crate::test_helpers::{assert_parse_error, parse_yaml};
 
     #[test]
