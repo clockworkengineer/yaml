@@ -151,15 +151,22 @@ fn run_yaml_suite_case(yaml: &str, should_error: bool, timeout: Duration) -> Sui
 // Run all YAML test suite cases and assert pass rate >= 90%
 #[test]
 pub fn run_yaml_test_suite() {
-    // Silence panic output while this test runs; we still track panics
-    // via `catch_unwind`, but avoid noisy backtraces in the output.
     let _panic_hook_guard = PanicHookGuard::new_silent();
+    let possible_paths = load_suite_paths();
+    let suite_dir = select_suite_dir(&possible_paths);
+    if suite_dir.is_none() {
+        print_suite_dir_error(&possible_paths);
+        return;
+    }
+    let suite_dir = suite_dir.unwrap();
+    run_yaml_suite_tests(&suite_dir);
+}
 
-    // Read possible suite paths from suite_paths.txt in the same directory
+fn load_suite_paths() -> Vec<PathBuf> {
     let suite_paths_file = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
         .join("suite_paths.txt");
-    let possible_paths: Vec<PathBuf> = if suite_paths_file.exists() {
+    if suite_paths_file.exists() {
         match fs::read_to_string(&suite_paths_file) {
             Ok(contents) => contents
                 .lines()
@@ -179,28 +186,27 @@ pub fn run_yaml_test_suite() {
             PathBuf::from("c:/Projects/yaml/yaml-test-suite"),
             PathBuf::from("../yaml-test-suite"),
         ]
-    };
+    }
+}
 
-    let suite_dir = possible_paths.iter().find(|p| p.exists()).cloned();
-    let suite_dir = match suite_dir {
-        Some(dir) => dir,
-        None => {
-            println!(
-                "YAML test suite repo directory not found in any of these locations from suite_paths.txt:"
-            );
-            for path in &possible_paths {
-                println!("  - {:?}", path);
-            }
-            println!(
-                "Please create suite_paths.txt in this directory with paths to the yaml-test-suite repo."
-            );
-            return;
-        }
-    };
+fn select_suite_dir(possible_paths: &[PathBuf]) -> Option<PathBuf> {
+    possible_paths.iter().find(|p| p.exists()).cloned()
+}
 
+fn print_suite_dir_error(possible_paths: &[PathBuf]) {
+    println!(
+        "YAML test suite repo directory not found in any of these locations from suite_paths.txt:"
+    );
+    for path in possible_paths {
+        println!("  - {:?}", path);
+    }
+    println!(
+        "Please create suite_paths.txt in this directory with paths to the yaml-test-suite repo."
+    );
+}
+
+fn run_yaml_suite_tests(suite_dir: &Path) {
     let skip_list: Vec<&str> = vec![];
-    // Current known failing cases from the latest full run (38 total)
-    // Update this list to only include test IDs that are currently known to fail.
     let known_failures: Vec<&str> = vec![
         "236B", "2CMS", "4HVU", "4JVG", "5LLU", "5TRB", "5U3A", "6S55", "7LBH", "7MNF", "9C9N",
         "9CWY", "01", "BF9H", "BS4K", "C2SP", "CXX2", "D49Q", "DK4H", "06", "DMG6", "EB22", "EW3V",
@@ -213,7 +219,7 @@ pub fn run_yaml_test_suite() {
     let mut failures = Vec::new();
     let mut unexpected_failures = Vec::new();
 
-    let mut test_dirs = get_all_test_dirs(&suite_dir);
+    let mut test_dirs = get_all_test_dirs(suite_dir);
     if test_dirs.is_empty() {
         println!("No test directories found. Make sure you're using the data release branch.");
         println!("Run: cd tests/yaml-test-suite && git checkout data-2022-01-17");
