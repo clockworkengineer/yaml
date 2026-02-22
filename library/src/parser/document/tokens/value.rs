@@ -3,7 +3,7 @@
 //! This demonstrates how the tokenization approach solves the decorator parsing
 //! problem and eliminates infinite loops.
 
-use crate::error::{ErrorKind, YamlError};
+// ...existing code...
 use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
 use crate::parser::directives::DirectiveContext;
 const MAX_NESTING_DEPTH: usize = 128;
@@ -225,9 +225,9 @@ pub fn parse_value_with_tokens(
     depth: usize,
 ) -> crate::parser::ParseResult<Node> {
     if depth > MAX_NESTING_DEPTH {
-        return Err(YamlError::new(
-            ErrorKind::ValidationError,
-            "Nesting too deep: possible malicious or malformed YAML",
+        return Err(crate::parser::document::token_errors::unexpected_token_in_value(
+            stream.source_mut(),
+            &Token::Plain("Nesting too deep: possible malicious or malformed YAML".to_string()),
         ));
     }
     #[cfg(feature = "debug-trace")]
@@ -254,6 +254,13 @@ pub fn parse_value_with_tokens(
             stream.next()?;
             #[cfg(feature = "debug-trace")]
             log::debug!("value_tokens: parsed alias = {}", alias);
+            // Strict: alias must resolve, otherwise error
+            if alias.is_empty() {
+                return Err(crate::parser::document::token_errors::empty_token_name(
+                    stream.source_mut(),
+                    "Empty alias name is not allowed",
+                ));
+            }
             return Ok(Node::Alias(alias));
         }
     }
@@ -340,11 +347,7 @@ pub fn parse_value_with_tokens(
             && decorators.anchor.is_some()
             && stream.current_flow_depth() == 0
         {
-            return Err(
-                crate::parser::document::anchor_errors::AnchorErrors::anchor_cannot_precede_dash_block(
-                    stream,
-                ),
-            );
+            return Err(crate::parser::document::anchor_errors::AnchorErrors::anchor_cannot_precede_dash_block(stream));
         }
         // U99R: Disallow a comma immediately after a tag in block context.
         // In block (non-flow) context, ',' is not a valid value separator.
@@ -356,11 +359,7 @@ pub fn parse_value_with_tokens(
                 None => true,
             }
         {
-            return Err(
-                crate::parser::document::token_errors::unexpected_comma_after_tag_in_block_value(
-                    stream.source_mut(),
-                ),
-            );
+            return Err(crate::parser::document::token_errors::unexpected_comma_after_tag_in_block_value(stream.source_mut()));
         }
         match stream.current() {
             Some(Token::Eof)
@@ -563,16 +562,10 @@ pub fn parse_value_with_tokens(
             // If the decorated value resolved to an alias, treat this as a
             // structural error rather than accepting an anchored alias.
             if matches!(result, Node::Alias(_)) {
-                return Err(
-                    crate::parser::document::anchor_errors::AnchorErrors::invalid_anchored_alias(
-                        stream,
-                    ),
-                );
+                return Err(crate::parser::document::anchor_errors::AnchorErrors::invalid_anchored_alias(stream));
             }
             if matches!(result, Node::Anchored(_, _)) {
-                return Err(
-                    crate::parser::document::anchor_errors::AnchorErrors::multiple_anchors(stream),
-                );
+                return Err(crate::parser::document::anchor_errors::AnchorErrors::multiple_anchors(stream));
             }
             result = Node::Anchored(Box::new(result), anchor_name);
         }
