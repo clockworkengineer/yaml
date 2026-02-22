@@ -155,22 +155,44 @@ pub fn run_yaml_test_suite() {
     // via `catch_unwind`, but avoid noisy backtraces in the output.
     let _panic_hook_guard = PanicHookGuard::new_silent();
 
-    // Try multiple possible paths for the test suite
-    let possible_paths = vec![
-        Path::new("c:/Projects/yaml/yaml-test-suite"),
-        Path::new("../yaml-test-suite"),
-    ];
+    // Read possible suite paths from suite_paths.txt in the same directory
+    let suite_paths_file = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("suite_paths.txt");
+    let possible_paths: Vec<PathBuf> = if suite_paths_file.exists() {
+        match fs::read_to_string(&suite_paths_file) {
+            Ok(contents) => contents
+                .lines()
+                .filter_map(|line| {
+                    let trimmed = line.trim();
+                    if trimmed.is_empty() {
+                        None
+                    } else {
+                        Some(PathBuf::from(trimmed))
+                    }
+                })
+                .collect(),
+            Err(_) => vec![],
+        }
+    } else {
+        vec![
+            PathBuf::from("c:/Projects/yaml/yaml-test-suite"),
+            PathBuf::from("../yaml-test-suite"),
+        ]
+    };
 
     let suite_dir = possible_paths.iter().find(|p| p.exists()).cloned();
     let suite_dir = match suite_dir {
         Some(dir) => dir,
         None => {
-            println!("YAML test suite repo directory not found in any of these locations:");
+            println!(
+                "YAML test suite repo directory not found in any of these locations from suite_paths.txt:"
+            );
             for path in &possible_paths {
                 println!("  - {:?}", path);
             }
             println!(
-                "Please clone https://github.com/yaml/yaml-test-suite.git to one of these locations."
+                "Please create suite_paths.txt in this directory with paths to the yaml-test-suite repo."
             );
             return;
         }
@@ -191,7 +213,7 @@ pub fn run_yaml_test_suite() {
     let mut failures = Vec::new();
     let mut unexpected_failures = Vec::new();
 
-    let mut test_dirs = get_all_test_dirs(suite_dir);
+    let mut test_dirs = get_all_test_dirs(&suite_dir);
     if test_dirs.is_empty() {
         println!("No test directories found. Make sure you're using the data release branch.");
         println!("Run: cd tests/yaml-test-suite && git checkout data-2022-01-17");

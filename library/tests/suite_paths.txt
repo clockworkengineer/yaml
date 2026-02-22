@@ -1,0 +1,2 @@
+../yaml-test-suite
+c:/Projects/yaml/yaml-test-suite
