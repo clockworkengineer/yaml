@@ -29,7 +29,7 @@ mod flow_debug;
 mod flow_trailing_comma_tests;
 
 // Official YAML test suite failing cases
-mod official_suite_fixes;
+mod official_suite_tests;
 
 
 // Block-format tag tests

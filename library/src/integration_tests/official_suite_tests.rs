@@ -1,12 +1,7 @@
-//! Tests for fixing the 10 failing official YAML test suite cases
+//! Tests for fixing the failing official YAML test suite cases
 //!
 //! These tests recreate the failing test cases from the official YAML 1.2 test suite
 //! to allow debugging and fixing without needing the full test suite data.
-
-
-// Standalone test for 4HVU - Wrong indentation in Sequence (false positive)
-
-// Standalone test for 2CMS - Invalid mapping in plain multiline (false positive)
 
 #[cfg(test)]
 mod tests {
@@ -55,58 +50,7 @@ mod tests {
             "DMG6 should fail to parse due to wrong indentation in mapping",
         );
     }
-    // #[test]
-    // fn test_4hvu_sequence_indentation_standalone() {
-    //     let yaml = b"- item1\n- item2\n  - subitem1\n  - subitem2\n";
-    //     let mut source = BufferSource::new(yaml);
-    //     let result = parse(&mut source);
 
-    //     #[cfg(feature = "debug-trace")]
-    //     println!("4HVU Standalone Result: {:?}", result);
-
-    //     // If marked as false positive, we should succeed
-    //     assert!(
-    //         result.is_err(),
-    //         "4HVU should parse (false positive): {:?}",
-    //         result.err()
-    //     );
-    // }
-    // #[test]
-    // fn test_2cms_plain_multiline_standalone() {
-    //     // This might be a false positive - need to understand what makes it invalid
-    //     let yaml = b"key: this is a plain\n  multiline scalar\n  that continues\n";
-    //     let mut source = BufferSource::new(yaml);
-    //     let result = parse(&mut source);
-
-    //     #[cfg(feature = "debug-trace")]
-    //     println!("2CMS Standalone Result: {:?}", result);
-
-    //     // If this is marked as false positive, we should succeed
-    //     assert!(
-    //         result.is_err(),
-    //         "2CMS should parse (false positive): {:?}",
-    //         result.err()
-    //     );
-    // }
-
-    // // Test 4QFQ - Block scalar edge cases (should error)
-    // #[test]
-    // fn test_4qfq_block_scalar_error() {
-    //     // This YAML is from the 4QFQ test case, which should now succeed to parse
-    //     let yaml = b"- |\n detected\n- >\n \n  \n  # detected\n- |1\n  explicit\n- >\n detected\n";
-    //     let mut source = BufferSource::new(yaml);
-    //     let result = parse(&mut source);
-
-    //     #[cfg(feature = "debug-trace")]
-    //     println!("4QFQ Result: {:?}", result);
-
-    //     // This test should succeed to parse (expect Ok)
-    //     assert!(
-    //         result.is_err(),
-    //         "4QFQ should succeed to parse, but failed: {:?}",
-    //         result
-    //     );
-    // }
     // Test 5TRB - Unterminated/invalid quoted scalar
     #[test]
     fn test_5trb_unterminated_quoted_scalar() {
@@ -115,24 +59,6 @@ mod tests {
         assert_fails(yaml, "5TRB should fail to parse, but succeeded");
     }
 
-    // Test 236B - Indentation/structure: Invalid mapping/sequence structure (should error)
-    // #[test]
-    // fn test_236b_invalid_mapping_sequence_structure() {
-    //     // This YAML is from the 236B test case (should fail to parse)
-    //     let yaml = b"foo:\n  bar\ninvalid\n";
-    //     let mut source = BufferSource::new(yaml);
-    //     let result = parse(&mut source);
-
-    //     #[cfg(feature = "debug-trace")]
-    //     println!("236B Result: {:?}", result);
-
-    //     // Fail the test if parsing does NOT return an error
-    //     assert!(
-    //         result.is_err(),
-    //         "236B should fail to parse, but succeeded: {:?}",
-    //         result
-    //     );
-    // }
     // Test 229Q - Spec Example 2.4. Sequence of Mappings
     #[test]
     fn test_229q_sequence_of_mappings() {
@@ -327,4 +253,75 @@ literal: |
             }
         }
     }
+    // #[test]
+    // fn test_4hvu_sequence_indentation_standalone() {
+    //     let yaml = b"- item1\n- item2\n  - subitem1\n  - subitem2\n";
+    //     let mut source = BufferSource::new(yaml);
+    //     let result = parse(&mut source);
+
+    //     #[cfg(feature = "debug-trace")]
+    //     println!("4HVU Standalone Result: {:?}", result);
+
+    //     // If marked as false positive, we should succeed
+    //     assert!(
+    //         result.is_err(),
+    //         "4HVU should parse (false positive): {:?}",
+    //         result.err()
+    //     );
+    // }
+    // #[test]
+    // fn test_2cms_plain_multiline_standalone() {
+    //     // This might be a false positive - need to understand what makes it invalid
+    //     let yaml = b"key: this is a plain\n  multiline scalar\n  that continues\n";
+    //     let mut source = BufferSource::new(yaml);
+    //     let result = parse(&mut source);
+
+    //     #[cfg(feature = "debug-trace")]
+    //     println!("2CMS Standalone Result: {:?}", result);
+
+    //     // If this is marked as false positive, we should succeed
+    //     assert!(
+    //         result.is_err(),
+    //         "2CMS should parse (false positive): {:?}",
+    //         result.err()
+    //     );
+    // }
+
+    // // Test 4QFQ - Block scalar edge cases (should error)
+    // #[test]
+    // fn test_4qfq_block_scalar_error() {
+    //     // This YAML is from the 4QFQ test case, which should now succeed to parse
+    //     let yaml = b"- |\n detected\n- >\n \n  \n  # detected\n- |1\n  explicit\n- >\n detected\n";
+    //     let mut source = BufferSource::new(yaml);
+    //     let result = parse(&mut source);
+
+    //     #[cfg(feature = "debug-trace")]
+    //     println!("4QFQ Result: {:?}", result);
+
+    //     // This test should succeed to parse (expect Ok)
+    //     assert!(
+    //         result.is_err(),
+    //         "4QFQ should succeed to parse, but failed: {:?}",
+    //         result
+    //     );
+    // }
+
+    // Test 236B - Indentation/structure: Invalid mapping/sequence structure (should error)
+    // #[test]
+    // fn test_236b_invalid_mapping_sequence_structure() {
+    //     // This YAML is from the 236B test case (should fail to parse)
+    //     let yaml = b"foo:\n  bar\ninvalid\n";
+    //     let mut source = BufferSource::new(yaml);
+    //     let result = parse(&mut source);
+
+    //     #[cfg(feature = "debug-trace")]
+    //     println!("236B Result: {:?}", result);
+
+    //     // Fail the test if parsing does NOT return an error
+    //     assert!(
+    //         result.is_err(),
+    //         "236B should fail to parse, but succeeded: {:?}",
+    //         result
+    //     );
+    // }
 }
