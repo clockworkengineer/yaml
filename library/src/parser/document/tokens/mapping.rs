@@ -227,7 +227,7 @@ impl MappingParseContext {
         stream: &mut TokenStream,
         current_indent: usize,
         token: &Option<Token>,
-        depth: usize,
+        _depth: usize,
     ) -> crate::parser::ParseResult<Option<Node>> {
         match token {
             Some(Token::Indent(level)) if *level < current_indent => {
@@ -319,7 +319,7 @@ impl MappingParseContext {
         token: Option<Token>,
         current_indent: usize,
         saw_comment_between_entries: bool,
-        depth: usize,
+        _depth: usize,
     ) -> crate::parser::ParseResult<Option<Option<(Node, Node)>>> {
         if let Some(Token::Indent(level)) = token {
             let last_value_is_empty = self

@@ -246,6 +246,7 @@ fn create_nested_structure(depth: usize) -> Node {
 
 /// Example: Parsing sensor readings in constrained memory
 #[cfg(feature = "std")]
+#[allow(dead_code)]
 fn parse_sensor_reading() {
     let sensor_data = r#"
 reading:
@@ -269,6 +270,7 @@ reading:
 
 /// Example: Configuration with bounded arrays
 #[cfg(feature = "std")]
+#[allow(dead_code)]
 fn validate_configuration() {
     let config = r#"
 endpoints:

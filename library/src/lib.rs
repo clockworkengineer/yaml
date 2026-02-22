@@ -290,10 +290,6 @@ pub use validation::validators::{
     RequiredValidator, TypeValidator, ValidationResult, Validator,
 };
 
-// Serialization API
-/// Formatting options for YAML output
-#[cfg(feature = "alloc")]
-pub use stringify::format::{CollectionStyle, FormatContext, FormatOptions, QuoteStyle};
 /// Custom serializer support
 #[cfg(feature = "alloc")]
 pub use stringify::serializer::{Serializer, SerializerRegistry, TaggedSerializer, TypeSerializer};

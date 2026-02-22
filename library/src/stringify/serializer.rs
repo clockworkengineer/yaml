@@ -43,6 +43,7 @@ pub trait Serializer {
 /// logic to the shared walker while keeping their output identical.
 pub trait FormatWriter {
     /// Underlying output destination
+    #[allow(dead_code)]
     fn dest(&mut self) -> &mut dyn IDestination;
 
     /// Emit a YAML `null` value
