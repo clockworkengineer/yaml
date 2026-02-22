@@ -7,7 +7,6 @@ use std::fs::{self, File};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
-use yaml_lib::{BufferSource, parse};
 
 #[derive(Debug)]
 struct TestCase {
@@ -115,8 +114,7 @@ fn main() {
                 };
                 let start_time = Instant::now();
                 let result = std::panic::catch_unwind(|| {
-                    let mut source = BufferSource::new(test.yaml.as_bytes());
-                    parse(&mut source)
+                    yaml_lib::parse_with_config(&test.yaml, yaml_lib::ParserConfig::strict())
                 });
                 let _elapsed = start_time.elapsed();
                 let parse_result = match result {
@@ -185,8 +183,7 @@ fn main() {
         }
         let start_time = Instant::now();
         let result = std::panic::catch_unwind(|| {
-            let mut source = BufferSource::new(test.yaml.as_bytes());
-            parse(&mut source)
+            yaml_lib::parse_with_config(&test.yaml, yaml_lib::ParserConfig::strict())
         });
         let _elapsed = start_time.elapsed();
         let parse_result = match result {

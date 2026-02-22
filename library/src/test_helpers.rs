@@ -5,8 +5,9 @@ use crate::error::YamlError;
 
 /// Parse YAML from a string or byte slice, panicking on error.
 pub fn parse_yaml(input: impl AsRef<[u8]>) -> Node {
-    let mut source = BufferSource::new(input.as_ref());
-    parse(&mut source).expect("YAML parse failed")
+    // removed unused variable after switching to parse_with_config
+    let config = crate::parser::config::ParserConfig::strict();
+    crate::parse_with_config(std::str::from_utf8(input.as_ref()).expect("Invalid UTF-8"), config).expect("YAML parse failed")
 }
 
 /// Assert that two nodes are equal, with pretty diff on failure.
@@ -16,8 +17,9 @@ pub fn assert_nodes_eq(expected: &Node, actual: &Node) {
 
 /// Assert that parsing fails with a specific error substring.
 pub fn assert_parse_error(input: impl AsRef<[u8]>, expected_msg: &str) {
-    let mut source = BufferSource::new(input.as_ref());
-    let result = parse(&mut source);
+    // removed unused variable after switching to parse_with_config
+    let config = crate::parser::config::ParserConfig::strict();
+    let result = crate::parse_with_config(std::str::from_utf8(input.as_ref()).expect("Invalid UTF-8"), config);
     assert!(result.is_err(), "Expected parse error, but got Ok");
     let err = result.unwrap_err();
     let err_str = err.to_string();
