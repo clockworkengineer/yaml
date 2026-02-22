@@ -3,9 +3,9 @@
 //! This demonstrates how the tokenization approach solves the decorator parsing
 //! problem and eliminates infinite loops.
 
+use crate::error::{ErrorKind, YamlError};
 use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
 use crate::parser::directives::DirectiveContext;
-use crate::error::{YamlError, ErrorKind};
 const MAX_NESTING_DEPTH: usize = 128;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
@@ -14,8 +14,8 @@ fn should_preserve_double_bang(tag_raw: &str) -> bool {
     if let Some(suffix) = tag_raw.strip_prefix("!!") {
         match suffix {
             // Core scalar and collection tags commonly preserved in tests
-            "str" | "int" | "float" | "bool" | "null" | "timestamp" | "yaml" | "binary" |
-            "map" | "seq" | "set" | "omap" | "pairs" => true,
+            "str" | "int" | "float" | "bool" | "null" | "timestamp" | "yaml" | "binary" | "map"
+            | "seq" | "set" | "omap" | "pairs" => true,
             // Extended integer formats used in tests
             "int:hex" | "int:oct" => true,
             _ => false,
@@ -351,7 +351,10 @@ pub fn parse_value_with_tokens(
         // "- !!str, xxx" should be a syntax error, not an empty value.
         if matches!(stream.current(), Some(Token::Comma))
             && stream.current_flow_depth() == 0
-            && match decorators.tag.as_ref() { Some(t) => !t.starts_with("!<"), None => true }
+            && match decorators.tag.as_ref() {
+                Some(t) => !t.starts_with("!<"),
+                None => true,
+            }
         {
             return Err(
                 crate::parser::document::token_errors::unexpected_comma_after_tag_in_block_value(
@@ -379,10 +382,12 @@ pub fn parse_value_with_tokens(
                     // a local tag resolution.
                     directives
                         .validate_tag_handle_usage(tag_raw_ref)
-                        .map_err(|e| crate::parser::document::token_errors::invalid_tag_handle_usage(
-                            stream.source_mut(),
-                            &e.to_string(),
-                        ))?;
+                        .map_err(|e| {
+                            crate::parser::document::token_errors::invalid_tag_handle_usage(
+                                stream.source_mut(),
+                                &e.to_string(),
+                            )
+                        })?;
                     let resolved = directives.resolve_tag(tag_raw_ref);
                     if let Some(coerced) = try_coerce_tag(&resolved, result.clone()) {
                         result = coerced;
@@ -460,10 +465,12 @@ pub fn parse_value_with_tokens(
             // QLJ7: Enforce that explicit handles are declared via %TAG
             directives
                 .validate_tag_handle_usage(tag_raw_ref)
-                .map_err(|e| crate::parser::document::token_errors::invalid_tag_handle_usage(
-                    stream.source_mut(),
-                    &e.to_string(),
-                ))?;
+                .map_err(|e| {
+                    crate::parser::document::token_errors::invalid_tag_handle_usage(
+                        stream.source_mut(),
+                        &e.to_string(),
+                    )
+                })?;
             let tag_resolved = directives.resolve_tag(tag_raw_ref);
             if tag_resolved == "!!str"
                 || tag_resolved == "!str"
@@ -564,9 +571,7 @@ pub fn parse_value_with_tokens(
             }
             if matches!(result, Node::Anchored(_, _)) {
                 return Err(
-                    crate::parser::document::anchor_errors::AnchorErrors::multiple_anchors(
-                        stream,
-                    ),
+                    crate::parser::document::anchor_errors::AnchorErrors::multiple_anchors(stream),
                 );
             }
             result = Node::Anchored(Box::new(result), anchor_name);
@@ -826,10 +831,7 @@ mod tests {
 
         let err = parse_value_with_tokens(&mut stream, &directives, 0).unwrap_err();
         let err_str = err.to_string().to_ascii_lowercase();
-        assert!(
-            err_str.contains("duplicate anchor")
-                || err_str.contains("multiple anchors")
-        );
+        assert!(err_str.contains("duplicate anchor") || err_str.contains("multiple anchors"));
     }
 
     #[test]
