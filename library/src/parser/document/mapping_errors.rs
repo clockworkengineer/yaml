@@ -1,6 +1,6 @@
-use crate::parser::token_stream::TokenStream;
-use crate::error::enhanced::{EnhancedError, ErrorCode};
 use crate::error::YamlError;
+use crate::error::enhanced::{EnhancedError, ErrorCode};
+use crate::parser::token_stream::TokenStream;
 
 /// Centralized error: Mapping key without value (expected value after colon)
 ///
@@ -9,10 +9,12 @@ use crate::error::YamlError;
 pub fn mapping_key_without_value_expected_value_after_colon(
     stream: &mut TokenStream,
 ) -> EnhancedError {
-    EnhancedError::new(crate::parser::document::error_builder::mapping_key_error_yaml(
-        stream.source_mut(),
-        "YAML compliance error: Mapping key without value (expected value after colon)",
-    ))
+    EnhancedError::new(
+        crate::parser::document::error_builder::mapping_key_error_yaml(
+            stream.source_mut(),
+            "YAML compliance error: Mapping key without value (expected value after colon)",
+        ),
+    )
     .with_code(ErrorCode::E001)
 }
 
@@ -39,12 +41,16 @@ pub fn invalid_indentation_after_comment_in_mapping_value(
 pub fn invalid_indentation_extending_completed_mapping_value(
     stream: &mut TokenStream,
 ) -> EnhancedError {
-    EnhancedError::new(crate::parser::document::error_builder::mapping_key_error_yaml(
-        stream.source_mut(),
-        "Invalid indentation: indented content cannot extend a completed mapping value",
-    ))
+    EnhancedError::new(
+        crate::parser::document::error_builder::mapping_key_error_yaml(
+            stream.source_mut(),
+            "Invalid indentation: indented content cannot extend a completed mapping value",
+        ),
+    )
     .with_code(ErrorCode::E010)
-    .with_note("Ensure nested content follows keys with omitted values (e.g., 'key:\n  nested: 1').")
+    .with_note(
+        "Ensure nested content follows keys with omitted values (e.g., 'key:\n  nested: 1').",
+    )
 }
 
 /// Centralized error: Inconsistent dedent within nested mapping value for keys
@@ -53,10 +59,12 @@ pub fn invalid_indentation_extending_completed_mapping_value(
 pub fn inconsistent_dedent_within_mapping_value_for_keys(
     stream: &mut TokenStream,
 ) -> EnhancedError {
-    EnhancedError::new(crate::parser::document::error_builder::mapping_key_error_yaml(
-        stream.source_mut(),
-        "Invalid indentation for nested mapping key: inconsistent dedent within mapping value",
-    ))
+    EnhancedError::new(
+        crate::parser::document::error_builder::mapping_key_error_yaml(
+            stream.source_mut(),
+            "Invalid indentation for nested mapping key: inconsistent dedent within mapping value",
+        ),
+    )
     .with_code(ErrorCode::E009)
     .with_note("Ensure all keys under the nested mapping use the same indentation.")
 }
@@ -69,18 +77,20 @@ pub fn invalid_anchored_alias_key_on_alias_nodes(stream: &mut TokenStream) -> En
     // Behavior-neutral: underlying builder and final message remain identical.
     let base = crate::parser::document::anchor_errors::AnchorErrors::invalid_anchored_alias(stream);
     EnhancedError::new(base)
-    .with_code(ErrorCode::E004)
-    .with_note("Anchors are not allowed on alias nodes.")
+        .with_code(ErrorCode::E004)
+        .with_note("Anchors are not allowed on alias nodes.")
 }
 
 /// Centralized error: Multiple anchors applied to a mapping key
 ///
 /// Returns an EnhancedError with code E005 and note, matching existing behavior and text.
 pub fn multiple_anchors_on_mapping_key(stream: &mut TokenStream) -> EnhancedError {
-    EnhancedError::new(crate::parser::document::error_builder::mapping_key_error_yaml(
-        stream.source_mut(),
-        "A mapping key cannot have multiple anchors",
-    ))
+    EnhancedError::new(
+        crate::parser::document::error_builder::mapping_key_error_yaml(
+            stream.source_mut(),
+            "A mapping key cannot have multiple anchors",
+        ),
+    )
     .with_code(ErrorCode::E005)
     .with_note("A key can only have one anchor.")
 }

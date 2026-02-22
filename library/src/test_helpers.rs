@@ -1,29 +1,45 @@
 //! Common test helpers for YAML library integration/unit tests
 
-use crate::{Node, parse, BufferSource};
 use crate::error::YamlError;
+use crate::{BufferSource, Node, parse};
 
 /// Parse YAML from a string or byte slice, panicking on error.
 pub fn parse_yaml(input: impl AsRef<[u8]>) -> Node {
     // removed unused variable after switching to parse_with_config
     let config = crate::parser::config::ParserConfig::strict();
-    crate::parse_with_config(std::str::from_utf8(input.as_ref()).expect("Invalid UTF-8"), config).expect("YAML parse failed")
+    crate::parse_with_config(
+        std::str::from_utf8(input.as_ref()).expect("Invalid UTF-8"),
+        config,
+    )
+    .expect("YAML parse failed")
 }
 
 /// Assert that two nodes are equal, with pretty diff on failure.
 pub fn assert_nodes_eq(expected: &Node, actual: &Node) {
-    assert_eq!(expected, actual, "Nodes are not equal.\nExpected: {:#?}\nActual: {:#?}", expected, actual);
+    assert_eq!(
+        expected, actual,
+        "Nodes are not equal.\nExpected: {:#?}\nActual: {:#?}",
+        expected, actual
+    );
 }
 
 /// Assert that parsing fails with a specific error substring.
 pub fn assert_parse_error(input: impl AsRef<[u8]>, expected_msg: &str) {
     // removed unused variable after switching to parse_with_config
     let config = crate::parser::config::ParserConfig::strict();
-    let result = crate::parse_with_config(std::str::from_utf8(input.as_ref()).expect("Invalid UTF-8"), config);
+    let result = crate::parse_with_config(
+        std::str::from_utf8(input.as_ref()).expect("Invalid UTF-8"),
+        config,
+    );
     assert!(result.is_err(), "Expected parse error, but got Ok");
     let err = result.unwrap_err();
     let err_str = err.to_string();
-    assert!(err_str.contains(expected_msg), "Error message did not contain expected substring.\nExpected: {}\nActual: {}", expected_msg, err_str);
+    assert!(
+        err_str.contains(expected_msg),
+        "Error message did not contain expected substring.\nExpected: {}\nActual: {}",
+        expected_msg,
+        err_str
+    );
 }
 
 /// Stringify a node to YAML (if supported by the build).
