@@ -19,18 +19,13 @@ mod nested_structure_tests;
 mod set_tests;
 mod tag_coercion_tests;
 mod validation_tests;
+mod block_tag_tests;
+mod flow_debug;
+mod flow_trailing_comma_tests;
 
 // Embedded systems integration tests
 #[cfg(feature = "embedded")]
 mod embedded_tests;
 
-// Flow collection edge case tests
-mod flow_debug;
-mod flow_trailing_comma_tests;
-
 // Official YAML test suite failing cases
 mod official_suite_tests;
-
-
-// Block-format tag tests
-mod block_tag_tests;
