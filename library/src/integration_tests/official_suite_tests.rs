@@ -25,6 +25,30 @@
 
 #[cfg(test)]
 mod tests {
+        /// Helper: Extract the first array node from the first document node, if present.
+        fn get_first_array_from_document(node: &Node) -> Option<&Vec<Node>> {
+            match node {
+                Node::Document(items) => {
+                    if let Some(Node::Array(arr)) = items.first() {
+                        Some(arr)
+                    } else {
+                        None
+                    }
+                }
+                Node::Documents(docs) => {
+                    if let Some(Node::Document(items)) = docs.first() {
+                        if let Some(Node::Array(arr)) = items.first() {
+                            Some(arr)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            }
+        }
     use crate::{BufferSource, Node, parse};
 
     /// Helper: parse YAML and expect success, returning the root node.
@@ -346,36 +370,18 @@ literal: |
     // }
 
     // Test parsing '---\n-\n-\n' and check its node structure
-    // #[test]
-    // fn test_parse_empty_sequence_items() {
-    //     let yaml = b"---\n- \n- \n\n";
-    //     let node = parse_expect_ok(yaml, "Failed to parse empty sequence items");
+    #[test]
+    fn test_parse_empty_sequence_items() {
+        let yaml = b"---\n- \n- \n\n";
+        let node = parse_expect_ok(yaml, "Failed to parse empty sequence items");
 
-    //     // Should be a Document with an Array containing two Nulls
-    //     if let Node::Documents(docs) = node {
-    //         if let Some(Node::Document(items)) = docs.first() {
-    //             assert_eq!(
-    //                 items.len(),
-    //                 1,
-    //                 "Document should have one top-level node (the sequence)"
-    //             );
-    //             match &items[0] {
-    //                 Node::Array(arr) => {
-    //                     assert_eq!(arr.len(), 2, "Array should have 2 items");
-    //                     for (i, item) in arr.iter().enumerate() {
-    //                         match item {
-    //                             Node::None => {}
-    //                             other => panic!("Item {} should be Null, got {:?}", i, other),
-    //                         }
-    //                     }
-    //                 }
-    //                 other => panic!("Expected Array as first document element, got {:?}", other),
-    //             }
-    //         } else {
-    //             panic!("Expected Document as first element in Documents");
-    //         }
-    //     } else {
-    //         panic!("Expected Documents node at root");
-    //     }
-    // }
+        let arr = get_first_array_from_document(&node).expect("Expected Array as first document element in Document");
+        assert_eq!(arr.len(), 2, "Array should have 2 items");
+        for (i, item) in arr.iter().enumerate() {
+            match item {
+                Node::None => {}
+                other => panic!("Item {} should be Null, got {:?}", i, other),
+            }
+        }
+    }
 }
