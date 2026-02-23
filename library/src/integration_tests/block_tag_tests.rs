@@ -1,6 +1,29 @@
-///
-/// Block-format tag tests: tags with block scalars, block mappings, and block sequences.
-///
+// =====================================================================================
+//  File: block_tag_tests.rs
+//  Location: library/src/integration_tests/
+// -------------------------------------------------------------------------------------
+//  Purpose:
+//      Integration tests for YAML block tag parsing and handling in the yaml_lib crate.
+//      These tests validate correct recognition and processing of explicit tags on
+//      block scalars, sequences, and mappings, ensuring compliance with the YAML spec.
+//
+//  Context:
+//      - Part of the yaml_lib project, a Rust YAML parser/serializer.
+//      - Tags are used to indicate data types and semantics in YAML documents.
+//      - Tests ensure correct tag resolution, preservation, and node wrapping.
+//
+//  Authors:      (Add your name or contributors here)
+//  Created:      (Add creation date if known)
+//  Last Updated: 2026-02-23
+// -------------------------------------------------------------------------------------
+//  Test Coverage:
+//      - Explicit tags on block scalars (literal, folded)
+//      - Tag resolution and canonicalization
+//      - Tagged sequences and mappings
+//      - Nested and edge case tag scenarios
+//      - Error handling for malformed tags
+// =====================================================================================
+
 #[cfg(test)]
 mod tests {
     use crate::nodes::node::BlockStyle;

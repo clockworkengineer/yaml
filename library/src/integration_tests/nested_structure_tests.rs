@@ -1,6 +1,28 @@
-///
-/// Nested structure tests: nested mappings, nested sequences, and complex combinations.
-///
+// =====================================================================================
+//  File: nested_structure_tests.rs
+//  Location: library/src/integration_tests/
+// -------------------------------------------------------------------------------------
+//  Purpose:
+//      Integration tests for YAML nested structure parsing in the yaml_lib crate.
+//      These tests validate correct handling of deeply nested sequences, mappings,
+//      and mixed structures, ensuring compliance with the YAML specification.
+//
+//  Context:
+//      - Part of the yaml_lib project, a Rust YAML parser/serializer.
+//      - Focuses on complex and deeply nested YAML document layouts.
+//      - Ensures robust handling of recursion, nesting, and edge cases.
+//
+//  Authors:      (Add your name or contributors here)
+//  Created:      (Add creation date if known)
+//  Last Updated: 2026-02-23
+// -------------------------------------------------------------------------------------
+//  Test Coverage:
+//      - Nested sequences and mappings
+//      - Mixed nested structures
+//      - Deep recursion and edge cases
+//      - Compliance with YAML nesting rules
+// =====================================================================================
+
 #[cfg(test)]
 mod tests {
     use crate::nodes::node::{BlockStyle, QuoteType};

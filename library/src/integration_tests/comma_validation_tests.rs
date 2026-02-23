@@ -1,3 +1,28 @@
+// =====================================================================================
+//  File: comma_validation_tests.rs
+//  Location: library/src/integration_tests/
+// -------------------------------------------------------------------------------------
+//  Purpose:
+//      Integration tests for validation of comma usage in YAML sequences in the yaml_lib crate.
+//      These tests ensure that invalid comma placements (leading, trailing, double commas)
+//      and related syntax errors are correctly detected and reported according to the YAML spec.
+//
+//  Context:
+//      - Part of the yaml_lib project, a Rust YAML parser/serializer.
+//      - Focuses on flow sequence syntax and error handling for malformed input.
+//      - Ensures robust error reporting and spec compliance for comma-related issues.
+//
+//  Authors:      (Add your name or contributors here)
+//  Created:      (Add creation date if known)
+//  Last Updated: 2026-02-23
+// -------------------------------------------------------------------------------------
+//  Test Coverage:
+//      - Leading, trailing, and double commas in sequences
+//      - Comments after commas
+//      - Error message validation for comma misuse
+//      - Edge cases for flow sequence parsing
+// =====================================================================================
+
 #[cfg(test)]
 mod tests {
     use crate::test_helpers::{assert_parse_error, parse_yaml};

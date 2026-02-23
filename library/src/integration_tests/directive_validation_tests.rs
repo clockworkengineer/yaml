@@ -1,3 +1,28 @@
+// =====================================================================================
+//  File: directive_validation_tests.rs
+//  Location: library/src/integration_tests/
+// -------------------------------------------------------------------------------------
+//  Purpose:
+//      Integration tests for validation of YAML directive usage in the yaml_lib crate.
+//      These tests ensure that directives such as %YAML are correctly validated for
+//      placement, required document content, and error reporting according to the YAML spec.
+//
+//  Context:
+//      - Part of the yaml_lib project, a Rust YAML parser/serializer.
+//      - Focuses on error handling and validation for directive placement and usage.
+//      - Ensures robust error reporting and spec compliance for directive-related issues.
+//
+//  Authors:      (Add your name or contributors here)
+//  Created:      (Add creation date if known)
+//  Last Updated: 2026-02-23
+// -------------------------------------------------------------------------------------
+//  Test Coverage:
+//      - %YAML directive without document content
+//      - Directives followed by end marker only
+//      - Proper directive usage with valid documents
+//      - Error message validation for directive misuse
+// =====================================================================================
+
 #[cfg(test)]
 mod tests {
     use crate::test_helpers::{assert_parse_error, parse_yaml};

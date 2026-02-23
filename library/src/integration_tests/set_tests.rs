@@ -1,11 +1,27 @@
-//! Set parsing and stringifying tests for YAML sets
-//!
-//! This module contains comprehensive tests for YAML set functionality including:
-//! - Parsing sets with !!set tags
-//! - Converting mappings with null values to sets  
-//! - Converting sequences to sets with duplicate removal
-//! - Stringifying sets back to proper YAML format
-//! - Round-trip testing (parse -> stringify -> parse)
+// =====================================================================================
+//  File: set_tests.rs
+//  Location: library/src/integration_tests/
+// -------------------------------------------------------------------------------------
+//  Purpose:
+//      Integration tests for YAML set type parsing and handling in the yaml_lib crate.
+//      These tests validate correct recognition and processing of !!set tags, set semantics,
+//      and edge cases for set construction and usage.
+//
+//  Context:
+//      - Part of the yaml_lib project, a Rust YAML parser/serializer.
+//      - Focuses on YAML !!set tag, set node construction, and set-specific behaviors.
+//      - Ensures robust handling of sets in both flow and block formats.
+//
+//  Authors:      (Add your name or contributors here)
+//  Created:      (Add creation date if known)
+//  Last Updated: 2026-02-23
+// -------------------------------------------------------------------------------------
+//  Test Coverage:
+//      - !!set tag parsing (flow and block)
+//      - Set construction from mappings
+//      - Edge cases for empty and nested sets
+//      - Compliance with YAML set semantics
+// =====================================================================================
 
 #[cfg(test)]
 mod tests {
@@ -541,7 +557,7 @@ mod tests {
 
     #[test]
     fn test_comprehensive_set_formats() {
-                // All YAML is now inside the string literal below
+        // All YAML is now inside the string literal below
         // Test that all set formats work together and produce equivalent results
         let yaml = b"array_set: !!set [item1, item2, item3]\nexplicit_set: !!set\n  ? item1\n  ? item2\n  ? item3\ninline_set: !!set {item1, item2, item3}\nmapping_set: !!set {item1: null, item2: null, item3: null}";
         let result = parse_yaml(yaml);
@@ -631,7 +647,7 @@ mod tests {
 
     #[test]
     fn test_set_final_behavior() {
-                // All YAML is now inside the string literal below
+        // All YAML is now inside the string literal below
         // Comprehensive test showing the final set behavior with flow formats only
         let yaml = b"sets_demo:\n  array_set: !!set [apple, banana, cherry]\n  inline_set: !!set {red, green, blue}\n  mapping_set: !!set {one: null, two: null, three: null}\n";
         let result = parse_yaml(yaml);

@@ -1,6 +1,29 @@
-///
-/// Error handling tests: parsing errors, invalid syntax, edge cases.
-///
+// =====================================================================================
+//  File: error_handling_tests.rs
+//  Location: library/src/integration_tests/
+// -------------------------------------------------------------------------------------
+//  Purpose:
+//      Integration tests for error handling and reporting in the yaml_lib crate.
+//      These tests validate that parsing errors, invalid syntax, and edge cases are
+//      correctly detected and reported with meaningful error messages, ensuring
+//      compliance with the YAML specification and robust user feedback.
+//
+//  Context:
+//      - Part of the yaml_lib project, a Rust YAML parser/serializer.
+//      - Focuses on error scenarios, malformed input, and panic safety.
+//      - Ensures comprehensive error coverage for YAML parsing and validation.
+//
+//  Authors:      (Add your name or contributors here)
+//  Created:      (Add creation date if known)
+//  Last Updated: 2026-02-23
+// -------------------------------------------------------------------------------------
+//  Test Coverage:
+//      - Syntax errors and malformed YAML
+//      - Error message validation and content
+//      - Panic safety and edge cases
+//      - Alias, anchor, and tag error scenarios
+//      - Compliance with YAML error handling rules
+// =====================================================================================
 
 #[cfg(test)]
 mod tests {

@@ -1,6 +1,29 @@
-///
-/// Document structure tests: multi-document YAML, document markers, header comments.
-///
+// =====================================================================================
+//  File: document_structure_tests.rs
+//  Location: library/src/integration_tests/
+// -------------------------------------------------------------------------------------
+//  Purpose:
+//      Integration tests for YAML document structure parsing in the yaml_lib crate.
+//      These tests validate correct handling of multi-document streams, document boundaries,
+//      and structural edge cases, ensuring compliance with the YAML specification.
+//
+//  Context:
+//      - Part of the yaml_lib project, a Rust YAML parser/serializer.
+//      - Focuses on document boundaries, multi-document parsing, and structure validation.
+//      - Ensures robust handling of complex YAML document layouts and edge cases.
+//
+//  Authors:      (Add your name or contributors here)
+//  Created:      (Add creation date if known)
+//  Last Updated: 2026-02-23
+// -------------------------------------------------------------------------------------
+//  Test Coverage:
+//      - Multi-document streams and boundaries
+//      - Document start and end markers
+//      - Nested and complex document structures
+//      - Edge cases for empty and malformed documents
+//      - Compliance with YAML document structure rules
+// =====================================================================================
+
 #[cfg(test)]
 mod tests {
     use crate::nodes::node::{BlockStyle, QuoteType};

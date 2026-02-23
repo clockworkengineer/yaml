@@ -1,6 +1,28 @@
-//! Tests for directive parsing and tag resolution
-
-// ...existing code...
+// =====================================================================================
+//  File: directive_tests.rs
+//  Location: library/src/integration_tests/
+// -------------------------------------------------------------------------------------
+//  Purpose:
+//      Integration tests for YAML directive parsing and handling in the yaml_lib crate.
+//      These tests validate correct recognition and processing of YAML directives such as
+//      %TAG and %YAML, ensuring compliance with the YAML specification for document structure
+//      and tag resolution.
+//
+//  Context:
+//      - Part of the yaml_lib project, a Rust YAML parser/serializer.
+//      - Directives control parsing behavior, tag resolution, and document versioning.
+//      - Tests ensure robust handling of directives and edge cases in multi-document streams.
+//
+//  Authors:      (Add your name or contributors here)
+//  Created:      (Add creation date if known)
+//  Last Updated: 2026-02-23
+// -------------------------------------------------------------------------------------
+//  Test Coverage:
+//      - %TAG and %YAML directive parsing
+//      - Local and global tag handles
+//      - Multi-document streams with directives
+//      - Edge cases for directive placement and errors
+// =====================================================================================
 
 #[cfg(test)]
 mod tests {

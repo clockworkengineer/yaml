@@ -1,6 +1,28 @@
-///
-/// File parsing tests: parsing YAML files from the filesystem.
-///
+// =====================================================================================
+//  File: file_parsing_tests.rs
+//  Location: library/src/integration_tests/
+// -------------------------------------------------------------------------------------
+//  Purpose:
+//      Integration tests for parsing YAML files from the filesystem in the yaml_lib crate.
+//      These tests validate correct reading, parsing, and error handling for multiple YAML
+//      files, ensuring robust file I/O and compliance with the YAML specification.
+//
+//  Context:
+//      - Part of the yaml_lib project, a Rust YAML parser/serializer.
+//      - Focuses on end-to-end parsing of real YAML files from the test suite.
+//      - Ensures robust handling of file I/O, batch parsing, and edge cases.
+//
+//  Authors:      (Add your name or contributors here)
+//  Created:      (Add creation date if known)
+//  Last Updated: 2026-02-23
+// -------------------------------------------------------------------------------------
+//  Test Coverage:
+//      - Batch parsing of YAML files
+//      - File I/O error handling
+//      - Skipping unsupported or malformed files
+//      - Compliance with YAML file structure and content
+// =====================================================================================
+
 #[cfg(test)]
 mod tests {
     use crate::{FileSource, parse};

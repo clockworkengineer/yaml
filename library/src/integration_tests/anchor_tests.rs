@@ -1,12 +1,35 @@
-//! Tests for anchor and alias parsing edge cases
-
-use crate::Node;
-use crate::test_helpers::parse_yaml;
+// =====================================================================================
+//  File: anchor_tests.rs
+//  Location: library/src/integration_tests/
+// -------------------------------------------------------------------------------------
+//  Purpose:
+//      Integration tests for YAML anchor and alias handling in the yaml_lib crate.
+//      These tests validate correct parsing and behavior of YAML anchors, aliases,
+//      and related edge cases, including anchor names with special characters,
+//      empty anchor values, and anchors on various node types.
+//
+//  Context:
+//      - Part of the yaml_lib project, a Rust YAML parser/serializer.
+//      - Tests are based on YAML specification examples and custom edge cases.
+//      - Ensures compliance with YAML anchor/alias semantics and robustness.
+//
+//  Authors:      (Add your name or contributors here)
+//  Created:      (Add creation date if known)
+//  Last Updated: 2026-02-23
+// -------------------------------------------------------------------------------------
+//  Test Coverage:
+//      - Anchor names with special characters (e.g., colon)
+//      - Empty anchor values
+//      - Anchors on sequences and mappings
+//      - Alias resolution
+//      - Panic safety for malformed anchors/aliases
+// =====================================================================================
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
+    use crate::Node;
+    use crate::test_helpers::parse_yaml;
     #[test]
     fn test_anchor_name_with_colon() {
         // Test from 2SXE: anchor name containing a colon

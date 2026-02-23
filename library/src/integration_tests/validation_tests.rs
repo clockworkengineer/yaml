@@ -1,4 +1,27 @@
-//! Integration tests for validation and error detection
+// =====================================================================================
+//  File: validation_tests.rs
+//  Location: library/src/integration_tests/
+// -------------------------------------------------------------------------------------
+//  Purpose:
+//      Integration tests for YAML validation rules in the yaml_lib crate.
+//      These tests validate correct enforcement of YAML syntax and formatting rules,
+//      including indentation, whitespace, and other structural requirements.
+//
+//  Context:
+//      - Part of the yaml_lib project, a Rust YAML parser/serializer.
+//      - Focuses on validation of YAML documents for spec compliance and error reporting.
+//      - Ensures robust handling of invalid input and edge cases.
+//
+//  Authors:      (Add your name or contributors here)
+//  Created:      (Add creation date if known)
+//  Last Updated: 2026-02-23
+// -------------------------------------------------------------------------------------
+//  Test Coverage:
+//      - Indentation and whitespace validation
+//      - Tabs vs. spaces enforcement
+//      - Structural and formatting rule checks
+//      - Error message validation for invalid input
+// =====================================================================================
 
 #[cfg(test)]
 mod tests {

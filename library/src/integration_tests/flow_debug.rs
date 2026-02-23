@@ -1,5 +1,27 @@
-//! Debug tests for flow collection edge cases
-
+// =====================================================================================
+//  File: flow_debug.rs
+//  Location: library/src/integration_tests/
+// -------------------------------------------------------------------------------------
+//  Purpose:
+//      Integration tests for debugging and validating YAML flow style parsing in the yaml_lib crate.
+//      These tests focus on edge cases, trailing commas, and error scenarios in flow mappings
+//      and sequences, aiding in parser development and troubleshooting.
+//
+//  Context:
+//      - Part of the yaml_lib project, a Rust YAML parser/serializer.
+//      - Used for debugging and validating flow style parsing logic and error handling.
+//      - Ensures robust handling of flow mappings, sequences, and related edge cases.
+//
+//  Authors:      (Add your name or contributors here)
+//  Created:      (Add creation date if known)
+//  Last Updated: 2026-02-23
+// -------------------------------------------------------------------------------------
+//  Test Coverage:
+//      - Flow mappings and sequences
+//      - Trailing commas and formatting edge cases
+//      - Error handling and debug output
+//      - Compliance with YAML flow style rules
+// =====================================================================================
 
 #[cfg(test)]
 mod tests {

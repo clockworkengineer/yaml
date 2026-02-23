@@ -1,4 +1,28 @@
-//! Module: integration_tests/json_tests.rs
+// =====================================================================================
+//  File: json_tests.rs
+//  Location: library/src/integration_tests/
+// -------------------------------------------------------------------------------------
+//  Purpose:
+//      Integration tests for JSON serialization in the yaml_lib crate.
+//      These tests validate correct conversion of YAML node structures to JSON format,
+//      ensuring compliance with JSON encoding rules for strings, numbers, arrays, and objects.
+//
+//  Context:
+//      - Part of the yaml_lib project, a Rust YAML parser/serializer.
+//      - Ensures interoperability and correctness of JSON output from YAML data.
+//      - Focuses on both compact and pretty-printed JSON serialization.
+//
+//  Authors:      (Add your name or contributors here)
+//  Created:      (Add creation date if known)
+//  Last Updated: 2026-02-23
+// -------------------------------------------------------------------------------------
+//  Test Coverage:
+//      - String and number encoding
+//      - Array and object encoding
+//      - Pretty-printing and compact output
+//      - Edge cases for empty and nested structures
+//      - Error handling for invalid input
+// =====================================================================================
 
 #[cfg(test)]
 mod tests {

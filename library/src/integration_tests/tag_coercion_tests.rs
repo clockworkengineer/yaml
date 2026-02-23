@@ -1,6 +1,28 @@
-///
-/// Tag and coercion tests: YAML tags (!!int, !!float, !!str, !!timestamp, etc.) and type coercion.
-///
+// =====================================================================================
+//  File: tag_coercion_tests.rs
+//  Location: library/src/integration_tests/
+// -------------------------------------------------------------------------------------
+//  Purpose:
+//      Integration tests for YAML tag coercion and type handling in the yaml_lib crate.
+//      These tests validate correct recognition, preservation, and coercion of tags on
+//      scalars, sequences, and mappings, ensuring compliance with the YAML specification.
+//
+//  Context:
+//      - Part of the yaml_lib project, a Rust YAML parser/serializer.
+//      - Focuses on tag resolution, type coercion, and tag preservation in parsed nodes.
+//      - Ensures robust handling of explicit and implicit tags in YAML documents.
+//
+//  Authors:      (Add your name or contributors here)
+//  Created:      (Add creation date if known)
+//  Last Updated: 2026-02-23
+// -------------------------------------------------------------------------------------
+//  Test Coverage:
+//      - Tag coercion for scalars, sequences, and mappings
+//      - Explicit and implicit tag handling
+//      - Edge cases for tag resolution and preservation
+//      - Compliance with YAML tag semantics
+// =====================================================================================
+
 #[cfg(test)]
 mod tests {
     use crate::nodes::node::QuoteType;

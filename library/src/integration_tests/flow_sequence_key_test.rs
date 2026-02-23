@@ -1,3 +1,27 @@
+// =====================================================================================
+//  File: flow_sequence_key_test.rs
+//  Location: library/src/integration_tests/
+// -------------------------------------------------------------------------------------
+//  Purpose:
+//      Integration tests for YAML flow sequence usage as mapping keys in the yaml_lib crate.
+//      These tests validate correct parsing and handling of flow sequences as keys in mappings,
+//      ensuring compliance with the YAML specification and support for advanced key types.
+//
+//  Context:
+//      - Part of the yaml_lib project, a Rust YAML parser/serializer.
+//      - Focuses on edge cases for mapping keys and flow sequence syntax.
+//      - Ensures robust handling of non-scalar mapping keys in YAML documents.
+//
+//  Authors:      (Add your name or contributors here)
+//  Created:      (Add creation date if known)
+//  Last Updated: 2026-02-23
+// -------------------------------------------------------------------------------------
+//  Test Coverage:
+//      - Flow sequences as mapping keys
+//      - Compliance with YAML mapping key rules
+//      - Edge cases for advanced key types
+// =====================================================================================
+
 #[cfg(test)]
 mod tests {
     use crate::{BufferSource, parse};

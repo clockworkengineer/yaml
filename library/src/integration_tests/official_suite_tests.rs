@@ -1,7 +1,27 @@
-//! Tests for fixing the failing official YAML test suite cases
-//!
-//! These tests recreate the failing test cases from the official YAML 1.2 test suite
-//! to allow debugging and fixing without needing the full test suite data.
+// =====================================================================================
+//  File: official_suite_tests.rs
+//  Location: library/src/integration_tests/
+// -------------------------------------------------------------------------------------
+//  Purpose:
+//      Integration tests for the official YAML test suite in the yaml_lib crate.
+//      These tests validate parser compliance with the YAML specification using
+//      canonical examples and edge cases from the official YAML test suite.
+//
+//  Context:
+//      - Part of the yaml_lib project, a Rust YAML parser/serializer.
+//      - Focuses on comprehensive spec compliance and interoperability.
+//      - Ensures robust handling of all YAML features and edge cases.
+//
+//  Authors:      (Add your name or contributors here)
+//  Created:      (Add creation date if known)
+//  Last Updated: 2026-02-23
+// -------------------------------------------------------------------------------------
+//  Test Coverage:
+//      - Canonical YAML examples from the official test suite
+//      - Positive and negative parsing cases
+//      - Edge cases and spec compliance
+//      - Helper functions for parsing and validation
+// =====================================================================================
 
 #[cfg(test)]
 mod tests {

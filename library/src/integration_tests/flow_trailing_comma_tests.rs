@@ -1,3 +1,27 @@
+// =====================================================================================
+//  File: flow_trailing_comma_tests.rs
+//  Location: library/src/integration_tests/
+// -------------------------------------------------------------------------------------
+//  Purpose:
+//      Integration tests for YAML flow style trailing comma handling in the yaml_lib crate.
+//      These tests validate correct parsing of flow mappings and sequences with trailing commas,
+//      ensuring compliance with the YAML specification and robust parser behavior.
+//
+//  Context:
+//      - Part of the yaml_lib project, a Rust YAML parser/serializer.
+//      - Focuses on edge cases for trailing commas in flow style collections.
+//      - Ensures robust handling of valid and invalid trailing comma scenarios.
+//
+//  Authors:      (Add your name or contributors here)
+//  Created:      (Add creation date if known)
+//  Last Updated: 2026-02-23
+// -------------------------------------------------------------------------------------
+//  Test Coverage:
+//      - Flow mappings and sequences with trailing commas
+//      - Compliance with YAML flow style rules
+//      - Edge cases for comma placement and formatting
+// =====================================================================================
+
 #[cfg(test)]
 mod tests {
     use crate::{BufferSource, parse};

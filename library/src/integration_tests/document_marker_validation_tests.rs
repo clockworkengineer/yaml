@@ -1,3 +1,28 @@
+// =====================================================================================
+//  File: document_marker_validation_tests.rs
+//  Location: library/src/integration_tests/
+// -------------------------------------------------------------------------------------
+//  Purpose:
+//      Integration tests for validation of YAML document marker usage in the yaml_lib crate.
+//      These tests ensure that document start markers (---) are correctly validated for
+//      placement, formatting, and error reporting according to the YAML specification.
+//
+//  Context:
+//      - Part of the yaml_lib project, a Rust YAML parser/serializer.
+//      - Focuses on error handling and validation for document marker placement and usage.
+//      - Ensures robust error reporting and spec compliance for document marker issues.
+//
+//  Authors:      (Add your name or contributors here)
+//  Created:      (Add creation date if known)
+//  Last Updated: 2026-02-23
+// -------------------------------------------------------------------------------------
+//  Test Coverage:
+//      - Document start marker (---) placement and formatting
+//      - Invalid content on marker line
+//      - Proper marker usage with valid documents
+//      - Error message validation for marker misuse
+// =====================================================================================
+
 #[cfg(test)]
 mod tests {
     use crate::test_helpers::{assert_parse_error, parse_yaml};

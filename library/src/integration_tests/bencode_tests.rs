@@ -1,4 +1,29 @@
-//! Module: integration_tests/bencode_tests.rs
+// =====================================================================================
+//  File: bencode_tests.rs
+//  Location: library/src/integration_tests/
+// -------------------------------------------------------------------------------------
+//  Purpose:
+//      Integration tests for Bencode serialization in the yaml_lib crate.
+//      These tests validate correct conversion of YAML node structures to the
+//      Bencode format, ensuring compliance with Bencode encoding rules for
+//      strings, integers, lists, and dictionaries.
+//
+//  Context:
+//      - Part of the yaml_lib project, a Rust YAML parser/serializer.
+//      - Bencode is used in applications such as BitTorrent for data serialization.
+//      - Tests ensure interoperability and correctness of Bencode output.
+//
+//  Authors:      (Add your name or contributors here)
+//  Created:      (Add creation date if known)
+//  Last Updated: 2026-02-23
+// -------------------------------------------------------------------------------------
+//  Test Coverage:
+//      - String and integer encoding
+//      - List and dictionary encoding
+//      - Key sorting in dictionaries
+//      - Edge cases for empty and nested structures
+//      - Error handling for invalid input
+// =====================================================================================
 
 #[cfg(test)]
 mod tests {

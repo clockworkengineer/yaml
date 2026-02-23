@@ -1,6 +1,28 @@
-///
-/// Inline and flow syntax tests: inline mappings ({}), flow sequences ([]), explicit keys.
-///
+// =====================================================================================
+//  File: inline_flow_tests.rs
+//  Location: library/src/integration_tests/
+// -------------------------------------------------------------------------------------
+//  Purpose:
+//      Integration tests for YAML inline (flow style) mapping and sequence parsing in the yaml_lib crate.
+//      These tests validate correct handling of inline mappings and sequences, including edge cases,
+//      formatting variations, and compliance with the YAML specification.
+//
+//  Context:
+//      - Part of the yaml_lib project, a Rust YAML parser/serializer.
+//      - Focuses on flow style (inline) collections and their parsing logic.
+//      - Ensures robust handling of inline YAML syntax and edge cases.
+//
+//  Authors:      (Add your name or contributors here)
+//  Created:      (Add creation date if known)
+//  Last Updated: 2026-02-23
+// -------------------------------------------------------------------------------------
+//  Test Coverage:
+//      - Inline mappings and sequences
+//      - Empty and nested inline collections
+//      - Formatting and whitespace edge cases
+//      - Compliance with YAML flow style rules
+// =====================================================================================
+
 #[cfg(test)]
 mod tests {
     use crate::nodes::node::{BlockStyle, QuoteType};

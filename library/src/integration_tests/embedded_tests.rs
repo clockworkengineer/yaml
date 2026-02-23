@@ -1,4 +1,27 @@
-//! Integration tests for embedded system features
+// =====================================================================================
+//  File: embedded_tests.rs
+//  Location: library/src/integration_tests/
+// -------------------------------------------------------------------------------------
+//  Purpose:
+//      Integration tests for YAML parsing and validation in embedded and resource-constrained
+//      environments using the yaml_lib crate. These tests ensure correct parsing, structure,
+//      and value handling for typical embedded system YAML configurations.
+//
+//  Context:
+//      - Part of the yaml_lib project, a Rust YAML parser/serializer.
+//      - Focuses on scenarios relevant to embedded systems and minimal environments.
+//      - Ensures robust parsing, validation, and error handling for embedded use cases.
+//
+//  Authors:      (Add your name or contributors here)
+//  Created:      (Add creation date if known)
+//  Last Updated: 2026-02-23
+// -------------------------------------------------------------------------------------
+//  Test Coverage:
+//      - Simple and nested YAML structures
+//      - Type validation (strings, numbers, booleans)
+//      - Edge cases for minimal and malformed input
+//      - Compliance with embedded system requirements
+// =====================================================================================
 
 #[cfg(test)]
 mod tests {
