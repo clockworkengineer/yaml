@@ -187,6 +187,59 @@ pub(crate) fn parse_document_markers(
                 }
             }
         }
+        // CXX2: Check for anchor followed by mapping on the document start line
+        // This must be done at character level before creating TokenStream
+        if matches!(source.current(), Some('&')) {
+            let st_anchor = source.save_state();
+            // Skip the anchor
+            source.next(); // skip '&'
+            while let Some(ch) = source.current() {
+                if is_horizontal_space(ch) || ch == '&' || ch.is_alphanumeric() || ch == '_' || ch == '-' {
+                    source.next();
+                } else {
+                    break;
+                }
+            }
+            // Skip whitespace after anchor name
+            while let Some(ch) = source.current() {
+                if is_horizontal_space(ch) {
+                    source.next();
+                } else {
+                    break;
+                }
+            }
+            // Check if there's a colon on this line (indicating mapping)
+            let mut has_mapping_colon = false;
+            while let Some(ch) = source.current() {
+                if is_line_terminator(ch) {
+                    break;
+                }
+                if ch == ':' {
+                    // Found a colon - check if it's followed by space or newline (mapping indicator)
+                    source.next();
+                    if let Some(next_ch) = source.current() {
+                        if is_horizontal_space(next_ch) || is_line_terminator(next_ch) {
+                            has_mapping_colon = true;
+                        }
+                    } else {
+                        // EOF after colon also indicates mapping
+                        has_mapping_colon = true;
+                    }
+                    break;
+                }
+                source.next();
+            }
+            source.restore_state(st_anchor);
+            if has_mapping_colon {
+                let ts_err =
+                    crate::parser::token_stream::TokenStream::new(source, directives, false)
+                        .map_err(to_yaml_error)?;
+                return Err(parse_error_token(
+                    &ts_err,
+                    "Mapping keys are not allowed on the same line as document start marker (---).",
+                ));
+            }
+        }
         // Use token stream to check for forbidden tokens before newline
         let st = source.save_state();
         let early_error = {
@@ -213,6 +266,10 @@ pub(crate) fn parse_document_markers(
                         if let Err(e) = directives.validate_tag_handle_usage(&tag_str) {
                             err = Some(parse_error_token(&ts, &e.to_string()));
                         }
+                    }
+                    Some(crate::parser::lexer::Token::Anchor(_)) => {
+                        // CXX2: Anchor check is now done at character level before TokenStream creation (see above)
+                        // This case should not be reached for anchors with mappings as they're caught earlier
                     }
                     Some(crate::parser::lexer::Token::Plain(_)) => {
                         if let Some(crate::parser::lexer::Token::Colon) = ts.peek().ok().flatten() {

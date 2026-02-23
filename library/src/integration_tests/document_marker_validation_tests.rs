@@ -42,4 +42,12 @@ mod tests {
             "Should parse valid document marker"
         );
     }
+
+    #[test]
+    fn test_cxx2_anchor_on_document_start_line() {
+        // Test: Anchor with mapping on same line as --- is invalid (CXX2)
+        // YAML spec does not allow mapping keys on the document start marker line
+        let yaml = b"--- &anchor a: b\n";
+        assert_parse_error(yaml, "Mapping keys are not allowed");
+    }
 }

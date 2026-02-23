@@ -209,7 +209,7 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
     let skip_list: Vec<&str> = vec![];
     let known_failures: Vec<&str> = vec![
         "236B", "2CMS", "4HVU", "4JVG", "5LLU", "5TRB", "5U3A", "6S55", "7LBH", "7MNF", "9C9N",
-        "9CWY", "01", "BF9H", "BS4K", "C2SP", "CXX2", "D49Q", "DK4H", "06", "DMG6", "EB22", "EW3V",
+        "9CWY", "01", "BF9H", "BS4K", "C2SP", "D49Q", "DK4H", "06", "DMG6", "EB22", "EW3V",
         "G7JE", "G9HC", "GDY7", "GT5M", "JKF3", "KS4U", "QB6E", "QLJ7", "RHX7", "RXY3", "S98Z",
         "00", "ZCZ6", "ZVH3",
     ];
