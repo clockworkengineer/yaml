@@ -25,30 +25,30 @@
 
 #[cfg(test)]
 mod tests {
-        /// Helper: Extract the first array node from the first document node, if present.
-        fn get_first_array_from_document(node: &Node) -> Option<&Vec<Node>> {
-            match node {
-                Node::Document(items) => {
+    /// Helper: Extract the first array node from the first document node, if present.
+    fn get_first_array_from_document(node: &Node) -> Option<&Vec<Node>> {
+        match node {
+            Node::Document(items) => {
+                if let Some(Node::Array(arr)) = items.first() {
+                    Some(arr)
+                } else {
+                    None
+                }
+            }
+            Node::Documents(docs) => {
+                if let Some(Node::Document(items)) = docs.first() {
                     if let Some(Node::Array(arr)) = items.first() {
                         Some(arr)
                     } else {
                         None
                     }
+                } else {
+                    None
                 }
-                Node::Documents(docs) => {
-                    if let Some(Node::Document(items)) = docs.first() {
-                        if let Some(Node::Array(arr)) = items.first() {
-                            Some(arr)
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                }
-                _ => None,
             }
+            _ => None,
         }
+    }
     use crate::{BufferSource, Node, parse};
 
     /// Helper: parse YAML and expect success, returning the root node.
