@@ -13,9 +13,6 @@
 //      - Bencode is used in applications such as BitTorrent for data serialization.
 //      - Tests ensure interoperability and correctness of Bencode output.
 //
-//  Authors:      (Add your name or contributors here)
-//  Created:      (Add creation date if known)
-//  Last Updated: 2026-02-23
 // -------------------------------------------------------------------------------------
 //  Test Coverage:
 //      - String and integer encoding

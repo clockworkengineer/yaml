@@ -12,9 +12,6 @@
 //      - Focuses on edge cases for trailing commas in flow style collections.
 //      - Ensures robust handling of valid and invalid trailing comma scenarios.
 //
-//  Authors:      (Add your name or contributors here)
-//  Created:      (Add creation date if known)
-//  Last Updated: 2026-02-23
 // -------------------------------------------------------------------------------------
 //  Test Coverage:
 //      - Flow mappings and sequences with trailing commas

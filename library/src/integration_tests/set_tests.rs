@@ -12,9 +12,6 @@
 //      - Focuses on YAML !!set tag, set node construction, and set-specific behaviors.
 //      - Ensures robust handling of sets in both flow and block formats.
 //
-//  Authors:      (Add your name or contributors here)
-//  Created:      (Add creation date if known)
-//  Last Updated: 2026-02-23
 // -------------------------------------------------------------------------------------
 //  Test Coverage:
 //      - !!set tag parsing (flow and block)

@@ -12,9 +12,6 @@
 //      - Focuses on document boundaries, multi-document parsing, and structure validation.
 //      - Ensures robust handling of complex YAML document layouts and edge cases.
 //
-//  Authors:      (Add your name or contributors here)
-//  Created:      (Add creation date if known)
-//  Last Updated: 2026-02-23
 // -------------------------------------------------------------------------------------
 //  Test Coverage:
 //      - Multi-document streams and boundaries

@@ -12,9 +12,6 @@
 //      - Focuses on edge cases for mapping keys and flow sequence syntax.
 //      - Ensures robust handling of non-scalar mapping keys in YAML documents.
 //
-//  Authors:      (Add your name or contributors here)
-//  Created:      (Add creation date if known)
-//  Last Updated: 2026-02-23
 // -------------------------------------------------------------------------------------
 //  Test Coverage:
 //      - Flow sequences as mapping keys

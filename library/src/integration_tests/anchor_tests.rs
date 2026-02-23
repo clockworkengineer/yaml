@@ -13,9 +13,6 @@
 //      - Tests are based on YAML specification examples and custom edge cases.
 //      - Ensures compliance with YAML anchor/alias semantics and robustness.
 //
-//  Authors:      (Add your name or contributors here)
-//  Created:      (Add creation date if known)
-//  Last Updated: 2026-02-23
 // -------------------------------------------------------------------------------------
 //  Test Coverage:
 //      - Anchor names with special characters (e.g., colon)

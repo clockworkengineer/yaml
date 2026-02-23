@@ -12,9 +12,6 @@
 //      - Focuses on comprehensive spec compliance and interoperability.
 //      - Ensures robust handling of all YAML features and edge cases.
 //
-//  Authors:      (Add your name or contributors here)
-//  Created:      (Add creation date if known)
-//  Last Updated: 2026-02-23
 // -------------------------------------------------------------------------------------
 //  Test Coverage:
 //      - Canonical YAML examples from the official test suite

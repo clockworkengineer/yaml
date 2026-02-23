@@ -12,9 +12,6 @@
 //      - Focuses on end-to-end parsing of real YAML files from the test suite.
 //      - Ensures robust handling of file I/O, batch parsing, and edge cases.
 //
-//  Authors:      (Add your name or contributors here)
-//  Created:      (Add creation date if known)
-//  Last Updated: 2026-02-23
 // -------------------------------------------------------------------------------------
 //  Test Coverage:
 //      - Batch parsing of YAML files

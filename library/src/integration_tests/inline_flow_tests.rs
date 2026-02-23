@@ -12,9 +12,6 @@
 //      - Focuses on flow style (inline) collections and their parsing logic.
 //      - Ensures robust handling of inline YAML syntax and edge cases.
 //
-//  Authors:      (Add your name or contributors here)
-//  Created:      (Add creation date if known)
-//  Last Updated: 2026-02-23
 // -------------------------------------------------------------------------------------
 //  Test Coverage:
 //      - Inline mappings and sequences

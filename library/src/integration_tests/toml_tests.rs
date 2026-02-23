@@ -12,9 +12,6 @@
 //      - Ensures interoperability and correctness of TOML output from YAML data.
 //      - Focuses on both simple and nested TOML serialization scenarios.
 //
-//  Authors:      (Add your name or contributors here)
-//  Created:      (Add creation date if known)
-//  Last Updated: 2026-02-23
 // -------------------------------------------------------------------------------------
 //  Test Coverage:
 //      - String and number encoding

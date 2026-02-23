@@ -12,9 +12,6 @@
 //      - Focuses on tag resolution, type coercion, and tag preservation in parsed nodes.
 //      - Ensures robust handling of explicit and implicit tags in YAML documents.
 //
-//  Authors:      (Add your name or contributors here)
-//  Created:      (Add creation date if known)
-//  Last Updated: 2026-02-23
 // -------------------------------------------------------------------------------------
 //  Test Coverage:
 //      - Tag coercion for scalars, sequences, and mappings

@@ -12,9 +12,6 @@
 //      - Used for debugging and validating flow style parsing logic and error handling.
 //      - Ensures robust handling of flow mappings, sequences, and related edge cases.
 //
-//  Authors:      (Add your name or contributors here)
-//  Created:      (Add creation date if known)
-//  Last Updated: 2026-02-23
 // -------------------------------------------------------------------------------------
 //  Test Coverage:
 //      - Flow mappings and sequences

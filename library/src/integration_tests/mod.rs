@@ -12,9 +12,6 @@
 //      - Centralizes integration test module imports for maintainability and clarity.
 //      - Supports both standard and embedded system test configurations.
 //
-//  Authors:      (Add your name or contributors here)
-//  Created:      (Add creation date if known)
-//  Last Updated: 2026-02-23
 // -------------------------------------------------------------------------------------
 //  Module Coverage:
 //      - Parsing, serialization, and error handling tests
@@ -43,10 +40,10 @@ mod flow_sequence_key_test;
 mod flow_trailing_comma_tests;
 mod inline_flow_tests;
 mod nested_structure_tests;
+mod sequence_null_vs_empty_string_tests;
 mod set_tests;
 mod tag_coercion_tests;
 mod validation_tests;
-mod sequence_null_vs_empty_string_tests;
 
 // Embedded systems integration tests
 #[cfg(feature = "embedded")]

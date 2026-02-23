@@ -12,9 +12,6 @@
 //      - Focuses on error handling and validation for document marker placement and usage.
 //      - Ensures robust error reporting and spec compliance for document marker issues.
 //
-//  Authors:      (Add your name or contributors here)
-//  Created:      (Add creation date if known)
-//  Last Updated: 2026-02-23
 // -------------------------------------------------------------------------------------
 //  Test Coverage:
 //      - Document start marker (---) placement and formatting

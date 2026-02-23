@@ -12,9 +12,6 @@
 //      - Tags are used to indicate data types and semantics in YAML documents.
 //      - Tests ensure correct tag resolution, preservation, and node wrapping.
 //
-//  Authors:      (Add your name or contributors here)
-//  Created:      (Add creation date if known)
-//  Last Updated: 2026-02-23
 // -------------------------------------------------------------------------------------
 //  Test Coverage:
 //      - Explicit tags on block scalars (literal, folded)

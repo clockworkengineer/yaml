@@ -13,9 +13,6 @@
 //      - Directives control parsing behavior, tag resolution, and document versioning.
 //      - Tests ensure robust handling of directives and edge cases in multi-document streams.
 //
-//  Authors:      (Add your name or contributors here)
-//  Created:      (Add creation date if known)
-//  Last Updated: 2026-02-23
 // -------------------------------------------------------------------------------------
 //  Test Coverage:
 //      - %TAG and %YAML directive parsing

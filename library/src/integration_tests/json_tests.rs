@@ -12,9 +12,6 @@
 //      - Ensures interoperability and correctness of JSON output from YAML data.
 //      - Focuses on both compact and pretty-printed JSON serialization.
 //
-//  Authors:      (Add your name or contributors here)
-//  Created:      (Add creation date if known)
-//  Last Updated: 2026-02-23
 // -------------------------------------------------------------------------------------
 //  Test Coverage:
 //      - String and number encoding

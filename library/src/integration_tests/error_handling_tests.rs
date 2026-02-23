@@ -13,9 +13,6 @@
 //      - Focuses on error scenarios, malformed input, and panic safety.
 //      - Ensures comprehensive error coverage for YAML parsing and validation.
 //
-//  Authors:      (Add your name or contributors here)
-//  Created:      (Add creation date if known)
-//  Last Updated: 2026-02-23
 // -------------------------------------------------------------------------------------
 //  Test Coverage:
 //      - Syntax errors and malformed YAML

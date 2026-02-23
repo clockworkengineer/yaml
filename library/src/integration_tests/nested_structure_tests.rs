@@ -12,9 +12,6 @@
 //      - Focuses on complex and deeply nested YAML document layouts.
 //      - Ensures robust handling of recursion, nesting, and edge cases.
 //
-//  Authors:      (Add your name or contributors here)
-//  Created:      (Add creation date if known)
-//  Last Updated: 2026-02-23
 // -------------------------------------------------------------------------------------
 //  Test Coverage:
 //      - Nested sequences and mappings

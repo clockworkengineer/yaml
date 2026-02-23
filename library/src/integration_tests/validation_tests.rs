@@ -12,9 +12,6 @@
 //      - Focuses on validation of YAML documents for spec compliance and error reporting.
 //      - Ensures robust handling of invalid input and edge cases.
 //
-//  Authors:      (Add your name or contributors here)
-//  Created:      (Add creation date if known)
-//  Last Updated: 2026-02-23
 // -------------------------------------------------------------------------------------
 //  Test Coverage:
 //      - Indentation and whitespace validation

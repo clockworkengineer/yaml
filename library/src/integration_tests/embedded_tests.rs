@@ -12,9 +12,6 @@
 //      - Focuses on scenarios relevant to embedded systems and minimal environments.
 //      - Ensures robust parsing, validation, and error handling for embedded use cases.
 //
-//  Authors:      (Add your name or contributors here)
-//  Created:      (Add creation date if known)
-//  Last Updated: 2026-02-23
 // -------------------------------------------------------------------------------------
 //  Test Coverage:
 //      - Simple and nested YAML structures

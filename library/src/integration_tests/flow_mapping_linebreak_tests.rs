@@ -12,9 +12,6 @@
 //      - Focuses on edge cases for flow mapping formatting and line breaks.
 //      - Ensures robust handling of non-standard but valid YAML formatting.
 //
-//  Authors:      (Add your name or contributors here)
-//  Created:      (Add creation date if known)
-//  Last Updated: 2026-02-23
 // -------------------------------------------------------------------------------------
 //  Test Coverage:
 //      - Flow mappings with line breaks

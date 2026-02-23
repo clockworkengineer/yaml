@@ -12,9 +12,6 @@
 //      - Focuses on flow sequence syntax and error handling for malformed input.
 //      - Ensures robust error reporting and spec compliance for comma-related issues.
 //
-//  Authors:      (Add your name or contributors here)
-//  Created:      (Add creation date if known)
-//  Last Updated: 2026-02-23
 // -------------------------------------------------------------------------------------
 //  Test Coverage:
 //      - Leading, trailing, and double commas in sequences

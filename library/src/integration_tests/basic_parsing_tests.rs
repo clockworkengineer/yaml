@@ -13,9 +13,6 @@
 //      - Tests are based on YAML spec examples and custom scenarios.
 //      - Ensures robust handling of basic YAML syntax and edge cases.
 //
-//  Authors:      (Add your name or contributors here)
-//  Created:      (Add creation date if known)
-//  Last Updated: 2026-02-23
 // -------------------------------------------------------------------------------------
 //  Test Coverage:
 //      - Literal and folded block scalars
