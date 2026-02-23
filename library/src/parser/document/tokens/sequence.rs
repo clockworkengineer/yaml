@@ -124,16 +124,71 @@ pub fn parse_sequence_with_tokens(
         let is_dash = matches!(stream.current(), Some(Token::Dash));
         if is_dash {
             stream.next()?;
-            // Skip whitespace after dash, but preserve Indent tokens for dedent detection
-            // Only skip newlines and comments here
-            stream.skip_newlines_and_comments()?;
+            // Check for empty sequence item (dash followed by newline or EOF)
+            // Don't skip whitespace here - we need to check for newline first
             match stream.current() {
-                Some(Token::Newline) | None => {
+                Some(Token::Newline) => {
+                    // We have a newline after the dash. Check if there's indented content after it.
+                    stream.next()?;  // Consume the newline
+                    // Now check if there's an Indent token indicating nested content
+                    match stream.current() {
+                        Some(Token::Indent(level)) if *level > current_indent => {
+                            // There's indented content after the dash - this is NOT an empty item
+                            // Put the stream state back and fall through to parse the value
+                            // Actually, we can't put it back, so just parse the indented content
+                            let indent = *level;
+                            stream.next()?;
+                            if matches!(stream.current(), Some(Token::Dash)) {
+                                // Nested sequence
+                                stack.push((indent, Vec::new()));
+                                continue;
+                            } else {
+                                // Parse as mapping or other value
+                                use crate::parser::document::tokens::mapping::parse_mapping_with_tokens;
+                                let mapping =
+                                    parse_mapping_with_tokens(stream, indent, directives, depth + 1)?;
+                                if let Some((_, items)) = stack.last_mut() {
+                                    items.push(mapping);
+                                }
+                            }
+                        }
+                        _ => {
+                            // No indented content after the newline - this IS an empty item
+                            if let Some((_, items)) = stack.last_mut() {
+                                items.push(Node::None);
+                            }
+                            // Continue to next iteration after handling empty item
+                            continue;
+                        }
+                    }
+                }
+                None => {
+                    // EOF after dash - empty item
                     if let Some((_, items)) = stack.last_mut() {
                         items.push(Node::None);
                     }
-                    if let Some(Token::Newline) = stream.current() {
-                        stream.next()?;
+                    continue;
+                }
+                Some(Token::Comment(_)) => {
+                    // Skip any comments after the dash
+                    stream.skip_newlines_and_comments()?;
+                    // After skipping comments, check again for empty item
+                    match stream.current() {
+                        Some(Token::Newline) | None => {
+                            if let Some((_, items)) = stack.last_mut() {
+                                items.push(Node::None);
+                            }
+                            if let Some(Token::Newline) = stream.current() {
+                                stream.next()?;
+                            }
+                        }
+                        _ => {
+                            // Parse the value after the comment
+                            let value = parse_value_with_tokens(stream, directives, depth + 1)?;
+                            if let Some((_, items)) = stack.last_mut() {
+                                items.push(value);
+                            }
+                        }
                     }
                 }
                 Some(Token::Dash) => {
@@ -162,6 +217,9 @@ pub fn parse_sequence_with_tokens(
                     if indent > current_indent && matches!(stream.current(), Some(Token::Dash)) {
                         // New nested sequence: push to stack
                         stack.push((indent, Vec::new()));
+                        continue;
+                    } else if indent == current_indent && matches!(stream.current(), Some(Token::Dash)) {
+                        // Another dash at the same indent level - continue sequence
                         continue;
                     } else if indent >= current_indent {
                         use crate::parser::document::tokens::mapping::parse_mapping_with_tokens;
