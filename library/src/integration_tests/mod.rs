@@ -46,6 +46,7 @@ mod nested_structure_tests;
 mod set_tests;
 mod tag_coercion_tests;
 mod validation_tests;
+mod sequence_null_vs_empty_string_tests;
 
 // Embedded systems integration tests
 #[cfg(feature = "embedded")]
