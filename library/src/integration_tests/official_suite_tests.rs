@@ -375,12 +375,25 @@ literal: |
         let yaml = b"---\n- \n- \n\n";
         let node = parse_expect_ok(yaml, "Failed to parse empty sequence items");
 
-        let arr = get_first_array_from_document(&node).expect("Expected Array as first document element in Document");
-        assert_eq!(arr.len(), 2, "Array should have 2 items");
+        let arr = get_first_array_from_document(&node).unwrap_or_else(|| {
+            panic!(
+                "Expected Array as first document element in Document, got node: {:#?}",
+                node
+            )
+        });
+        assert_eq!(
+            arr.len(),
+            2,
+            "Array should have 2 items, got array: {:#?}",
+            arr
+        );
         for (i, item) in arr.iter().enumerate() {
             match item {
                 Node::None => {}
-                other => panic!("Item {} should be Null, got {:?}", i, other),
+                other => panic!(
+                    "Item {} should be Null (Node::None), got: {:#?}\nFull array: {:#?}",
+                    i, other, arr
+                ),
             }
         }
     }
