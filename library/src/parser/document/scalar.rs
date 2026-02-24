@@ -1,4 +1,3 @@
-
 //! Scalar Parsing Logic
 //!
 //! Implements detection and parsing of YAML scalars, including block and plain scalars.

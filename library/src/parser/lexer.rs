@@ -1,16 +1,21 @@
-//! YAML Lexer / Tokenizer
-//!
-//! Implements the tokenization layer for YAML parsing, sitting between the character source
-//! and the parser. Pre-processes decorators (tags, anchors), identifies token boundaries,
-//! and simplifies the parser by avoiding infinite lookahead loops.
-//!
-//! Copyright (c) 2026 YAML Library Developers
+use crate::lexer_debug;
+
+/**
+ * YAML Lexer / Tokenizer
+ *
+ * Implements the tokenization layer for YAML parsing, sitting between the character source
+ * and the parser. Pre-processes decorators (tags, anchors), identifies token boundaries,
+ * and simplifies the parser by avoiding infinite lookahead loops.
+ *
+ * Copyright (c) 2026 YAML Library Developers
+ */
 
 use crate::constants::*;
 use crate::io::traits::ISource;
 use crate::parser::utils::error_helpers;
 use crate::parser::utils::token_scan;
 
+// Macro for debug logging in the lexer
 // Helper for tag delimiter logic to avoid borrow checker issues
 fn is_tag_delimiter(source: &mut dyn ISource, ch: char) -> bool {
     if ch == CHAR_COLON {

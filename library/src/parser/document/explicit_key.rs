@@ -106,7 +106,9 @@ pub(crate) fn parse_explicit_mapping_entry(
         // Use stream.current() for error context since TokenStream.lexer is private
         let cur = stream.current().cloned();
         return Err(
-            crate::parser::document::errors::mapping_errors::expected_explicit_key_token(stream, cur),
+            crate::parser::document::errors::mapping_errors::expected_explicit_key_token(
+                stream, cur,
+            ),
         );
     }
     stream.next()?;

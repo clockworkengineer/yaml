@@ -31,4 +31,5 @@ pub mod lexer;
 pub mod token_stream;
 
 /// Shared parser utilities
+#[macro_use]
 pub mod utils;

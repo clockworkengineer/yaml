@@ -1,12 +1,13 @@
-//! Anchor Collection & Validation
-//!
-//! Provides functions for collecting, validating, and managing YAML anchors in document trees.
-//! Ensures anchor uniqueness, non-emptiness, and supports anchor lookup for alias resolution.
-//!
-//! Copyright (c) 2026 YAML Library Developers
-
 use crate::anchors_debug;
 
+/**
+ * Anchor Collection & Validation
+ *
+ * Provides functions for collecting, validating, and managing YAML anchors in document trees.
+ * Ensures anchor uniqueness, non-emptiness, and supports anchor lookup for alias resolution.
+ *
+ * Copyright (c) 2026 YAML Library Developers
+ */
 use crate::nodes::node::Node;
 use crate::parser::ParseResult;
 use crate::parser::utils::error_helpers;
