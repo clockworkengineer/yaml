@@ -1,9 +1,12 @@
-//! Token Error Helpers
-//!
-//! Centralizes error construction for token-related parsing errors in YAML, providing helpers
-//! for expected tokens, scalars, and other token stream expectations.
-//!
-//! Copyright (c) 2026 YAML Library Developers
+
+/*
+ * Token Error Helpers
+ *
+ * Centralizes error construction for token-related parsing errors in YAML, providing helpers
+ * for expected tokens, scalars, and other token stream expectations.
+ *
+ * Copyright (c) 2026 YAML Library Developers
+ */
 
 use crate::error::YamlError;
 use crate::io::traits::ISource;

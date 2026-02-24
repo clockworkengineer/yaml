@@ -1,9 +1,12 @@
-//! Anchor & Alias Error Helpers
-//!
-//! Centralizes error construction for YAML anchors and aliases, providing helpers
-//! for consistent error messages and easier future maintenance.
-//!
-//! Copyright (c) 2026 YAML Library Developers
+
+/*
+ * Anchor & Alias Error Helpers
+ *
+ * Centralizes error construction for YAML anchors and aliases, providing helpers
+ * for consistent error messages and easier future maintenance.
+ *
+ * Copyright (c) 2026 YAML Library Developers
+ */
 
 use crate::parser::token_stream::TokenStream;
 
