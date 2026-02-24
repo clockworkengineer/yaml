@@ -1,3 +1,11 @@
+
+//! Document Contents Parsing
+//!
+//! Implements parsing logic for YAML document contents, including error construction macros,
+//! indentation validation, and handling of explicit keys, block heads, and document markers.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 /// Macro for common error construction
 macro_rules! parse_err {
     ($msg:expr) => {

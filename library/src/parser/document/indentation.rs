@@ -1,13 +1,10 @@
-//! Module: parser/document/indentation.rs
+//! Indentation Validation Helpers
 //!
-//! Centralizes indentation validation policies so future changes to
-//! indentation rules can be made in one place without touching many
-//! parser call sites.
+//! Centralizes indentation validation policies for YAML parsing, allowing future changes
+//! to indentation rules in one place. Provides helpers for producing structured `YamlError`s
+//! with source context and context-aware variants leveraging `ParsingContext`.
 //!
-//! This module provides small helpers that produce structured `YamlError`s
-//! via the shared error builder, including source context (current char,
-//! indent level). It also offers context-aware variants that can leverage
-//! `ParsingContext` when needed.
+//! Copyright (c) 2026 YAML Library Developers
 
 use crate::error::{ErrorKind, YamlError};
 use crate::io::traits::ISource;

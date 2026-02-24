@@ -1,3 +1,10 @@
+//! Node Utilities for Document Parsing
+//!
+//! Provides helpers for node normalization and construction during YAML document parsing.
+//! Includes normalization of nodes for mapping keys and re-exports construction helpers.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 use crate::nodes::node::Node;
 
 // Re-export node construction helpers from nodes::node_utils

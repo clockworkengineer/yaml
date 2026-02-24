@@ -1,3 +1,11 @@
+
+//! Document Parsing Entry Points
+//!
+//! Provides entry points and core logic for parsing YAML documents, handling directives,
+//! document markers, and integration with helpers and main parsing loop.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::nodes::node::Node::Document;

@@ -1,3 +1,11 @@
+//! Document Parsing Helpers
+//!
+//! Provides parsing, validation, and utility helpers for YAML document parsing.
+//! Includes entry points for error construction, token stream setup, whitespace/comment skipping,
+//! mapping key lookahead, block head classification, indentation validation, and comment parsing.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 // DRY NOTE: All comment parsing and comment spacing validation must use parse_comment_token and validate_comment_spacing_token below.
 //
 // HELPERS DOCUMENTATION
@@ -123,9 +131,7 @@ pub(crate) fn classify_doc_marker(
 /// when non-empty content starting at the current position is found,
 /// or None when there is no tag-like content.
 #[inline]
-pub(crate) fn peek_tag_after_doc_start(
-    source: &mut dyn ISource,
-) -> Option<String> {
+pub(crate) fn peek_tag_after_doc_start(source: &mut dyn ISource) -> Option<String> {
     let st_tag = source.save_state();
     let mut tag_raw = String::new();
     while let Some(ch) = source.current() {
@@ -194,7 +200,12 @@ pub(crate) fn parse_document_markers(
             // Skip the anchor
             source.next(); // skip '&'
             while let Some(ch) = source.current() {
-                if is_horizontal_space(ch) || ch == '&' || ch.is_alphanumeric() || ch == '_' || ch == '-' {
+                if is_horizontal_space(ch)
+                    || ch == '&'
+                    || ch.is_alphanumeric()
+                    || ch == '_'
+                    || ch == '-'
+                {
                     source.next();
                 } else {
                     break;

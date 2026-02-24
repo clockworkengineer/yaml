@@ -1,3 +1,10 @@
+//! YAML Tree Validation
+//!
+//! Provides strict validation for parsed YAML node trees, ensuring compliance with
+//! the YAML specification and test suite requirements. Should be called after parsing.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 // Strict validation pass for YAML node tree after parsing
 // This function should be called after parsing to ensure the node tree is valid
 // according to YAML spec and test suite requirements.

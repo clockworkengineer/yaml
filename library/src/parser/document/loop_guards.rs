@@ -1,7 +1,10 @@
-//! Module: parser/document/loop_guards.rs
+//! Loop Guard Macros & Utilities
 //!
-//! Provides macros and utilities for safe loop iteration in parsing functions.
-//! These guards prevent infinite loops and resource exhaustion attacks.
+//! Provides macros and utilities for safe loop iteration in YAML parsing functions,
+//! preventing infinite loops and resource exhaustion attacks. Includes configurable
+//! limits for iterations, sequence items, and mapping pairs.
+//!
+//! Copyright (c) 2026 YAML Library Developers
 
 /// Default maximum number of loop iterations for parsing loops.
 /// This prevents infinite loops in case of malformed input or parser bugs.

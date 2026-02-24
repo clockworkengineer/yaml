@@ -1,3 +1,10 @@
+//! Mapping Tokens & Parsing
+//!
+//! Contains functions and helpers for parsing YAML mapping tokens and handling
+//! indented/nested values, block sequences, and compliance errors.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 /// Parses a value that is indented relative to the current mapping key.
 /// Distinguishes between block sequences and nested mappings, and handles YAML compliance errors.
 /// Handles indented/nested value after a mapping key.
@@ -174,7 +181,9 @@ impl MappingParseContext {
                 }
             }
 
-            if let Some(result) = self.handle_special_tokens(stream, current_indent, &token, depth)? {
+            if let Some(result) =
+                self.handle_special_tokens(stream, current_indent, &token, depth)?
+            {
                 return Ok(result);
             }
             if let Some(pair) = self.try_parse_and_insert_pair(

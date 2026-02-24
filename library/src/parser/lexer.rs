@@ -1,8 +1,10 @@
-//! Lexer/Tokenizer for YAML parsing
+//! YAML Lexer / Tokenizer
 //!
-//! This module provides a tokenization layer that sits between the character source
-//! and the parser. It pre-processes decorators (tags, anchors) and identifies token
-//! boundaries, making the parser simpler and avoiding infinite loops in lookahead.
+//! Implements the tokenization layer for YAML parsing, sitting between the character source
+//! and the parser. Pre-processes decorators (tags, anchors), identifies token boundaries,
+//! and simplifies the parser by avoiding infinite lookahead loops.
+//!
+//! Copyright (c) 2026 YAML Library Developers
 
 use crate::constants::*;
 use crate::io::traits::ISource;

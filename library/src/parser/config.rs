@@ -1,6 +1,9 @@
-//! Parser configuration with builder pattern
+//! Parser Configuration & Builder
 //!
-//! Provides a fluent API for customizing YAML parser behavior.
+//! Provides configuration options and a fluent builder API for customizing YAML parser behavior.
+//! Supports setting limits, toggling features, and adapting to different environments.
+//!
+//! Copyright (c) 2026 YAML Library Developers
 
 #[cfg(feature = "std")]
 use std::string::String;
@@ -417,9 +420,9 @@ mod tests {
         let err = result.unwrap_err();
         let err_str = err.to_string();
         assert!(
-            err_str.contains("Custom depth error") ||
-            err_str.contains("maximum parser depth") ||
-            err_str.contains("Validation error"),
+            err_str.contains("Custom depth error")
+                || err_str.contains("maximum parser depth")
+                || err_str.contains("Validation error"),
             "Error message: {}",
             err_str
         );

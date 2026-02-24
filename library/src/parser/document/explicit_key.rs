@@ -1,3 +1,10 @@
+//! Explicit Key Parsing Helpers
+//!
+//! Provides helpers and utilities for parsing explicit keys in YAML mappings,
+//! including token stream setup, loop guards, and normalization routines.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 /// Helper to initialize a TokenStream and skip initial trivia for explicit key parsing.
 fn setup_token_stream<'a>(
     source: &'a mut dyn ISource,

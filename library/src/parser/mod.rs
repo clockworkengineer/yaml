@@ -1,3 +1,11 @@
+
+//! YAML Parser Module
+//!
+//! Aggregates core modules for YAML parsing, including document parsing, configuration,
+//! directive handling, and lexing/tokenization. Provides the common result type for parser operations.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 /// Common result type for parser operations using the library-wide YamlError.
 ///
 /// This is an internal alias to keep signatures concise while

@@ -1,14 +1,16 @@
-//! Token-based sequence parser
+//! Sequence Token Parsing
 //!
-//! Parses YAML sequences using tokenization instead of character-based lookahead.
-//! This eliminates infinite loops with decorators and simplifies the logic.
+//! Implements token-based parsing for YAML sequences, eliminating infinite loops
+//! with decorators and simplifying sequence parsing logic.
+//!
+//! Copyright (c) 2026 YAML Library Developers
 
 use crate::nodes::node::Node;
 use crate::parser::directives::DirectiveContext;
+use crate::parser::document::flow_punctuation;
 use crate::parser::document::tokens::value::parse_value_with_tokens;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
-use crate::parser::document::flow_punctuation;
 
 /// Parse a block sequence using tokens
 ///
@@ -45,12 +47,15 @@ pub fn parse_sequence_with_tokens(
         base_indent,
         depth
     );
-    use crate::utils::optimization::{NodeBuilder, CapacityHints};
+    use crate::utils::optimization::{CapacityHints, NodeBuilder};
     // Use a small capacity profile for typical sequences
     let node_builder = NodeBuilder::with_hints(CapacityHints::small());
     let mut stack: Vec<(usize, Vec<Node>)> = Vec::new();
     // Pre-allocate sequence items using NodeBuilder
-    stack.push((base_indent, Vec::with_capacity(node_builder.hints().sequence_items)));
+    stack.push((
+        base_indent,
+        Vec::with_capacity(node_builder.hints().sequence_items),
+    ));
 
     // Skip initial trivia (whitespace, comments)
     stream.skip_trivia()?;
@@ -90,7 +95,9 @@ pub fn parse_sequence_with_tokens(
                 }
                 Some(Token::DocumentEnd) => {
                     // Document end marker - validate no content after it on same line
-                    crate::parser::document::helpers::validate_trailing_content_after_document_end(stream)?;
+                    crate::parser::document::helpers::validate_trailing_content_after_document_end(
+                        stream,
+                    )?;
                     let (_, items) = stack.pop().unwrap();
                     if items.is_empty() {
                         return Ok(Node::None);
@@ -129,7 +136,7 @@ pub fn parse_sequence_with_tokens(
             match stream.current() {
                 Some(Token::Newline) => {
                     // We have a newline after the dash. Check if there's indented content after it.
-                    stream.next()?;  // Consume the newline
+                    stream.next()?; // Consume the newline
                     // Now check if there's an Indent token indicating nested content
                     match stream.current() {
                         Some(Token::Indent(level)) if *level > current_indent => {
@@ -145,8 +152,12 @@ pub fn parse_sequence_with_tokens(
                             } else {
                                 // Parse as mapping or other value
                                 use crate::parser::document::tokens::mapping::parse_mapping_with_tokens;
-                                let mapping =
-                                    parse_mapping_with_tokens(stream, indent, directives, depth + 1)?;
+                                let mapping = parse_mapping_with_tokens(
+                                    stream,
+                                    indent,
+                                    directives,
+                                    depth + 1,
+                                )?;
                                 if let Some((_, items)) = stack.last_mut() {
                                     items.push(mapping);
                                 }
@@ -218,7 +229,9 @@ pub fn parse_sequence_with_tokens(
                         // New nested sequence: push to stack
                         stack.push((indent, Vec::new()));
                         continue;
-                    } else if indent == current_indent && matches!(stream.current(), Some(Token::Dash)) {
+                    } else if indent == current_indent
+                        && matches!(stream.current(), Some(Token::Dash))
+                    {
                         // Another dash at the same indent level - continue sequence
                         continue;
                     } else if indent >= current_indent {

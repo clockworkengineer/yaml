@@ -1,3 +1,10 @@
+//! YAML Directives Parsing
+//!
+//! Implements parsing logic for YAML directives (%YAML, %TAG) at the start of documents.
+//! Handles version specification, tag shorthands, and reserved directives.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 use crate::error::YamlError;
 use crate::parser::document::directive_errors::DirectiveErrors;
 use crate::utils::is_line_terminator;
@@ -140,7 +147,10 @@ impl DirectiveContext {
         // Accept but warn on future minor versions (treat as 1.2 behavior)
         if minor > 2 {
             #[cfg(feature = "std")]
-            eprintln!("Warning: Unrecognized YAML minor version {}. Proceeding as YAML 1.2.", minor);
+            eprintln!(
+                "Warning: Unrecognized YAML minor version {}. Proceeding as YAML 1.2.",
+                minor
+            );
         }
         self.yaml_version = Some((major, minor));
         Ok(())

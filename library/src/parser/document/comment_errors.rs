@@ -1,3 +1,10 @@
+//! Comment Error Helpers
+//!
+//! Centralizes error construction for YAML comment parsing, providing helpers
+//! for consistent error messages and easier future maintenance.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 use crate::error::YamlError;
 use crate::io::traits::ISource;
 use crate::parser::document::error_builder::syntax_error;

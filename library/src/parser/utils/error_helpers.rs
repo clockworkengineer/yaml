@@ -1,3 +1,11 @@
+
+//! Error Helper Functions
+//!
+//! Provides helper functions for constructing common YAML parsing errors, including
+//! empty anchor names, undefined anchors, and merge source validation.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 /// Error helper for empty anchor name
 #[allow(dead_code)]
 pub fn empty_anchor_name() -> crate::error::YamlError {

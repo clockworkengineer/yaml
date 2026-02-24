@@ -1,4 +1,9 @@
-//! Module: parser/utils/mod.rs
+//! Parser Utility Modules
+//!
+//! Aggregates utility modules for YAML parsing, including helpers for comments, errors,
+//! indentation, token scanning, visiting, and whitespace handling.
+//!
+//! Copyright (c) 2026 YAML Library Developers
 
 pub mod comments;
 pub mod error_helpers;

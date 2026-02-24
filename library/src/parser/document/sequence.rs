@@ -1,5 +1,11 @@
+//! Sequence Parsing Logic
+//!
+//! Implements parsing logic for YAML sequences (arrays), handling sequence items,
+//! nested sequences, comments, document boundaries, and indentation tracking.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 use crate::parser::ParseResult;
-/// Module: parser/document/sequence.rs
 // ...existing code...
 use crate::parser::token_stream::TokenStream;
 use crate::{combined_loop_guard, loop_guard_init};

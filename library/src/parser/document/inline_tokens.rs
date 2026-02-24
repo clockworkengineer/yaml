@@ -1,3 +1,10 @@
+//! Inline Token Parsing Helpers
+//!
+//! Provides parsing logic and helpers for handling inline YAML collections (sequences and mappings),
+//! including special cases like double-colon scalars. All error construction uses centralized helpers.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 // DRY NOTE: All error construction in this file must use centralized helpers from error_builder.rs (e.g., syntax_error, structure_error, mapping_key_error_yaml, etc.).
 // Do not return raw error strings or construct errors directly.
 /// DRY ENTRY POINT: Parses a value or key in inline collections, handling special cases like double-colon scalars.

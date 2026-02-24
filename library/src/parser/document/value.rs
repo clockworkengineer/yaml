@@ -1,4 +1,10 @@
-//! Module: parser/document/value.rs
+//! Value Parsing Logic
+//!
+//! Implements parsing logic for YAML values, handling tags, anchors, aliases, inline collections,
+//! quoted scalars, and plain scalars. Integrates with directive context for tag resolution and
+//! supports type coercion and anchor/alias resolution.
+//!
+//! Copyright (c) 2026 YAML Library Developers
 
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
@@ -30,7 +36,6 @@ pub(crate) fn parse_value(
     // - Decorators on empty values (FH7J, PW8X)
     // - Flow collections (better token boundaries)
     // - Aliases (simpler token handling)
-
 
     use crate::parser::document::tokens::value::parse_value_with_tokens;
     use crate::parser::token_stream::TokenStream;

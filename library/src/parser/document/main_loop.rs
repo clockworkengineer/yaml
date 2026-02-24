@@ -1,3 +1,10 @@
+//! Main Parsing Loop
+//!
+//! Implements the main loop for YAML document parsing, handling document markers,
+//! content parsing, and integration with directives and helpers.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::nodes::node::Node::Document;

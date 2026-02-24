@@ -1,8 +1,15 @@
-/// Module: parser/document/mapping.rs
+//! Mapping Parsing Logic
+//!
+//! Implements parsing logic for YAML mappings (dictionaries), handling key-value pairs,
+//! complex keys, nested mappings, comments, and indentation. Integrates with token-based
+//! mapping parsing and directive context for tag resolution.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
-use crate::parser::document::tokens::mapping::parse_mapping_with_tokens;
 use crate::parser::ParseResult;
+use crate::parser::document::tokens::mapping::parse_mapping_with_tokens;
 // ...existing code...
 
 /// Parses a YAML mapping (dictionary) with the specified indentation level.

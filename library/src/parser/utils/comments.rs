@@ -1,13 +1,15 @@
-//! Module: parser/utils/comments.rs
+//! Comment Handling Helpers
 //!
-//! Shared helpers for comment handling and comment+indentation
-//! validation at the document level.
+//! Provides shared helpers for comment handling and comment+indentation validation
+//! at the YAML document level. Ensures proper comment placement and indentation.
+//!
+//! Copyright (c) 2026 YAML Library Developers
 
 use crate::error::YamlError;
 use crate::io::traits::ISource;
+use crate::parser::ParseResult;
 use crate::parser::directives::DirectiveContext;
 use crate::parser::token_stream::TokenStream;
-use crate::parser::ParseResult;
 
 /// Validate that a top-level comment line is not followed by
 /// improperly indented value-like content (e.g., 8XDJ-style
@@ -56,11 +58,10 @@ pub(crate) fn validate_top_level_comment_followed_by_indented_content(
                     | Some(crate::parser::lexer::Token::DoubleQuoted(_))
                     | Some(crate::parser::lexer::Token::FlowMappingStart)
                     | Some(crate::parser::lexer::Token::FlowSequenceStart) => {
-                        let msg =
-                            crate::parser::document::helpers::parse_error_token(
-                                &stream,
-                                "Unexpected indented content after top-level comment.",
-                            );
+                        let msg = crate::parser::document::helpers::parse_error_token(
+                            &stream,
+                            "Unexpected indented content after top-level comment.",
+                        );
                         return Err(YamlError::from(msg));
                     }
                     _ => {}

@@ -1,3 +1,10 @@
+//! Token Scanning Helpers
+//!
+//! Provides generic functions for scanning tokens with leading characters and delimiters,
+//! reducing duplication in tag, anchor, and alias scanning logic.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 /// Shared generic function for scanning tokens with a leading character and a set of delimiters.
 /// Used to reduce duplication in scan_tag, scan_anchor, scan_alias, etc.
 pub fn scan_token_with_leading<F, G, T>(

@@ -1,3 +1,11 @@
+
+//! Directive Error Helpers
+//!
+//! Centralizes error construction for YAML directive parsing, providing helpers
+//! for consistent error messages and easier future maintenance.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 use crate::error::{ErrorKind, YamlError};
 
 /// Centralized constructors for directive-related errors and messages.

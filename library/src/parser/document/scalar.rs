@@ -1,3 +1,11 @@
+
+//! Scalar Parsing Logic
+//!
+//! Implements detection and parsing of YAML scalars, including block and plain scalars.
+//! Provides helpers for block scalar header parsing and plain scalar handling.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 /// Shared helper for block scalar and plain scalar detection and parsing
 use crate::constants::{CHAR_DASH, CHAR_GREATER_THAN, CHAR_SPACE, CHAR_VERTICAL_BAR};
 use crate::error::YamlError;

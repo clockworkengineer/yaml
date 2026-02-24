@@ -1,5 +1,12 @@
+//! YAML Document Parsing Modules
+//!
+//! Aggregates modules for parsing YAML documents, including sequences, mappings, scalars,
+//! anchors, aliases, directives, and document boundaries. Provides utilities for normalization
+//! and management of parsed nodes and document structure.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 pub mod anchor_errors;
-pub mod validate_tree;
 ///
 /// Modules for parsing YAML documents.
 ///
@@ -30,6 +37,7 @@ mod scalar;
 mod sequence;
 pub mod token_errors;
 mod tokens;
+pub mod validate_tree;
 mod value;
 
 pub use parse::parse;

@@ -1,3 +1,10 @@
+//! Flow Punctuation Helpers
+//!
+//! Provides helpers for handling punctuation in YAML flow collections, including
+//! error construction for missing commas or end markers in sequences and mappings.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 use crate::error::YamlError;
 use crate::io::traits::ISource;
 use crate::parser::ParseResult;

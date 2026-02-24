@@ -1,6 +1,11 @@
-//! Centralized logging macro for the lexer
+
+//! Lexer Debug Logging Macro
 //!
-//! This macro wraps conditional logging for token emission and debug output.
+//! Provides a macro for centralized debug logging in the YAML lexer, wrapping conditional
+//! logging for token emission and debug output. Enabled only when the `debug-trace` feature is active.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 
 #[macro_export]
 macro_rules! lexer_debug {

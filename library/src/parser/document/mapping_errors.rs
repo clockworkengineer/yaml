@@ -1,3 +1,10 @@
+//! Mapping Error Helpers
+//!
+//! Centralizes error construction for YAML mapping parsing, providing helpers
+//! for consistent error messages and easier future maintenance.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 use crate::error::YamlError;
 use crate::error::enhanced::{EnhancedError, ErrorCode};
 use crate::parser::token_stream::TokenStream;

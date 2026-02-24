@@ -1,7 +1,9 @@
-//! Token-based value parser (proof of concept)
+//! Value Token Parsing
 //!
-//! This demonstrates how the tokenization approach solves the decorator parsing
-//! problem and eliminates infinite loops.
+//! Implements token-based parsing for YAML values, demonstrating how tokenization
+//! solves decorator parsing problems and eliminates infinite loops.
+//!
+//! Copyright (c) 2026 YAML Library Developers
 
 // ...existing code...
 use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
@@ -225,10 +227,12 @@ pub fn parse_value_with_tokens(
     depth: usize,
 ) -> crate::parser::ParseResult<Node> {
     if depth > MAX_NESTING_DEPTH {
-        return Err(crate::parser::document::token_errors::unexpected_token_in_value(
-            stream.source_mut(),
-            &Token::Plain("Nesting too deep: possible malicious or malformed YAML".to_string()),
-        ));
+        return Err(
+            crate::parser::document::token_errors::unexpected_token_in_value(
+                stream.source_mut(),
+                &Token::Plain("Nesting too deep: possible malicious or malformed YAML".to_string()),
+            ),
+        );
     }
     #[cfg(feature = "debug-trace")]
     log::debug!(
@@ -359,7 +363,11 @@ pub fn parse_value_with_tokens(
                 None => true,
             }
         {
-            return Err(crate::parser::document::token_errors::unexpected_comma_after_tag_in_block_value(stream.source_mut()));
+            return Err(
+                crate::parser::document::token_errors::unexpected_comma_after_tag_in_block_value(
+                    stream.source_mut(),
+                ),
+            );
         }
         match stream.current() {
             Some(Token::Eof)
@@ -562,10 +570,16 @@ pub fn parse_value_with_tokens(
             // If the decorated value resolved to an alias, treat this as a
             // structural error rather than accepting an anchored alias.
             if matches!(result, Node::Alias(_)) {
-                return Err(crate::parser::document::anchor_errors::AnchorErrors::invalid_anchored_alias(stream));
+                return Err(
+                    crate::parser::document::anchor_errors::AnchorErrors::invalid_anchored_alias(
+                        stream,
+                    ),
+                );
             }
             if matches!(result, Node::Anchored(_, _)) {
-                return Err(crate::parser::document::anchor_errors::AnchorErrors::multiple_anchors(stream));
+                return Err(
+                    crate::parser::document::anchor_errors::AnchorErrors::multiple_anchors(stream),
+                );
             }
             result = Node::Anchored(Box::new(result), anchor_name);
         }
