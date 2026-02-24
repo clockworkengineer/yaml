@@ -1,6 +1,9 @@
-//! Debug utilities for YAML development
+//! Debugging utilities for YAML library development.
 //!
-//! Provides debugging tools including breakpoints, logging, and trace capabilities.
+//! This module provides debug levels, context tracking, and helper functions
+//! for internal development and troubleshooting of the YAML library.
+//!
+//! (c) 2026 YAML Library Developers
 
 use alloc::format;
 use alloc::string::String;

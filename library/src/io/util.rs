@@ -1,5 +1,11 @@
-//! Shared IO helpers for buffer and file sources/destinations
-use std::io::{Read, Write, Result};
+//! Shared I/O Utilities
+//!
+//! Provides helper functions for reading and writing bytes and strings to and from
+//! buffer and file sources/destinations. Used throughout the YAML I/O modules.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
+use std::io::{Read, Result, Write};
 
 /// Read all bytes from a reader into a Vec<u8>
 pub fn read_all<R: Read>(mut reader: R) -> Result<Vec<u8>> {

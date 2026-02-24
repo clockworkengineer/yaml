@@ -1,4 +1,11 @@
-//! Module: misc/mod.rs
+
+//! Miscellaneous Utilities Module
+//!
+//! Provides miscellaneous helpers for YAML processing, including version retrieval
+//! and document counting utilities. Used for general-purpose tasks not covered by other modules.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 
 use crate::Node;
 

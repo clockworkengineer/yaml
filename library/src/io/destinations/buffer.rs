@@ -1,4 +1,9 @@
-//! Module: io/destinations/buffer.rs
+//! Buffer Destination for Encoded Output
+//!
+//! Provides a memory buffer implementation for storing encoded YAML or JSON data as bytes.
+//! Implements the `IDestination` trait for writing and manipulating byte content in memory.
+//!
+//! Copyright (c) 2026 YAML Library Developers
 
 use crate::io::traits::IDestination;
 /// A memory buffer implementation for storing encoded JSON data as bytes.

@@ -1,4 +1,11 @@
-//! Module: io/sources/file.rs
+
+//! File Source for Decoded Input
+//!
+//! Provides a file-based source for reading YAML or JSON data from disk.
+//! Implements the `ISource` trait and file operations for traversing and reading byte content from files.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 
 use crate::io::traits::ISource;
 use std::fs::File as StdFile;

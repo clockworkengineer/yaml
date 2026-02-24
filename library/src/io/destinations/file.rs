@@ -1,4 +1,11 @@
-//! Module: io/destinations/file.rs
+
+//! File Destination for Encoded Output
+//!
+//! Provides a file-based destination for writing encoded YAML or JSON data to disk.
+//! Implements the `IDestination` trait and file operations for storing and manipulating encoded data.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 
 use crate::io::traits::IDestination;
 use std::fs::File as StdFile;

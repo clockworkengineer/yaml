@@ -1,11 +1,13 @@
-//! Enhanced error handling with suggestions, recovery, and rich context
+//! Enhanced Error Handling Module
 //!
-//! This module provides advanced error handling features including:
-//! - Error suggestions ("did you mean...?")
-//! - Error recovery strategies
+//! Provides advanced error handling for YAML parsing and processing, including:
+//! - Suggestions ("did you mean...?")
+//! - Recovery strategies
 //! - Source code snippets in error messages
 //! - Error codes for programmatic handling
-//! - Structured error reporting
+//! - Structured error reporting with rich context
+//!
+//! Copyright (c) 2026 YAML Library Developers
 
 #[cfg(feature = "std")]
 use std::fmt;

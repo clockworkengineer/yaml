@@ -1,7 +1,9 @@
-//! Module: embedded/allocator.rs
+//! Embedded Custom Allocator
 //!
-//! Custom allocator support for embedded systems.
-//! Provides arena-based allocation patterns suitable for resource-constrained environments.
+//! Provides arena-based and bump allocation patterns for embedded and resource-constrained environments.
+//! Designed for use in YAML parsing and manipulation on systems without standard allocators.
+//!
+//! Copyright (c) 2026 YAML Library Developers
 
 /// Simple bump allocator for embedded systems
 /// Allocates memory from a fixed-size buffer in a linear fashion

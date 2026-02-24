@@ -1,7 +1,9 @@
-//! Developer tools for debugging and inspection
+//! YAML Developer Tools Module
 //!
-//! This module provides utilities for developers working with YAML documents,
-//! including pretty-printing, inspection, debugging, and diagnostics.
+//! Aggregates developer utilities for debugging, inspection, pretty-printing, and diagnostics
+//! for YAML documents. Includes submodules for debugging, diffing, inspection, and tracing.
+//!
+//! Copyright (c) 2026 YAML Library Developers
 
 #[cfg(feature = "alloc")]
 pub mod debug;

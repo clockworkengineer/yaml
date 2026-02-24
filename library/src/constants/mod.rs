@@ -1,3 +1,20 @@
+//! YAML Library - Constants Module
+//!
+//! This module defines character and string constants used throughout the YAML parser and emitter.
+//!
+//! Copyright (c) 2026 YAML Library Contributors
+//! License: MIT OR Apache-2.0
+//!
+//! Source: library/src/constants/mod.rs
+//!
+//! # Overview
+//! This module centralizes all character and string constants for YAML syntax, improving code clarity and maintainability.
+//!
+//! # Usage
+//! Use these constants when parsing or emitting YAML to avoid magic values and ensure consistency.
+//!
+//! ---
+//!
 //! Module: constants/mod.rs
 
 pub const CHAR_DASH: char = '-';

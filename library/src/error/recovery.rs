@@ -1,8 +1,10 @@
-//! Error recovery strategies and mechanisms
+//! YAML Error Recovery Strategies
 //!
-//! This module provides error recovery functionality to allow parsing
-//! to continue after encountering errors, collecting multiple errors
-//! instead of failing on the first one.
+//! Provides error recovery mechanisms for YAML parsing, allowing parsing to continue
+//! after encountering errors and collecting multiple errors for robust diagnostics.
+//! Includes error collection, recovery strategies, and integration with enhanced error handling.
+//!
+//! Copyright (c) 2026 YAML Library Developers
 
 use alloc::vec::Vec;
 

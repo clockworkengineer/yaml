@@ -1,3 +1,11 @@
+//! YAML Error Handling Module
+//!
+//! Aggregates error types, message constants, enhanced error handling, and recovery strategies
+//! for YAML parsing and processing. Provides structured error handling with detailed context
+//! and unified error conversion for robust diagnostics and reporting.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 /// Allow conversion from ValidationError to YamlError for unified error handling
 #[cfg(feature = "alloc")]
 impl From<crate::validation::error::ValidationError> for YamlError {

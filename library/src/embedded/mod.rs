@@ -1,23 +1,10 @@
-//! Module: embedded/mod.rs
+//! Embedded Systems Support Module
 //!
-//! Embedded systems support module providing compile-time configuration,
-//! memory limits, and lightweight alternatives for resource-constrained environments.
+//! Aggregates compile-time configuration, memory limits, and lightweight alternatives for YAML parsing
+//! on resource-constrained embedded environments. Includes numeric type recommendations and memory optimization tips.
 //!
-//! # Memory Optimization Guide
-//!
-//! ## Numeric Types for Embedded Systems
-//!
-//! While the full `Numeric` enum supports 9 variants (i64, f64, u64, u8, i32, u32, i16, u16, i8),
-//! embedded systems should prefer smaller types to minimize memory usage:
-//!
-//! **Recommended Types:**
-//! - `Numeric::Int32(i32)` - Primary integer type (4 bytes)
-//! - `Numeric::Float(f32)` via `.to_f32()` - Primary floating-point type (4 bytes)
-//! - `Numeric::Int16(i16)` - For small integers (2 bytes)
-//! - `Numeric::Byte(u8)` - For byte values (1 byte)
-//!
-//! **Avoid on Embedded (8 bytes each):**
-//! - `Numeric::Integer(i64)`
+//! Copyright (c) 2026 YAML Library Developers
+
 //! - `Numeric::Float(f64)`
 //! - `Numeric::UInteger(u64)`
 //!

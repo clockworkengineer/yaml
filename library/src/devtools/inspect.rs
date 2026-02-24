@@ -1,6 +1,9 @@
-//! Node inspection and introspection tools
+//! YAML Node Inspection & Introspection
 //!
-//! Provides utilities for examining YAML node structure, types, and content.
+//! Utilities for examining, summarizing, and introspecting YAML node structure, types, and content.
+//! Includes helpers for type detection, value extraction, and node traversal for debugging and analysis.
+//!
+//! Copyright (c) 2026 YAML Library Developers
 
 use alloc::format;
 use alloc::string::{String, ToString};

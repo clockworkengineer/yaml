@@ -1,4 +1,9 @@
-//! Module: io/sources/buffer.rs
+//! Buffer Source for Decoded Input
+//!
+//! Provides a memory buffer implementation for reading YAML or JSON data from bytes.
+//! Implements the `ISource` trait for traversing and reading byte content from memory.
+//!
+//! Copyright (c) 2026 YAML Library Developers
 
 use crate::io::traits::ISource;
 

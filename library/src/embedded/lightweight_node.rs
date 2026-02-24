@@ -1,3 +1,11 @@
+//! Embedded Lightweight Node Representation
+//!
+//! Defines minimal, fixed-size node types for YAML parsing on embedded systems.
+//! Optimized for memory-constrained environments, supporting basic scalar types and
+//! conversion from full-featured nodes. Collection support is limited or requires arena context.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 use crate::nodes::node::{Node, Numeric};
 use core::convert::TryFrom;
 impl TryFrom<&Node> for LightNode {
@@ -31,7 +39,6 @@ impl TryFrom<&Numeric> for LightNumeric {
         }
     }
 }
-
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;

@@ -1,3 +1,10 @@
+//! YAML I/O Traits
+//!
+//! Defines core traits for reading from and writing to YAML data sources and destinations.
+//! Provides interfaces for sequential reading, writing, and state management for I/O operations.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 /// Trait defining the interface for reading and traversing YAML data from a source.
 /// Provides basic operations for sequential character-based reading.
 use crate::constants::{CHAR_SPACE, CHAR_TAB};

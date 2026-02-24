@@ -1,3 +1,11 @@
+
+//! YAML Node Definitions
+//!
+//! Defines the core `Node` enum and related traits for representing YAML data structures.
+//! Includes conversion, cloning, and utility methods for node manipulation and introspection.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 #[allow(dead_code)]
 /// Shared trait for node/string conversion and cloning
 pub trait NodeStringConvert {

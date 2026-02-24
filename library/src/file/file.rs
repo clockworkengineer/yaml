@@ -1,4 +1,9 @@
-//! Module: file/file.rs
+//! File Format Utilities
+//!
+//! Provides utilities for handling Unicode text file formats and byte order marks (BOM).
+//! Supports UTF-8, UTF-16, and UTF-32 in both little and big endian variants.
+//!
+//! Copyright (c) 2026 YAML Library Developers
 
 use std::fs::File;
 use std::io::{Read, Result, Write};

@@ -1,4 +1,9 @@
-//! Module: error/messages.rs
+//! YAML Error Message Constants
+//!
+//! Contains static error message strings for YAML parsing and processing errors.
+//! Used throughout the library for consistent and descriptive error reporting.
+//!
+//! Copyright (c) 2026 YAML Library Developers
 
 pub const ERR_EXPECT_COLON_INLINE_MAPPING: &str = "Expected ':' in inline mapping";
 pub const ERR_EOF_INLINE_MAPPING: &str = "Unexpected end of input in inline mapping";

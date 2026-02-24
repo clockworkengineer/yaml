@@ -1,6 +1,9 @@
-//! Execution tracing and profiling
+//! YAML Execution Tracing & Profiling
 //!
-//! Provides tools for tracing execution flow and measuring performance.
+//! Tools for tracing execution flow, profiling, and measuring performance in YAML processing.
+//! Includes event types, trace context, and helpers for diagnostics and benchmarking.
+//!
+//! Copyright (c) 2026 YAML Library Developers
 
 use alloc::format;
 use alloc::string::{String, ToString};

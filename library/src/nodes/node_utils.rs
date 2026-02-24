@@ -1,3 +1,10 @@
+//! Node Utility Functions
+//!
+//! Provides helper functions for constructing tagged, anchored, and mapping nodes
+//! in the YAML library. Used for building and manipulating node structures programmatically.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 use super::node::{BlockStyle, QuoteType};
 
 #[allow(dead_code)]

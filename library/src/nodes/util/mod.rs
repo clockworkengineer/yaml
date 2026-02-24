@@ -1,4 +1,9 @@
-//! Shared node utility functions for yaml_lib
+//! Node Utility Functions
+//!
+//! Provides shared utility functions for node creation and manipulation in the YAML library.
+//! Includes helpers for constructing nodes and sets from generic values.
+//!
+//! Copyright (c) 2026 YAML Library Developers
 
 use crate::nodes::node::Node;
 

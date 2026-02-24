@@ -1,6 +1,10 @@
-//! Node diffing utilities
+//! YAML Node Diffing Utilities
 //!
-//! Provides tools for comparing YAML nodes and identifying differences.
+//! Provides functions and types for comparing YAML nodes and reporting differences.
+//! Includes diff types, result structures, and helpers for formatting and analyzing
+//! changes between YAML node trees, supporting both scalars and collections.
+//!
+//! Copyright (c) 2026 YAML Library Developers
 
 use alloc::format;
 use alloc::string::{String, ToString};

@@ -1,7 +1,10 @@
-//! Module: embedded/config.rs
+//! Embedded Configuration Constants
 //!
-//! Compile-time configuration for embedded systems.
-//! Override defaults by setting these constants at compile time or use builder patterns.
+//! Compile-time configuration for YAML parsing on embedded systems.
+//! Provides tunable constants for nesting depth, document size, and string length.
+//! Override defaults at compile time or via builder patterns for resource-constrained environments.
+//!
+//! Copyright (c) 2026 YAML Library Developers
 
 /// Maximum depth of nested YAML structures (sequences, mappings)
 /// Default: 32 levels

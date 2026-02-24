@@ -1,3 +1,10 @@
+//! Integration Tests: Sequence Null vs Empty String
+//!
+//! Tests YAML parsing behavior for sequences containing null values versus empty strings.
+//! Ensures correct differentiation and handling of `null` and `""` in sequence contexts.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 use crate::{BufferSource, Node, parse};
 
 #[test]
