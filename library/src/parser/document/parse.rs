@@ -11,7 +11,7 @@ use crate::nodes::node::Node;
 use crate::nodes::node::Node::Document;
 
 use crate::parser::ParseResult;
-use crate::parser::document::errors::directive_errors::DirectiveErrors;
+use crate::parser::errors::directive_errors::DirectiveErrors;
 use crate::parser::document::helpers::{
     self, handle_directives, parse_document_end_marker, parse_document_markers, to_yaml_error,
 };
@@ -310,7 +310,7 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
                     ) {
                         source.restore_state(st_td5n);
                         return Err(
-                            crate::parser::document::errors::token_errors::document_unexpected_plain_after_top_level_sequence(
+                            crate::parser::errors::token_errors::document_unexpected_plain_after_top_level_sequence(
                                 source,
                             ),
                         );
@@ -399,7 +399,7 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
                                 )
                             });
                         if prev_all_plain {
-                            return Err(crate::parser::document::errors::token_errors::document_unexpected_plain_after_top_level_sequence(
+                            return Err(crate::parser::errors::token_errors::document_unexpected_plain_after_top_level_sequence(
                                 source,
                             ));
                         }

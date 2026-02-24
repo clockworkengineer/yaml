@@ -69,7 +69,7 @@ fn skip_inline_trivia(stream: &mut TokenStream) -> crate::parser::ParseResult<()
 use crate::nodes::node::Node;
 use crate::nodes::node_utils::make_set_node;
 use crate::parser::directives::DirectiveContext;
-use crate::parser::document::tokens::value::parse_value_with_tokens;
+use crate::parser::tokens::value::parse_value_with_tokens;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
 use crate::{BlockStyle, QuoteType};
@@ -511,14 +511,14 @@ fn ensure_progress(
             None | Some(crate::parser::lexer::Token::Eof)
         ) {
             return Err(
-                crate::parser::document::errors::token_errors::parser_did_not_advance_syntax(
+                crate::parser::errors::token_errors::parser_did_not_advance_syntax(
                     stream.source_mut(),
                     context,
                 ),
             );
         } else {
             return Err(
-                crate::parser::document::errors::token_errors::parser_did_not_advance_structure(
+                crate::parser::errors::token_errors::parser_did_not_advance_structure(
                     stream.source_mut(),
                     context,
                 ),

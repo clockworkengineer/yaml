@@ -6,14 +6,6 @@
 //!
 //! Copyright (c) 2026 YAML Library Developers
 
-pub mod errors;
-pub use errors::anchor_errors;
-pub use errors::block_scalar_errors;
-pub use errors::comment_errors;
-pub use errors::directive_errors;
-pub use errors::indentation_errors;
-pub use errors::mapping_errors;
-pub use errors::token_errors;
 ///
 /// Modules for parsing YAML documents.
 ///
@@ -21,33 +13,28 @@ pub use errors::token_errors;
 /// scalars, anchors, aliases, and directives. Provides utilities for
 /// managing document boundaries and normalization of parsed nodes.
 ///
-mod anchors;
-// pub mod block_scalar_errors;
-// pub mod comment_errors;
-mod contents;
+
+pub use parse::parse;
 pub mod context;
-// pub mod directive_errors;
 pub mod error_builder;
-mod explicit_key;
+pub mod explicit_key;
 pub mod flow_punctuation;
 pub mod helpers;
 pub mod indentation;
-// pub mod indentation_errors;
-mod inline_tokens;
+pub mod inline_tokens;
+pub mod mapping;
+pub mod node_utils;
+pub mod scalar;
+pub mod validate_tree;
+
+mod anchors;
+mod contents;
 mod loop_guards;
 mod main_loop;
-mod mapping;
-// pub mod mapping_errors;
-pub mod node_utils;
 mod parse;
-mod scalar;
 mod sequence;
-// pub mod token_errors;
-mod tokens;
-pub mod validate_tree;
 mod value;
 
-pub use parse::parse;
 
 #[cfg(test)]
 mod tests {

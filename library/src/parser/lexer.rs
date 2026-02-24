@@ -255,7 +255,7 @@ impl<'a> Lexer<'a> {
                                 _ => false,
                             };
                             if saw_tab && nested_indicator {
-                                return Err(crate::parser::document::indentation_errors::IndentationErrors::tabs_not_allowed_yaml_syntax(
+                                return Err(crate::parser::errors::indentation_errors::IndentationErrors::tabs_not_allowed_yaml_syntax(
                                     self.source,
                                 ));
                             }
@@ -276,7 +276,7 @@ impl<'a> Lexer<'a> {
                             }
                             self.source.restore_state(state);
                             if saw_tab {
-                                return Err(crate::parser::document::indentation_errors::IndentationErrors::tabs_not_allowed_yaml_syntax(
+                                return Err(crate::parser::errors::indentation_errors::IndentationErrors::tabs_not_allowed_yaml_syntax(
                                     self.source,
                                 ));
                             }
@@ -298,7 +298,7 @@ impl<'a> Lexer<'a> {
                                 }
                                 self.source.restore_state(state);
                                 if saw_tab {
-                                    return Err(crate::parser::document::indentation_errors::IndentationErrors::tabs_not_allowed_yaml_syntax(
+                                    return Err(crate::parser::errors::indentation_errors::IndentationErrors::tabs_not_allowed_yaml_syntax(
                                         self.source,
                                     ));
                                 }
@@ -646,7 +646,7 @@ impl<'a> Lexer<'a> {
                         | Some(CHAR_CARRIAGE_RETURN)
                         | None
                 ) {
-                    return Err(crate::parser::document::indentation_errors::IndentationErrors::tabs_not_allowed_flow_collections(
+                    return Err(crate::parser::errors::indentation_errors::IndentationErrors::tabs_not_allowed_flow_collections(
                         self.source,
                     ));
                 }
@@ -705,7 +705,7 @@ impl<'a> Lexer<'a> {
                         self.peek_next_non_whitespace(),
                         Some(CHAR_NEWLINE) | Some(CHAR_CARRIAGE_RETURN) | None
                     ) {
-                        return Err(crate::parser::document::indentation_errors::IndentationErrors::tabs_not_allowed_yaml_syntax(
+                        return Err(crate::parser::errors::indentation_errors::IndentationErrors::tabs_not_allowed_yaml_syntax(
                             self.source,
                         ));
                     }
@@ -791,7 +791,7 @@ impl<'a> Lexer<'a> {
         // If a comment follows, it must be preceded by whitespace
         if let Some(CHAR_HASH) = self.source.current() {
             if !saw_whitespace {
-                return Err(crate::parser::document::comment_errors::CommentErrors::comment_must_be_preceded_by_whitespace_after_flow_closer(
+                return Err(crate::parser::errors::comment_errors::CommentErrors::comment_must_be_preceded_by_whitespace_after_flow_closer(
                     self.source,
                     closer,
                 ));
@@ -929,7 +929,7 @@ impl<'a> Lexer<'a> {
                         // can report a clear syntax error instead of
                         // silently treating it as a valid comment.
                         if let Some(CHAR_HASH) = self.source.current() {
-                            return Err(crate::parser::document::comment_errors::CommentErrors::comment_must_be_separated_from_quoted_scalar_by_whitespace(
+                            return Err(crate::parser::errors::comment_errors::CommentErrors::comment_must_be_separated_from_quoted_scalar_by_whitespace(
                                 self.source,
                             ));
                         }
@@ -943,7 +943,7 @@ impl<'a> Lexer<'a> {
                 None => {
                     lexer_debug!("Unterminated single-quoted string: reached EOF");
                     return Err(
-                        crate::parser::document::token_errors::unterminated_single_quoted_eof(
+                        crate::parser::errors::token_errors::unterminated_single_quoted_eof(
                             self.source,
                         ),
                     );
@@ -1070,7 +1070,7 @@ impl<'a> Lexer<'a> {
                                     }
                                     _ => {
                                         return Err(
-                                            crate::parser::document::token_errors::invalid_escape_x_expected_2_hex(
+                                            crate::parser::errors::token_errors::invalid_escape_x_expected_2_hex(
                                                 self.source,
                                             ),
                                         );
@@ -1092,7 +1092,7 @@ impl<'a> Lexer<'a> {
                                     }
                                     _ => {
                                         return Err(
-                                            crate::parser::document::token_errors::invalid_escape_u_expected_4_hex(
+                                            crate::parser::errors::token_errors::invalid_escape_u_expected_4_hex(
                                                 self.source,
                                             ),
                                         );
@@ -1104,7 +1104,7 @@ impl<'a> Lexer<'a> {
                                 Some(ch) => content.push(ch),
                                 None => {
                                     return Err(
-                                        crate::parser::document::token_errors::invalid_unicode_codepoint_u4(
+                                        crate::parser::errors::token_errors::invalid_unicode_codepoint_u4(
                                             self.source,
                                             code,
                                         ),
@@ -1124,7 +1124,7 @@ impl<'a> Lexer<'a> {
                                     }
                                     _ => {
                                         return Err(
-                                            crate::parser::document::token_errors::invalid_escape_u_expected_8_hex(
+                                            crate::parser::errors::token_errors::invalid_escape_u_expected_8_hex(
                                                 self.source,
                                             ),
                                         );
@@ -1136,7 +1136,7 @@ impl<'a> Lexer<'a> {
                                 Some(ch) => content.push(ch),
                                 None => {
                                     return Err(
-                                        crate::parser::document::token_errors::invalid_unicode_codepoint_u8(
+                                        crate::parser::errors::token_errors::invalid_unicode_codepoint_u8(
                                             self.source,
                                             code,
                                         ),
@@ -1147,7 +1147,7 @@ impl<'a> Lexer<'a> {
                         // Invalid escape sequences - reject per YAML 1.2 spec
                         Some(c) => {
                             return Err(
-                                crate::parser::document::token_errors::invalid_escape_generic(
+                                crate::parser::errors::token_errors::invalid_escape_generic(
                                     self.source,
                                     c,
                                 ),
@@ -1158,7 +1158,7 @@ impl<'a> Lexer<'a> {
                                 "Unterminated double-quoted string: reached EOF after escape"
                             );
                             return Err(
-                                crate::parser::document::token_errors::unterminated_double_quoted_eof_after_escape(
+                                crate::parser::errors::token_errors::unterminated_double_quoted_eof_after_escape(
                                     self.source,
                                 ),
                             );
@@ -1173,7 +1173,7 @@ impl<'a> Lexer<'a> {
                     // can report a clear syntax error instead of
                     // silently treating it as a valid comment.
                     if let Some(CHAR_HASH) = self.source.current() {
-                        return Err(crate::parser::document::comment_errors::CommentErrors::comment_must_be_separated_from_quoted_scalar_by_whitespace(
+                        return Err(crate::parser::errors::comment_errors::CommentErrors::comment_must_be_separated_from_quoted_scalar_by_whitespace(
                             self.source,
                         ));
                     }
@@ -1186,7 +1186,7 @@ impl<'a> Lexer<'a> {
                 None => {
                     lexer_debug!("Unterminated double-quoted string: reached EOF");
                     return Err(
-                        crate::parser::document::token_errors::unterminated_double_quoted_eof(
+                        crate::parser::errors::token_errors::unterminated_double_quoted_eof(
                             self.source,
                         ),
                     );

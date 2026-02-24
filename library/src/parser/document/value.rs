@@ -37,7 +37,7 @@ pub(crate) fn parse_value(
     // - Flow collections (better token boundaries)
     // - Aliases (simpler token handling)
 
-    use crate::parser::document::tokens::value::parse_value_with_tokens;
+    use crate::parser::tokens::value::parse_value_with_tokens;
     use crate::parser::token_stream::TokenStream;
 
     let mut stream = TokenStream::new(source, directives, false)?;

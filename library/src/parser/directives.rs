@@ -6,7 +6,7 @@
 //! Copyright (c) 2026 YAML Library Developers
 
 use crate::error::YamlError;
-use crate::parser::document::directive_errors::DirectiveErrors;
+use crate::parser::errors::directive_errors::DirectiveErrors;
 use crate::utils::is_line_terminator;
 /// Parses YAML directives (%YAML, %TAG) at the start of a document.
 /// Returns a DirectiveContext or error string.

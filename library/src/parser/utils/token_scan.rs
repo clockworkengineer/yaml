@@ -32,7 +32,7 @@ where
         name.pop();
     }
     if name.is_empty() {
-        return Err(crate::parser::document::token_errors::empty_token_name(
+        return Err(crate::parser::errors::token_errors::empty_token_name(
             source,
             empty_error,
         ));

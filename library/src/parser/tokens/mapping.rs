@@ -29,7 +29,7 @@ fn parse_indented_mapping_value(
     if let Some(level) = indent_level {
         stream.skip_newlines_and_comments()?;
         if matches!(stream.current(), Some(Token::Dash)) {
-            use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
+            use crate::parser::tokens::sequence::parse_sequence_with_tokens;
             let ctx_seq = crate::parser::document::context::ParsingContext::new(level)
                 .child_block_context(
                     level,
@@ -51,7 +51,7 @@ fn parse_indented_mapping_value(
     }
     // YAML compliance error: Mapping key without value (expected value after colon)
     if !explicit_key && matches!(stream.current(), Some(Token::Eof) | None) {
-        let err = crate::parser::document::mapping_errors::
+        let err = crate::parser::errors::mapping_errors::
             mapping_key_without_value_expected_value_after_colon(stream);
         return Err(err.to_string().into());
     }
@@ -70,7 +70,7 @@ use crate::nodes::node::Node;
 use crate::nodes::node::{BlockStyle, QuoteType};
 use crate::parser::directives::DirectiveContext;
 use crate::parser::document::node_utils::force_key_to_string;
-use crate::parser::document::tokens::value::parse_value_with_tokens;
+use crate::parser::tokens::value::parse_value_with_tokens;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
 
@@ -171,7 +171,7 @@ impl MappingParseContext {
                     // breaking other valid YAML patterns.
                     if self.base_indent == 2 && line_indent == 1 {
                         // Dedenting from indent 2 to indent 1 - this is the DMG6 error case
-                        let err = crate::parser::document::mapping_errors::
+                        let err = crate::parser::errors::mapping_errors::
                             inconsistent_dedent_within_mapping_value_for_keys(stream);
                         return Err(err.to_string().into());
                     }
@@ -342,7 +342,7 @@ impl MappingParseContext {
                 // the previous value is already complete, an indented block must
                 // not extend that value.
                 if !last_value_is_empty && saw_comment_between_entries {
-                    let err = crate::parser::document::mapping_errors::
+                    let err = crate::parser::errors::mapping_errors::
                         invalid_indentation_after_comment_in_mapping_value(stream);
                     return Err(err.to_string().into());
                 }
@@ -362,7 +362,7 @@ impl MappingParseContext {
                     if matches!(stream.current(), Some(Token::Plain(_))) {
                         if let Some(next) = stream.peek()? {
                             if matches!(next, Token::Colon) {
-                                let err = crate::parser::document::mapping_errors::
+                                let err = crate::parser::errors::mapping_errors::
                                     invalid_indentation_extending_completed_mapping_value(stream);
                                 return Err(err.to_string().into());
                             }
@@ -552,14 +552,14 @@ fn apply_decorators_to_key(
     if let Some(anchor) = decorators.anchor {
         if matches!(key_node, Node::Alias(_)) {
             let err =
-                crate::parser::document::mapping_errors::invalid_anchored_alias_key_on_alias_nodes(
+                crate::parser::errors::mapping_errors::invalid_anchored_alias_key_on_alias_nodes(
                     stream,
                 );
             return Err(err.to_string().into());
         }
         if matches!(key_node, Node::Anchored(_, _)) {
             let err =
-                crate::parser::document::mapping_errors::multiple_anchors_on_mapping_key(stream);
+                crate::parser::errors::mapping_errors::multiple_anchors_on_mapping_key(stream);
             return Err(err.to_string().into());
         }
         key_node = Node::Anchored(Box::new(key_node), anchor);
@@ -597,7 +597,7 @@ fn parse_mapping_value(
         Some(Token::Indent(level)) => {
             stream.next()?; // consume Indent
             if matches!(stream.current(), Some(Token::Dash)) {
-                use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
+                use crate::parser::tokens::sequence::parse_sequence_with_tokens;
                 let ctx_seq = crate::parser::document::context::ParsingContext::new(level)
                     .child_block_context(
                         level,
@@ -624,14 +624,14 @@ fn parse_mapping_value(
                 match quote {
                     QuoteType::Single | QuoteType::Double => {
                         if matches!(stream.current(), Some(Token::Plain(_))) {
-                            return Err(crate::parser::document::mapping_errors::invalid_trailing_plain_text_after_quoted_scalar(stream));
+                            return Err(crate::parser::errors::mapping_errors::invalid_trailing_plain_text_after_quoted_scalar(stream));
                         }
                         // Re-enable scoped nested ':' guard for quoted scalars:
                         // If a ':' appears immediately after the quoted value on the same
                         // logical line and is followed by same-line plain content, reject.
                         if stream.is_colon_on_same_line() {
                             if matches!(stream.peek()?, Some(Token::Plain(_))) {
-                                return Err(crate::parser::document::mapping_errors::nested_key_separator_in_block_value_same_line(stream));
+                                return Err(crate::parser::errors::mapping_errors::nested_key_separator_in_block_value_same_line(stream));
                             }
                         }
                     }

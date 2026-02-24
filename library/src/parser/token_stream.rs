@@ -188,11 +188,11 @@ impl<'a> TokenStream<'a> {
                 self.next()?;
                 Ok(())
             }
-            Some(_token) => Err(crate::parser::document::token_errors::expected_specific_token(
+            Some(_token) => Err(crate::parser::errors::token_errors::expected_specific_token(
                 self.source_mut(),
                 expected.clone(),
             )),
-            None => Err(crate::parser::document::token_errors::expected_specific_token(
+            None => Err(crate::parser::errors::token_errors::expected_specific_token(
                 self.source_mut(),
                 expected.clone(),
             )),
@@ -349,14 +349,14 @@ impl<'a> TokenStream<'a> {
             match self.current() {
                 Some(Token::Tag(tag_str)) => {
                     if decorators.tag.is_some() {
-                        return Err(crate::parser::document::token_errors::duplicate_tag_found(
+                        return Err(crate::parser::errors::token_errors::duplicate_tag_found(
                             self.source_mut(),
                         ));
                     }
                     // Validate explicit tag handle usage against current document directives.
                     if let Err(e) = self._directives.validate_tag_handle_usage(tag_str.as_str()) {
                         return Err(
-                            crate::parser::document::token_errors::invalid_tag_handle_usage(
+                            crate::parser::errors::token_errors::invalid_tag_handle_usage(
                                 self.source_mut(),
                                 &e.to_string(),
                             ),
@@ -369,7 +369,7 @@ impl<'a> TokenStream<'a> {
                 Some(Token::Anchor(name)) => {
                     if decorators.anchor.is_some() {
                         return Err(
-                            crate::parser::document::token_errors::duplicate_anchor_found(
+                            crate::parser::errors::token_errors::duplicate_anchor_found(
                                 self.source_mut(),
                             ),
                         );
@@ -458,10 +458,10 @@ impl<'a> TokenStream<'a> {
                 self.next()?;
                 Ok(result)
             }
-            Some(_token) => Err(crate::parser::document::token_errors::expected_plain_scalar(
+            Some(_token) => Err(crate::parser::errors::token_errors::expected_plain_scalar(
                 self.source_mut(),
             )),
-            None => Err(crate::parser::document::token_errors::expected_plain_scalar_eof(
+            None => Err(crate::parser::errors::token_errors::expected_plain_scalar_eof(
                 self.source_mut(),
             )),
         }
@@ -476,10 +476,10 @@ impl<'a> TokenStream<'a> {
                 self.next()?;
                 Ok(result)
             }
-            Some(_token) => Err(crate::parser::document::token_errors::expected_quoted_scalar(
+            Some(_token) => Err(crate::parser::errors::token_errors::expected_quoted_scalar(
                 self.source_mut(),
             )),
-            None => Err(crate::parser::document::token_errors::expected_quoted_scalar_eof(
+            None => Err(crate::parser::errors::token_errors::expected_quoted_scalar_eof(
                 self.source_mut(),
             )),
         }
@@ -503,10 +503,10 @@ impl<'a> TokenStream<'a> {
                 self.next()?;
                 Ok((result, ScalarType::DoubleQuoted))
             }
-            Some(_token) => Err(crate::parser::document::token_errors::expected_scalar(
+            Some(_token) => Err(crate::parser::errors::token_errors::expected_scalar(
                 self.source_mut(),
             )),
-            None => Err(crate::parser::document::token_errors::expected_scalar_eof(
+            None => Err(crate::parser::errors::token_errors::expected_scalar_eof(
                 self.source_mut(),
             )),
         }

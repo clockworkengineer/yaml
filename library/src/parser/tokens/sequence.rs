@@ -8,7 +8,7 @@
 use crate::nodes::node::Node;
 use crate::parser::directives::DirectiveContext;
 use crate::parser::document::flow_punctuation;
-use crate::parser::document::tokens::value::parse_value_with_tokens;
+use crate::parser::tokens::value::parse_value_with_tokens;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
 
@@ -151,7 +151,7 @@ pub fn parse_sequence_with_tokens(
                                 continue;
                             } else {
                                 // Parse as mapping or other value
-                                use crate::parser::document::tokens::mapping::parse_mapping_with_tokens;
+                                use crate::parser::tokens::mapping::parse_mapping_with_tokens;
                                 let mapping = parse_mapping_with_tokens(
                                     stream,
                                     indent,
@@ -235,7 +235,7 @@ pub fn parse_sequence_with_tokens(
                         // Another dash at the same indent level - continue sequence
                         continue;
                     } else if indent >= current_indent {
-                        use crate::parser::document::tokens::mapping::parse_mapping_with_tokens;
+                        use crate::parser::tokens::mapping::parse_mapping_with_tokens;
                         let mapping =
                             parse_mapping_with_tokens(stream, indent, directives, depth + 1)?;
                         if let Some((_, items)) = stack.last_mut() {
@@ -279,7 +279,7 @@ pub fn parse_sequence_with_tokens(
                         }
                     }
                     if is_colon {
-                        use crate::parser::document::tokens::mapping::parse_mapping_with_tokens;
+                        use crate::parser::tokens::mapping::parse_mapping_with_tokens;
                         let indent = current_indent;
                         let mapping =
                             parse_mapping_with_tokens(stream, indent, directives, depth + 1)?;

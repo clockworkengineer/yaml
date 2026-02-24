@@ -6,6 +6,8 @@
 //!
 //! Copyright (c) 2026 YAML Library Developers
 
+use crate::parser::tokens::mapping::parse_mapping_with_tokens;
+
 /// Macro for common error construction
 macro_rules! parse_err {
     ($msg:expr) => {
@@ -142,7 +144,7 @@ fn token_dispatch(
                 let mut stream =
                     crate::parser::token_stream::TokenStream::new(source, directives, false)
                         .ok()?;
-                let result = crate::parser::document::tokens::mapping::parse_mapping_with_tokens(
+                let result = parse_mapping_with_tokens(
                     &mut stream,
                     level_val,
                     directives,
@@ -162,7 +164,7 @@ fn token_dispatch(
                     crate::parser::token_stream::TokenStream::new(source, directives, false)
                         .ok()?;
                 let ctx_seq = ctx.child_block_context(seq_indent, CollectionType::BlockSequence);
-                let result = crate::parser::document::tokens::sequence::parse_sequence_with_tokens(
+                let result = crate::parser::tokens::sequence::parse_sequence_with_tokens(
                     &mut stream,
                     seq_indent,
                     ctx.indent_level,
@@ -209,7 +211,7 @@ fn skip_trivia_with_ctx(
     if !ctx.in_flow {
         match crate::utils::skip_whitespace_and_comments_validate_tabs(source) {
             Ok(()) => Ok(()),
-            Err(_e) => Err(crate::parser::document::errors::indentation_errors::IndentationErrors::tabs_not_allowed_yaml_block(source)),
+            Err(_e) => Err(crate::parser::errors::indentation_errors::IndentationErrors::tabs_not_allowed_yaml_block(source)),
         }
     } else {
         crate::utils::skip_whitespace_and_comments(source);
@@ -279,7 +281,7 @@ pub fn parse_document_contents(
                     let ctx_seq =
                         ctx.child_block_context(seq_indent, CollectionType::BlockSequence);
                     let seq =
-                        crate::parser::document::tokens::sequence::parse_sequence_with_tokens(
+                        crate::parser::tokens::sequence::parse_sequence_with_tokens(
                             &mut stream,
                             seq_indent,
                             indent_level,
@@ -351,7 +353,7 @@ pub fn parse_document_contents(
                         Ok(parse_mapping(source, indent_level, directives)?)
                     } else {
                         Ok(
-                            crate::parser::document::tokens::value::parse_value_with_tokens(
+                            crate::parser::tokens::value::parse_value_with_tokens(
                                 &mut stream,
                                 directives,
                                 0,
@@ -360,7 +362,7 @@ pub fn parse_document_contents(
                     }
                 }
                 _ => Ok(
-                    crate::parser::document::tokens::value::parse_value_with_tokens(
+                    crate::parser::tokens::value::parse_value_with_tokens(
                         &mut stream,
                         directives,
                         0,
@@ -384,17 +386,17 @@ pub fn parse_document_contents(
                             let mut ts_err = crate::parser::token_stream::TokenStream::new(
                                 source, directives, false,
                             )?;
-                            Err(crate::parser::document::errors::anchor_errors::AnchorErrors::anchor_cannot_precede_dash_same_line(&mut ts_err))
+                            Err(crate::parser::errors::anchor_errors::AnchorErrors::anchor_cannot_precede_dash_same_line(&mut ts_err))
                         }
                         Some(crate::parser::lexer::Token::Plain(s)) => {
                             if s.trim_start().starts_with('-') {
                                 let mut ts_err = crate::parser::token_stream::TokenStream::new(
                                     source, directives, false,
                                 )?;
-                                Err(crate::parser::document::errors::anchor_errors::AnchorErrors::anchor_cannot_precede_dash_same_line(&mut ts_err))
+                                Err(crate::parser::errors::anchor_errors::AnchorErrors::anchor_cannot_precede_dash_same_line(&mut ts_err))
                             } else {
                                 Ok(
-                                    crate::parser::document::tokens::value::parse_value_with_tokens(
+                                    crate::parser::tokens::value::parse_value_with_tokens(
                                         &mut stream,
                                         directives,
                                         0,
@@ -404,7 +406,7 @@ pub fn parse_document_contents(
                         }
                         // Newline or anything else: defer to value parser
                         _ => Ok(
-                            crate::parser::document::tokens::value::parse_value_with_tokens(
+                            crate::parser::tokens::value::parse_value_with_tokens(
                                 &mut stream,
                                 directives,
                                 0,
@@ -413,7 +415,7 @@ pub fn parse_document_contents(
                     }
                 }
                 _ => Ok(
-                    crate::parser::document::tokens::value::parse_value_with_tokens(
+                    crate::parser::tokens::value::parse_value_with_tokens(
                         &mut stream,
                         directives,
                         0,
@@ -449,7 +451,7 @@ pub fn parse_document_contents(
                     | Some(crate::parser::lexer::Token::DocumentStart)
                     | Some(crate::parser::lexer::Token::DocumentEnd)
                     | None => Node::None,
-                    _ => crate::parser::document::tokens::value::parse_value_with_tokens(
+                    _ => crate::parser::tokens::value::parse_value_with_tokens(
                         &mut stream,
                         directives,
                         0,
@@ -478,7 +480,7 @@ pub fn parse_document_contents(
                 let mut stream =
                     crate::parser::token_stream::TokenStream::new(source, directives, false)?;
                 Ok(
-                    crate::parser::document::tokens::mapping::parse_mapping_with_tokens(
+                    parse_mapping_with_tokens(
                         &mut stream,
                         base_indent,
                         directives,

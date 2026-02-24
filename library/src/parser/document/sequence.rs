@@ -33,7 +33,7 @@ pub(crate) fn parse_sequence(
     let mut stream = TokenStream::new(source, directives, false)?;
     // NOTE: parse_sequence is only used in legacy paths, so we pass a default context
     let ctx = crate::parser::document::context::ParsingContext::default();
-    let node = crate::parser::document::tokens::sequence::parse_sequence_with_tokens(
+    let node = crate::parser::tokens::sequence::parse_sequence_with_tokens(
         &mut stream,
         indent_level,
         indent_level.saturating_sub(1),
@@ -83,13 +83,13 @@ fn parse_sequence_inner(
                     }
                     Some(crate::parser::lexer::Token::FlowSequenceStart)
                     | Some(crate::parser::lexer::Token::FlowMappingStart) => {
-                        use crate::parser::document::tokens::value::parse_value_with_tokens;
+                        use crate::parser::tokens::value::parse_value_with_tokens;
                         let value = parse_value_with_tokens(stream, directives, 0)?;
                         items.push(value);
                         continue;
                     }
                     _ => {
-                        use crate::parser::document::tokens::value::parse_value_with_tokens;
+                        use crate::parser::tokens::value::parse_value_with_tokens;
                         let value = parse_value_with_tokens(stream, directives, 0)?;
                         items.push(value);
                         continue;

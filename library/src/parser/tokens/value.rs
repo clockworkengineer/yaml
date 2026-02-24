@@ -228,7 +228,7 @@ pub fn parse_value_with_tokens(
 ) -> crate::parser::ParseResult<Node> {
     if depth > MAX_NESTING_DEPTH {
         return Err(
-            crate::parser::document::token_errors::unexpected_token_in_value(
+            crate::parser::errors::token_errors::unexpected_token_in_value(
                 stream.source_mut(),
                 &Token::Plain("Nesting too deep: possible malicious or malformed YAML".to_string()),
             ),
@@ -260,7 +260,7 @@ pub fn parse_value_with_tokens(
             log::debug!("value_tokens: parsed alias = {}", alias);
             // Strict: alias must resolve, otherwise error
             if alias.is_empty() {
-                return Err(crate::parser::document::token_errors::empty_token_name(
+                return Err(crate::parser::errors::token_errors::empty_token_name(
                     stream.source_mut(),
                     "Empty alias name is not allowed",
                 ));
@@ -319,7 +319,7 @@ pub fn parse_value_with_tokens(
             // Outside flow, an increased indentation after !!seq indicates
             // a block sequence value (e.g. `!!seq` followed by `- a`).
             if let Some(Token::Indent(level)) = stream.current() {
-                use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
+                use crate::parser::tokens::sequence::parse_sequence_with_tokens;
                 let ctx_seq = crate::parser::document::context::ParsingContext::new(*level)
                     .child_block_context(
                         *level,
@@ -351,7 +351,7 @@ pub fn parse_value_with_tokens(
             && decorators.anchor.is_some()
             && stream.current_flow_depth() == 0
         {
-            return Err(crate::parser::document::anchor_errors::AnchorErrors::anchor_cannot_precede_dash_block(stream));
+            return Err(crate::parser::errors::anchor_errors::AnchorErrors::anchor_cannot_precede_dash_block(stream));
         }
         // U99R: Disallow a comma immediately after a tag in block context.
         // In block (non-flow) context, ',' is not a valid value separator.
@@ -364,7 +364,7 @@ pub fn parse_value_with_tokens(
             }
         {
             return Err(
-                crate::parser::document::token_errors::unexpected_comma_after_tag_in_block_value(
+                crate::parser::errors::token_errors::unexpected_comma_after_tag_in_block_value(
                     stream.source_mut(),
                 ),
             );
@@ -390,7 +390,7 @@ pub fn parse_value_with_tokens(
                     directives
                         .validate_tag_handle_usage(tag_raw_ref)
                         .map_err(|e| {
-                            crate::parser::document::token_errors::invalid_tag_handle_usage(
+                            crate::parser::errors::token_errors::invalid_tag_handle_usage(
                                 stream.source_mut(),
                                 &e.to_string(),
                             )
@@ -446,7 +446,7 @@ pub fn parse_value_with_tokens(
             && matches!(stream.current(), Some(Token::Plain(s)) if s.trim_start().starts_with('-'))
         {
             return Err(
-                crate::parser::document::anchor_errors::AnchorErrors::anchor_cannot_precede_dash_block(
+                crate::parser::errors::anchor_errors::AnchorErrors::anchor_cannot_precede_dash_block(
                     stream,
                 ),
             );
@@ -473,7 +473,7 @@ pub fn parse_value_with_tokens(
             directives
                 .validate_tag_handle_usage(tag_raw_ref)
                 .map_err(|e| {
-                    crate::parser::document::token_errors::invalid_tag_handle_usage(
+                    crate::parser::errors::token_errors::invalid_tag_handle_usage(
                         stream.source_mut(),
                         &e.to_string(),
                     )
@@ -571,14 +571,14 @@ pub fn parse_value_with_tokens(
             // structural error rather than accepting an anchored alias.
             if matches!(result, Node::Alias(_)) {
                 return Err(
-                    crate::parser::document::anchor_errors::AnchorErrors::invalid_anchored_alias(
+                    crate::parser::errors::anchor_errors::AnchorErrors::invalid_anchored_alias(
                         stream,
                     ),
                 );
             }
             if matches!(result, Node::Anchored(_, _)) {
                 return Err(
-                    crate::parser::document::anchor_errors::AnchorErrors::multiple_anchors(stream),
+                    crate::parser::errors::anchor_errors::AnchorErrors::multiple_anchors(stream),
                 );
             }
             result = Node::Anchored(Box::new(result), anchor_name);
@@ -634,7 +634,7 @@ fn parse_value_content(
             crate::parser::document::scalar::parse_scalar_with_tokens(stream, directives, 0)
         }
         Some(Token::Dash) => {
-            use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
+            use crate::parser::tokens::sequence::parse_sequence_with_tokens;
             let ctx_seq = crate::parser::document::context::ParsingContext::new(0)
                 .child_block_context(
                     0,
@@ -644,7 +644,7 @@ fn parse_value_content(
         }
         Some(Token::Indent(level)) => {
             // Indented value: parse nested mapping
-            use crate::parser::document::tokens::mapping::parse_mapping_with_tokens;
+            use crate::parser::tokens::mapping::parse_mapping_with_tokens;
             parse_mapping_with_tokens(stream, *level, directives, depth + 1)
         }
         Some(Token::Newline) => {
@@ -660,7 +660,7 @@ fn parse_value_content(
                     stream.skip_newlines_and_comments()?;
                     // Decide between sequence or mapping based on next token
                     if matches!(stream.current(), Some(Token::Dash)) {
-                        use crate::parser::document::tokens::sequence::parse_sequence_with_tokens;
+                        use crate::parser::tokens::sequence::parse_sequence_with_tokens;
                         let ctx_seq = crate::parser::document::context::ParsingContext::new(_lvl)
                             .child_block_context(
                                 _lvl,
@@ -675,7 +675,7 @@ fn parse_value_content(
                             depth + 1,
                         );
                     } else {
-                        use crate::parser::document::tokens::mapping::parse_mapping_with_tokens;
+                        use crate::parser::tokens::mapping::parse_mapping_with_tokens;
                         return parse_mapping_with_tokens(stream, _lvl, directives, depth + 1);
                     }
                 }
@@ -704,7 +704,7 @@ fn parse_value_content(
         )),
         Some(Token::QuestionMark) => {
             // Explicit key marker - parse as mapping with explicit keys
-            use crate::parser::document::tokens::mapping::parse_mapping_with_tokens;
+            use crate::parser::tokens::mapping::parse_mapping_with_tokens;
             // Parse mapping at indent 0 (explicit keys can appear at any indent)
             parse_mapping_with_tokens(stream, 0, directives, depth + 1)
         }
@@ -721,7 +721,7 @@ fn parse_value_content(
                 tok
             );
             Err(
-                crate::parser::document::token_errors::unexpected_token_in_value(
+                crate::parser::errors::token_errors::unexpected_token_in_value(
                     stream.source_mut(),
                     &tok,
                 ),

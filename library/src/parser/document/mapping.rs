@@ -9,7 +9,7 @@
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::parser::ParseResult;
-use crate::parser::document::tokens::mapping::parse_mapping_with_tokens;
+use crate::parser::tokens::mapping::parse_mapping_with_tokens;
 // ...existing code...
 
 /// Parses a YAML mapping (dictionary) with the specified indentation level.

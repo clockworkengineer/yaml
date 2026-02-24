@@ -106,7 +106,7 @@ pub(crate) fn parse_explicit_mapping_entry(
         // Use stream.current() for error context since TokenStream.lexer is private
         let cur = stream.current().cloned();
         return Err(
-            crate::parser::document::errors::mapping_errors::expected_explicit_key_token(
+            crate::parser::errors::mapping_errors::expected_explicit_key_token(
                 stream, cur,
             ),
         );
@@ -120,10 +120,10 @@ pub(crate) fn parse_explicit_mapping_entry(
             stream.next()?;
             stream.skip_trivia()?;
             // Parse document contents as key (empty explicit key)
-            crate::parser::document::tokens::value::parse_value_with_tokens(stream, directives, 0)?
+            crate::parser::tokens::value::parse_value_with_tokens(stream, directives, 0)?
         }
         _ => {
-            crate::parser::document::tokens::value::parse_value_with_tokens(stream, directives, 0)?
+            crate::parser::tokens::value::parse_value_with_tokens(stream, directives, 0)?
         }
     };
     // Normalize key_node to Node::Str if not already
@@ -141,11 +141,11 @@ pub(crate) fn parse_explicit_mapping_entry(
                 Some(Token::Newline) => {
                     stream.next()?;
                     stream.skip_trivia()?;
-                    crate::parser::document::tokens::value::parse_value_with_tokens(
+                    crate::parser::tokens::value::parse_value_with_tokens(
                         stream, directives, 0,
                     )?
                 }
-                _ => crate::parser::document::tokens::value::parse_value_with_tokens(
+                _ => crate::parser::tokens::value::parse_value_with_tokens(
                     stream, directives, 0,
                 )?,
             }
