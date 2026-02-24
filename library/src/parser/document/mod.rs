@@ -6,7 +6,14 @@
 //!
 //! Copyright (c) 2026 YAML Library Developers
 
-pub mod anchor_errors;
+pub mod errors;
+pub use errors::anchor_errors;
+pub use errors::block_scalar_errors;
+pub use errors::comment_errors;
+pub use errors::directive_errors;
+pub use errors::indentation_errors;
+pub use errors::mapping_errors;
+pub use errors::token_errors;
 ///
 /// Modules for parsing YAML documents.
 ///
@@ -15,27 +22,27 @@ pub mod anchor_errors;
 /// managing document boundaries and normalization of parsed nodes.
 ///
 mod anchors;
-pub mod block_scalar_errors;
-pub mod comment_errors;
+// pub mod block_scalar_errors;
+// pub mod comment_errors;
 mod contents;
 pub mod context;
-pub mod directive_errors;
+// pub mod directive_errors;
 pub mod error_builder;
 mod explicit_key;
 pub mod flow_punctuation;
 pub mod helpers;
 pub mod indentation;
-pub mod indentation_errors;
+// pub mod indentation_errors;
 mod inline_tokens;
 mod loop_guards;
 mod main_loop;
 mod mapping;
-pub mod mapping_errors;
+// pub mod mapping_errors;
 pub mod node_utils;
 mod parse;
 mod scalar;
 mod sequence;
-pub mod token_errors;
+// pub mod token_errors;
 mod tokens;
 pub mod validate_tree;
 mod value;

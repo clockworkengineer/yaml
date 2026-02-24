@@ -116,7 +116,7 @@ fn parse_document_main_loop(
                                 ) {
                                     source.restore_state(st);
                                     return Err(
-                                        crate::parser::document::token_errors::document_unexpected_plain_after_top_level_sequence(
+                                        crate::parser::document::errors::token_errors::document_unexpected_plain_after_top_level_sequence(
                                             source,
                                         ),
                                     );
@@ -138,7 +138,7 @@ fn parse_document_main_loop(
                             if at_top_level {
                                 if let Node::Str(_, QuoteType::Unquoted, _) = &node {
                                     return Err(
-                                        crate::parser::document::token_errors::document_unexpected_plain_after_top_level_sequence(
+                                        crate::parser::document::errors::token_errors::document_unexpected_plain_after_top_level_sequence(
                                             source,
                                         ),
                                     );
@@ -168,7 +168,7 @@ fn parse_document_main_loop(
                 if ahead_indent == indent_level {
                     source.restore_state(st);
                     return Err(
-                        crate::parser::document::token_errors::document_unexpected_plain_after_top_level_sequence(
+                        crate::parser::document::errors::token_errors::document_unexpected_plain_after_top_level_sequence(
                             source,
                         ),
                     );

@@ -52,7 +52,7 @@ fn parse_block_header_line(
                     .chars()
                     .all(|c| c == '+' || c == CHAR_DASH || c.is_ascii_digit());
                 if !first_ok {
-                    return Err(crate::parser::document::block_scalar_errors::BlockScalarErrors::invalid_header_unexpected_text(
+                    return Err(crate::parser::document::errors::block_scalar_errors::BlockScalarErrors::invalid_header_unexpected_text(
                         source,
                     ));
                 }
@@ -74,7 +74,7 @@ fn parse_block_header_line(
     let digits: String = header_meta.chars().filter(|c| c.is_ascii_digit()).collect();
     if !digits.is_empty() {
         if digits.len() != 1 || digits.chars().next().unwrap() == '0' {
-            return Err(crate::parser::document::block_scalar_errors::BlockScalarErrors::invalid_indent_indicator(
+            return Err(crate::parser::document::errors::block_scalar_errors::BlockScalarErrors::invalid_indent_indicator(
                 source,
             ));
         }
@@ -309,7 +309,7 @@ fn parse_block_scalar(
     if indicator == '|' && !has_explicit_indent_indicator {
         if let Some(first_indent) = first_content_indent {
             if blank_lines_before_content >= 1 && max_blank_indent_before_content > first_indent {
-                return Err(crate::parser::document::block_scalar_errors::BlockScalarErrors::invalid_literal_blank_indent(
+                return Err(crate::parser::document::errors::block_scalar_errors::BlockScalarErrors::invalid_literal_blank_indent(
                     stream.source_mut(),
                     max_blank_indent_before_content,
                     first_indent,
@@ -355,7 +355,7 @@ pub(crate) fn parse_scalar_with_tokens(
         Some(Token::DoubleQuoted(s)) => parse_double_quoted_scalar(stream, &s),
         Some(Token::Plain(s)) => parse_scalar_dispatch(stream, &s, directives),
         _ => Err(
-            crate::parser::document::token_errors::expected_scalar_token(
+            crate::parser::document::errors::token_errors::expected_scalar_token(
                 stream.source_mut(),
                 &current_token_str,
             ),

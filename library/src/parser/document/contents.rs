@@ -209,7 +209,7 @@ fn skip_trivia_with_ctx(
     if !ctx.in_flow {
         match crate::utils::skip_whitespace_and_comments_validate_tabs(source) {
             Ok(()) => Ok(()),
-            Err(_e) => Err(crate::parser::document::indentation_errors::IndentationErrors::tabs_not_allowed_yaml_block(source)),
+            Err(_e) => Err(crate::parser::document::errors::indentation_errors::IndentationErrors::tabs_not_allowed_yaml_block(source)),
         }
     } else {
         crate::utils::skip_whitespace_and_comments(source);
@@ -384,14 +384,14 @@ pub fn parse_document_contents(
                             let mut ts_err = crate::parser::token_stream::TokenStream::new(
                                 source, directives, false,
                             )?;
-                            Err(crate::parser::document::anchor_errors::AnchorErrors::anchor_cannot_precede_dash_same_line(&mut ts_err))
+                            Err(crate::parser::document::errors::anchor_errors::AnchorErrors::anchor_cannot_precede_dash_same_line(&mut ts_err))
                         }
                         Some(crate::parser::lexer::Token::Plain(s)) => {
                             if s.trim_start().starts_with('-') {
                                 let mut ts_err = crate::parser::token_stream::TokenStream::new(
                                     source, directives, false,
                                 )?;
-                                Err(crate::parser::document::anchor_errors::AnchorErrors::anchor_cannot_precede_dash_same_line(&mut ts_err))
+                                Err(crate::parser::document::errors::anchor_errors::AnchorErrors::anchor_cannot_precede_dash_same_line(&mut ts_err))
                             } else {
                                 Ok(
                                     crate::parser::document::tokens::value::parse_value_with_tokens(

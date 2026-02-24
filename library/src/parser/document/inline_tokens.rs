@@ -511,14 +511,14 @@ fn ensure_progress(
             None | Some(crate::parser::lexer::Token::Eof)
         ) {
             return Err(
-                crate::parser::document::token_errors::parser_did_not_advance_syntax(
+                crate::parser::document::errors::token_errors::parser_did_not_advance_syntax(
                     stream.source_mut(),
                     context,
                 ),
             );
         } else {
             return Err(
-                crate::parser::document::token_errors::parser_did_not_advance_structure(
+                crate::parser::document::errors::token_errors::parser_did_not_advance_structure(
                     stream.source_mut(),
                     context,
                 ),
