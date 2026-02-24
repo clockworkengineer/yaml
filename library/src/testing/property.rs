@@ -1,6 +1,15 @@
-//! Property-based testing utilities
+//! YAML Property-Based Testing Utilities
 //!
-//! Provides tools for defining and checking properties that should always hold.
+//! This module provides utilities for property-based testing of YAML functionality.
+//! It includes tools for defining and checking properties that should always hold for YAML data structures and operations.
+//!
+//! # Features
+//! - Define testable properties
+//! - Check properties over randomized data
+//! - Utilities for robust property-based testing
+//!
+//! # Usage
+//! Use these utilities to ensure correctness and invariants in YAML processing code.
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -90,12 +99,7 @@ pub mod properties {
         // Second round-trip; failures here indicate a true property violation.
         let node2 = match roundtrip_node(&node1) {
             Ok(n) => n,
-            Err(e) => {
-                return PropertyResult::Fail(format!(
-                    "Second round-trip failed: {}",
-                    e
-                ))
-            }
+            Err(e) => return PropertyResult::Fail(format!("Second round-trip failed: {}", e)),
         };
 
         // Compare debug representations (not perfect but good enough)

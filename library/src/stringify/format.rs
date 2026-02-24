@@ -1,7 +1,9 @@
-//! Formatting options and control for YAML serialization
+//! YAML Formatting Options & Control
 //!
-//! Provides fine-grained control over YAML output formatting including
-//! indentation, line width, quote styles, and collection formatting.
+//! Provides fine-grained control over YAML output formatting, including indentation,
+//! line width, quote styles, and collection formatting for serialization.
+//!
+//! Copyright (c) 2026 YAML Library Developers
 
 use alloc::string::String;
 

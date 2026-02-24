@@ -1,3 +1,28 @@
+//! YAML_lib: Modular YAML Toolkit for Rust
+//!
+//! This crate provides a lightweight, modular, and flexible YAML implementation for Rust.
+//! It includes a core Node type, parser, multiple format serializers (YAML, JSON, XML, TOML, Bencode),
+//! file and buffer I/O abstractions, pretty-printing, and Unicode-aware file handling.
+//!
+//! # Features
+//! - Core Node type for YAML structures
+//! - Streaming parser
+//! - Multiple format serializers
+//! - File and buffer I/O
+//! - Pretty-printing utilities
+//! - Unicode support
+//!
+//! # Minimum Supported Rust Version
+//! 1.88.0
+//!
+//! # Feature Flags
+//! - `std` (default): Enable standard library support
+//! - `alloc`: Enable heap-allocated data structures
+//! - `serde`: Enable Serde serialization/deserialization
+//! - `debug-anchors`: Enable debug logging for anchors
+//!
+//! # Usage
+//! Add `yaml_lib` as a dependency and use the provided modules for YAML parsing, serialization, and processing.
 #[macro_use]
 pub mod anchors_debug_macro;
 #[macro_use]

@@ -1,6 +1,16 @@
-//! Performance measurement and optimization utilities
+//! Performance Utilities for YAML Library
 //!
-//! Provides tools for profiling YAML operations and gathering statistics.
+//! This module provides performance measurement and optimization tools for YAML processing.
+//! It includes profiling helpers and statistics gathering utilities to analyze and improve
+//! the efficiency of YAML operations.
+//!
+//! # Features
+//! - Profiling of YAML operations
+//! - Gathering statistics on document structures
+//! - Utilities for measuring and optimizing performance
+//!
+//! # Usage
+//! Use these tools to profile, analyze, and optimize YAML processing code.
 
 #[cfg(feature = "std")]
 use std::time::{Duration, Instant};

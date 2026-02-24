@@ -1,7 +1,16 @@
-//! Built-in validators for common validation patterns
+//! Built-in Validators for YAML Validation
 //!
-//! Provides reusable validators for type checking, range validation,
-//! pattern matching, and custom validation logic.
+//! This module provides reusable built-in validators for common validation patterns in YAML documents.
+//! It includes type checking, range validation, pattern matching, and support for custom validation logic.
+//!
+//! # Features
+//! - Type checking validators
+//! - Range and length validation
+//! - Pattern matching (regex)
+//! - Support for custom validation logic
+//!
+//! # Usage
+//! Use these validators to enforce schema rules and constraints on YAML data.
 
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};

@@ -1,3 +1,16 @@
+//! Validation Engine for YAML Library
+//!
+//! This module provides core helpers and context for building validation errors and implementing
+//! schema-based validation logic for YAML documents. It supports DRY error construction and reusable
+//! validation patterns for custom validators.
+//!
+//! # Features
+//! - Centralized error construction for validators
+//! - Context helpers for schema validation
+//! - Extensible for custom validation logic
+//!
+//! # Usage
+//! Use these helpers to implement robust and consistent validation for YAML data structures.
 /// Core helpers for building validation errors (DRY for validators)
 pub struct ValidationContextCore;
 

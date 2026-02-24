@@ -1,4 +1,9 @@
-//! Module: stringify/toml.rs
+//! TOML Stringification
+//!
+//! Provides functions for converting YAML nodes to TOML string representations, including
+//! escaping, formatting, and output to destinations.
+//!
+//! Copyright (c) 2026 YAML Library Developers
 
 use crate::io::traits::IDestination;
 use crate::nodes::node::*;

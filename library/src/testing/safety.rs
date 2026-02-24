@@ -1,7 +1,15 @@
-//! Memory safety auditing tools
+//! YAML Memory Safety Auditing Tools
 //!
-//! Provides utilities for detecting memory leaks, undefined behavior,
-//! and other safety issues.
+//! This module provides utilities for auditing memory safety in YAML processing.
+//! It includes tools for detecting memory leaks, undefined behavior, and other safety issues.
+//!
+//! # Features
+//! - Memory leak detection
+//! - Undefined behavior checks
+//! - Tools for identifying safety issues in YAML code
+//!
+//! # Usage
+//! Use these tools to audit and improve the safety of YAML processing code.
 
 use alloc::format;
 use alloc::string::{String, ToString};

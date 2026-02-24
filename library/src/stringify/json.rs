@@ -1,10 +1,15 @@
-//! Module: stringify/json.rs
+//! JSON Stringification
+//!
+//! Provides functions for converting YAML nodes to JSON string representations, including
+//! escaping, formatting, and output to destinations. Handles JSON-specific escape sequences.
+//!
+//! Copyright (c) 2026 YAML Library Developers
 
 use crate::error::YamlError;
 use crate::io::traits::IDestination;
 use crate::nodes::node::*;
 use crate::stringify::format::node_to_key_like_string;
-use crate::stringify::serializer::{walk_node, FormatWriter, StreamResult};
+use crate::stringify::serializer::{FormatWriter, StreamResult, walk_node};
 use crate::utils::escape::escape_for_json;
 
 /// Escapes special characters in a string for JSON representation.

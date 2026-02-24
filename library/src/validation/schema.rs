@@ -1,7 +1,15 @@
-//! Schema definition types for YAML validation
+//! Schema Definition Types for YAML Validation
 //!
-//! Provides types for defining the expected structure and constraints
-//! of YAML documents, similar to JSON Schema.
+//! This module provides types and structures for defining the expected schema of YAML documents,
+//! similar to JSON Schema. It enables specifying types, constraints, and validation rules for YAML data.
+//!
+//! # Features
+//! - Schema types for YAML nodes
+//! - Support for constraints and validation rules
+//! - Enables schema-driven validation
+//!
+//! # Usage
+//! Use these types to define and enforce the structure of YAML documents.
 
 use alloc::collections::BTreeMap;
 use alloc::string::String;

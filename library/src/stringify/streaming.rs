@@ -1,6 +1,9 @@
-//! Streaming serialization for large YAML documents
+//! Streaming YAML Serialization
 //!
-//! Provides incremental serialization without loading entire document into memory.
+//! Provides incremental serialization for large YAML documents, enabling output
+//! without loading the entire document into memory. Supports efficient streaming to destinations.
+//!
+//! Copyright (c) 2026 YAML Library Developers
 
 use alloc::string::String;
 use alloc::vec::Vec;

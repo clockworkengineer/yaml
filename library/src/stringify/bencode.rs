@@ -1,4 +1,9 @@
-//! Module: stringify/bencode.rs
+//! Bencode Stringification
+//!
+//! Provides functions for recursively encoding YAML nodes to Bencode format, handling strings,
+//! integers, lists, and dictionaries according to the Bencode specification.
+//!
+//! Copyright (c) 2026 YAML Library Developers
 
 use crate::io::traits::IDestination;
 use crate::nodes::node::*;

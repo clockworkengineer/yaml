@@ -1,4 +1,16 @@
-//! Module: stringify/xml.rs
+
+//! YAML to XML Stringifier
+//!
+//! This module provides functionality to convert YAML node structures into XML format.
+//! It handles escaping, tag sanitization, and writing XML-compliant output to a destination.
+//!
+//! # Features
+//! - Escapes special XML characters
+//! - Sanitizes tag names to be XML-compliant
+//! - Supports writing text and node structures as XML
+//!
+//! # Usage
+//! Use the provided functions to serialize YAML nodes to XML for output or further processing.
 
 use crate::io::traits::IDestination;
 use crate::nodes::node::*;

@@ -1,10 +1,17 @@
-//! Performance optimization utilities for YAML parsing and processing
+//! Optimization Utilities for YAML Library
 //!
-//! This module provides various optimizations including:
-//! - Lazy tag coercion (defer type conversion until needed)
+//! This module provides performance optimization utilities for YAML parsing and processing.
+//! It includes lazy tag coercion, capacity hints, zero-copy string operations, and profiling helpers
+//! to improve efficiency and reduce resource usage.
+//!
+//! # Features
+//! - Lazy tag coercion (deferred type conversion)
 //! - Capacity hints for pre-allocation
-//! - Zero-copy string operations where possible
+//! - Zero-copy string operations
 //! - Performance profiling helpers
+//!
+//! # Usage
+//! Use these utilities to optimize YAML processing code for speed and memory efficiency.
 
 #[cfg(feature = "std")]
 use std::borrow::Cow;

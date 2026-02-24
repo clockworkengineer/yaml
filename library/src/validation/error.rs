@@ -1,4 +1,16 @@
-//! Error types for validation
+//! Validation Error Types for YAML Library
+//!
+//! This module defines error types used during schema and data validation of YAML documents.
+//! It provides structured error variants for type mismatches, range violations, length errors,
+//! and other validation failures.
+//!
+//! # Features
+//! - Structured error types for validation
+//! - Supports detailed error reporting for schema validation
+//! - Used by validation engine and custom validators
+//!
+//! # Usage
+//! Use these error types to report and handle validation failures in YAML processing code.
 
 use alloc::string::String;
 use alloc::vec::Vec;

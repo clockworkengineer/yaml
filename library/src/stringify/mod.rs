@@ -1,3 +1,10 @@
+//! YAML Stringification Modules
+//!
+//! Aggregates modules for converting YAML nodes to various string representations, including
+//! Bencode, default YAML, JSON, TOML, XML, and streaming/custom serializers. Provides formatting options.
+//!
+//! Copyright (c) 2026 YAML Library Developers
+
 /// bencode
 pub mod bencode;
 /// default

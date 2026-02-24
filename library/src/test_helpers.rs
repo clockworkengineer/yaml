@@ -1,4 +1,15 @@
-//! Common test helpers for YAML library integration/unit tests
+//! Test Helpers for YAML Library
+//!
+//! This module provides common helper functions for integration and unit tests in the YAML library.
+//! It includes utilities for parsing YAML, asserting node equality, and simplifying test code.
+//!
+//! # Features
+//! - Parse YAML from strings or bytes
+//! - Assert node equality with pretty diffs
+//! - Utilities for robust and readable tests
+//!
+//! # Usage
+//! Use these helpers to write concise and effective tests for YAML processing code.
 
 use crate::error::YamlError;
 use crate::{BufferSource, Node, parse};

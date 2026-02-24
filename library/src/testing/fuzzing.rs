@@ -1,7 +1,15 @@
-//! Fuzzing infrastructure for YAML parsing and serialization
+//! YAML Fuzzing Infrastructure
 //!
-//! Provides tools for generating random YAML inputs and detecting crashes,
-//! hangs, and incorrect behavior.
+//! This module provides infrastructure for fuzz testing YAML parsing and serialization.
+//! It includes tools for generating random YAML inputs and detecting crashes, hangs, and incorrect behavior.
+//!
+//! # Features
+//! - Random YAML input generation
+//! - Crash and hang detection
+//! - Utilities for fuzz-based robustness testing
+//!
+//! # Usage
+//! Use the provided fuzzing utilities to test the resilience of YAML parsing and serialization code.
 
 use alloc::boxed::Box;
 use alloc::string::String;

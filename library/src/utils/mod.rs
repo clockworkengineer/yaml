@@ -1,4 +1,18 @@
-//! Module: utils/mod.rs
+//! YAML Library Utility Modules
+//!
+//! This module aggregates utility submodules for the YAML library, including performance tools,
+//! string interning, escaping, streaming, and anchor helpers. These utilities provide reusable
+//! building blocks for efficient and robust YAML processing.
+//!
+//! # Features
+//! - Performance measurement and optimization
+//! - String interning
+//! - String escaping for multiple formats
+//! - Streaming and iterator support
+//! - Anchor-related helpers
+//!
+//! # Usage
+//! Import and use the relevant submodules as needed throughout the YAML library.
 
 /// Performance measurement and optimization utilities
 pub mod performance;
@@ -18,11 +32,8 @@ pub mod streaming;
 
 /// Anchor-related helpers for DRY refactor
 pub mod anchors_helpers;
-pub mod anchors_helpers2;
 
-use crate::constants::{
-    CHAR_CARRIAGE_RETURN, CHAR_HASH, CHAR_NEWLINE, CHAR_SPACE, CHAR_TAB,
-};
+use crate::constants::{CHAR_CARRIAGE_RETURN, CHAR_HASH, CHAR_NEWLINE, CHAR_SPACE, CHAR_TAB};
 use crate::io::traits::ISource;
 use crate::{Node, Numeric};
 

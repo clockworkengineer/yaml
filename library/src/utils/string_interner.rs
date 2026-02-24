@@ -1,10 +1,16 @@
-//! String interning for memory optimization
+//! String Interning Utilities for YAML Library
 //!
-//! This module provides string interning capabilities to reduce memory usage
-//! when the same strings appear multiple times in YAML documents (e.g., common keys
-//! like "name", "type", "id", "value").
-//!
+//! This module provides string interning capabilities to optimize memory usage when
+//! identical strings appear repeatedly in YAML documents (such as common keys).
 //! String interning can reduce memory usage by 20-40% for typical configuration files.
+//!
+//! # Features
+//! - Efficient string interning for deduplication
+//! - Reduces memory footprint for repeated strings
+//! - Thread-safe and no_std compatible
+//!
+//! # Usage
+//! Use the string interner to store and reuse common strings in YAML processing.
 
 #[cfg(feature = "std")]
 use std::collections::HashMap;

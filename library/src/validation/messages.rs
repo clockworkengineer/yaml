@@ -1,8 +1,16 @@
-//! Shared validation message helpers (behavior-neutral DRY refactor)
+//! Validation Message Helpers for YAML Library
 //!
-//! This module centralizes common human-readable validation descriptions
-//! so that range/length/enum messages stay consistent across validators
-//! while keeping the exact existing wording.
+//! This module provides shared helpers for generating human-readable validation messages.
+//! It centralizes descriptions for type, range, length, and enum validation to ensure consistency
+//! across all validators while preserving existing wording.
+//!
+//! # Features
+//! - Centralized message formatting for validation
+//! - Consistent descriptions for type, range, and length checks
+//! - Used by schema and custom validators
+//!
+//! # Usage
+//! Use these helpers to generate consistent validation messages in error reporting.
 
 use alloc::string::String;
 use alloc::vec::Vec;

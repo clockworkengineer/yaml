@@ -1,8 +1,14 @@
-//! Shared string escaping utilities for stringify modules
+//! String Escaping Utilities for YAML Library
 //!
-//! This module centralizes escaping logic for JSON, XML, and YAML
-//! representations so that format-specific modules can reuse a
-//! consistent implementation.
+//! This module provides shared escaping logic for JSON, XML, and YAML stringification.
+//! It ensures consistent and correct escaping of special characters across different formats.
+//!
+//! # Features
+//! - Escape special characters for JSON, XML, and YAML
+//! - Centralized, reusable implementation
+//!
+//! # Usage
+//! Use these functions in format-specific modules to ensure proper escaping of output strings.
 
 #[cfg(feature = "alloc")]
 extern crate alloc;

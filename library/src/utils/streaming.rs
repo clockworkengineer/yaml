@@ -1,11 +1,17 @@
-//! Streaming and iterator support for efficient YAML processing
+//! Streaming Utilities for YAML Library
 //!
-//! This module provides streaming capabilities for processing large YAML documents
-//! without loading the entire structure into memory at once. It includes:
-//! - Iterator-based node traversal (depth-first and breadth-first)
+//! This module provides streaming and iterator support for efficient YAML processing.
+//! It enables processing large YAML documents without loading them entirely into memory,
+//! using iterator-based traversal, streaming parsers, and memory-efficient operations.
+//!
+//! # Features
+//! - Iterator-based node traversal (depth-first, breadth-first)
 //! - Streaming parser for lazy evaluation
-//! - Memory-efficient processing with filter/map/fold operations
+//! - Memory-efficient filter/map/fold operations
 //! - Path-based node access
+//!
+//! # Usage
+//! Use these utilities to process large or streaming YAML data efficiently.
 
 use alloc::collections::VecDeque;
 use alloc::string::String;

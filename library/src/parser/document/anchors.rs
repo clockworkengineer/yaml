@@ -11,7 +11,6 @@ use crate::nodes::node::Node;
 use crate::parser::ParseResult;
 use crate::parser::utils::error_helpers;
 use crate::utils::anchors_helpers;
-use crate::utils::anchors_helpers2;
 use std::collections::HashMap;
 
 #[allow(dead_code)]
@@ -64,7 +63,7 @@ pub(crate) fn replace_aliases(node: &mut Node, anchors: &HashMap<String, Node>) 
     let mut replacer = |n: &mut Node| match n {
         Node::Alias(name) => {
             anchors_debug!("Replacing alias: {}", name);
-            match anchors_helpers2::lookup_anchor(anchors, name) {
+            match anchors_helpers::lookup_anchor(anchors, name) {
                 Ok(found) => *n = found.clone(),
                 Err(e) => err = Some(e),
             }
@@ -115,8 +114,8 @@ pub(crate) fn expand_merge_keys(
                         match &v {
                             Node::Alias(name) => {
                                 anchors_debug!("Expanding merge alias: {}", name);
-                                match anchors_helpers2::lookup_anchor(anchors, name)
-                                    .and_then(|src| anchors_helpers2::as_mapping(src, name))
+                                match anchors_helpers::lookup_anchor(anchors, name)
+                                    .and_then(|src| anchors_helpers::as_mapping(src, name))
                                 {
                                     Ok(src_pairs) => expanded_pairs.extend(src_pairs.clone()),
                                     Err(e) => {
@@ -134,9 +133,9 @@ pub(crate) fn expand_merge_keys(
                                                 "Expanding merge alias in array: {}",
                                                 name
                                             );
-                                            match anchors_helpers2::lookup_anchor(anchors, name)
+                                            match anchors_helpers::lookup_anchor(anchors, name)
                                                 .and_then(|src| {
-                                                    anchors_helpers2::as_mapping(src, name)
+                                                    anchors_helpers::as_mapping(src, name)
                                                 }) {
                                                 Ok(src_pairs) => {
                                                     expanded_pairs.extend(src_pairs.clone())

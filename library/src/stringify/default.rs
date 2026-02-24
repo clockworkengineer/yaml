@@ -1,4 +1,9 @@
-//! Module: stringify/default.rs
+//! Default YAML Stringification
+//!
+//! Provides functions for converting YAML nodes to their default string representations,
+//! including escaping, formatting, and output to destinations.
+//!
+//! Copyright (c) 2026 YAML Library Developers
 
 use crate::constants::*;
 use crate::error::YamlError;

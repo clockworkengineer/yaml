@@ -1,6 +1,9 @@
-//! Custom serializer trait and implementations
+//! Custom Serializer Trait & Implementations
 //!
-//! Allows users to define custom serialization logic for specific node types.
+//! Defines traits and implementations for custom serialization logic for YAML nodes.
+//! Allows users to provide custom serializers for specific node types and output formats.
+//!
+//! Copyright (c) 2026 YAML Library Developers
 
 use alloc::boxed::Box;
 use alloc::string::String;
