@@ -30,9 +30,11 @@ Restructure the `parser` folder for improved maintainability, clarity, and scala
 - Note: Both macros (`anchors_debug!` and `lexer_debug!`) are kept in `parser/utils/macros/` as they are well-organized debug utilities.
 
 ### 5. Flatten and Group Document Submodules
-- In `parser/document/`, merge small files (e.g., `context.rs`, `helpers.rs`, `node_utils.rs`, `error_builder.rs`) into a single `core.rs` if possible.
-- Keep main logic files (`parse.rs`, `main_loop.rs`, `mapping.rs`, `sequence.rs`, `scalar.rs`, `value.rs`, `validate_tree.rs`, `anchors.rs`, `contents.rs`, `explicit_key.rs`, `flow_punctuation.rs`, `indentation.rs`, `inline_tokens.rs`, `loop_guards.rs`) in `parser/document/`.
-- Remove or merge files as appropriate.
+- ~~In `parser/document/`, merge small files (e.g., `context.rs`, `helpers.rs`, `node_utils.rs`, `error_builder.rs`) into a single `core.rs` if possible.~~ ✅
+  - Note: These files were already moved to `parser/utils/` in step 3
+- ~~Keep main logic files (`parse.rs`, `main_loop.rs`, `mapping.rs`, `sequence.rs`, `scalar.rs`, `value.rs`, `validate_tree.rs`, `anchors.rs`, `contents.rs`, `explicit_key.rs`, `flow_punctuation.rs`, `indentation.rs`, `inline_tokens.rs`, `loop_guards.rs`) in `parser/document/`.~~ ✅
+- ~~Remove or merge files as appropriate.~~ ✅
+  - Note: All remaining files serve distinct purposes with clear responsibilities; no further merging needed
 
 ### 6. Update `mod.rs` Files
 - Update all `mod.rs` files to reflect the new structure and re-export modules as needed.
