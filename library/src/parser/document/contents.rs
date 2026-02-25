@@ -1,4 +1,3 @@
-
 //! Document Contents Parsing
 //!
 //! Implements parsing logic for YAML document contents, including error construction macros,
@@ -529,5 +528,56 @@ pub fn parse_document_contents(
             ))
         }
         None => Ok(Node::None),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::nodes::node::Node;
+    use crate::parser::directives::DirectiveContext;
+    use crate::io::sources::buffer::Buffer;
+    use crate::parser::utils::context::ParsingContext;
+    use crate::parser::utils::context::CollectionType;
+
+    fn make_ctx_none() -> ParsingContext {
+        ParsingContext { collection_type: CollectionType::None, ..Default::default() }
+    }
+
+    #[test]
+    fn test_parse_scalar_or_value_plain_multiline() {
+        let mut buf = Buffer::new(b"abc\ndef\nghi");
+        let directives = DirectiveContext::default();
+        let ctx = make_ctx_none();
+        let node = parse_scalar_or_value(&mut buf, &directives, 0, &ctx).unwrap();
+        assert_eq!(node, Node::from("abc def ghi"));
+    }
+
+    #[test]
+    fn test_parse_scalar_or_value_value_branch() {
+        let mut buf = Buffer::new(b"42");
+        let directives = DirectiveContext::default();
+        let ctx = ParsingContext { collection_type: CollectionType::BlockSequence, ..Default::default() };
+        let node = parse_scalar_or_value(&mut buf, &directives, 0, &ctx).unwrap();
+        // Accepts any parse_value result, just check not None
+        assert!(node != Node::None);
+    }
+
+    #[test]
+    fn test_parse_document_contents_unexpected_char() {
+        let mut buf = Buffer::new(b"$");
+        let directives = DirectiveContext::default();
+        let ctx = make_ctx_none();
+        let result = parse_document_contents(&mut buf, 0, &directives, &ctx);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_document_contents_none_on_eof() {
+        let mut buf = Buffer::new(b"");
+        let directives = DirectiveContext::default();
+        let ctx = make_ctx_none();
+        let node = parse_document_contents(&mut buf, 0, &directives, &ctx).unwrap();
+        assert_eq!(node, Node::None);
     }
 }

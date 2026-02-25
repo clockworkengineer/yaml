@@ -1,3 +1,4 @@
+
 //! Explicit Key Parsing Helpers
 //!
 //! Provides helpers and utilities for parsing explicit keys in YAML mappings,
@@ -170,4 +171,67 @@ pub(crate) fn collect_explicit_keys_block(
         directives,
         Some(crate::parser::document::loop_guards::MAX_MAPPING_PAIRS),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::nodes::node::Node;
+
+    #[test]
+    fn test_guarded_explicit_key_loop_basic() {
+        let mut count = 0;
+        let result = guarded_explicit_key_loop(
+            || {
+                if count < 3 {
+                    count += 1;
+                    Some(Ok((Node::from(count), Node::from(count * 10))))
+                } else {
+                    None
+                }
+            },
+            Some(5),
+        )
+        .unwrap();
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0], (Node::from(1), Node::from(10)));
+        assert_eq!(result[2], (Node::from(3), Node::from(30)));
+    }
+
+    #[test]
+    fn test_guarded_explicit_key_loop_max_pairs() {
+        let mut count = 0;
+        let result = guarded_explicit_key_loop(
+            || {
+                if count < 10 {
+                    count += 1;
+                    Some(Ok((Node::from(count), Node::from(count))))
+                } else {
+                    None
+                }
+            },
+            Some(4),
+        )
+        .unwrap();
+        assert_eq!(result.len(), 4);
+    }
+
+    #[test]
+    fn test_guarded_explicit_key_loop_error() {
+        let result = guarded_explicit_key_loop(
+            || Some(Err(crate::error::YamlError::from("fail"))),
+            Some(1),
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_normalize_node_to_str() {
+        let n = Node::from("abc");
+        let norm = normalize_node_to_str(&n);
+        assert_eq!(norm, n);
+        let n2 = Node::from(123);
+        let norm2 = normalize_node_to_str(&n2);
+        assert!(matches!(norm2, Node::Str(_, _, _)));
+    }
 }
