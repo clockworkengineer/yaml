@@ -39,9 +39,7 @@ impl TryFrom<&Numeric> for LightNumeric {
             Numeric::UInt16(u) => Ok(LightNumeric::Byte((*u).min(255) as u8)),
             Numeric::UInt32(u) => Ok(LightNumeric::Integer((*u).min(i32::MAX as u32) as i32)),
             Numeric::UInteger(u) => Ok(LightNumeric::Integer((*u).min(i32::MAX as u64) as i32)),
-            Numeric::Int8(i) => Ok(LightNumeric::Short(*i as i16)),
             // Add more mappings as needed
-            _ => Err("Unsupported numeric type for lightweight conversion"),
         }
     }
 }

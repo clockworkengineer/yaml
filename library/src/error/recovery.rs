@@ -1,3 +1,4 @@
+  
 //! YAML Error Recovery Strategies
 //!
 //! Provides error recovery mechanisms for YAML parsing, allowing parsing to continue
@@ -372,5 +373,50 @@ mod tests {
 
         ctx.enter_block_mapping();
         assert!(ctx.can_recover(RecoveryStrategy::SkipToNextMapping));
+    }
+      #[test]
+    fn test_error_collection_clear() {
+        let mut collection = ErrorCollection::new();
+        collection.add(EnhancedError::new(YamlError::new(ErrorKind::SyntaxError, "test")));
+        assert!(!collection.is_empty());
+        collection.clear();
+        assert!(collection.is_empty());
+    }
+
+    #[test]
+    fn test_error_collection_into_result() {
+        let collection = ErrorCollection::new();
+        let result: Result<i32, EnhancedError> = collection.into_result(42);
+        assert_eq!(result.unwrap(), 42);
+
+        let mut collection = ErrorCollection::new();
+        collection.add(EnhancedError::new(YamlError::new(ErrorKind::SyntaxError, "fail")));
+        let result: Result<i32, EnhancedError> = collection.into_result(42);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_recovery_handler_strict_abort() {
+        let handler = RecoveryHandler::strict();
+        let error = YamlError::new(ErrorKind::ParseError, "test");
+        assert_eq!(handler.recover(&error), RecoveryStrategy::Abort);
+    }
+
+    #[test]
+    fn test_recovery_context_deep_bracket() {
+        let mut ctx = RecoveryContext::new();
+        for _ in 0..5 {
+            ctx.enter_flow_mapping();
+        }
+        assert_eq!(ctx.bracket_depth, 5);
+        assert!(ctx.in_flow);
+        ctx.exit_flow();
+        assert_eq!(ctx.bracket_depth, 4);
+        ctx.exit_flow();
+        ctx.exit_flow();
+        ctx.exit_flow();
+        ctx.exit_flow();
+        assert_eq!(ctx.bracket_depth, 0);
+        assert!(!ctx.in_flow);
     }
 }

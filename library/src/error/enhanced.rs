@@ -1,3 +1,4 @@
+
 //! Enhanced Error Handling Module
 //!
 //! Provides advanced error handling for YAML parsing and processing, including:
@@ -575,5 +576,51 @@ mod tests {
         assert!(formatted.contains("[E001]"));
         assert!(formatted.contains("Suggestions:"));
         assert!(formatted.contains("Note:"));
+    }
+        #[test]
+    fn test_span_invalid() {
+        let span = Span::new(2, 3, 1, 1); // end before start
+        assert_eq!(span.start_line, 2);
+        assert_eq!(span.end_line, 1);
+        assert!(!span.is_point());
+    }
+
+    #[test]
+    fn test_error_suggestion_empty() {
+        let suggestion = ErrorSuggestion::new("");
+        assert_eq!(suggestion.message, "");
+        assert_eq!(suggestion.replacement, None);
+        assert_eq!(suggestion.span, None);
+    }
+
+    #[test]
+    fn test_error_suggestion_with_span() {
+        let span = Span::point(1, 1);
+        let suggestion = ErrorSuggestion::new("Fix here").with_span(span);
+        assert_eq!(suggestion.span, Some(span));
+    }
+
+    #[test]
+    fn test_enhanced_error_no_code() {
+        let base = YamlError::new(ErrorKind::SyntaxError, "no code");
+        let enhanced = EnhancedError::new(base);
+        assert_eq!(enhanced.code(), None);
+    }
+
+    #[test]
+    fn test_enhanced_error_multiple_notes() {
+        let base = YamlError::new(ErrorKind::SyntaxError, "multi notes");
+        let enhanced = EnhancedError::new(base)
+            .with_note("First note")
+            .with_note("Second note");
+        assert_eq!(enhanced.notes().len(), 2);
+    }
+
+    #[test]
+    fn test_recovery_failure() {
+        let recovery = ErrorRecovery::new(RecoveryStrategy::Abort).failed("Could not recover");
+        assert!(!recovery.recovered);
+        assert_eq!(recovery.strategy, RecoveryStrategy::Abort);
+        assert_eq!(recovery.message, "Could not recover");
     }
 }
