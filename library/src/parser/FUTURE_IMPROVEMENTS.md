@@ -57,7 +57,15 @@ parser/utils/
 - Clear separation of concerns
 - Each file would be ~200-300 lines instead of 1000+
 
-**Effort:** Medium (needs careful import tracking across codebase)
+**Effort:** High (1008 lines with complex interdependencies, extensive import tracking needed)
+
+**Note**: Initial attempt showed this requires careful extraction of:
+- 17+ public functions
+- Shared imports and types (DocMarkerKind, BlockHeadKind, etc.)
+- Unit tests distributed throughout the file
+- Complex error handling patterns
+
+This refactoring would take significant time and testing to ensure correctness.
 
 ### Medium Priority
 
