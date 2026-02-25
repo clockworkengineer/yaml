@@ -1,3 +1,4 @@
+
 //! Buffer Source for Decoded Input
 //!
 //! Provides a memory buffer implementation for reading YAML or JSON data from bytes.
@@ -251,5 +252,80 @@ mod tests {
         source.reset();
         assert_eq!(source.current(), Some('z'));
         assert!(source.more());
+    }
+        #[test]
+    fn buffer_handles_only_newlines() {
+        let mut source = Buffer::new(b"\n\n\n");
+        assert_eq!(source.line, 0);
+        assert_eq!(source.column, 0);
+        for i in 0..3 {
+            assert_eq!(source.current(), Some('\n'));
+            source.next();
+            assert_eq!(source.line, i + 1);
+            assert_eq!(source.column, 0);
+        }
+        assert_eq!(source.current(), None);
+    }
+
+    #[test]
+    fn buffer_handles_mixed_line_endings() {
+        let mut source = Buffer::new(b"a\r\nb\rc\nd");
+        assert_eq!(source.current(), Some('a'));
+        source.next(); // '\r'
+        assert_eq!(source.current(), Some('\r'));
+        source.next(); // '\n' (part of CRLF)
+        assert_eq!(source.current(), Some('\n'));
+        source.next(); // 'b'
+        assert_eq!(source.current(), Some('b'));
+        source.next(); // '\r'
+        assert_eq!(source.current(), Some('\r'));
+        source.next(); // 'c'
+        assert_eq!(source.current(), Some('c'));
+        source.next(); // '\n'
+        assert_eq!(source.current(), Some('\n'));
+        source.next(); // 'd'
+        assert_eq!(source.current(), Some('d'));
+        source.next();
+        assert_eq!(source.current(), None);
+    }
+
+    #[test]
+    fn buffer_save_restore_multiple_points() {
+        let mut source = Buffer::new(b"abcde");
+        let s0 = source.save_state();
+        source.next();
+        let s1 = source.save_state();
+        source.next();
+        let s2 = source.save_state();
+        source.next();
+        assert_eq!(source.current(), Some('d'));
+        source.restore_state(s1);
+        assert_eq!(source.current(), Some('b'));
+        source.restore_state(s2);
+        assert_eq!(source.current(), Some('c'));
+        source.restore_state(s0);
+        assert_eq!(source.current(), Some('a'));
+    }
+
+    #[test]
+    fn buffer_reset_after_partial_read() {
+        let mut source = Buffer::new(b"xyz");
+        source.next();
+        assert_eq!(source.current(), Some('y'));
+        source.reset();
+        assert_eq!(source.current(), Some('x'));
+    }
+
+    #[test]
+    fn buffer_handles_large_input() {
+        let data = vec![b'a'; 10_000];
+        let mut source = Buffer::new(&data);
+        let mut count = 0;
+        while source.more() {
+            assert_eq!(source.current(), Some('a'));
+            source.next();
+            count += 1;
+        }
+        assert_eq!(count, 10_000);
     }
 }
