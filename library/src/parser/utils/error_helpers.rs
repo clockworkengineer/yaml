@@ -47,5 +47,5 @@ pub fn syntax_error<S: AsRef<str>>(
     source: &mut dyn crate::io::traits::ISource,
     msg: S,
 ) -> crate::error::YamlError {
-    crate::parser::document::error_builder::syntax_error(source, msg.as_ref())
+    crate::parser::utils::error_builder::syntax_error(source, msg.as_ref())
 }

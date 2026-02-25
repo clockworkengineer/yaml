@@ -58,7 +58,7 @@ pub(crate) fn validate_top_level_comment_followed_by_indented_content(
                     | Some(crate::parser::lexer::Token::DoubleQuoted(_))
                     | Some(crate::parser::lexer::Token::FlowMappingStart)
                     | Some(crate::parser::lexer::Token::FlowSequenceStart) => {
-                        let msg = crate::parser::document::helpers::parse_error_token(
+                        let msg = crate::parser::utils::helpers::parse_error_token(
                             &stream,
                             "Unexpected indented content after top-level comment.",
                         );

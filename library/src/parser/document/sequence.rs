@@ -32,7 +32,7 @@ pub(crate) fn parse_sequence(
 ) -> ParseResult<crate::nodes::node::Node> {
     let mut stream = TokenStream::new(source, directives, false)?;
     // NOTE: parse_sequence is only used in legacy paths, so we pass a default context
-    let ctx = crate::parser::document::context::ParsingContext::default();
+    let ctx = crate::parser::utils::context::ParsingContext::default();
     let node = crate::parser::tokens::sequence::parse_sequence_with_tokens(
         &mut stream,
         indent_level,

@@ -23,10 +23,10 @@ use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::parser::ParseResult;
 use crate::parser::directives::DirectiveContext;
-use crate::parser::document::context::{CollectionType, ParsingContext};
+use crate::parser::utils::context::{CollectionType, ParsingContext};
 use crate::parser::document::explicit_key::parse_multiple_explicit_keys;
-use crate::parser::document::helpers;
-use crate::parser::document::helpers::{BlockHeadKind, DocMarkerKind, classify_doc_marker};
+use crate::parser::utils::helpers;
+use crate::parser::utils::helpers::{BlockHeadKind, DocMarkerKind, classify_doc_marker};
 use crate::parser::document::indentation::{
     ensure_indent_at_least, ensure_indent_at_least_no_source,
 };
@@ -241,7 +241,7 @@ pub fn parse_document_contents(
     ctx: &ParsingContext,
 ) -> ParseResult<Node> {
     skip_trivia_with_ctx(source, ctx)?;
-    crate::parser::document::helpers::validate_indentation_and_whitespace(source, directives, ctx)?;
+    crate::parser::utils::helpers::validate_indentation_and_whitespace(source, directives, ctx)?;
     let head_kind = helpers::classify_block_head(source, directives, ctx);
 
     // Handle explicit keys first so token-dispatch doesn't overshadow '?'
@@ -469,7 +469,7 @@ pub fn parse_document_contents(
                 }
                 crate::utils::skip_whitespace_and_comments(source);
             }
-            Ok(crate::parser::document::node_utils::make_mapping_node(
+            Ok(crate::parser::utils::node_utils::make_mapping_node(
                 pairs,
             ))
         }

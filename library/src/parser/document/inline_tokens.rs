@@ -308,7 +308,7 @@ pub fn parse_inline_mapping_with_tokens(
                 "Exceeded 1000 iterations in parse_inline_mapping_with_tokens, possible infinite loop"
                     .to_string(),
             );
-            return Err(crate::parser::document::error_builder::limit_error(
+            return Err(crate::parser::utils::error_builder::limit_error(
                 "flow mapping parser",
                 1000,
                 "loop iterations",
@@ -483,7 +483,7 @@ pub fn parse_inline_mapping_with_tokens(
     if is_set {
         // For !!set, convert mapping pairs with Node::None values to Node::Set
         if let Some(set_items) =
-            crate::parser::document::node_utils::pairs_to_set_items_if_all_none(&pairs)
+            crate::parser::utils::node_utils::pairs_to_set_items_if_all_none(&pairs)
         {
             Ok(make_set_node(set_items))
         } else {

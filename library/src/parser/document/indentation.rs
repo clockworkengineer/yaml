@@ -9,7 +9,7 @@
 use crate::error::{ErrorKind, YamlError};
 use crate::io::traits::ISource;
 use crate::parser::ParseResult;
-use crate::parser::document::context::ParsingContext;
+use crate::parser::utils::context::ParsingContext;
 
 /// Ensures that `actual` indent is at least `expected`.
 ///
@@ -23,7 +23,7 @@ pub fn ensure_indent_at_least(
     what: &str,
 ) -> ParseResult<()> {
     if actual < expected {
-        return Err(crate::parser::document::error_builder::indentation_error(
+        return Err(crate::parser::utils::error_builder::indentation_error(
             source,
             &format!(
                 "{} at invalid indentation: expected >= {}, got {}",
@@ -66,7 +66,7 @@ pub fn ensure_valid_child_indent(
     what: &str,
 ) -> Result<(), YamlError> {
     if !ctx.is_valid_child_indent(child_indent) {
-        return Err(crate::parser::document::error_builder::indentation_error(
+        return Err(crate::parser::utils::error_builder::indentation_error(
             source,
             &format!(
                 "Invalid child indentation for {}: parent {}, child {}",

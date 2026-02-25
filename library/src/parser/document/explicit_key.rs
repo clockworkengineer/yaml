@@ -17,7 +17,7 @@ fn setup_token_stream<'a>(
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::parser::ParseResult;
-use crate::parser::document::node_utils::normalize_node_to_str;
+use crate::parser::utils::node_utils::normalize_node_to_str;
 use crate::{loop_guard_check, loop_guard_init};
 
 /// Helper for DRY loop guard usage in explicit key parsing.

@@ -26,7 +26,7 @@ use crate::parser::token_stream::TokenStream;
 /// - No complex lookahead for decorators
 /// - Clear token boundaries prevent infinite loops
 /// - Natural handling of empty items after decorators
-use crate::parser::document::context::ParsingContext;
+use crate::parser::utils::context::ParsingContext;
 
 pub fn parse_sequence_with_tokens(
     stream: &mut TokenStream,
@@ -81,7 +81,7 @@ pub fn parse_sequence_with_tokens(
         if !ctx.in_flow
             && !matches!(
                 ctx.collection_type,
-                crate::parser::document::context::CollectionType::BlockMapping
+                crate::parser::utils::context::CollectionType::BlockMapping
             )
         {
             match stream.current() {
@@ -95,7 +95,7 @@ pub fn parse_sequence_with_tokens(
                 }
                 Some(Token::DocumentEnd) => {
                     // Document end marker - validate no content after it on same line
-                    crate::parser::document::helpers::validate_trailing_content_after_document_end(
+                    crate::parser::utils::helpers::validate_trailing_content_after_document_end(
                         stream,
                     )?;
                     let (_, items) = stack.pop().unwrap();
@@ -117,7 +117,7 @@ pub fn parse_sequence_with_tokens(
                         let (_, items) = stack.pop().unwrap();
                         return Ok(Node::Array(items));
                     } else {
-                        return Err(crate::parser::document::error_builder::indentation_error(
+                        return Err(crate::parser::utils::error_builder::indentation_error(
                             stream.source_mut(),
                             "Invalid indentation for sequence item",
                         ));
@@ -208,7 +208,7 @@ pub fn parse_sequence_with_tokens(
                     let nested_base = current_indent + 1;
                     let ctx_seq = ctx.child_block_context(
                         nested_base,
-                        crate::parser::document::context::CollectionType::BlockSequence,
+                        crate::parser::utils::context::CollectionType::BlockSequence,
                     );
                     let seq = parse_sequence_with_tokens(
                         stream,
@@ -338,7 +338,7 @@ pub fn parse_sequence_with_tokens(
                     if dedent_level <= parent_indent {
                         break;
                     } else {
-                        return Err(crate::parser::document::error_builder::indentation_error(
+                        return Err(crate::parser::utils::error_builder::indentation_error(
                             stream.source_mut(),
                             "Invalid indentation for sequence item",
                         ));

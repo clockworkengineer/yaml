@@ -30,10 +30,10 @@ fn parse_indented_mapping_value(
         stream.skip_newlines_and_comments()?;
         if matches!(stream.current(), Some(Token::Dash)) {
             use crate::parser::tokens::sequence::parse_sequence_with_tokens;
-            let ctx_seq = crate::parser::document::context::ParsingContext::new(level)
+            let ctx_seq = crate::parser::utils::context::ParsingContext::new(level)
                 .child_block_context(
                     level,
-                    crate::parser::document::context::CollectionType::BlockSequence,
+                    crate::parser::utils::context::CollectionType::BlockSequence,
                 );
             let seq = parse_sequence_with_tokens(
                 stream,
@@ -69,7 +69,7 @@ struct MappingParseContext {
 use crate::nodes::node::Node;
 use crate::nodes::node::{BlockStyle, QuoteType};
 use crate::parser::directives::DirectiveContext;
-use crate::parser::document::node_utils::force_key_to_string;
+use crate::parser::utils::node_utils::force_key_to_string;
 use crate::parser::tokens::value::parse_value_with_tokens;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
@@ -275,7 +275,7 @@ impl MappingParseContext {
                 return Ok(Some(Node::Mapping(pairs)));
             }
             Some(Token::DocumentEnd) => {
-                crate::parser::document::helpers::validate_trailing_content_after_document_end(
+                crate::parser::utils::helpers::validate_trailing_content_after_document_end(
                     stream,
                 )?;
                 let (_, pairs) = self.stack.pop().unwrap();
@@ -598,10 +598,10 @@ fn parse_mapping_value(
             stream.next()?; // consume Indent
             if matches!(stream.current(), Some(Token::Dash)) {
                 use crate::parser::tokens::sequence::parse_sequence_with_tokens;
-                let ctx_seq = crate::parser::document::context::ParsingContext::new(level)
+                let ctx_seq = crate::parser::utils::context::ParsingContext::new(level)
                     .child_block_context(
                         level,
-                        crate::parser::document::context::CollectionType::BlockSequence,
+                        crate::parser::utils::context::CollectionType::BlockSequence,
                     );
                 return parse_sequence_with_tokens(
                     stream,

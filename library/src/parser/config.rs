@@ -133,13 +133,13 @@ impl ParserConfig {
     pub fn check_depth(&self, current_depth: usize) -> Result<(), crate::error::YamlError> {
         if current_depth > self.max_depth {
             if let Some(ref _msg) = self.depth_error_message {
-                Err(crate::parser::document::error_builder::limit_error(
+                Err(crate::parser::utils::error_builder::limit_error(
                     "Nesting depth",
                     self.max_depth,
                     &format!("current: {}", current_depth),
                 ))
             } else {
-                Err(crate::parser::document::error_builder::limit_error(
+                Err(crate::parser::utils::error_builder::limit_error(
                     "Nesting depth",
                     self.max_depth,
                     &format!("current: {}", current_depth),
@@ -154,7 +154,7 @@ impl ParserConfig {
     pub fn check_size(&self, current_size: usize) -> Result<(), crate::error::YamlError> {
         if let Some(max) = self.max_size {
             if current_size > max {
-                return Err(crate::parser::document::error_builder::limit_error(
+                return Err(crate::parser::utils::error_builder::limit_error(
                     "Document size (bytes)",
                     max,
                     "bytes",
@@ -168,7 +168,7 @@ impl ParserConfig {
     pub fn check_anchor_count(&self, count: usize) -> Result<(), crate::error::YamlError> {
         if let Some(max) = self.max_anchors {
             if count > max {
-                return Err(crate::parser::document::error_builder::limit_error(
+                return Err(crate::parser::utils::error_builder::limit_error(
                     "Anchor count",
                     max,
                     "anchors",

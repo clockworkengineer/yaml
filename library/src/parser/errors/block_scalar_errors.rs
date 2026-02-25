@@ -10,7 +10,7 @@
 
 use crate::error::YamlError;
 use crate::io::traits::ISource;
-use crate::parser::document::error_builder::{indentation_error, syntax_error};
+use crate::parser::utils::error_builder::{indentation_error, syntax_error};
 
 /// Centralized constructors for block scalar parsing errors.
 /// Behavior-neutral: messages match existing strings exactly.

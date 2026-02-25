@@ -9,7 +9,7 @@ use crate::nodes::node::Node;
 
 // Re-export node construction helpers from nodes::node_utils
 pub use crate::nodes::node_utils::make_mapping_node;
-use crate::parser::document::helpers::node_to_inline_string;
+use crate::parser::utils::helpers::node_to_inline_string;
 
 /// Normalize a Node to a double-quoted Node::Str for use as a mapping key.
 pub fn normalize_node_to_str(node: &Node) -> Node {

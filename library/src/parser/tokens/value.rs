@@ -124,7 +124,7 @@ fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
             // Convert mapping with null values to a set (DRY)
             Node::Mapping(pairs) => {
                 if let Some(set_items) =
-                    crate::parser::document::node_utils::pairs_to_set_items_if_all_none(&pairs)
+                    crate::parser::utils::node_utils::pairs_to_set_items_if_all_none(&pairs)
                 {
                     Some(Node::Set(set_items))
                 } else {
@@ -287,7 +287,7 @@ pub fn parse_value_with_tokens(
             .tag
             .as_ref()
             .map(|t| {
-                crate::parser::document::node_utils::resolved_is_seq(&directives.resolve_tag(t))
+                crate::parser::utils::node_utils::resolved_is_seq(&directives.resolve_tag(t))
             })
             .unwrap_or(false);
 
@@ -320,10 +320,10 @@ pub fn parse_value_with_tokens(
             // a block sequence value (e.g. `!!seq` followed by `- a`).
             if let Some(Token::Indent(level)) = stream.current() {
                 use crate::parser::tokens::sequence::parse_sequence_with_tokens;
-                let ctx_seq = crate::parser::document::context::ParsingContext::new(*level)
+                let ctx_seq = crate::parser::utils::context::ParsingContext::new(*level)
                     .child_block_context(
                         *level,
-                        crate::parser::document::context::CollectionType::BlockSequence,
+                        crate::parser::utils::context::CollectionType::BlockSequence,
                     );
                 let seq =
                     parse_sequence_with_tokens(stream, *level, 0, directives, &ctx_seq, depth + 1)?;
@@ -433,7 +433,7 @@ pub fn parse_value_with_tokens(
             .tag
             .as_ref()
             .map(|t| {
-                crate::parser::document::node_utils::resolved_is_set(&directives.resolve_tag(t))
+                crate::parser::utils::node_utils::resolved_is_set(&directives.resolve_tag(t))
             })
             .unwrap_or(false);
 
@@ -513,7 +513,7 @@ pub fn parse_value_with_tokens(
                         );
                     }
                 }
-            } else if crate::parser::document::node_utils::resolved_is_seq(&tag_resolved) {
+            } else if crate::parser::utils::node_utils::resolved_is_seq(&tag_resolved) {
                 // Always wrap as Tagged with canonical tag for sequences
                 match &result {
                     Node::Array(items) => {
@@ -528,7 +528,7 @@ pub fn parse_value_with_tokens(
                             Node::Tagged(Box::new(result), "tag:yaml.org,2002:seq".to_string());
                     }
                 }
-            } else if crate::parser::document::node_utils::resolved_is_map(&tag_resolved) {
+            } else if crate::parser::utils::node_utils::resolved_is_map(&tag_resolved) {
                 // Always wrap as Tagged with canonical tag for mappings
                 match &result {
                     Node::Mapping(pairs) => {
@@ -635,10 +635,10 @@ fn parse_value_content(
         }
         Some(Token::Dash) => {
             use crate::parser::tokens::sequence::parse_sequence_with_tokens;
-            let ctx_seq = crate::parser::document::context::ParsingContext::new(0)
+            let ctx_seq = crate::parser::utils::context::ParsingContext::new(0)
                 .child_block_context(
                     0,
-                    crate::parser::document::context::CollectionType::BlockSequence,
+                    crate::parser::utils::context::CollectionType::BlockSequence,
                 );
             parse_sequence_with_tokens(stream, 0, 0, directives, &ctx_seq, depth + 1)
         }
@@ -661,10 +661,10 @@ fn parse_value_content(
                     // Decide between sequence or mapping based on next token
                     if matches!(stream.current(), Some(Token::Dash)) {
                         use crate::parser::tokens::sequence::parse_sequence_with_tokens;
-                        let ctx_seq = crate::parser::document::context::ParsingContext::new(_lvl)
+                        let ctx_seq = crate::parser::utils::context::ParsingContext::new(_lvl)
                             .child_block_context(
                                 _lvl,
-                                crate::parser::document::context::CollectionType::BlockSequence,
+                                crate::parser::utils::context::CollectionType::BlockSequence,
                             );
                         return parse_sequence_with_tokens(
                             stream,

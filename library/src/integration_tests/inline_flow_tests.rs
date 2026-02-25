@@ -140,7 +140,7 @@ mod tests {
 
                 assert_eq!(collected.len(), 2);
 
-                use crate::parser::document::node_utils::normalize_node_to_str;
+                use crate::parser::utils::node_utils::normalize_node_to_str;
                 // Normalize keys for comparison
                 let (k1, v1) = &collected[0];
                 let norm_k1 = normalize_node_to_str(k1);

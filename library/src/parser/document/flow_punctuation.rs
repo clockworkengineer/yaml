@@ -26,11 +26,11 @@ pub fn expected_separator_or_end_error(
     ctx: FlowContext,
 ) -> crate::error::YamlError {
     match ctx {
-        FlowContext::Sequence => crate::parser::document::error_builder::syntax_error(
+        FlowContext::Sequence => crate::parser::utils::error_builder::syntax_error(
             stream.source_mut(),
             "Expected comma or ] in flow sequence",
         ),
-        FlowContext::Mapping => crate::parser::document::error_builder::syntax_error(
+        FlowContext::Mapping => crate::parser::utils::error_builder::syntax_error(
             stream.source_mut(),
             "Expected comma or } in flow mapping",
         ),
@@ -90,7 +90,7 @@ pub fn consume_trailing_separators_and_closers_in_block_sequence(
 pub fn unexpected_extra_closing_bracket_in_flow_sequence(
     stream: &mut TokenStream,
 ) -> crate::error::YamlError {
-    crate::parser::document::error_builder::syntax_error(
+    crate::parser::utils::error_builder::syntax_error(
         stream.source_mut(),
         "Unexpected extra closing bracket ']' in flow sequence",
     )
@@ -100,7 +100,7 @@ pub fn unexpected_extra_closing_bracket_in_flow_sequence(
 pub fn leading_or_double_comma_in_flow_sequence(
     stream: &mut TokenStream,
 ) -> crate::error::YamlError {
-    crate::parser::document::error_builder::syntax_error(
+    crate::parser::utils::error_builder::syntax_error(
         stream.source_mut(),
         "Leading or double comma in flow sequence is not allowed",
     )
@@ -110,7 +110,7 @@ pub fn leading_or_double_comma_in_flow_sequence(
 pub fn unexpected_eof_in_flow_mapping_unclosed(
     stream: &mut TokenStream,
 ) -> crate::error::YamlError {
-    crate::parser::document::error_builder::syntax_error(
+    crate::parser::utils::error_builder::syntax_error(
         stream.source_mut(),
         "Syntax error: Unexpected end of input in flow mapping (unclosed '{')",
     )
@@ -123,7 +123,7 @@ pub fn unexpected_eof_in_flow_mapping_unclosed(
 pub fn unexpected_eof_in_flow_sequence(_stream: &mut TokenStream) -> crate::error::YamlError {
     // Note: For flow sequence EOF, existing code uses the generic EOF helper
     // without source context. Preserve exact message for neutrality.
-    crate::parser::document::error_builder::eof_error("flow sequence")
+    crate::parser::utils::error_builder::eof_error("flow sequence")
 }
 
 /// Centralized error: Invalid bare '-' entries inside a flow sequence.
@@ -135,7 +135,7 @@ pub fn unexpected_eof_in_flow_sequence(_stream: &mut TokenStream) -> crate::erro
 pub fn invalid_bare_dash_entries_in_flow_sequence(
     stream: &mut TokenStream,
 ) -> crate::error::YamlError {
-    crate::parser::document::error_builder::mapping_key_error_yaml(
+    crate::parser::utils::error_builder::mapping_key_error_yaml(
         stream.source_mut(),
         "Invalid use of '-' indicators inside flow sequence",
     )
@@ -151,7 +151,7 @@ pub fn invalid_content_immediately_after_flow_closer(
     closer: char,
     found: char,
 ) -> YamlError {
-    crate::parser::document::error_builder::syntax_error(
+    crate::parser::utils::error_builder::syntax_error(
         source,
         &format!(
             "YAML syntax error: Invalid content '{}' immediately after '{}' - whitespace or newline required",
@@ -165,5 +165,5 @@ pub fn invalid_content_immediately_after_flow_closer(
 /// Wraps the existing `expected_error` message text used by callers to ensure
 /// behavior-neutral DRY routing for colon expectations in flow mappings.
 pub fn expected_colon_in_flow_mapping(source: &mut dyn ISource) -> YamlError {
-    crate::parser::document::error_builder::expected_error(source, ": in flow mapping")
+    crate::parser::utils::error_builder::expected_error(source, ": in flow mapping")
 }

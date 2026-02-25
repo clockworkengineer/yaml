@@ -12,7 +12,7 @@ use crate::nodes::node::Node::Document;
 
 use crate::parser::ParseResult;
 use crate::parser::errors::directive_errors::DirectiveErrors;
-use crate::parser::document::helpers::{
+use crate::parser::utils::helpers::{
     self, handle_directives, parse_document_end_marker, parse_document_markers, to_yaml_error,
 };
 use crate::parser::document::main_loop::parse_document;
@@ -143,8 +143,8 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
             let st = source.save_state();
             let ts = crate::parser::token_stream::TokenStream::new(source, &directives, false)?;
             let res = matches!(
-                crate::parser::document::helpers::classify_doc_marker(&ts),
-                Some(crate::parser::document::helpers::DocMarkerKind::Start)
+                crate::parser::utils::helpers::classify_doc_marker(&ts),
+                Some(crate::parser::utils::helpers::DocMarkerKind::Start)
             );
             source.restore_state(st);
             res
@@ -175,7 +175,7 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
             }
             if matches!(source.current(), Some(crate::constants::CHAR_EXCLAMATION)) {
                 if let Some(tag_raw) =
-                    crate::parser::document::helpers::peek_tag_after_doc_start(source)
+                    crate::parser::utils::helpers::peek_tag_after_doc_start(source)
                 {
                     if let Err(e) = directives.validate_tag_handle_usage(&tag_raw) {
                         // Build a simple parse error without borrowing the source twice

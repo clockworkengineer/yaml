@@ -10,7 +10,7 @@
 
 use crate::error::YamlError;
 use crate::io::traits::ISource;
-use crate::parser::document::error_builder;
+use crate::parser::utils::error_builder;
 
 /// Centralized constructors for indentation-related parsing errors.
 /// Behavior-neutral: messages and error categories match existing call sites.

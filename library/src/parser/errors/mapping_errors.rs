@@ -20,7 +20,7 @@ pub fn mapping_key_without_value_expected_value_after_colon(
     stream: &mut TokenStream,
 ) -> EnhancedError {
     EnhancedError::new(
-        crate::parser::document::error_builder::mapping_key_error_yaml(
+        crate::parser::utils::error_builder::mapping_key_error_yaml(
             stream.source_mut(),
             "YAML compliance error: Mapping key without value (expected value after colon)",
         ),
@@ -34,7 +34,7 @@ pub fn mapping_key_without_value_expected_value_after_colon(
 pub fn invalid_indentation_after_comment_in_mapping_value(
     stream: &mut TokenStream,
 ) -> EnhancedError {
-    EnhancedError::new(crate::parser::document::error_builder::mapping_key_error_yaml(
+    EnhancedError::new(crate::parser::utils::error_builder::mapping_key_error_yaml(
         stream.source_mut(),
         "Invalid indentation after comment: indented content cannot extend a completed scalar mapping value",
     ))
@@ -52,7 +52,7 @@ pub fn invalid_indentation_extending_completed_mapping_value(
     stream: &mut TokenStream,
 ) -> EnhancedError {
     EnhancedError::new(
-        crate::parser::document::error_builder::mapping_key_error_yaml(
+        crate::parser::utils::error_builder::mapping_key_error_yaml(
             stream.source_mut(),
             "Invalid indentation: indented content cannot extend a completed mapping value",
         ),
@@ -70,7 +70,7 @@ pub fn inconsistent_dedent_within_mapping_value_for_keys(
     stream: &mut TokenStream,
 ) -> EnhancedError {
     EnhancedError::new(
-        crate::parser::document::error_builder::mapping_key_error_yaml(
+        crate::parser::utils::error_builder::mapping_key_error_yaml(
             stream.source_mut(),
             "Invalid indentation for nested mapping key: inconsistent dedent within mapping value",
         ),
@@ -96,7 +96,7 @@ pub fn invalid_anchored_alias_key_on_alias_nodes(stream: &mut TokenStream) -> En
 /// Returns an EnhancedError with code E005 and note, matching existing behavior and text.
 pub fn multiple_anchors_on_mapping_key(stream: &mut TokenStream) -> EnhancedError {
     EnhancedError::new(
-        crate::parser::document::error_builder::mapping_key_error_yaml(
+        crate::parser::utils::error_builder::mapping_key_error_yaml(
             stream.source_mut(),
             "A mapping key cannot have multiple anchors",
         ),
@@ -109,7 +109,7 @@ pub fn multiple_anchors_on_mapping_key(stream: &mut TokenStream) -> EnhancedErro
 ///
 /// Behavior-neutral: preserves exact message text and error type.
 pub fn invalid_trailing_plain_text_after_quoted_scalar(stream: &mut TokenStream) -> YamlError {
-    crate::parser::document::error_builder::syntax_error(
+    crate::parser::utils::error_builder::syntax_error(
         stream.source_mut(),
         "Invalid content immediately after quoted scalar: trailing plain text on the same line is not allowed",
     )
@@ -122,7 +122,7 @@ pub fn invalid_trailing_plain_text_after_quoted_scalar(stream: &mut TokenStream)
 /// Rejects patterns like `a: b: c` or `a: 'b': c` in block context, which
 /// incorrectly introduce a second key-value separator on the same line.
 pub fn nested_key_separator_in_block_value_same_line(stream: &mut TokenStream) -> YamlError {
-    crate::parser::document::error_builder::syntax_error(
+    crate::parser::utils::error_builder::syntax_error(
         stream.source_mut(),
         "Invalid mapping value: unexpected ':' immediately after value on the same line",
     )
@@ -133,7 +133,7 @@ pub fn expected_explicit_key_token(
     stream: &mut TokenStream,
     cur: Option<crate::parser::lexer::Token>,
 ) -> YamlError {
-    crate::parser::document::error_builder::syntax_error(
+    crate::parser::utils::error_builder::syntax_error(
         stream.source_mut(),
         &format!("Expected '?' token for explicit key, got {:?}", cur),
     )

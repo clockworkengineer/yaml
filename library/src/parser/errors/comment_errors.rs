@@ -10,7 +10,7 @@
 
 use crate::error::YamlError;
 use crate::io::traits::ISource;
-use crate::parser::document::error_builder::syntax_error;
+use crate::parser::utils::error_builder::syntax_error;
 
 /// Centralized constructors for comment-related parsing errors.
 /// Behavior-neutral: messages match existing strings exactly.

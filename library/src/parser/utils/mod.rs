@@ -10,7 +10,11 @@
 pub mod macros;
 
 pub mod comments;
+pub mod context;
+pub mod error_builder;
 pub mod error_helpers;
+pub mod helpers;
 pub mod indentation;
+pub mod node_utils;
 pub mod token_scan;
 pub mod visit;

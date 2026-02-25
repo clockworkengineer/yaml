@@ -94,7 +94,7 @@ use crate::error::YamlError;
 use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::parser::ParseResult;
-use crate::parser::document::context::ParsingContext;
+use crate::parser::utils::context::ParsingContext;
 use crate::utils::{is_comment_start, is_horizontal_space, is_line_terminator};
 
 /// Simple classifier for document markers in the TokenStream.
@@ -409,7 +409,7 @@ pub(crate) fn parse_document_end_marker(
 /// # Returns
 ///
 /// A formatted error string with token context information
-use crate::parser::document::error_builder::{ErrorBuilder, ErrorCategory};
+use crate::parser::utils::error_builder::{ErrorBuilder, ErrorCategory};
 
 pub(crate) fn parse_error_token(
     stream: &crate::parser::token_stream::TokenStream,
@@ -769,7 +769,7 @@ pub(crate) fn node_to_inline_string(node: &Node) -> String {
 mod tests {
     use super::*;
     use crate::io::sources::buffer::Buffer;
-    use crate::parser::document::context::{CollectionType, ParsingContext};
+    use crate::parser::utils::context::{CollectionType, ParsingContext};
 
     #[test]
     fn test_validate_indentation_block_context_with_tab() {

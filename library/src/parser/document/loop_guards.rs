@@ -58,7 +58,7 @@ macro_rules! loop_guard_check {
     ($counter:ident, $max:expr, $context:expr) => {{
         $counter += 1;
         if $counter >= $max {
-            return Err(crate::parser::document::error_builder::limit_error(
+            return Err(crate::parser::utils::error_builder::limit_error(
                 $context,
                 $max,
                 "loop iterations",
@@ -82,7 +82,7 @@ macro_rules! loop_guard_check {
 macro_rules! collection_size_check {
     ($collection:expr, $max:expr, $type_name:expr) => {
         if $collection.len() >= $max {
-            return Err(crate::parser::document::error_builder::limit_error(
+            return Err(crate::parser::utils::error_builder::limit_error(
                 $type_name, $max, "items",
             ));
         }
@@ -110,14 +110,14 @@ macro_rules! combined_loop_guard {
     ($counter:ident, $collection:expr, $max_iter:expr, $max_size:expr, $context:expr) => {{
         $counter += 1;
         if $counter >= $max_iter {
-            return Err(crate::parser::document::error_builder::limit_error(
+            return Err(crate::parser::utils::error_builder::limit_error(
                 &format!("{} parsing", $context),
                 $max_iter,
                 "loop iterations",
             ));
         }
         if $collection.len() >= $max_size {
-            return Err(crate::parser::document::error_builder::limit_error(
+            return Err(crate::parser::utils::error_builder::limit_error(
                 $context, $max_size, "items",
             ));
         }

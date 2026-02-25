@@ -15,15 +15,11 @@
 ///
 
 pub use parse::parse;
-pub mod context;
-pub mod error_builder;
 pub mod explicit_key;
 pub mod flow_punctuation;
-pub mod helpers;
 pub mod indentation;
 pub mod inline_tokens;
 pub mod mapping;
-pub mod node_utils;
 pub mod scalar;
 pub mod validate_tree;
 
@@ -105,7 +101,7 @@ mod tests {
         assert_eq!(source.get_current_indent_level(), 0);
         let directives = crate::parser::directives::DirectiveContext::new();
         assert!(
-            crate::parser::document::helpers::peek_ahead_for_mapping_key(&mut source, &directives)
+            crate::parser::utils::helpers::peek_ahead_for_mapping_key(&mut source, &directives)
         );
         assert_eq!(source.get_current_indent_level(), 0);
     }
@@ -115,7 +111,7 @@ mod tests {
         let mut source = Buffer::new(b"key value");
         let directives = crate::parser::directives::DirectiveContext::new();
         assert!(
-            !crate::parser::document::helpers::peek_ahead_for_mapping_key(&mut source, &directives)
+            !crate::parser::utils::helpers::peek_ahead_for_mapping_key(&mut source, &directives)
         );
         assert_eq!(source.get_current_indent_level(), 0);
     }
@@ -125,7 +121,7 @@ mod tests {
         let mut source = Buffer::new(b"key\n: value");
         let directives = crate::parser::directives::DirectiveContext::new();
         assert!(
-            !crate::parser::document::helpers::peek_ahead_for_mapping_key(&mut source, &directives)
+            !crate::parser::utils::helpers::peek_ahead_for_mapping_key(&mut source, &directives)
         );
     }
 
@@ -134,7 +130,7 @@ mod tests {
         let mut source = Buffer::new(b"key   : value");
         let directives = crate::parser::directives::DirectiveContext::new();
         assert!(
-            crate::parser::document::helpers::peek_ahead_for_mapping_key(&mut source, &directives)
+            crate::parser::utils::helpers::peek_ahead_for_mapping_key(&mut source, &directives)
         );
     }
 
@@ -143,7 +139,7 @@ mod tests {
         let mut source = Buffer::new(b"");
         let directives = crate::parser::directives::DirectiveContext::new();
         assert!(
-            !crate::parser::document::helpers::peek_ahead_for_mapping_key(&mut source, &directives)
+            !crate::parser::utils::helpers::peek_ahead_for_mapping_key(&mut source, &directives)
         );
     }
 
@@ -234,7 +230,7 @@ mod tests {
     fn test_parse_document_contents_empty_line() {
         let directives = DirectiveContext::new();
         let mut src = Buffer::new(b"key: value\n\n");
-        let ctx = crate::parser::document::context::ParsingContext::new(0);
+        let ctx = crate::parser::utils::context::ParsingContext::new(0);
         let n = parse_document_contents(&mut src, 0, &directives, &ctx).unwrap();
         assert!(matches!(n, Node::Mapping(_)));
     }

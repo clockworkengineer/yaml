@@ -230,7 +230,7 @@ pub(crate) fn expand_merge_keys(
                                 }
                                 combined.push((
                                     k.clone(),
-                                    crate::parser::document::node_utils::make_mapping_node(
+                                    crate::parser::utils::node_utils::make_mapping_node(
                                         merged_pairs,
                                     ),
                                 ));
@@ -243,7 +243,7 @@ pub(crate) fn expand_merge_keys(
                 combined.push((k, v));
                 i += 1;
             }
-            *pairs = crate::parser::document::node_utils::dedupe_mapping_pairs_by_last_occurrence(
+            *pairs = crate::parser::utils::node_utils::dedupe_mapping_pairs_by_last_occurrence(
                 combined,
             );
         }

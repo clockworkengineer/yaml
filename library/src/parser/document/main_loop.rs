@@ -12,7 +12,7 @@ use crate::nodes::node::QuoteType;
 use crate::parser::ParseResult;
 use crate::parser::directives::DirectiveContext;
 use crate::parser::document::contents::parse_document_contents;
-use crate::parser::document::helpers::{DocMarkerKind, classify_doc_marker};
+use crate::parser::utils::helpers::{DocMarkerKind, classify_doc_marker};
 use crate::parser::utils::visit::visit;
 
 /// Checks if the current position is at a document marker (--- or ...).
@@ -59,7 +59,7 @@ fn parse_document_main_loop(
     indent_level: usize,
     directives: &DirectiveContext,
 ) -> ParseResult<Vec<Node>> {
-    use crate::parser::document::context::ParsingContext;
+    use crate::parser::utils::context::ParsingContext;
     let mut document_nodes = Vec::new();
     let root_ctx = ParsingContext::new(indent_level);
     while let Some(c) = source.current() {
@@ -227,7 +227,7 @@ pub fn parse_document(
         });
         if let Some(e) = first_error {
             // Convert validation error to a simple parse error without precise position
-            return Err(crate::parser::document::helpers::to_yaml_error(format!(
+            return Err(crate::parser::utils::helpers::to_yaml_error(format!(
                 "{}",
                 e
             )));
@@ -263,7 +263,7 @@ pub fn parse_document(
             });
 
             if has_anchored_empty_value && has_top_level_map_tagged_key {
-                use crate::parser::document::error_builder::mapping_key_error_yaml;
+                use crate::parser::utils::error_builder::mapping_key_error_yaml;
                 return Err(mapping_key_error_yaml(
                     source,
                     "Invalid anchored mapping value: node-anchor-not-indented (H7J7) where an anchor attaches only to an empty scalar and a separate !!map mapping appears at the same mapping level.",
@@ -283,7 +283,7 @@ pub fn parse_document(
                             (&inner[0].0, &inner[0].1)
                         {
                             if s.contains(' ') {
-                                use crate::parser::document::error_builder::mapping_key_error_yaml;
+                                use crate::parser::utils::error_builder::mapping_key_error_yaml;
                                 return Err(mapping_key_error_yaml(
                                     source,
                                     "Unexpected mixed content in mapping value: plain scalar line followed by mapping entries at the same indentation (HU3P)",
