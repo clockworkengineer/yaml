@@ -243,11 +243,67 @@ pub(crate) fn expand_merge_keys(
                 combined.push((k, v));
                 i += 1;
             }
-            *pairs = crate::parser::utils::node_utils::dedupe_mapping_pairs_by_last_occurrence(
-                combined,
-            );
+            *pairs =
+                crate::parser::utils::node_utils::dedupe_mapping_pairs_by_last_occurrence(combined);
         }
     };
     crate::parser::utils::visit::visit_mut(node, &mut expander);
     if let Some(e) = err { Err(e) } else { Ok(()) }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::nodes::node::Node;
+    use std::collections::HashMap;
+
+    #[test]
+    fn test_collect_anchors_basic() {
+        let node = Node::Anchored(Box::new(Node::from(42)), "anchor1".to_string());
+        let mut anchors = HashMap::new();
+        let result = collect_anchors(&node, &mut anchors);
+        assert!(result.is_ok());
+        assert_eq!(anchors.get("anchor1"), Some(&Node::from(42)));
+    }
+
+    #[test]
+    fn test_collect_anchors_empty_name_error() {
+        let node = Node::Anchored(Box::new(Node::from(1)), " ".to_string());
+        let mut anchors = HashMap::new();
+        let result = collect_anchors(&node, &mut anchors);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_collect_anchors_nested() {
+        let inner = Node::Anchored(Box::new(Node::from("foo")), "a2".to_string());
+        let node = Node::Mapping(vec![
+            (
+                Node::from("k1"),
+                Node::Anchored(Box::new(Node::from(42)), "a1".to_string()),
+            ),
+            (Node::from("k2"), inner.clone()),
+        ]);
+        let mut anchors = HashMap::new();
+        let result = collect_anchors(&node, &mut anchors);
+        assert!(result.is_ok());
+        assert_eq!(anchors.get("a1"), Some(&Node::from(42)));
+        assert_eq!(anchors.get("a2"), Some(&Node::from("foo")));
+    }
+
+    #[test]
+    fn test_replace_aliases_with_missing_anchor() {
+        let mut node = Node::Alias("missing".to_string());
+        let anchors = HashMap::new();
+        let result = replace_aliases(&mut node, &anchors);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_replace_aliases_success() {
+        let mut anchors = HashMap::new();
+        anchors.insert("a1".to_string(), Node::from(123));
+        let mut node = Node::Alias("a1".to_string());
+        let result = replace_aliases(&mut node, &anchors);
+        assert!(result.is_ok());
+    }
 }
