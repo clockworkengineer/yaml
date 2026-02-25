@@ -1,9 +1,9 @@
 // =====================================================================================
 //  File: directive_validation_tests.rs
-//  Location: library/src/integration_tests/
+//  Location: library/src/internal_tests/
 // -------------------------------------------------------------------------------------
 //  Purpose:
-//      Integration tests for validation of YAML directive usage in the yaml_lib crate.
+//      Internal tests for validation of YAML directive usage in the yaml_lib crate.
 //      These tests ensure that directives such as %YAML are correctly validated for
 //      placement, required document content, and error reporting according to the YAML spec.
 //

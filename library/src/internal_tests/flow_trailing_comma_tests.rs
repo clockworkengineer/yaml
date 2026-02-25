@@ -1,9 +1,9 @@
 // =====================================================================================
 //  File: flow_trailing_comma_tests.rs
-//  Location: library/src/integration_tests/
+//  Location: library/src/internal_tests/
 // -------------------------------------------------------------------------------------
 //  Purpose:
-//      Integration tests for YAML flow style trailing comma handling in the yaml_lib crate.
+//      Internal tests for YAML flow style trailing comma handling in the yaml_lib crate.
 //      These tests validate correct parsing of flow mappings and sequences with trailing commas,
 //      ensuring compliance with the YAML specification and robust parser behavior.
 //

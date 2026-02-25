@@ -1,9 +1,9 @@
 // =====================================================================================
 //  File: tag_coercion_tests.rs
-//  Location: library/src/integration_tests/
+//  Location: library/src/internal_tests/
 // -------------------------------------------------------------------------------------
 //  Purpose:
-//      Integration tests for YAML tag coercion and type handling in the yaml_lib crate.
+//      Internal tests for YAML tag coercion and type handling in the yaml_lib crate.
 //      These tests validate correct recognition, preservation, and coercion of tags on
 //      scalars, sequences, and mappings, ensuring compliance with the YAML specification.
 //

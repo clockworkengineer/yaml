@@ -1,9 +1,9 @@
 // =====================================================================================
 //  File: file_parsing_tests.rs
-//  Location: library/src/integration_tests/
+//  Location: library/src/internal_tests/
 // -------------------------------------------------------------------------------------
 //  Purpose:
-//      Integration tests for parsing YAML files from the filesystem in the yaml_lib crate.
+//      Internal tests for parsing YAML files from the filesystem in the yaml_lib crate.
 //      These tests validate correct reading, parsing, and error handling for multiple YAML
 //      files, ensuring robust file I/O and compliance with the YAML specification.
 //

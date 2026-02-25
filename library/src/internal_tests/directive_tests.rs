@@ -1,9 +1,9 @@
 // =====================================================================================
 //  File: directive_tests.rs
-//  Location: library/src/integration_tests/
+//  Location: library/src/internal_tests/
 // -------------------------------------------------------------------------------------
 //  Purpose:
-//      Integration tests for YAML directive parsing and handling in the yaml_lib crate.
+//      Internal tests for YAML directive parsing and handling in the yaml_lib crate.
 //      These tests validate correct recognition and processing of YAML directives such as
 //      %TAG and %YAML, ensuring compliance with the YAML specification for document structure
 //      and tag resolution.

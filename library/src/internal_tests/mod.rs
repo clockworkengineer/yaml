@@ -1,15 +1,15 @@
 // =====================================================================================
 //  File: mod.rs
-//  Location: library/src/integration_tests/
+//  Location: library/src/internal_tests/
 // -------------------------------------------------------------------------------------
 //  Purpose:
-//      Module declaration file for integration tests in the yaml_lib crate.
-//      This file organizes and includes all integration test modules, ensuring
+//      Module declaration file for internal tests in the yaml_lib crate.
+//      This file organizes and includes all internal test modules, ensuring
 //      comprehensive test coverage for YAML parsing, serialization, and validation.
 //
 //  Context:
 //      - Part of the yaml_lib project, a Rust YAML parser/serializer.
-//      - Centralizes integration test module imports for maintainability and clarity.
+//      - Centralizes internal test module imports for maintainability and clarity.
 //      - Supports both standard and embedded system test configurations.
 //
 // -------------------------------------------------------------------------------------
@@ -19,12 +19,12 @@
 //      - Edge cases, validation, and embedded system scenarios
 // =====================================================================================
 
-// Original integration test modules
+// Original internal test modules
 mod bencode_tests;
 mod json_tests;
 mod toml_tests;
 
-// New organized integration test modules (split from parser_stringify_integration)
+// New organized internal test modules (split from parser_stringify_integration)
 mod anchor_tests;
 mod basic_parsing_tests;
 mod block_tag_tests;
@@ -45,7 +45,7 @@ mod set_tests;
 mod tag_coercion_tests;
 mod validation_tests;
 
-// Embedded systems integration tests
+// Embedded systems internal tests
 #[cfg(feature = "embedded")]
 mod embedded_tests;
 

@@ -1,9 +1,9 @@
 // =====================================================================================
 //  File: validation_tests.rs
-//  Location: library/src/integration_tests/
+//  Location: library/src/internal_tests/
 // -------------------------------------------------------------------------------------
 //  Purpose:
-//      Integration tests for YAML validation rules in the yaml_lib crate.
+//      Internal tests for YAML validation rules in the yaml_lib crate.
 //      These tests validate correct enforcement of YAML syntax and formatting rules,
 //      including indentation, whitespace, and other structural requirements.
 //

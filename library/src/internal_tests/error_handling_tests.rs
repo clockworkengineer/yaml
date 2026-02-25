@@ -1,9 +1,9 @@
 // =====================================================================================
 //  File: error_handling_tests.rs
-//  Location: library/src/integration_tests/
+//  Location: library/src/internal_tests/
 // -------------------------------------------------------------------------------------
 //  Purpose:
-//      Integration tests for error handling and reporting in the yaml_lib crate.
+//      Internal tests for error handling and reporting in the yaml_lib crate.
 //      These tests validate that parsing errors, invalid syntax, and edge cases are
 //      correctly detected and reported with meaningful error messages, ensuring
 //      compliance with the YAML specification and robust user feedback.

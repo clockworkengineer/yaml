@@ -1,9 +1,9 @@
 // =====================================================================================
 //  File: flow_debug.rs
-//  Location: library/src/integration_tests/
+//  Location: library/src/internal_tests/
 // -------------------------------------------------------------------------------------
 //  Purpose:
-//      Integration tests for debugging and validating YAML flow style parsing in the yaml_lib crate.
+//      Internal tests for debugging and validating YAML flow style parsing in the yaml_lib crate.
 //      These tests focus on edge cases, trailing commas, and error scenarios in flow mappings
 //      and sequences, aiding in parser development and troubleshooting.
 //

@@ -1,9 +1,9 @@
 // =====================================================================================
 //  File: official_suite_tests.rs
-//  Location: library/src/integration_tests/
+//  Location: library/src/internal_tests/
 // -------------------------------------------------------------------------------------
 //  Purpose:
-//      Integration tests for the official YAML test suite in the yaml_lib crate.
+//      Internal tests for the official YAML test suite in the yaml_lib crate.
 //      These tests validate parser compliance with the YAML specification using
 //      canonical examples and edge cases from the official YAML test suite.
 //

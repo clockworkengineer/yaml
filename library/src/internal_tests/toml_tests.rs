@@ -1,9 +1,9 @@
 // =====================================================================================
 //  File: toml_tests.rs
-//  Location: library/src/integration_tests/
+//  Location: library/src/internal_tests/
 // -------------------------------------------------------------------------------------
 //  Purpose:
-//      Integration tests for TOML serialization in the yaml_lib crate.
+//      Internal tests for TOML serialization in the yaml_lib crate.
 //      These tests validate correct conversion of YAML node structures to TOML format,
 //      ensuring compliance with TOML encoding rules for strings, numbers, tables, and arrays.
 //

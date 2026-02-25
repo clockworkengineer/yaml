@@ -1,9 +1,9 @@
 // =====================================================================================
 //  File: flow_sequence_key_test.rs
-//  Location: library/src/integration_tests/
+//  Location: library/src/internal_tests/
 // -------------------------------------------------------------------------------------
 //  Purpose:
-//      Integration tests for YAML flow sequence usage as mapping keys in the yaml_lib crate.
+//      Internal tests for YAML flow sequence usage as mapping keys in the yaml_lib crate.
 //      These tests validate correct parsing and handling of flow sequences as keys in mappings,
 //      ensuring compliance with the YAML specification and support for advanced key types.
 //

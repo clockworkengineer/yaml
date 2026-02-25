@@ -1,9 +1,9 @@
 // =====================================================================================
 //  File: set_tests.rs
-//  Location: library/src/integration_tests/
+//  Location: library/src/internal_tests/
 // -------------------------------------------------------------------------------------
 //  Purpose:
-//      Integration tests for YAML set type parsing and handling in the yaml_lib crate.
+//      Internal tests for YAML set type parsing and handling in the yaml_lib crate.
 //      These tests validate correct recognition and processing of !!set tags, set semantics,
 //      and edge cases for set construction and usage.
 //

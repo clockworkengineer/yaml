@@ -1,9 +1,9 @@
 // =====================================================================================
 //  File: anchor_tests.rs
-//  Location: library/src/integration_tests/
+//  Location: library/src/internal_tests/
 // -------------------------------------------------------------------------------------
 //  Purpose:
-//      Integration tests for YAML anchor and alias handling in the yaml_lib crate.
+//      Internal tests for YAML anchor and alias handling in the yaml_lib crate.
 //      These tests validate correct parsing and behavior of YAML anchors, aliases,
 //      and related edge cases, including anchor names with special characters,
 //      empty anchor values, and anchors on various node types.

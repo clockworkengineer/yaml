@@ -1,9 +1,9 @@
 // =====================================================================================
 //  File: block_tag_tests.rs
-//  Location: library/src/integration_tests/
+//  Location: library/src/internal_tests/
 // -------------------------------------------------------------------------------------
 //  Purpose:
-//      Integration tests for YAML block tag parsing and handling in the yaml_lib crate.
+//      Internal tests for YAML block tag parsing and handling in the yaml_lib crate.
 //      These tests validate correct recognition and processing of explicit tags on
 //      block scalars, sequences, and mappings, ensuring compliance with the YAML spec.
 //

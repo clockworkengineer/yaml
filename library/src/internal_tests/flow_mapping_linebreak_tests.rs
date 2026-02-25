@@ -1,9 +1,9 @@
 // =====================================================================================
 //  File: flow_mapping_linebreak_tests.rs
-//  Location: library/src/integration_tests/
+//  Location: library/src/internal_tests/
 // -------------------------------------------------------------------------------------
 //  Purpose:
-//      Integration tests for YAML flow mapping linebreak handling in the yaml_lib crate.
+//      Internal tests for YAML flow mapping linebreak handling in the yaml_lib crate.
 //      These tests validate correct parsing of flow mappings with line breaks between keys,
 //      colons, and values, ensuring compliance with the YAML specification.
 //

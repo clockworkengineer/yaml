@@ -1,9 +1,9 @@
 // =====================================================================================
 //  File: basic_parsing_tests.rs
-//  Location: library/src/integration_tests/
+//  Location: library/src/internal_tests/
 // -------------------------------------------------------------------------------------
 //  Purpose:
-//      Integration tests for basic YAML parsing functionality in the yaml_lib crate.
+//      Internal tests for basic YAML parsing functionality in the yaml_lib crate.
 //      These tests cover fundamental YAML constructs such as sequences, mappings,
 //      block styles, comments, and scalar values, ensuring correct parsing and
 //      compliance with the YAML specification.

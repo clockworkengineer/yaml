@@ -1,9 +1,9 @@
 // =====================================================================================
 //  File: bencode_tests.rs
-//  Location: library/src/integration_tests/
+//  Location: library/src/internal_tests/
 // -------------------------------------------------------------------------------------
 //  Purpose:
-//      Integration tests for Bencode serialization in the yaml_lib crate.
+//      Internal tests for Bencode serialization in the yaml_lib crate.
 //      These tests validate correct conversion of YAML node structures to the
 //      Bencode format, ensuring compliance with Bencode encoding rules for
 //      strings, integers, lists, and dictionaries.

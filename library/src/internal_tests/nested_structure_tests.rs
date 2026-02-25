@@ -1,9 +1,9 @@
 // =====================================================================================
 //  File: nested_structure_tests.rs
-//  Location: library/src/integration_tests/
+//  Location: library/src/internal_tests/
 // -------------------------------------------------------------------------------------
 //  Purpose:
-//      Integration tests for YAML nested structure parsing in the yaml_lib crate.
+//      Internal tests for YAML nested structure parsing in the yaml_lib crate.
 //      These tests validate correct handling of deeply nested sequences, mappings,
 //      and mixed structures, ensuring compliance with the YAML specification.
 //

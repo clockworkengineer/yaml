@@ -1,9 +1,9 @@
 // =====================================================================================
 //  File: embedded_tests.rs
-//  Location: library/src/integration_tests/
+//  Location: library/src/internal_tests/
 // -------------------------------------------------------------------------------------
 //  Purpose:
-//      Integration tests for YAML parsing and validation in embedded and resource-constrained
+//      Internal tests for YAML parsing and validation in embedded and resource-constrained
 //      environments using the yaml_lib crate. These tests ensure correct parsing, structure,
 //      and value handling for typical embedded system YAML configurations.
 //

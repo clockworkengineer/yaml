@@ -1,9 +1,9 @@
 // =====================================================================================
 //  File: inline_flow_tests.rs
-//  Location: library/src/integration_tests/
+//  Location: library/src/internal_tests/
 // -------------------------------------------------------------------------------------
 //  Purpose:
-//      Integration tests for YAML inline (flow style) mapping and sequence parsing in the yaml_lib crate.
+//      Internal tests for YAML inline (flow style) mapping and sequence parsing in the yaml_lib crate.
 //      These tests validate correct handling of inline mappings and sequences, including edge cases,
 //      formatting variations, and compliance with the YAML specification.
 //

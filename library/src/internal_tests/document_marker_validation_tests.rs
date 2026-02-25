@@ -1,9 +1,9 @@
 // =====================================================================================
 //  File: document_marker_validation_tests.rs
-//  Location: library/src/integration_tests/
+//  Location: library/src/internal_tests/
 // -------------------------------------------------------------------------------------
 //  Purpose:
-//      Integration tests for validation of YAML document marker usage in the yaml_lib crate.
+//      Internal tests for validation of YAML document marker usage in the yaml_lib crate.
 //      These tests ensure that document start markers (---) are correctly validated for
 //      placement, formatting, and error reporting according to the YAML specification.
 //

@@ -1,9 +1,9 @@
 // =====================================================================================
 //  File: document_structure_tests.rs
-//  Location: library/src/integration_tests/
+//  Location: library/src/internal_tests/
 // -------------------------------------------------------------------------------------
 //  Purpose:
-//      Integration tests for YAML document structure parsing in the yaml_lib crate.
+//      Internal tests for YAML document structure parsing in the yaml_lib crate.
 //      These tests validate correct handling of multi-document streams, document boundaries,
 //      and structural edge cases, ensuring compliance with the YAML specification.
 //

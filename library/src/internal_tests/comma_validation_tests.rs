@@ -1,9 +1,9 @@
 // =====================================================================================
 //  File: comma_validation_tests.rs
-//  Location: library/src/integration_tests/
+//  Location: library/src/internal_tests/
 // -------------------------------------------------------------------------------------
 //  Purpose:
-//      Integration tests for validation of comma usage in YAML sequences in the yaml_lib crate.
+//      Internal tests for validation of comma usage in YAML sequences in the yaml_lib crate.
 //      These tests ensure that invalid comma placements (leading, trailing, double commas)
 //      and related syntax errors are correctly detected and reported according to the YAML spec.
 //
