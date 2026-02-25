@@ -1,4 +1,3 @@
-
 //! File Destination for Encoded Output
 //!
 //! Provides a file-based destination for writing encoded YAML or JSON data to disk.
@@ -6,11 +5,10 @@
 //!
 //! Copyright (c) 2026 YAML Library Developers
 
-
 use crate::io::traits::IDestination;
+use crate::io::util::{write_all, write_str};
 use std::fs::File as StdFile;
 use std::io::{Read, Seek, Write};
-use crate::io::util::{write_all, write_str};
 
 /// A file-based destination for writing JSON data to disk.
 /// Implements file operations for storing and manipulating encoded data.
@@ -247,6 +245,53 @@ mod tests {
         let path = "test_name.txt";
         let file = File::new(path)?;
         file.close()?;
+        fs::remove_file(path)?;
+        Ok(())
+    }
+
+    // --- New and relevant unit tests ---
+    #[test]
+    fn add_bytes_empty_string_file() -> std::io::Result<()> {
+        let path = "test_empty_bytes.txt";
+        let mut file = File::new(path)?;
+        file.add_bytes("");
+        assert_eq!(file.file_length(), 0);
+        fs::remove_file(path)?;
+        Ok(())
+    }
+
+    #[test]
+    fn clear_on_empty_file() -> std::io::Result<()> {
+        let path = "test_clear_empty.txt";
+        let mut file = File::new(path)?;
+        file.clear();
+        assert_eq!(file.file_length(), 0);
+        fs::remove_file(path)?;
+        Ok(())
+    }
+
+    #[test]
+    fn add_byte_and_clear_and_add_again_file() -> std::io::Result<()> {
+        let path = "test_add_clear_add.txt";
+        let mut file = File::new(path)?;
+        file.add_byte(b'a');
+        file.clear();
+        file.add_byte(b'b');
+        assert_eq!(file.last(), Some(b'b'));
+        fs::remove_file(path)?;
+        Ok(())
+    }
+
+    #[test]
+    fn last_after_multiple_adds_and_clear_file() -> std::io::Result<()> {
+        let path = "test_last_multi.txt";
+        let mut file = File::new(path)?;
+        file.add_bytes("abc");
+        assert_eq!(file.last(), Some(b'c'));
+        file.clear();
+        assert_eq!(file.last(), None);
+        file.add_bytes("xyz");
+        assert_eq!(file.last(), Some(b'z'));
         fs::remove_file(path)?;
         Ok(())
     }

@@ -109,4 +109,47 @@ mod tests {
         buffer.add_byte(0xFF);
         assert_eq!(buffer.to_string(), "�");
     }
+
+    // --- New and relevant unit tests ---
+    #[test]
+    fn add_bytes_empty_string() {
+        let mut buffer = Buffer::new();
+        buffer.add_bytes("");
+        assert!(buffer.buffer.is_empty());
+    }
+
+    #[test]
+    fn clear_on_empty_buffer() {
+        let mut buffer = Buffer::new();
+        buffer.clear();
+        assert!(buffer.buffer.is_empty());
+    }
+
+    #[test]
+    fn add_byte_and_clear_and_add_again() {
+        let mut buffer = Buffer::new();
+        buffer.add_byte(b'a');
+        buffer.clear();
+        buffer.add_byte(b'b');
+        assert_eq!(buffer.to_string(), "b");
+    }
+
+    #[test]
+    fn last_after_multiple_adds_and_clear() {
+        let mut buffer = Buffer::new();
+        buffer.add_bytes("abc");
+        assert_eq!(buffer.last(), Some(b'c'));
+        buffer.clear();
+        assert_eq!(buffer.last(), None);
+        buffer.add_bytes("xyz");
+        assert_eq!(buffer.last(), Some(b'z'));
+    }
+
+    #[test]
+    fn to_string_with_mixed_ascii_and_non_utf8() {
+        let mut buffer = Buffer::new();
+        buffer.add_bytes("abc");
+        buffer.add_byte(0xFF);
+        assert_eq!(buffer.to_string(), "abc�");
+    }
 }
