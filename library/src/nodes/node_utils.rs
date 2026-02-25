@@ -1,3 +1,4 @@
+
 //! Node Utility Functions
 //!
 //! Provides helper functions for constructing tagged, anchored, and mapping nodes
@@ -76,3 +77,112 @@ pub fn is_boolean_node(node: &Node) -> bool {
 pub fn is_none_node(node: &Node) -> bool {
     matches!(node, Node::None)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::nodes::node::{Node, QuoteType, BlockStyle};
+
+    #[test]
+    fn test_make_tagged_node() {
+        let inner = Node::from("foo");
+        let tagged = make_tagged_node(inner.clone(), "!mytag".to_string());
+        match tagged {
+            Node::Tagged(boxed, tag) => {
+                assert_eq!(*boxed, inner);
+                assert_eq!(tag, "!mytag");
+            }
+            _ => panic!("Expected Tagged node"),
+        }
+    }
+
+    #[test]
+    fn test_make_anchored_node() {
+        let inner = Node::from(42);
+        let anchored = make_anchored_node(inner.clone(), "anchor1".to_string());
+        match anchored {
+            Node::Anchored(boxed, name) => {
+                assert_eq!(*boxed, inner);
+                assert_eq!(name, "anchor1");
+            }
+            _ => panic!("Expected Anchored node"),
+        }
+    }
+
+    #[test]
+    fn test_make_mapping_node() {
+        let pairs = vec![(Node::from("k"), Node::from("v"))];
+        let mapping = make_mapping_node(pairs.clone());
+        match mapping {
+            Node::Mapping(m) => assert_eq!(m, pairs),
+            _ => panic!("Expected Mapping node"),
+        }
+    }
+
+    #[test]
+    fn test_make_array_node() {
+        let items = vec![Node::from(1), Node::from(2)];
+        let arr = make_array_node(items.clone());
+        match arr {
+            Node::Array(a) => assert_eq!(a, items),
+            _ => panic!("Expected Array node"),
+        }
+    }
+
+    #[test]
+    fn test_make_block_scalar_node_literal_and_folded() {
+        let lit = make_block_scalar_node("abc".to_string(), false);
+        let fold = make_block_scalar_node("xyz".to_string(), true);
+        match lit {
+            Node::Str(s, QuoteType::Unquoted, BlockStyle::Literal) => assert_eq!(s, "abc"),
+            _ => panic!("Expected literal block scalar"),
+        }
+        match fold {
+            Node::Str(s, QuoteType::Unquoted, BlockStyle::Folded) => assert_eq!(s, "xyz"),
+            _ => panic!("Expected folded block scalar"),
+        }
+    }
+
+    #[test]
+    fn test_is_string_node_and_is_number_node() {
+        let s = Node::from("foo");
+        let n = Node::from(123);
+        assert!(is_string_node(&s));
+        assert!(!is_string_node(&n));
+        assert!(is_number_node(&n));
+        assert!(!is_number_node(&s));
+    }
+
+    #[test]
+    fn test_is_boolean_node_and_is_none_node() {
+        let b = Node::from(true);
+        let n = Node::None;
+        assert!(is_boolean_node(&b));
+        assert!(!is_boolean_node(&n));
+        assert!(is_none_node(&n));
+        assert!(!is_none_node(&b));
+    }
+
+    #[test]
+    fn test_make_set_node() {
+        let items = vec![Node::from(1), Node::from(2)];
+        let set = make_set_node(items.clone());
+        match set {
+            Node::Set(s) => assert_eq!(s, items),
+            _ => panic!("Expected Set node"),
+        }
+    }
+
+    #[test]
+    fn test_normalize_node() {
+        let n1 = Node::from("");
+        let n2 = Node::from("  ");
+        let n3 = Node::from("abc");
+        let n4 = Node::from(123);
+        assert_eq!(normalize_node(&n1), Node::None);
+        assert_eq!(normalize_node(&n2), Node::None);
+        assert_eq!(normalize_node(&n3), Node::from("abc"));
+        assert_eq!(normalize_node(&n4), n4);
+    }
+}
+

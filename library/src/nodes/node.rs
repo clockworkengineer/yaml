@@ -1,4 +1,3 @@
-
 //! YAML Node Definitions
 //!
 //! Defines the core `Node` enum and related traits for representing YAML data structures.
@@ -2888,5 +2887,69 @@ mod tests {
         assert!(builder.contains(&node1));
         assert!(builder.contains(&node2));
         assert!(!builder.contains(&node3));
+    }
+    // --- New and relevant unit tests ---
+    #[test]
+    fn test_node_string_convert_trait() {
+        let s = Node::from("hello");
+        assert_eq!(s.to_string_lossy(), "hello");
+        assert_eq!(s.as_str(), Some("hello"));
+        assert_eq!(s.clone_as_string(), Some(Node::from("hello")));
+
+        let n = Node::from(42);
+        assert_eq!(n.to_string_lossy(), "42");
+        assert_eq!(n.as_str(), None);
+        assert_eq!(n.clone_as_string(), None);
+    }
+
+    #[test]
+    fn test_numeric_variants_to_string_lossy() {
+        let i = Node::from(-5i64);
+        let f = Node::from(3.14f64);
+        let u = Node::from(7u64);
+        let b = Node::from(255u8);
+        let i32v = Node::from(-123i32);
+        assert_eq!(i.to_string_lossy(), "-5");
+        assert_eq!(f.to_string_lossy(), "3.14");
+        assert_eq!(u.to_string_lossy(), "7");
+        assert_eq!(b.to_string_lossy(), "255");
+        assert_eq!(i32v.to_string_lossy(), "-123");
+    }
+
+    #[test]
+    fn test_node_equality_and_clone() {
+        let n1 = Node::from("abc");
+        let n2 = n1.clone();
+        assert_eq!(n1, n2);
+        let n3 = Node::from(123);
+        assert_ne!(n1, n3);
+    }
+
+    #[test]
+    fn test_node_array_and_mapping_index() {
+        let arr = Node::Array(vec![Node::from(1), Node::from(2)]);
+        assert_eq!(arr[0], Node::from(1));
+        assert_eq!(arr[1], Node::from(2));
+
+        let map = Node::mapping().insert("foo", 42).build();
+        assert_eq!(map["foo"], Node::from(42));
+    }
+
+    #[test]
+    fn test_node_set_insert_and_contains() {
+        let set = Node::set().insert("a").insert("b");
+        assert!(set.contains(&Node::from("a")));
+        assert!(set.contains(&Node::from("b")));
+        assert!(!set.contains(&Node::from("c")));
+    }
+
+    #[test]
+    fn test_node_none_and_boolean() {
+        let n = Node::None;
+        assert_eq!(n.to_string_lossy(), "null");
+        let t = Node::from(true);
+        let f = Node::from(false);
+        assert_eq!(t.to_string_lossy(), "true");
+        assert_eq!(f.to_string_lossy(), "false");
     }
 }
