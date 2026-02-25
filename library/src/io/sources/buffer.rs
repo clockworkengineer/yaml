@@ -1,4 +1,3 @@
-
 //! Buffer Source for Decoded Input
 //!
 //! Provides a memory buffer implementation for reading YAML or JSON data from bytes.
@@ -253,7 +252,7 @@ mod tests {
         assert_eq!(source.current(), Some('z'));
         assert!(source.more());
     }
-        #[test]
+    #[test]
     fn buffer_handles_only_newlines() {
         let mut source = Buffer::new(b"\n\n\n");
         assert_eq!(source.line, 0);
