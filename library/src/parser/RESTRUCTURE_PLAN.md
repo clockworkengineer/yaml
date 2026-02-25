@@ -18,15 +18,16 @@ Restructure the `parser` folder for improved maintainability, clarity, and scala
 - ~~Remove the now-empty `parser/document/tokens/` folder.~~ ✅
 
 ### 3. Centralize Utilities
-- Move all utility files from `parser/document/` and `parser/utils/` into `parser/utils/`.
-  - If a utility is only used by `document`, consider a `parser/document/utils/` submodule.
-- Update all imports referencing moved utilities.
-- Remove redundant or empty utility folders.
+- ~~Move all utility files from `parser/document/` and `parser/utils/` into `parser/utils/`.~~ ✅
+  - ~~If a utility is only used by `document`, consider a `parser/document/utils/` submodule.~~ ✅
+- ~~Update all imports referencing moved utilities.~~ ✅
+- ~~Remove redundant or empty utility folders.~~ ✅
 
 ### 4. Review and Relocate Macros
-- If macros in `parser/utils/macros/` are only used in one module, move them to that module.
-- Otherwise, keep them in `parser/utils/macros/`.
-- Update macro imports as needed.
+- ~~If macros in `parser/utils/macros/` are only used in one module, move them to that module.~~ ✅
+- ~~Otherwise, keep them in `parser/utils/macros/`.~~ ✅
+- ~~Update macro imports as needed.~~ ✅
+- Note: Both macros (`anchors_debug!` and `lexer_debug!`) are kept in `parser/utils/macros/` as they are well-organized debug utilities.
 
 ### 5. Flatten and Group Document Submodules
 - In `parser/document/`, merge small files (e.g., `context.rs`, `helpers.rs`, `node_utils.rs`, `error_builder.rs`) into a single `core.rs` if possible.
