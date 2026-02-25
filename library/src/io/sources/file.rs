@@ -1,4 +1,5 @@
 
+
 //! File Source for Decoded Input
 //!
 //! Provides a file-based source for reading YAML or JSON data from disk.
@@ -155,6 +156,7 @@ mod tests {
     use std::fs::OpenOptions;
     use std::io::Write;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::fs;
 
     static TEST_FILE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -383,5 +385,72 @@ mod tests {
                 ]
             )])])])
         );
+    }
+    
+    fn create_temp_file(data: &[u8], name: &str) -> String {
+        let path = format!("test_temp_{}.txt", name);
+        let mut f = StdFile::create(&path).unwrap();
+        f.write_all(data).unwrap();
+        path
+    }
+
+    #[test]
+    fn file_handles_only_newlines() {
+        let path = create_temp_file(b"\n\n\n", "only_newlines");
+        let mut file = File::new(&path).unwrap();
+        for _ in 0..3 {
+            assert_eq!(file.current(), Some('\n'));
+            file.next();
+        }
+        assert_eq!(file.current(), None);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn file_handles_mixed_line_endings() {
+        let path = create_temp_file(b"a\r\nb\rc\nd", "mixed_lines");
+        let mut file = File::new(&path).unwrap();
+        assert_eq!(file.current(), Some('a'));
+        file.next(); // '\r'
+        assert_eq!(file.current(), Some('\n'));
+        file.next(); // 'b'
+        assert_eq!(file.current(), Some('b'));
+        file.next(); // '\r'
+        assert_eq!(file.current(), Some('\r'));
+        file.next(); // 'c'
+        assert_eq!(file.current(), Some('c'));
+        file.next(); // '\n'
+        assert_eq!(file.current(), Some('\n'));
+        file.next(); // 'd'
+        assert_eq!(file.current(), Some('d'));
+        file.next();
+        assert_eq!(file.current(), None);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn file_reset_after_partial_read() {
+        let path = create_temp_file(b"xyz", "reset_partial");
+        let mut file = File::new(&path).unwrap();
+        file.next();
+        assert_eq!(file.current(), Some('y'));
+        file.reset();
+        assert_eq!(file.current(), Some('x'));
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn file_handles_large_input() {
+        let data = vec![b'a'; 10_000];
+        let path = create_temp_file(&data, "large_input");
+        let mut file = File::new(&path).unwrap();
+        let mut count = 0;
+        while file.more() {
+            assert_eq!(file.current(), Some('a'));
+            file.next();
+            count += 1;
+        }
+        assert_eq!(count, 10_000);
+        fs::remove_file(path).unwrap();
     }
 }
