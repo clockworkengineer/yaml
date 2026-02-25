@@ -1,5 +1,3 @@
-
-
 //! File Source for Decoded Input
 //!
 //! Provides a file-based source for reading YAML or JSON data from disk.
@@ -7,11 +5,10 @@
 //!
 //! Copyright (c) 2026 YAML Library Developers
 
-
 use crate::io::traits::ISource;
+use crate::io::util::read_all;
 use std::fs::File as StdFile;
 use std::io::{Read, Seek, SeekFrom};
-use crate::io::util::read_all;
 
 /// File
 
@@ -153,10 +150,10 @@ mod tests {
     use super::*;
     use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
     use crate::parse;
+    use std::fs;
     use std::fs::OpenOptions;
     use std::io::Write;
     use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::fs;
 
     static TEST_FILE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -386,7 +383,7 @@ mod tests {
             )])])])
         );
     }
-    
+
     fn create_temp_file(data: &[u8], name: &str) -> String {
         let path = format!("test_temp_{}.txt", name);
         let mut f = StdFile::create(&path).unwrap();
