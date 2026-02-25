@@ -486,4 +486,76 @@ mod tests {
         assert_eq!(validator.max_depth(), 0);
         assert_eq!(validator.anchor_count(), 0);
     }
+    #[test]
+    fn test_nesting_depth_negative() {
+        // Negative values are not possible for usize, but test zero limit edge
+        assert!(check_nesting_depth(0).is_ok());
+    }
+
+    #[test]
+    fn test_document_size_zero_limit() {
+        // Simulate zero limit by temporarily overriding MAX_DOCUMENT_SIZE
+        // (Assume MAX_DOCUMENT_SIZE is not const for this test, otherwise skip)
+        // Here, just check zero size is valid
+        assert!(check_document_size(0).is_ok());
+    }
+
+    #[test]
+    fn test_string_length_empty_string() {
+        assert!(check_string_length(0).is_ok());
+    }
+
+    #[test]
+    fn test_sequence_items_empty() {
+        assert!(check_sequence_items(0).is_ok());
+    }
+
+    #[test]
+    fn test_mapping_pairs_empty() {
+        assert!(check_mapping_pairs(0).is_ok());
+    }
+
+    #[test]
+    fn test_anchor_count_zero() {
+        assert!(check_anchor_count(0).is_ok());
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn test_limit_error_display() {
+        let err = LimitError::SequenceItemsExceeded {
+            current: 10,
+            max: 5,
+        };
+        let msg = format!("{}", err);
+        assert!(msg.contains("Sequence items 10 exceeded maximum 5"));
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn test_limit_error_debug() {
+        let err = LimitError::AnchorsExceeded { current: 3, max: 2 };
+        let msg = format!("{:?}", err);
+        assert!(msg.contains("AnchorsExceeded"));
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn test_node_validator_empty_array() {
+        use crate::nodes::node::Node;
+        let arr = Node::Array(vec![]);
+        let mut validator = NodeValidator::new();
+        assert!(validator.validate(&arr).is_ok());
+        assert_eq!(validator.max_depth(), 0);
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn test_node_validator_empty_mapping() {
+        use crate::nodes::node::Node;
+        let mapping = Node::Mapping(vec![]);
+        let mut validator = NodeValidator::new();
+        assert!(validator.validate(&mapping).is_ok());
+        assert_eq!(validator.max_depth(), 0);
+    }
 }
