@@ -30,10 +30,16 @@ impl TryFrom<&Numeric> for LightNumeric {
     fn try_from(num: &Numeric) -> Result<Self, Self::Error> {
         match num {
             Numeric::Integer(i) => Ok(LightNumeric::Integer(*i as i32)),
+            Numeric::Int32(i) => Ok(LightNumeric::Integer(*i)),
+            Numeric::Int16(i) => Ok(LightNumeric::Short(*i)),
+            Numeric::Int8(i) => Ok(LightNumeric::Short(*i as i16)),
             Numeric::Float(f) => Ok(LightNumeric::Float(*f as f32)),
             Numeric::Byte(b) => Ok(LightNumeric::Byte(*b)),
-            Numeric::Int16(i) => Ok(LightNumeric::Short(*i)),
             Numeric::UInt8(u) => Ok(LightNumeric::Byte(*u)),
+            Numeric::UInt16(u) => Ok(LightNumeric::Byte((*u).min(255) as u8)),
+            Numeric::UInt32(u) => Ok(LightNumeric::Integer((*u).min(i32::MAX as u32) as i32)),
+            Numeric::UInteger(u) => Ok(LightNumeric::Integer((*u).min(i32::MAX as u64) as i32)),
+            Numeric::Int8(i) => Ok(LightNumeric::Short(*i as i16)),
             // Add more mappings as needed
             _ => Err("Unsupported numeric type for lightweight conversion"),
         }
@@ -272,6 +278,22 @@ mod tests {
     }
 
     #[test]
+    fn test_light_numeric_try_from_numeric() {
+        let n = Numeric::Integer(123);
+        let ln = LightNumeric::try_from(&n).unwrap();
+        assert_eq!(ln, LightNumeric::Integer(123));
+        let n = Numeric::Float(1.5);
+        let ln = LightNumeric::try_from(&n).unwrap();
+        assert_eq!(ln, LightNumeric::Float(1.5));
+        let n = Numeric::Byte(7);
+        let ln = LightNumeric::try_from(&n).unwrap();
+        assert_eq!(ln, LightNumeric::Byte(7));
+        let n = Numeric::Int16(42);
+        let ln = LightNumeric::try_from(&n).unwrap();
+        assert_eq!(ln, LightNumeric::Short(42));
+    }
+
+    #[test]
     fn test_fixed_string_creation() {
         let s = FixedString::from_str("Hello").unwrap();
         assert_eq!(s.as_str(), "Hello");
@@ -294,6 +316,15 @@ mod tests {
     }
 
     #[test]
+    fn test_fixed_string_from_str_edge_cases() {
+        let empty = FixedString::from_str("").unwrap();
+        assert!(empty.is_empty());
+        let max = FixedString::from_str(&"a".repeat(256)).unwrap();
+        assert_eq!(max.len(), 256);
+        assert_eq!(max.as_str(), &"a".repeat(256));
+    }
+
+    #[test]
     fn test_light_node_creation() {
         let bool_node = LightNode::boolean(true);
         assert_eq!(bool_node, LightNode::Boolean(true));
@@ -312,6 +343,30 @@ mod tests {
 
         let null_node = LightNode::null();
         assert_eq!(null_node, LightNode::None);
+    }
+
+    #[test]
+    fn test_light_node_try_from_node() {
+        let node = Node::from(true);
+        let ln = LightNode::try_from(&node).unwrap();
+        assert_eq!(ln, LightNode::Boolean(true));
+        let node = Node::from(123);
+        let ln = LightNode::try_from(&node).unwrap();
+        assert_eq!(ln, LightNode::Number(LightNumeric::Integer(123)));
+        let node = Node::from("abc");
+        let ln = LightNode::try_from(&node).unwrap();
+        match ln {
+            LightNode::Str(fs, _, _) => assert_eq!(fs.as_str(), "abc"),
+            _ => panic!("Expected string node"),
+        }
+        let node = Node::None;
+        let ln = LightNode::try_from(&node).unwrap();
+        assert_eq!(ln, LightNode::None);
+        // Test unsupported node types
+        let array_node = Node::Array(vec![Node::from(1)]);
+        assert!(LightNode::try_from(&array_node).is_err());
+        let mapping_node = Node::Mapping(vec![(Node::from("k"), Node::from(1))]);
+        assert!(LightNode::try_from(&mapping_node).is_err());
     }
 
     #[test]
@@ -345,5 +400,22 @@ mod tests {
         let idx = arena.add_mapping(pairs.clone()).unwrap();
         let retrieved = arena.get_mapping(idx).unwrap();
         assert_eq!(retrieved.len(), 2);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_node_arena_array_too_large() {
+        let mut arena = NodeArena::new();
+        let items = alloc::vec![LightNode::integer(0); MAX_SEQUENCE_ITEMS + 1];
+        assert!(arena.add_array(items).is_err());
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_node_arena_mapping_too_large() {
+        let mut arena = NodeArena::new();
+        let pairs =
+            alloc::vec![(LightNode::integer(0), LightNode::integer(1)); MAX_MAPPING_PAIRS + 1];
+        assert!(arena.add_mapping(pairs).is_err());
     }
 }

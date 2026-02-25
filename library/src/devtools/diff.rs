@@ -417,4 +417,73 @@ mod tests {
         assert!(formatted.contains("old"));
         assert!(formatted.contains("new"));
     }
+
+    #[test]
+    fn test_diff_added_node() {
+        let node1 = Node::Array(vec![Node::from(1)]);
+        let node2 = Node::Array(vec![Node::from(1), Node::from(2)]);
+        let result = diff_nodes(&node1, &node2);
+        assert!(result.diffs.iter().any(|d| d.diff_type == DiffType::Added));
+        assert!(
+            result
+                .diffs
+                .iter()
+                .any(|d| d.diff_type == DiffType::SizeChanged)
+        );
+    }
+
+    #[test]
+    fn test_diff_removed_node() {
+        let node1 = Node::Array(vec![Node::from(1), Node::from(2)]);
+        let node2 = Node::Array(vec![Node::from(1)]);
+        let result = diff_nodes(&node1, &node2);
+        assert!(
+            result
+                .diffs
+                .iter()
+                .any(|d| d.diff_type == DiffType::Removed)
+        );
+        assert!(
+            result
+                .diffs
+                .iter()
+                .any(|d| d.diff_type == DiffType::SizeChanged)
+        );
+    }
+
+    #[test]
+    fn test_diff_modified_number() {
+        let node1 = Node::from(10);
+        let node2 = Node::from(20);
+        let result = diff_nodes(&node1, &node2);
+        assert!(
+            result
+                .diffs
+                .iter()
+                .any(|d| d.diff_type == DiffType::Modified)
+        );
+        assert!(result.diffs[0].description.contains("Number value changed"));
+    }
+
+    #[test]
+    fn test_diff_type_changed_between_array_and_mapping() {
+        let node1 = Node::Array(vec![Node::from(1)]);
+        let node2 = Node::Mapping(vec![(Node::from("a"), Node::from(1))]);
+        let result = diff_nodes(&node1, &node2);
+        assert!(
+            result
+                .diffs
+                .iter()
+                .any(|d| d.diff_type == DiffType::TypeChanged)
+        );
+    }
+
+    #[test]
+    fn test_diff_result_format_no_differences() {
+        let node1 = Node::from("same");
+        let node2 = Node::from("same");
+        let result = diff_nodes(&node1, &node2);
+        let formatted = result.format();
+        assert!(formatted.contains("No differences found"));
+    }
 }

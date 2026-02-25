@@ -373,4 +373,56 @@ mod tests {
         assert!(NodeType::Array.is_collection());
         assert!(!NodeType::Array.is_scalar());
     }
+
+    #[test]
+    fn test_node_info_tag_anchor_alias() {
+        let tagged = Node::Tagged(Box::new(Node::from("tagged")), "!tag".to_string());
+        let anchored = Node::Anchored(Box::new(Node::from("anchored")), "anchor1".to_string());
+        let alias = Node::Alias("alias1".to_string());
+        let tagged_info = NodeInfo::new(&tagged);
+        let anchored_info = NodeInfo::new(&anchored);
+        let alias_info = NodeInfo::new(&alias);
+        assert!(tagged_info.has_tag);
+        assert!(!tagged_info.has_anchor);
+        assert!(!tagged_info.is_alias);
+        assert!(!anchored_info.has_tag);
+        assert!(anchored_info.has_anchor);
+        assert!(!anchored_info.is_alias);
+        assert!(!alias_info.has_tag);
+        assert!(!alias_info.has_anchor);
+        assert!(alias_info.is_alias);
+    }
+
+    #[test]
+    fn test_node_summary_long_string() {
+        let long_str = "a".repeat(60);
+        let node = Node::from(long_str.clone());
+        let summary = node_summary(&node);
+        assert!(summary.contains("..."));
+        assert!(summary.contains(&long_str[..47]));
+    }
+
+    #[test]
+    fn test_print_tree_documents() {
+        let docs = Node::Documents(vec![Node::from("doc1"), Node::from("doc2")]);
+        let tree = print_tree(&docs);
+        assert!(tree.contains("documents"));
+        assert!(tree.contains("doc[0]"));
+        assert!(tree.contains("doc[1]"));
+    }
+
+    #[test]
+    fn test_find_by_type_empty() {
+        let node = Node::Array(vec![]);
+        let found = find_by_type(&node, NodeType::Mapping);
+        assert_eq!(found.len(), 0);
+    }
+
+    #[test]
+    fn test_node_type_tagged_and_anchored() {
+        let tagged = Node::Tagged(Box::new(Node::from("tagged")), "!tag".to_string());
+        let anchored = Node::Anchored(Box::new(Node::from("anchored")), "anchor1".to_string());
+        assert_eq!(node_type(&tagged), NodeType::Tagged);
+        assert_eq!(node_type(&anchored), NodeType::Anchored);
+    }
 }

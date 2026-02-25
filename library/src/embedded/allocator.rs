@@ -140,12 +140,10 @@ mod tests {
     #[test]
     fn test_bump_allocator_alloc() {
         let mut allocator = BumpAllocator::new();
-
         let slice1 = allocator.alloc(100, 1);
         assert!(slice1.is_some());
         assert_eq!(slice1.unwrap().len(), 100);
         assert_eq!(allocator.used(), 100);
-
         let slice2 = allocator.alloc(200, 1);
         assert!(slice2.is_some());
         assert_eq!(slice2.unwrap().len(), 200);
@@ -155,12 +153,8 @@ mod tests {
     #[test]
     fn test_bump_allocator_alignment() {
         let mut allocator = BumpAllocator::new();
-
-        // Allocate with 8-byte alignment
         let slice1 = allocator.alloc(5, 8);
         assert!(slice1.is_some());
-
-        // Next allocation should be 8-byte aligned
         let slice2 = allocator.alloc(10, 8);
         assert!(slice2.is_some());
     }
@@ -168,8 +162,6 @@ mod tests {
     #[test]
     fn test_bump_allocator_out_of_memory() {
         let mut allocator = BumpAllocator::new();
-
-        // Try to allocate more than capacity
         let slice = allocator.alloc(5000, 1);
         assert!(slice.is_none());
     }
@@ -177,13 +169,21 @@ mod tests {
     #[test]
     fn test_bump_allocator_reset() {
         let mut allocator = BumpAllocator::new();
-
         allocator.alloc(100, 1);
         assert_eq!(allocator.used(), 100);
-
         allocator.reset();
         assert_eq!(allocator.used(), 0);
         assert_eq!(allocator.available(), 4096);
+    }
+
+    #[test]
+    fn test_bump_allocator_full_reset_and_reuse() {
+        let mut allocator = BumpAllocator::new();
+        let slice1 = allocator.alloc(4096, 1);
+        assert!(slice1.is_some());
+        allocator.reset();
+        let slice2 = allocator.alloc(4096, 1);
+        assert!(slice2.is_some());
     }
 
     #[test]
@@ -219,6 +219,40 @@ mod tests {
 
         assert_eq!(pool.free_count(), 0);
         assert_eq!(pool.allocated_count(), 3);
+    }
+
+    #[test]
+    fn test_fixed_size_pool_alloc_dealloc() {
+        let mut pool: FixedSizePool<32, 2> = FixedSizePool::new();
+        let block1_ptr;
+        let block2_ptr;
+        {
+            let block1 = pool.alloc().unwrap();
+            block1_ptr = block1 as *mut [u8; 32];
+            let block2 = pool.alloc().unwrap();
+            block2_ptr = block2 as *mut [u8; 32];
+        }
+        assert_eq!(pool.free_count(), 0);
+        unsafe {
+            pool.dealloc(block1_ptr);
+            pool.dealloc(block2_ptr);
+        }
+        assert_eq!(pool.free_count(), 2);
+    }
+
+    #[test]
+    fn test_fixed_size_pool_alloc_dealloc_reuse() {
+        let mut pool: FixedSizePool<16, 1> = FixedSizePool::new();
+        let block_ptr;
+        {
+            let block = pool.alloc().unwrap();
+            block_ptr = block as *mut [u8; 16];
+        }
+        unsafe {
+            pool.dealloc(block_ptr);
+        }
+        let block2 = pool.alloc();
+        assert!(block2.is_some());
     }
 
     #[test]

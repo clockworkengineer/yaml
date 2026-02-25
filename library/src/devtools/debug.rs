@@ -395,4 +395,57 @@ mod tests {
         debugger.disable_trace();
         assert!(!debugger.trace_enabled);
     }
+
+    #[test]
+    fn test_debug_context_log_levels() {
+        let mut ctx = DebugContext::new(DebugLevel::Trace);
+        ctx.error("Error".to_string());
+        ctx.warn("Warn".to_string());
+        ctx.info("Info".to_string());
+        ctx.debug("Debug".to_string());
+        ctx.trace("Trace".to_string());
+        let logs = ctx.logs();
+        assert_eq!(logs.len(), 5);
+        assert!(logs[0].contains("Error"));
+        assert!(logs[1].contains("Warn"));
+        assert!(logs[2].contains("Info"));
+        assert!(logs[3].contains("Debug"));
+        assert!(logs[4].contains("Trace"));
+    }
+
+    #[test]
+    fn test_debug_context_clear_logs() {
+        let mut ctx = DebugContext::new(DebugLevel::Debug);
+        ctx.info("Info message".to_string());
+        ctx.debug("Debug message".to_string());
+        assert!(!ctx.logs().is_empty());
+        ctx.clear_logs();
+        assert!(ctx.logs().is_empty());
+    }
+
+    #[test]
+    fn test_node_debugger_trace_visit() {
+        let mut debugger = NodeDebugger::with_trace();
+        let node = Node::from("test");
+        debugger.trace_visit(2, &node);
+        let logs = debugger.logs();
+        assert!(logs.contains("Visit"));
+        assert!(logs.contains("  ")); // Indentation for depth
+    }
+
+    #[test]
+    fn test_debug_assert_max_depth() {
+        let node = Node::Array(vec![Node::from(1), Node::Array(vec![Node::from(2)])]);
+        let depth = crate::devtools::inspect::node_depth(&node);
+        println!("Actual depth: {}", depth);
+        assert!(DebugAssert::assert_max_depth(&node, depth).is_ok());
+        assert!(DebugAssert::assert_max_depth(&node, depth - 1).is_err());
+    }
+
+    #[test]
+    fn test_debug_assert_collection() {
+        let node = Node::Array(vec![Node::from(1)]);
+        assert!(DebugAssert::assert_collection(&node).is_ok());
+        assert!(DebugAssert::assert_collection(&Node::from("test")).is_err());
+    }
 }
