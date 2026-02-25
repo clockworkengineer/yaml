@@ -41,9 +41,10 @@ pub mod error;
 /// Module for detecting and handling different Unicode text file formats
 #[cfg(feature = "file-io")]
 mod file;
-/// Module containing tests for the YAML library
+/// Module containing internal tests for the YAML library
+/// These tests use internal APIs and are not pure integration tests
 #[cfg(test)]
-mod integration_tests;
+mod internal_tests;
 /// Module providing input/output operations for reading and writing YAML data
 mod io;
 /// Module containing utility functions and helpers for YAML processing
