@@ -276,8 +276,8 @@ impl SchemaValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::validation::schema::Schema;
     use crate::nodes::node::Numeric;
+    use crate::validation::schema::Schema;
 
     #[test]
     fn test_simple_validation() {
@@ -382,5 +382,99 @@ mod tests {
         let msg = error.to_string();
         // Check that the error message contains the expected type mismatch
         assert!(msg.contains("Type mismatch"));
+    }
+}
+
+#[cfg(test)]
+mod additional_validation_engine_tests {
+    use super::*;
+    use crate::nodes::node::{Node, Numeric};
+    use crate::validation::schema::{PropertySchema, Schema, SchemaType};
+
+    #[test]
+    fn test_fail_type_mismatch_error() {
+        let err = ValidationContextCore::fail_type_mismatch(&SchemaType::String, &Node::from(42));
+        match err {
+            ValidationError::TypeMismatch { expected, found } => {
+                assert!(expected.contains("String"));
+                assert!(found.contains("42"));
+            }
+            _ => panic!("Expected TypeMismatch error"),
+        }
+    }
+
+    #[test]
+    fn test_fail_range_error() {
+        let err = ValidationContextCore::fail_range(5.0, Some(1.0), Some(10.0));
+        match err {
+            ValidationError::RangeError { value, min, max } => {
+                assert_eq!(value, 5.0);
+                assert_eq!(min, Some(1.0));
+                assert_eq!(max, Some(10.0));
+            }
+            _ => panic!("Expected RangeError"),
+        }
+    }
+
+    #[test]
+    fn test_fail_required_error() {
+        let err = ValidationContextCore::fail_required("foo");
+        match err {
+            ValidationError::RequiredFieldMissing { field } => {
+                assert_eq!(field, "foo");
+            }
+            _ => panic!("Expected RequiredFieldMissing error"),
+        }
+    }
+
+    #[test]
+    fn test_validation_context_fail_fast() {
+        let mut ctx = ValidationContext::new().with_fail_fast(true);
+        ctx.add_error(ValidationError::RequiredFieldMissing {
+            field: "x".to_string(),
+        });
+        assert!(ctx.should_stop());
+    }
+
+    #[test]
+    fn test_schema_validator_empty_object() {
+        let schema = Schema::object(BTreeMap::new());
+        let validator = SchemaValidator::new(schema);
+        let node = Node::Mapping(vec![]);
+        assert!(validator.validate(&node).is_ok());
+    }
+
+    #[test]
+    fn test_schema_validator_array_with_items() {
+        let mut item_schema = PropertySchema::new(SchemaType::Integer);
+        item_schema.required = true;
+        let mut root_schema = PropertySchema::new(SchemaType::Array);
+        root_schema.items = Some(Box::new(item_schema));
+        let schema = Schema {
+            root: root_schema,
+            title: None,
+            description: None,
+        };
+        let validator = SchemaValidator::new(schema);
+        let node = Node::Array(vec![
+            Node::Number(Numeric::Integer(1)),
+            Node::Number(Numeric::Integer(2)),
+        ]);
+        assert!(validator.validate(&node).is_ok());
+    }
+
+    #[test]
+    fn test_schema_validator_object_missing_required() {
+        let mut props = BTreeMap::new();
+        let mut required_schema = PropertySchema::new(SchemaType::String);
+        required_schema.required = true;
+        props.insert("foo".to_string(), required_schema);
+        let schema = Schema::object(props);
+        let validator = SchemaValidator::new(schema);
+        let node = Node::Mapping(vec![]);
+        let result = validator.validate(&node);
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("Required field"));
     }
 }

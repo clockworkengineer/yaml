@@ -593,3 +593,63 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod additional_validators_tests {
+    use super::*;
+
+    #[test]
+    fn test_type_validator_any() {
+        let validator = TypeValidator::new(SchemaType::Any);
+        assert!(validator.validate(&Node::from("string")).is_ok());
+        assert!(validator.validate(&Node::Number(Numeric::Integer(1))).is_ok());
+        assert!(validator.validate(&Node::Boolean(true)).is_ok());
+    }
+
+    #[test]
+    fn test_range_validator_invalid_node() {
+        let validator = RangeValidator::new(Some(0.0), Some(10.0));
+        let result = validator.validate(&Node::from("not a number"));
+        assert!(result.is_err());
+        if let Err(ValidationError::InvalidNodeType { validator: v, .. }) = result {
+            assert_eq!(v, "RangeValidator");
+        } else {
+            panic!("Expected InvalidNodeType error");
+        }
+    }
+
+    #[test]
+    fn test_length_validator_string_and_array() {
+        let validator = LengthValidator::new(Some(2), Some(4));
+        assert!(validator.validate(&Node::from("ab")).is_ok());
+        assert!(validator.validate(&Node::from("abcd")).is_ok());
+        assert!(validator.validate(&Node::from("a")).is_err());
+        assert!(validator.validate(&Node::from("abcde")).is_err());
+
+        let arr = Node::Array(vec![Node::from(1), Node::from(2)]);
+        assert!(validator.validate(&arr).is_ok());
+        let arr = Node::Array(vec![Node::from(1)]);
+        assert!(validator.validate(&arr).is_err());
+    }
+
+    #[test]
+    fn test_pattern_validator() {
+        let validator = PatternValidator::new("^abc[0-9]+$".to_string());
+        assert!(validator.validate(&Node::from("abc123")).is_ok());
+        assert!(validator.validate(&Node::from("ab123")).is_err());
+    }
+
+    #[test]
+    fn test_enum_validator() {
+        let validator = EnumValidator::new(vec!["A".to_string(), "B".to_string()]);
+        assert!(validator.validate(&Node::from("A")).is_ok());
+        assert!(validator.validate(&Node::from("C")).is_err());
+    }
+
+    #[test]
+    fn test_required_validator_non_mapping() {
+        let validator = RequiredValidator::new("foo");
+        let node = Node::Array(vec![]);
+        assert!(validator.validate(&node).is_err());
+    }
+}

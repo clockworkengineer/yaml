@@ -376,3 +376,75 @@ mod tests {
         assert_eq!(schema.description, Some("The name of the user".to_string()));
     }
 }
+
+#[cfg(test)]
+mod additional_schema_tests {
+    use super::*;
+
+    #[test]
+    fn test_property_schema_default_values() {
+        let schema = PropertySchema::new(SchemaType::Boolean);
+        assert!(!schema.required);
+        assert!(schema.description.is_none());
+        assert!(schema.minimum.is_none());
+        assert!(schema.maximum.is_none());
+        assert!(schema.min_length.is_none());
+        assert!(schema.max_length.is_none());
+        assert!(schema.pattern.is_none());
+        assert!(schema.enum_values.is_none());
+        assert!(schema.properties.is_none());
+        assert!(schema.items.is_none());
+        assert!(schema.default.is_none());
+    }
+
+    #[test]
+    fn test_property_schema_with_enum() {
+        let schema = PropertySchema::new(SchemaType::String)
+            .with_enum(vec!["A".to_string(), "B".to_string()]);
+        assert_eq!(schema.enum_values, Some(vec!["A".to_string(), "B".to_string()]));
+    }
+
+    #[test]
+    fn test_property_schema_with_items() {
+        let item_schema = PropertySchema::new(SchemaType::Integer);
+        let schema = PropertySchema::new(SchemaType::Array).with_items(item_schema.clone());
+        assert!(schema.items.is_some());
+        assert_eq!(schema.items.as_ref().unwrap().schema_type, SchemaType::Integer);
+    }
+
+    #[test]
+    fn test_property_schema_with_properties() {
+        let mut props = BTreeMap::new();
+        props.insert("foo".to_string(), PropertySchema::new(SchemaType::String));
+        let schema = PropertySchema::new(SchemaType::Object).with_properties(props.clone());
+        assert!(schema.properties.is_some());
+        assert_eq!(schema.properties.as_ref().unwrap().len(), 1);
+        assert!(schema.properties.as_ref().unwrap().contains_key("foo"));
+    }
+
+    #[test]
+    fn test_array_schema_defaults() {
+        let schema = ArraySchema::new(PropertySchema::new(SchemaType::String));
+        assert!(schema.min_items.is_none());
+        assert!(schema.max_items.is_none());
+        assert!(!schema.unique_items);
+    }
+
+    #[test]
+    fn test_object_schema_defaults() {
+        let schema = ObjectSchema::new();
+        assert!(schema.properties.is_empty());
+        assert!(schema.required.is_empty());
+        assert!(schema.additional_properties);
+    }
+
+    #[test]
+    fn test_schema_title_and_description() {
+        let schema = Schema::new(PropertySchema::new(SchemaType::Null))
+            .with_title("Null type")
+            .with_description("A schema for null values");
+        assert_eq!(schema.title, Some("Null type".to_string()));
+        assert_eq!(schema.description, Some("A schema for null values".to_string()));
+    }
+}
+    
