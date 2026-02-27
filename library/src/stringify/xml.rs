@@ -1,4 +1,3 @@
-
 //! YAML to XML Stringifier
 //!
 //! This module provides functionality to convert YAML node structures into XML format.
@@ -474,5 +473,49 @@ mod tests {
         assert!(tag_start.is_some());
         assert!(!tag_start.unwrap().is_ascii_digit());
         assert!(out.contains("v"));
+    }
+
+    #[test]
+    fn test_xml_boolean() {
+        let mut buf = BufferDestination::new();
+        let b_true = Node::Boolean(true);
+        stringify(&b_true, &mut buf).unwrap();
+        assert_eq!(buf.to_string(), "true");
+        buf.clear();
+        let b_false = Node::Boolean(false);
+        stringify(&b_false, &mut buf).unwrap();
+        assert_eq!(buf.to_string(), "false");
+    }
+
+    #[test]
+    fn test_xml_empty_mapping() {
+        let mut buf = BufferDestination::new();
+        let empty_map = Node::Mapping(vec![]);
+        stringify(&empty_map, &mut buf).unwrap();
+        assert_eq!(buf.to_string(), "");
+    }
+
+    #[test]
+    fn test_xml_escape_special_chars() {
+        let mut buf = BufferDestination::new();
+        let n = Node::Str(
+            "<tag>&\"'".to_string(),
+            QuoteType::Unquoted,
+            BlockStyle::None,
+        );
+        stringify(&n, &mut buf).unwrap();
+        let out = buf.to_string();
+        assert!(out.contains("&lt;tag&gt;"));
+        assert!(out.contains("&amp;"));
+        assert!(out.contains("&quot;"));
+        assert!(out.contains("&apos;"));
+    }
+
+    #[test]
+    fn test_xml_set_outputs_xml() {
+        let mut buf = BufferDestination::new();
+        let set = Node::Set(vec![Node::from(1)]);
+        stringify(&set, &mut buf).unwrap();
+        assert!(buf.to_string().contains("<item type=\"set\">1</item>"));
     }
 }

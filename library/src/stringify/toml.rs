@@ -292,4 +292,40 @@ mod tests {
         stringify(&nested, &mut buf).unwrap();
         assert_eq!(buf.to_string(), "[parent]\nchild = 2");
     }
+
+    #[test]
+    fn test_toml_array() {
+        let mut buf = BufferDestination::new();
+        let arr = Node::Array(vec![Node::from(1), Node::from(2), Node::from(3)]);
+        stringify(&arr, &mut buf).unwrap();
+        assert_eq!(buf.to_string(), "[1, 2, 3]");
+    }
+
+    #[test]
+    fn test_toml_boolean() {
+        let mut buf = BufferDestination::new();
+        let b_true = Node::Boolean(true);
+        stringify(&b_true, &mut buf).unwrap();
+        assert_eq!(buf.to_string(), "true");
+        buf.clear();
+        let b_false = Node::Boolean(false);
+        stringify(&b_false, &mut buf).unwrap();
+        assert_eq!(buf.to_string(), "false");
+    }
+
+    #[test]
+    fn test_toml_empty_mapping() {
+        let mut buf = BufferDestination::new();
+        let empty_map = Node::Mapping(vec![]);
+        stringify(&empty_map, &mut buf).unwrap();
+        assert_eq!(buf.to_string(), "");
+    }
+
+    #[test]
+    fn test_toml_set_as_array() {
+        let mut buf = BufferDestination::new();
+        let set = Node::Set(vec![Node::from(1), Node::from(2)]);
+        stringify(&set, &mut buf).unwrap();
+        assert_eq!(buf.to_string(), "[1, 2]");
+    }
 }
