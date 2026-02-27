@@ -53,7 +53,7 @@ pub fn validate_yaml_tree(node: &Node) -> Result<(), YamlError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::error::YamlError;
+    
     use crate::nodes;
     use crate::nodes::node::{BlockStyle, Node, QuoteType};
 

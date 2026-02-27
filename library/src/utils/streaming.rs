@@ -566,7 +566,7 @@ mod tests {
 #[cfg(test)]
 mod additional_streaming_tests {
     use super::*;
-    use crate::nodes::node::{Node, Numeric};
+    use crate::nodes::node::Node;
 
     #[test]
     fn test_empty_array_iterator() {
