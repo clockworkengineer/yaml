@@ -494,6 +494,62 @@
 				"--nocapture"
 			],
 			"group": "test"
+		},
+		{
+			"label": "run anchors_helpers.rs unit tests",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"--package",
+				"yaml_lib",
+				"anchors_helpers",
+				"--",
+				"--nocapture"
+			],
+			"group": "test"
+		},
+		{
+			"label": "run escape.rs unit tests",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"--package",
+				"yaml_lib",
+				"escape",
+				"--",
+				"--nocapture"
+			],
+			"group": "test"
+		},
+		{
+			"label": "run optimization.rs unit tests",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"--package",
+				"yaml_lib",
+				"optimization",
+				"--",
+				"--nocapture"
+			],
+			"group": "test"
+		},
+		{
+			"label": "run performance.rs unit tests",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"--package",
+				"yaml_lib",
+				"performance",
+				"--",
+				"--nocapture"
+			],
+			"group": "test"
 		}
 	]
 }

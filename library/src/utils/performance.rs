@@ -327,6 +327,63 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_document_stats_estimated_memory_bytes() {
+        let mut stats = DocumentStats::new();
+        stats.total_nodes = 3;
+        stats.total_string_bytes = 10;
+        stats.array_count = 1;
+        stats.mapping_count = 1;
+        stats.set_count = 1;
+        let mem = stats.estimated_memory_bytes();
+        assert!(mem >= 3 * 64 + 10 + 3 * 24);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_document_stats_summary() {
+        let stats = DocumentStats {
+            total_nodes: 2,
+            max_depth: 1,
+            string_count: 1,
+            number_count: 1,
+            boolean_count: 0,
+            array_count: 0,
+            mapping_count: 0,
+            set_count: 0,
+            anchor_count: 0,
+            alias_count: 0,
+            tagged_count: 0,
+            total_string_bytes: 5,
+            largest_array: 0,
+            largest_mapping: 0,
+        };
+        let summary = stats.summary();
+        assert!(summary.contains("Total nodes: 2"));
+        assert!(summary.contains("Strings: 1 (5 bytes)"));
+    }
+
+    #[test]
+    fn test_document_stats_from_node_edge_cases() {
+        use crate::nodes::node::Node;
+        let node = Node::None;
+        let stats = DocumentStats::from_node(&node);
+        assert_eq!(stats.total_nodes, 1);
+        let node = Node::Array(vec![]);
+        let stats = DocumentStats::from_node(&node);
+        assert_eq!(stats.array_count, 1);
+        let node = Node::Mapping(vec![]);
+        let stats = DocumentStats::from_node(&node);
+        assert_eq!(stats.mapping_count, 1);
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn test_compare_performance_runs() {
+        // Just check that it runs and doesn't panic
+        compare_performance("a", || {}, "b", || {});
+    }
+
+    #[test]
     fn test_document_stats_empty() {
         let stats = DocumentStats::new();
         assert_eq!(stats.total_nodes, 0);

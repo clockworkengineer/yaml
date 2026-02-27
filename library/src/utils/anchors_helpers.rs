@@ -61,3 +61,59 @@ pub fn as_mapping<'a>(
         Err(crate::parser::utils::error_helpers::merge_source_not_mapping(name))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::nodes::node::Node;
+    use std::collections::HashMap;
+
+    #[test]
+    fn test_lookup_anchor_found() {
+        let mut anchors = HashMap::new();
+        let node = Node::None;
+        anchors.insert("foo".to_string(), node.clone());
+        let found = lookup_anchor(&anchors, "foo");
+        assert!(found.is_ok());
+        assert_eq!(found.unwrap(), &node);
+    }
+
+    #[test]
+    fn test_lookup_anchor_not_found() {
+        let anchors = HashMap::new();
+        let err = lookup_anchor(&anchors, "bar").unwrap_err();
+        assert!(err.message().contains("bar"));
+    }
+
+    #[test]
+    fn test_as_mapping_success() {
+        let pairs = vec![(Node::None, Node::None)];
+        let node = Node::Mapping(pairs.clone());
+        let result = as_mapping(&node, "test");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), &pairs);
+    }
+
+    #[test]
+    fn test_as_mapping_error() {
+        let node = Node::None;
+        let result = as_mapping(&node, "notmap");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().message().contains("not a mapping"));
+    }
+
+    #[test]
+    fn test_traverse_with_error_ok() {
+        let node = Node::None;
+        let res = traverse_with_error(&node, |_n| None);
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_traverse_with_error_err() {
+        let node = Node::None;
+        let res = traverse_with_error(&node, |_n| Some("fail".to_string()));
+        assert!(res.is_err());
+        assert!(format!("{}", res.unwrap_err()).contains("fail"));
+    }
+}

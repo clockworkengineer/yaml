@@ -386,6 +386,64 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_lazy_tag_unknown_tag() {
+        let mut lazy = LazyTag::new("data".to_string(), "!!unknown".to_string());
+        let node = lazy.get_or_coerce();
+        if let Node::Str(val, _, _) = node {
+            assert_eq!(val, "data");
+        } else {
+            panic!("Expected Node::Str for unknown tag");
+        }
+    }
+
+    #[test]
+    fn test_capacity_hints_from_stats() {
+        let hints = CapacityHints::from_stats(20, 5);
+        assert!(hints.mapping_pairs >= 4);
+        assert_eq!(hints.nesting_depth, 5);
+    }
+
+    #[test]
+    fn test_capacity_hints_default_trait() {
+        let hints = CapacityHints::default();
+        assert_eq!(hints.mapping_pairs, 8);
+    }
+
+    #[test]
+    fn test_performance_optimizer_alloc_methods() {
+        let opt = PerformanceOptimizer::new();
+        let v: Vec<u8> = opt.alloc_vec();
+        assert_eq!(v.capacity(), opt.hints.sequence_items);
+        let s = opt.alloc_string();
+        assert_eq!(s.capacity(), opt.hints.string_capacity);
+    }
+
+    #[test]
+    fn test_performance_optimizer_enable_flags() {
+        let mut opt = PerformanceOptimizer::new();
+        opt.enable_lazy_tags();
+        opt.enable_zero_copy();
+        assert!(opt.lazy_tags);
+        assert!(opt.zero_copy);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_node_builder_update_hints() {
+        let mut builder = NodeBuilder::new();
+        let old_mapping = builder.hints().mapping_pairs;
+        builder.update_hints(20, 30);
+        assert!(builder.hints().mapping_pairs != old_mapping);
+    }
+
+    #[test]
+    fn test_fast_path_detector_edge_cases() {
+        assert!(!FastPathDetector::is_simple_scalar(""));
+        assert!(!FastPathDetector::is_simple_int("abc"));
+        assert!(!FastPathDetector::is_simple_mapping_line("key [1,2,3]"));
+    }
+
+    #[test]
     fn test_lazy_tag_int() {
         let mut lazy = LazyTag::new("42".to_string(), "!!int".to_string());
         assert!(!lazy.is_coerced());
