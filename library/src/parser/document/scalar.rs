@@ -550,8 +550,12 @@ mod tests {
         match stream_result {
             Ok(mut stream) => {
                 let res = parse_scalar_with_tokens(&mut stream, &directives, 0);
-                assert!(res.is_err(), "Expected error for unterminated single-quoted scalar, got: {:?}", res);
-            },
+                assert!(
+                    res.is_err(),
+                    "Expected error for unterminated single-quoted scalar, got: {:?}",
+                    res
+                );
+            }
             Err(_) => {
                 // Accept error from TokenStream creation as valid YAML compliance
             }
