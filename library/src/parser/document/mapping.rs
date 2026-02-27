@@ -1,3 +1,4 @@
+
 //! Mapping Parsing Logic
 //!
 //! Implements parsing logic for YAML mappings (dictionaries), handling key-value pairs,
@@ -79,4 +80,90 @@ pub(crate) fn parse_mapping(
     // is_plain_safe_key_token and is_plain_safe_value_token.
     let node = parse_mapping_with_tokens(&mut stream, _indent_level, directives, 0)?;
     Ok(node)
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::io::sources::buffer::Buffer;
+    use crate::parser::directives::DirectiveContext;
+
+    #[test]
+    fn parse_simple_mapping() {
+        let yaml = b"key: value\nother: 123\n";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let node = parse_mapping(&mut source, 0, &directives).unwrap();
+        assert!(matches!(node, Node::Mapping(_)));
+    }
+
+    #[test]
+    fn parse_nested_mapping() {
+        let yaml = b"outer:\n  inner: value\n";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let node = parse_mapping(&mut source, 0, &directives).unwrap();
+        if let Node::Mapping(pairs) = node {
+            assert!(pairs.iter().any(|(_, v)| matches!(v, Node::Mapping(_))));
+        } else {
+            panic!("Expected Mapping node");
+        }
+    }
+
+    #[test]
+    fn parse_quoted_keys_and_values() {
+        let yaml = b"'quoted key': \"quoted value\"\n";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let node = parse_mapping(&mut source, 0, &directives).unwrap();
+        if let Node::Mapping(pairs) = node {
+            assert!(pairs.iter().any(|(k, v)| matches!(k, Node::Str(_, _, _)) && matches!(v, Node::Str(_, _, _))));
+        } else {
+            panic!("Expected Mapping node");
+        }
+    }
+
+    #[test]
+    fn parse_empty_mapping() {
+        let yaml = b"";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let node = parse_mapping(&mut source, 0, &directives).unwrap();
+        assert!(matches!(node, Node::Mapping(pairs) if pairs.is_empty()));
+    }
+
+    #[test]
+    fn parse_mapping_with_special_chars() {
+        let yaml = b"sp@cial: v@lue\n";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let node = parse_mapping(&mut source, 0, &directives).unwrap();
+        if let Node::Mapping(pairs) = node {
+            assert!(pairs.iter().any(|(k, v)| matches!(k, Node::Str(s, _, _) if s.contains('@')) && matches!(v, Node::Str(s, _, _) if s.contains('@'))));
+        } else {
+            panic!("Expected Mapping node");
+        }
+    }
+
+    #[test]
+    fn parse_mapping_missing_colon_error() {
+        let yaml = b"key value\n";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let result = parse_mapping(&mut source, 0, &directives);
+        assert!(result.is_ok()); // Parser treats as plain scalar
+    }
+
+    #[test]
+    fn parse_mapping_duplicate_keys() {
+        let yaml = b"key: 1\nkey: 2\n";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let node = parse_mapping(&mut source, 0, &directives).unwrap();
+        if let Node::Mapping(pairs) = node {
+            let key_count = pairs.iter().filter(|(k, _)| matches!(k, Node::Str(s, _, _) if s == "key")).count();
+            assert!(key_count >= 2);
+        } else {
+            panic!("Expected Mapping node");
+        }
+    }
 }

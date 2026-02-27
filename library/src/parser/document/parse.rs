@@ -587,3 +587,77 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
     }
     Ok(Node::Documents(docs))
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::io::sources::buffer::Buffer;
+    use crate::nodes::node::Node;
+
+    #[test]
+    fn parse_single_document() {
+        let yaml = b"key: value\n";
+        let mut source = Buffer::new(yaml);
+        let node = parse(&mut source).unwrap();
+        if let Node::Documents(docs) = node {
+            assert_eq!(docs.len(), 1);
+        } else {
+            panic!("Expected Documents node");
+        }
+    }
+
+    #[test]
+    fn parse_multiple_documents() {
+        let yaml = b"---\nkey: 1\n---\nkey: 2\n";
+        let mut source = Buffer::new(yaml);
+        let node = parse(&mut source).unwrap();
+        if let Node::Documents(docs) = node {
+            assert_eq!(docs.len(), 2);
+        } else {
+            panic!("Expected Documents node");
+        }
+    }
+
+    #[test]
+    fn parse_document_with_explicit_end() {
+        let yaml = b"key: value\n...\n";
+        let mut source = Buffer::new(yaml);
+        let node = parse(&mut source).unwrap();
+        if let Node::Documents(docs) = node {
+            assert_eq!(docs.len(), 1);
+        } else {
+            panic!("Expected Documents node");
+        }
+    }
+
+    #[test]
+    fn parse_empty_stream() {
+        let yaml = b"";
+        let mut source = Buffer::new(yaml);
+        let node = parse(&mut source).unwrap();
+        if let Node::Documents(docs) = node {
+            assert!(docs.is_empty() || docs.iter().all(|d| matches!(d, Node::Document(nodes) if nodes.is_empty())));
+        } else {
+            panic!("Expected Documents node");
+        }
+    }
+
+    #[test]
+    fn parse_with_directives() {
+        let yaml = b"%YAML 1.2\n---\nkey: value\n";
+        let mut source = Buffer::new(yaml);
+        let node = parse(&mut source).unwrap();
+        if let Node::Documents(docs) = node {
+            assert_eq!(docs.len(), 1);
+        } else {
+            panic!("Expected Documents node");
+        }
+    }
+
+    #[test]
+    fn parse_directives_not_followed_by_document_error() {
+        let yaml = b"%YAML 1.2\n";
+        let mut source = Buffer::new(yaml);
+        let result = parse(&mut source);
+        assert!(result.is_err());
+    }
+}

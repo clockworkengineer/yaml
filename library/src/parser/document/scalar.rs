@@ -353,12 +353,10 @@ pub(crate) fn parse_scalar_with_tokens(
         Some(Token::SingleQuoted(s)) => parse_single_quoted_scalar(stream, &s),
         Some(Token::DoubleQuoted(s)) => parse_double_quoted_scalar(stream, &s),
         Some(Token::Plain(s)) => parse_scalar_dispatch(stream, &s, directives),
-        _ => Err(
-            crate::parser::errors::token_errors::expected_scalar_token(
-                stream.source_mut(),
-                &current_token_str,
-            ),
-        ),
+        _ => Err(crate::parser::errors::token_errors::expected_scalar_token(
+            stream.source_mut(),
+            &current_token_str,
+        )),
     }
 }
 // Module: parser/document/scalar.rs
@@ -481,12 +479,82 @@ mod tests {
             matches!(node, Node::Str(ref s, QuoteType::Double, BlockStyle::None) if s == "double quoted string")
         );
     }
+    #[test]
+    fn test_block_scalar_explicit_indent_and_chomping() {
+        let directives = DirectiveContext::new();
+        let value = "|2-\n  a\n  b\n\n";
+        let mut source = Buffer::new(value.as_bytes());
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+        let node = parse_scalar_with_tokens(&mut stream, &directives, 0).unwrap();
+        assert!(
+            matches!(node, Node::Str(ref s, QuoteType::Unquoted, BlockStyle::Literal) if s == "a\nb")
+        );
+    }
 
-    // ---
-    // The scalar parser is now modular:
-    // - parse_block_scalar: handles block scalars (|, >)
-    // - parse_plain_scalar: handles plain and multiline scalars
-    // - parse_single_quoted_scalar: handles single-quoted scalars
-    // - parse_double_quoted_scalar: handles double-quoted scalars
-    // Error handling is centralized and token stream navigation uses helpers for DRYness.
+    #[test]
+    fn test_block_scalar_whitespace_only() {
+        let directives = DirectiveContext::new();
+        let value = "|\n    \n    \n";
+        let mut source = Buffer::new(value.as_bytes());
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+        let node = parse_scalar_with_tokens(&mut stream, &directives, 0).unwrap();
+        assert!(
+            matches!(node, Node::Str(ref s, QuoteType::Unquoted, BlockStyle::Literal) if s.trim().is_empty())
+        );
+    }
+
+    #[test]
+    fn test_plain_scalar_with_special_chars() {
+        let directives = DirectiveContext::new();
+        // Use a valid plain scalar (no colon, comment after value)
+        let value = "plain value # comment\n";
+        let mut source = Buffer::new(value.as_bytes());
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+        let node = parse_scalar_with_tokens(&mut stream, &directives, 0).unwrap();
+        if let Node::Str(ref s, QuoteType::Unquoted, BlockStyle::None) = node {
+            // YAML spec: comment is ignored, trailing whitespace may be preserved
+            assert_eq!(s.trim_end(), "plain value");
+        } else {
+            panic!("Expected unquoted plain scalar, got: {:?}", node);
+        }
+    }
+
+    #[test]
+    fn test_double_quoted_scalar_with_escapes() {
+        let directives = DirectiveContext::new();
+        let value = "\"escaped \\n string\"";
+        let mut source = Buffer::new(value.as_bytes());
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+        let node = parse_scalar_with_tokens(&mut stream, &directives, 0).unwrap();
+        assert!(
+            matches!(node, Node::Str(ref s, QuoteType::Double, BlockStyle::None) if s.contains("escaped ") && s.contains("string"))
+        );
+    }
+
+    #[test]
+    fn test_block_scalar_invalid_header_error() {
+        let directives = DirectiveContext::new();
+        let value = "| invalid\n  a\n";
+        let mut source = Buffer::new(value.as_bytes());
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+        let res = parse_scalar_with_tokens(&mut stream, &directives, 0);
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_unterminated_single_quoted_scalar_error() {
+        let directives = DirectiveContext::new();
+        let value = "'unterminated string";
+        let mut source = Buffer::new(value.as_bytes());
+        let stream_result = TokenStream::new(&mut source, &directives, false);
+        match stream_result {
+            Ok(mut stream) => {
+                let res = parse_scalar_with_tokens(&mut stream, &directives, 0);
+                assert!(res.is_err(), "Expected error for unterminated single-quoted scalar, got: {:?}", res);
+            },
+            Err(_) => {
+                // Accept error from TokenStream creation as valid YAML compliance
+            }
+        }
+    }
 }
