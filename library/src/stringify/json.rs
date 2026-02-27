@@ -350,6 +350,83 @@ pub fn stringify_pretty(
 }
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_json_boolean_and_null() {
+        let mut buf = BufferDestination::new();
+        stringify(&Node::Boolean(true), &mut buf).unwrap();
+        assert_eq!(buf.to_string(), "true");
+        buf.clear();
+        stringify(&Node::Boolean(false), &mut buf).unwrap();
+        assert_eq!(buf.to_string(), "false");
+        buf.clear();
+        stringify(&Node::None, &mut buf).unwrap();
+        assert_eq!(buf.to_string(), "null");
+    }
+
+    #[test]
+    fn test_json_array_and_mapping() {
+        let mut buf = BufferDestination::new();
+        let arr = Node::Array(vec![
+            Node::Number(Numeric::Integer(1)),
+            Node::Number(Numeric::Integer(2)),
+            Node::Number(Numeric::Integer(3)),
+        ]);
+        stringify(&arr, &mut buf).unwrap();
+        assert!(buf.to_string().contains("["));
+        assert!(buf.to_string().contains("1"));
+        assert!(buf.to_string().contains("2"));
+        assert!(buf.to_string().contains("3"));
+
+        buf.clear();
+        let map = Node::Mapping(vec![
+            (Node::from("key1"), Node::from("val1")),
+            (Node::from("key2"), Node::Number(Numeric::Integer(42))),
+        ]);
+        stringify(&map, &mut buf).unwrap();
+        let out = buf.to_string();
+        assert!(out.contains("key1"));
+        assert!(out.contains("val1"));
+        assert!(out.contains("key2"));
+        assert!(out.contains("42"));
+    }
+
+    #[test]
+    fn test_json_tagged_and_anchored() {
+        let mut buf = BufferDestination::new();
+        let tagged = Node::Tagged(
+            Box::new(Node::Str(
+                "tagged".to_string(),
+                QuoteType::Unquoted,
+                BlockStyle::None,
+            )),
+            "!tag".to_string(),
+        );
+        let anchored = Node::Anchored(
+            Box::new(Node::Str(
+                "anchored".to_string(),
+                QuoteType::Unquoted,
+                BlockStyle::None,
+            )),
+            "anchor1".to_string(),
+        );
+        stringify(&tagged, &mut buf).unwrap();
+        assert!(buf.to_string().contains("tagged"));
+        buf.clear();
+        stringify(&anchored, &mut buf).unwrap();
+        assert!(buf.to_string().contains("anchored"));
+    }
+
+    #[test]
+    fn test_json_alias_and_comment() {
+        let mut buf = BufferDestination::new();
+        let alias = Node::Alias("anchor1".to_string());
+        stringify(&alias, &mut buf).unwrap();
+        assert_eq!(buf.to_string(), "null");
+        buf.clear();
+        let comment = Node::Comment("this is a comment".to_string());
+        stringify(&comment, &mut buf).unwrap();
+        assert_eq!(buf.to_string(), "null");
+    }
     use super::*;
     use crate::io::destinations::buffer::Buffer as BufferDestination;
     use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};

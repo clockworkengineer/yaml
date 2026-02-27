@@ -155,6 +155,12 @@ impl FormatOptions {
         self.sort_keys = sort;
         self
     }
+
+    /// Builder method: set block threshold
+    pub fn with_block_threshold(mut self, threshold: usize) -> Self {
+        self.block_threshold = threshold;
+        self
+    }
 }
 
 /// Quote style for string values
@@ -304,6 +310,67 @@ pub fn node_to_key_like_string(node: &Node) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_format_options_defaults() {
+        let opts = FormatOptions::default();
+        assert_eq!(opts.indent, 2);
+        assert_eq!(opts.line_width, 80);
+        assert_eq!(opts.quote_style, QuoteStyle::Auto);
+        assert_eq!(opts.collection_style, CollectionStyle::Auto);
+        assert!(!opts.explicit_start);
+        assert!(!opts.explicit_end);
+        assert_eq!(opts.document_separator_lines, 1);
+        assert!(opts.preserve_formatting);
+        assert!(!opts.sort_keys);
+        assert!(opts.emit_null);
+        assert!(opts.flow_empty_collections);
+        assert_eq!(opts.block_threshold, 3);
+    }
+
+    #[test]
+    fn test_format_options_builder() {
+        let opts = FormatOptions::new()
+            .with_indent(3)
+            .with_line_width(100)
+            .with_sorted_keys(true)
+            .with_explicit_markers(true, false)
+            .with_block_threshold(5);
+        assert_eq!(opts.indent, 3);
+        assert_eq!(opts.line_width, 100);
+        assert!(opts.sort_keys);
+        assert!(opts.explicit_start);
+        assert!(!opts.explicit_end);
+        assert_eq!(opts.block_threshold, 5);
+    }
+
+    #[test]
+    fn test_format_context_newline_and_column() {
+        let mut ctx = FormatContext::new();
+        ctx.advance(2);
+        assert_eq!(ctx.column, 2);
+        ctx.newline();
+        assert_eq!(ctx.column, 0);
+        assert!(ctx.at_line_start);
+    }
+
+    #[test]
+    fn test_format_context_indent_and_dedent() {
+        let mut ctx = FormatContext::new();
+        ctx.indent();
+        ctx.indent();
+        assert_eq!(ctx.level, 2);
+        ctx.dedent();
+        assert_eq!(ctx.level, 1);
+        ctx.dedent();
+        assert_eq!(ctx.level, 0);
+    }
+
+    #[test]
+    fn test_format_options_explicit_markers() {
+        let opts = FormatOptions::new().with_explicit_markers(true, true);
+        assert!(opts.explicit_start);
+        assert!(opts.explicit_end);
+    }
     use super::*;
 
     #[test]
