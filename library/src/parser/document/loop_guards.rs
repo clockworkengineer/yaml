@@ -260,4 +260,62 @@ mod tests {
             err
         );
     }
+    #[test]
+    fn test_loop_guard_zero_limit() {
+        fn test_function() -> Result<(), crate::error::YamlError> {
+            loop_guard_init!(counter);
+            for _ in 0..1 {
+                loop_guard_check!(counter, 0, "Zero limit");
+            }
+            Ok(())
+        }
+        let result = test_function();
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("exceeded") || err.contains("Zero limit"));
+    }
+
+    #[test]
+    fn test_collection_size_check_empty_collection() {
+        fn test_function() -> Result<(), crate::error::YamlError> {
+            let items: Vec<u32> = Vec::new();
+            collection_size_check!(items, 0, "Empty collection");
+            Ok(())
+        }
+        let result = test_function();
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("exceeded") || err.contains("Empty collection"));
+    }
+
+    #[test]
+    fn test_loop_guard_custom_context_message() {
+        fn test_function() -> Result<(), crate::error::YamlError> {
+            loop_guard_init!(counter);
+            for _ in 0..2 {
+                loop_guard_check!(counter, 1, "Custom context message");
+            }
+            Ok(())
+        }
+        let result = test_function();
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("Custom context message"));
+    }
+
+    #[test]
+    fn test_nested_loop_guards() {
+        fn test_function() -> Result<(), crate::error::YamlError> {
+            loop_guard_init!(outer);
+            for _ in 0..9 {
+                loop_guard_check!(outer, 10, "Outer loop");
+                loop_guard_init!(inner);
+                for _ in 0..4 {
+                    loop_guard_check!(inner, 5, "Inner loop");
+                }
+            }
+            Ok(())
+        }
+        assert!(test_function().is_ok());
+    }
 }

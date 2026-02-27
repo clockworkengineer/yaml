@@ -69,9 +69,9 @@ fn skip_inline_trivia(stream: &mut TokenStream) -> crate::parser::ParseResult<()
 use crate::nodes::node::Node;
 use crate::nodes::node_utils::make_set_node;
 use crate::parser::directives::DirectiveContext;
-use crate::parser::tokens::value::parse_value_with_tokens;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
+use crate::parser::tokens::value::parse_value_with_tokens;
 use crate::{BlockStyle, QuoteType};
 
 #[cfg(feature = "debug-trace")]
@@ -666,6 +666,70 @@ mod tests {
                 &items[0],
                 Node::Str(s, _, _) if s == "::vector"
             ));
+        } else {
+            panic!("Expected Array node");
+        }
+    }
+    #[test]
+    fn test_flow_sequence_invalid_token() {
+        let yaml = b"[1, 2, @]";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+        let result = parse_inline_sequence_with_tokens(&mut stream, &directives, 0).unwrap();
+        if let Node::Array(items) = result {
+            assert_eq!(items.len(), 3);
+            assert!(matches!(&items[2], Node::Str(s, _, _) if s == "@"));
+        } else {
+            panic!("Expected Array node");
+        }
+    }
+
+    #[test]
+    fn test_flow_mapping_unexpected_end() {
+        let yaml = b"{a: 1, b:";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+        let result = parse_inline_mapping_with_tokens(&mut stream, &directives, 0, false);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_flow_sequence_mixed_types() {
+        let yaml = b"[1, {a: 2}, [3, 4]]";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+        let result = parse_inline_sequence_with_tokens(&mut stream, &directives, 0);
+        match result {
+            Ok(Node::Array(items)) => {
+                assert_eq!(items.len(), 3);
+                assert!(matches!(&items[0], Node::Number(_)));
+                assert!(matches!(&items[1], Node::Mapping(_)));
+                assert!(matches!(&items[2], Node::Array(_)));
+            }
+            Err(e) => {
+                // If parser does not support mixed types, print error for diagnosis
+                println!("Parser error: {}", e);
+                assert!(false, "Parser failed to handle mixed types: {}", e);
+            }
+            _ => {
+                assert!(false, "Unexpected node type returned");
+            }
+        }
+    }
+
+    #[test]
+    fn test_double_colon_scalar_error_handling() {
+        let yaml = b"[::]";
+        let mut source = Buffer::new(yaml);
+        let directives = DirectiveContext::new();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+        let result = parse_inline_sequence_with_tokens(&mut stream, &directives, 0).unwrap();
+        if let Node::Array(items) = result {
+            assert_eq!(items.len(), 1);
+            assert!(matches!(&items[0], Node::Str(s, _, _) if s == "::"));
         } else {
             panic!("Expected Array node");
         }
