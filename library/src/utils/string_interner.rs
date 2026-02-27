@@ -503,3 +503,73 @@ mod tests {
         assert_eq!(interner.len(), 1);
     }
 }
+
+#[cfg(test)]
+mod additional_string_interner_tests {
+    use super::*;
+
+    #[test]
+    fn test_interned_string_empty() {
+        let s = InternedString::from("");
+        assert_eq!(s.len(), 0);
+        assert!(s.is_empty());
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn test_string_interner_duplicate_interning() {
+        let interner = StringInterner::new();
+        let s1 = interner.intern("dup");
+        let s2 = interner.intern("dup");
+        assert_eq!(s1.as_str(), s2.as_str());
+        assert_eq!(s1.ref_count(), s2.ref_count());
+        assert_eq!(interner.len(), 1);
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn test_string_interner_clear_and_reuse() {
+        let interner = StringInterner::new();
+        interner.intern("foo");
+        interner.clear();
+        assert_eq!(interner.len(), 0);
+        let s = interner.intern("foo");
+        assert_eq!(s.as_str(), "foo");
+        assert_eq!(interner.len(), 1);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_simple_interner_empty() {
+        let interner = SimpleInterner::new();
+        assert!(interner.is_empty());
+        assert_eq!(interner.len(), 0);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_simple_interner_clear_and_reuse() {
+        let mut interner = SimpleInterner::new();
+        interner.intern("bar");
+        interner.clear();
+        assert_eq!(interner.len(), 0);
+        let s = interner.intern("bar");
+        assert_eq!(&*s, "bar");
+        assert_eq!(interner.len(), 1);
+    }
+
+    #[test]
+    fn test_common_strings_all_fields() {
+        let common = CommonStrings::new();
+        assert_eq!(common.key.as_str(), "key");
+        assert_eq!(common.data.as_str(), "data");
+        assert_eq!(common.config.as_str(), "config");
+        assert_eq!(common.description.as_str(), "description");
+        assert_eq!(common.enabled.as_str(), "enabled");
+        assert_eq!(common.disabled.as_str(), "disabled");
+        assert_eq!(common.status.as_str(), "status");
+        assert_eq!(common.message.as_str(), "message");
+        assert_eq!(common.error.as_str(), "error");
+        assert_eq!(common.result.as_str(), "result");
+    }
+}

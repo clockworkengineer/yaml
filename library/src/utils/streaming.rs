@@ -562,3 +562,77 @@ mod tests {
         assert_eq!(count, 5); // Mapping + a + 1 + b + 2
     }
 }
+
+#[cfg(test)]
+mod additional_streaming_tests {
+    use super::*;
+    use crate::nodes::node::{Node, Numeric};
+
+    #[test]
+    fn test_empty_array_iterator() {
+        let tree = Node::Array(vec![]);
+        let nodes: Vec<_> = tree.iter_depth_first().collect();
+        assert_eq!(nodes.len(), 1); // Only the array node itself
+    }
+
+    #[test]
+    fn test_empty_mapping_iterator() {
+        let tree = Node::Mapping(vec![]);
+        let nodes: Vec<_> = tree.iter_breadth_first().collect();
+        assert_eq!(nodes.len(), 1); // Only the mapping node itself
+    }
+
+    #[test]
+    fn test_node_path_invalid_key() {
+        let tree = Node::Mapping(vec![(Node::from("foo"), Node::from(1))]);
+        let mut path = NodePath::new();
+        path.push("bar");
+        let result = path.get(&tree);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_node_path_invalid_index() {
+        let tree = Node::Array(vec![Node::from(1)]);
+        let mut path = NodePath::new();
+        path.push(5usize);
+        let result = path.get(&tree);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_collect_strings_with_non_string_nodes() {
+        let tree = Node::Array(vec![Node::from(1), Node::from(2)]);
+        let strings = tree.collect_strings();
+        assert!(strings.is_empty());
+    }
+
+    #[test]
+    fn test_collect_numbers_with_non_number_nodes() {
+        let tree = Node::Array(vec![Node::from("a"), Node::from("b")]);
+        let numbers = tree.collect_numbers();
+        assert!(numbers.is_empty());
+    }
+
+    #[test]
+    fn test_node_stream_map_to_lengths() {
+        let tree = Node::Array(vec![Node::from("abc"), Node::from("de")]);
+        let stream = NodeStream::new(&tree);
+        let lengths: Vec<_> = stream
+            .map(|n| match n {
+                Node::Str(s, _, _) => s.len(),
+                _ => 0,
+            })
+            .collect();
+        assert!(lengths.contains(&3));
+        assert!(lengths.contains(&2));
+    }
+
+    #[test]
+    fn test_node_stream_fold_empty() {
+        let tree = Node::Array(vec![]);
+        let stream = NodeStream::new(&tree);
+        let sum = stream.fold(0, |acc, _| acc + 1);
+        assert_eq!(sum, 1); // Only the array node itself
+    }
+}
