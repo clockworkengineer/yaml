@@ -427,6 +427,92 @@ pub fn stringify(node: &Node, destination: &mut dyn IDestination) -> Result<(), 
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_stringify_empty_document() {
+        let node = Node::Documents(vec![Node::Document(vec![])]);
+        let mut buf = Buffer::new();
+        stringify(&node, &mut buf).expect("stringify failed");
+        assert_eq!(buf.to_string(), "---\n");
+    }
+
+    #[test]
+    fn test_stringify_boolean_values() {
+        let node = Node::Documents(vec![Node::Document(vec![
+            Node::Boolean(true),
+            Node::Boolean(false),
+        ])]);
+        let mut buf = Buffer::new();
+        stringify(&node, &mut buf).expect("stringify failed");
+        assert_eq!(buf.to_string(), "---\ntruefalse\n...\n");
+    }
+
+    #[test]
+    fn test_stringify_quoted_strings() {
+        let node = Node::Documents(vec![Node::Document(vec![
+            Node::Str("quoted".to_string(), QuoteType::Double, BlockStyle::None),
+            Node::Str("single".to_string(), QuoteType::Single, BlockStyle::None),
+        ])]);
+        let mut buf = Buffer::new();
+        stringify(&node, &mut buf).expect("stringify failed");
+        assert!(buf.to_string().contains("\"quoted\""));
+        assert!(buf.to_string().contains("'single'"));
+    }
+
+    #[test]
+    fn test_stringify_nested_array_and_mapping() {
+        let node = Node::Documents(vec![Node::Document(vec![Node::Array(vec![
+            Node::Mapping(vec![
+                (Node::from("key1"), Node::from("val1")),
+                (Node::from("key2"), Node::from("val2")),
+            ]),
+            Node::Array(vec![
+                Node::Number(Numeric::Integer(10)),
+                Node::Number(Numeric::Integer(20)),
+            ]),
+        ])])]);
+        let mut buf = Buffer::new();
+        stringify(&node, &mut buf).expect("stringify failed");
+        let out = buf.to_string();
+        assert!(out.contains("key1: val1"));
+        assert!(out.contains("key2: val2"));
+        assert!(out.contains("- 10"));
+        assert!(out.contains("- 20"));
+    }
+
+    #[test]
+    fn test_stringify_tagged_and_anchored() {
+        let tagged = Node::Tagged(
+            Box::new(Node::Str(
+                "tagged".to_string(),
+                QuoteType::Unquoted,
+                BlockStyle::None,
+            )),
+            "!tag".to_string(),
+        );
+        let anchored = Node::Anchored(
+            Box::new(Node::Str(
+                "anchored".to_string(),
+                QuoteType::Unquoted,
+                BlockStyle::None,
+            )),
+            "anchor1".to_string(),
+        );
+        let node = Node::Documents(vec![Node::Document(vec![tagged, anchored])]);
+        let mut buf = Buffer::new();
+        stringify(&node, &mut buf).expect("stringify failed");
+        let out = buf.to_string();
+        assert!(out.contains("!tag tagged"));
+        assert!(out.contains("&anchor1 anchored"));
+    }
+
+    #[test]
+    fn test_stringify_alias() {
+        let alias = Node::Alias("anchor1".to_string());
+        let node = Node::Documents(vec![Node::Document(vec![alias])]);
+        let mut buf = Buffer::new();
+        stringify(&node, &mut buf).expect("stringify failed");
+        assert!(buf.to_string().contains("*anchor1"));
+    }
     use super::*;
     use crate::io::destinations::buffer::Buffer;
     use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
