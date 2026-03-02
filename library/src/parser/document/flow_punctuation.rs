@@ -131,9 +131,7 @@ pub fn unexpected_eof_in_flow_sequence(_stream: &mut TokenStream) -> crate::erro
 /// Used for YAML suite cases like 9C9N ("Wrong indented flow sequence"),
 /// where a multi-line flow sequence continues on a line that is not
 /// sufficiently indented relative to the line where the sequence started.
-pub fn invalid_indentation_in_flow_sequence(
-    stream: &mut TokenStream,
-) -> crate::error::YamlError {
+pub fn invalid_indentation_in_flow_sequence(stream: &mut TokenStream) -> crate::error::YamlError {
     crate::parser::utils::error_builder::syntax_error(
         stream.source_mut(),
         "Invalid indentation in flow sequence",
