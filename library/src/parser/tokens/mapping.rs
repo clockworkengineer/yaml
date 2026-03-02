@@ -89,10 +89,10 @@ struct MappingParseContext {
 use crate::nodes::node::Node;
 use crate::nodes::node::{BlockStyle, QuoteType};
 use crate::parser::directives::DirectiveContext;
-use crate::parser::utils::node_utils::force_key_to_string;
-use crate::parser::tokens::value::parse_value_with_tokens;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
+use crate::parser::tokens::value::parse_value_with_tokens;
+use crate::parser::utils::node_utils::force_key_to_string;
 
 #[cfg(feature = "debug-trace")]
 /// Helper for debug logging of mapping parser internals.

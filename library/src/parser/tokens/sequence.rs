@@ -8,9 +8,9 @@
 use crate::nodes::node::Node;
 use crate::parser::directives::DirectiveContext;
 use crate::parser::document::flow_punctuation;
-use crate::parser::tokens::value::parse_value_with_tokens;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
+use crate::parser::tokens::value::parse_value_with_tokens;
 
 /// Parse a block sequence using tokens
 ///
