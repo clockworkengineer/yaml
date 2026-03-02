@@ -86,6 +86,16 @@ impl<'a> TokenStream<'a> {
         self.flow_depth > 0
     }
 
+    /// Returns the current logical line index tracked by the token stream.
+    ///
+    /// This is incremented whenever a `Newline` token is consumed via `next()`
+    /// and is useful for context-aware validation in flow collections
+    /// (e.g., enforcing indentation rules across line breaks).
+    #[inline]
+    pub fn current_line_index(&self) -> usize {
+        self.current_line_index
+    }
+
     /// Get the current token without consuming it
     #[inline]
     pub fn current(&self) -> Option<&Token> {

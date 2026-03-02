@@ -126,6 +126,20 @@ pub fn unexpected_eof_in_flow_sequence(_stream: &mut TokenStream) -> crate::erro
     crate::parser::utils::error_builder::eof_error("flow sequence")
 }
 
+/// Centralized error: Invalid indentation inside a flow sequence.
+///
+/// Used for YAML suite cases like 9C9N ("Wrong indented flow sequence"),
+/// where a multi-line flow sequence continues on a line that is not
+/// sufficiently indented relative to the line where the sequence started.
+pub fn invalid_indentation_in_flow_sequence(
+    stream: &mut TokenStream,
+) -> crate::error::YamlError {
+    crate::parser::utils::error_builder::syntax_error(
+        stream.source_mut(),
+        "Invalid indentation in flow sequence",
+    )
+}
+
 /// Centralized error: Invalid bare '-' entries inside a flow sequence.
 ///
 /// Some YAML suite cases expect that a flow sequence containing only bare
