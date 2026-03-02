@@ -234,7 +234,6 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
         ("EB22", "Tag resolution and schema differences"),
         ("EW3V", "Flow-style collections with comments"),
         ("G7JE", "Complex nested mappings and sequences"),
-        ("G9HC", "Indicators inside plain scalars"),
         ("GDY7", "Folded block scalar edge case"),
         ("GT5M", "Multi-document stream with directives"),
         ("JKF3", "Duplicate anchors / alias reuse"),

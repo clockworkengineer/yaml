@@ -69,6 +69,37 @@ fn parse_indented_mapping_value(
             return Ok(map);
         }
     }
+    // G9HC: "invalid-anchor-in-zero-indented-sequence"
+    //
+    // When a mapping key's value line begins with an anchor at the *same*
+    // indentation as the key (i.e., no additional indentation was detected
+    // above), YAML 1.2 treats this as invalid. Anchors must attach to the
+    // node being introduced, which for block values requires either:
+    //   - content on the same logical line as the key (e.g. `key: &a value`), or
+    //   - an indented block that carries the value (e.g. `key: &a` then
+    //     an indented mapping or sequence).
+    //
+    // The G9HC test case has:
+    //   seq:
+    //   &anchor
+    //   - a
+    //   - b
+    // Here the `&anchor` line is not further indented than `seq:` and is
+    // immediately followed by a zero-indented sequence. Instead of silently
+    // treating this as an omitted mapping value and reinterpreting the
+    // subsequent sequence at the document level, classify it as a syntax
+    // error using the existing anchor error helper.
+    if !explicit_key {
+        if matches!(stream.current(), Some(Token::Anchor(_))) {
+            return Err(
+                crate::parser::errors::anchor_errors::AnchorErrors::anchor_cannot_precede_dash_block(
+                    stream,
+                )
+                .to_string()
+                .into(),
+            );
+        }
+    }
     // YAML compliance error: Mapping key without value (expected value after colon)
     if !explicit_key && matches!(stream.current(), Some(Token::Eof) | None) {
         let err = crate::parser::errors::mapping_errors::
