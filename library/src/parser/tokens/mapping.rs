@@ -35,10 +35,30 @@ fn parse_indented_mapping_value(
                     level,
                     crate::parser::utils::context::CollectionType::BlockSequence,
                 );
+            // For block sequences used as mapping values, treat any
+            // *intermediate* dedent between the sequence indentation
+            // (`level`) and the parent mapping indentation (`cur_indent`)
+            // as belonging to the mapping, not the sequence itself.
+            //
+            // Concretely, we pass a parent indent that is one level less
+            // than the sequence's indent. This ensures that:
+            // - A full dedent back to the mapping's indent (e.g. from 3
+            //   to 0) is seen by the mapping parser as the natural end
+            //   of the sequence value.
+            // - A shallow dedent that is still more indented than the
+            //   parent (e.g. 3 -> 2 in the 4HVU case) is surfaced to the
+            //   mapping parser, where it is rejected by the indentation
+            //   guards instead of being silently treated as another
+            //   sequence item.
+            let parent_for_sequence = if level > 0 {
+                level.saturating_sub(1)
+            } else {
+                cur_indent
+            };
             let seq = parse_sequence_with_tokens(
                 stream,
                 level,
-                cur_indent,
+                parent_for_sequence,
                 directives,
                 &ctx_seq,
                 depth + 1,
@@ -688,6 +708,41 @@ mod tests {
             "8XDJ mapping via tokens should be rejected as invalid, but got: {:?}",
             result
         );
+    }
+
+    #[test]
+    fn debug_4hvu_mapping_tokens() {
+        // 4HVU: wrong indentation in sequence under a mapping value
+        let yaml = b"key:\n   - ok\n   - also ok\n  - wrong\n";
+        let directives = DirectiveContext::new();
+
+        // First, dump the raw token stream for inspection.
+        {
+            let mut source = Buffer::new(yaml);
+            let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+
+            println!("--- 4HVU tokens ---");
+            loop {
+                match stream.current() {
+                    Some(tok) => {
+                        println!("{:?}", tok);
+                        if matches!(tok, Token::Eof) {
+                            break;
+                        }
+                        stream.next().unwrap();
+                    }
+                    None => break,
+                }
+            }
+        }
+
+        // Then, parse via the mapping-token path and show the resulting node.
+        {
+            let mut source = Buffer::new(yaml);
+            let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+            let node = parse_mapping_with_tokens(&mut stream, 0, &directives, 0).unwrap();
+            println!("--- 4HVU mapping node ---\n{:#?}", node);
+        }
     }
 
     #[test]

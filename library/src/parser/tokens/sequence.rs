@@ -369,3 +369,48 @@ pub fn parse_sequence_with_tokens(
     // Use NodeBuilder for final array node
     Ok(Node::Array(items))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::io::sources::buffer::Buffer as BufferSource;
+    use crate::parser::directives::DirectiveContext;
+
+    #[test]
+    fn debug_4hvu_sequence_under_mapping_value() {
+        // Mirror the 4HVU sample as it appears under a mapping value.
+        let yaml = b"key:\n   - ok\n   - also ok\n  - wrong\n";
+        let mut source = BufferSource::new(yaml);
+        let directives = DirectiveContext::new();
+        let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+
+        // Advance through tokens until just after the first indent before the
+        // sequence (so current token is the first dash in the sequence).
+        loop {
+            match stream.current() {
+                Some(Token::Plain(_)) | Some(Token::Colon) | Some(Token::Newline) => {
+                    stream.next().unwrap();
+                }
+                Some(Token::Indent(level)) if *level == 3 => {
+                    // Consume the indent and stop; this mirrors parse_indented_mapping_value.
+                    stream.next().unwrap();
+                    break;
+                }
+                Some(tok) => {
+                    panic!("Unexpected token while seeking sequence start: {:?}", tok);
+                }
+                None => panic!("Unexpected end of tokens while seeking sequence start"),
+            }
+        }
+
+        // Now current token should be the first dash for the sequence items.
+        assert!(matches!(stream.current(), Some(Token::Dash)));
+
+        let ctx_seq = crate::parser::utils::context::ParsingContext::new(3).child_block_context(
+            3,
+            crate::parser::utils::context::CollectionType::BlockSequence,
+        );
+        let result = parse_sequence_with_tokens(&mut stream, 3, 0, &directives, &ctx_seq, 0);
+        println!("4HVU sequence parse result: {:?}", result);
+    }
+}
