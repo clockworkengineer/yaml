@@ -57,6 +57,7 @@ macro_rules! loop_guard_init {
 macro_rules! loop_guard_check {
     ($counter:ident, $max:expr, $context:expr) => {{
         $counter += 1;
+        #[allow(unused_comparisons)]
         if $counter >= $max {
             return Err(crate::parser::utils::error_builder::limit_error(
                 $context,
@@ -81,6 +82,7 @@ macro_rules! loop_guard_check {
 #[macro_export]
 macro_rules! collection_size_check {
     ($collection:expr, $max:expr, $type_name:expr) => {
+        #[allow(unused_comparisons)]
         if $collection.len() >= $max {
             return Err(crate::parser::utils::error_builder::limit_error(
                 $type_name, $max, "items",
@@ -109,6 +111,7 @@ macro_rules! collection_size_check {
 macro_rules! combined_loop_guard {
     ($counter:ident, $collection:expr, $max_iter:expr, $max_size:expr, $context:expr) => {{
         $counter += 1;
+        #[allow(unused_comparisons)]
         if $counter >= $max_iter {
             return Err(crate::parser::utils::error_builder::limit_error(
                 &format!("{} parsing", $context),
@@ -116,6 +119,7 @@ macro_rules! combined_loop_guard {
                 "loop iterations",
             ));
         }
+        #[allow(unused_comparisons)]
         if $collection.len() >= $max_size {
             return Err(crate::parser::utils::error_builder::limit_error(
                 $context, $max_size, "items",
