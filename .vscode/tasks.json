@@ -550,6 +550,83 @@
 				"--nocapture"
 			],
 			"group": "test"
+		},
+		{
+			"label": "cargo test debug_4hvu_tokens",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"--package",
+				"yaml_lib",
+				"parser::tokens::mapping::tests::debug_4hvu_mapping_tokens",
+				"--",
+				"--nocapture"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "cargo test debug_4hvu_tokens",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"--package",
+				"yaml_lib",
+				"parser::tokens::mapping::tests::debug_4hvu_mapping_tokens",
+				"--",
+				"--nocapture"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "cargo test debug_4hvu_tokens",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"--package",
+				"yaml_lib",
+				"parser::tokens::mapping::tests::debug_4hvu_mapping_tokens",
+				"--",
+				"--nocapture"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "cargo test internal file_parsing_tests",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"--package",
+				"yaml_lib",
+				"internal_tests::file_parsing_tests::tests::test_large_file_parsing",
+				"internal_tests::file_parsing_tests::tests::test_parse_yaml_files",
+				"--",
+				"--nocapture"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "cargo test internal nested_structure_tests",
+			"type": "shell",
+			"command": "C:\\Users\\User\\.cargo\\bin\\cargo.EXE",
+			"args": [
+				"test",
+				"--package",
+				"yaml_lib",
+				"internal_tests::nested_structure_tests::tests::test_parse_nested_large_sequences",
+				"internal_tests::nested_structure_tests::tests::test_parse_nested_sequences_with_mappings",
+				"--",
+				"--nocapture"
+			],
+			"isBackground": false,
+			"group": "test"
 		}
 	]
 }

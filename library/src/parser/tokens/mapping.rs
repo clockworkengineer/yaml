@@ -35,10 +35,30 @@ fn parse_indented_mapping_value(
                     level,
                     crate::parser::utils::context::CollectionType::BlockSequence,
                 );
+            // For block sequences used as mapping values, treat any
+            // *intermediate* dedent between the sequence indentation
+            // (`level`) and the parent mapping indentation (`cur_indent`)
+            // as belonging to the mapping, not the sequence itself.
+            //
+            // Concretely, we pass a parent indent that is one level less
+            // than the sequence's indent. This ensures that:
+            // - A full dedent back to the mapping's indent (e.g. from 3
+            //   to 0) is seen by the mapping parser as the natural end
+            //   of the sequence value.
+            // - A shallow dedent that is still more indented than the
+            //   parent (e.g. 3 -> 2 in the 4HVU case) is surfaced to the
+            //   mapping parser, where it is rejected by the indentation
+            //   guards instead of being silently treated as another
+            //   sequence item.
+            let parent_for_sequence = if level > 0 {
+                level.saturating_sub(1)
+            } else {
+                cur_indent
+            };
             let seq = parse_sequence_with_tokens(
                 stream,
                 level,
-                cur_indent,
+                parent_for_sequence,
                 directives,
                 &ctx_seq,
                 depth + 1,
@@ -47,6 +67,37 @@ fn parse_indented_mapping_value(
         } else {
             let map = parse_mapping_with_tokens(stream, level, directives, depth + 1)?;
             return Ok(map);
+        }
+    }
+    // G9HC: "invalid-anchor-in-zero-indented-sequence"
+    //
+    // When a mapping key's value line begins with an anchor at the *same*
+    // indentation as the key (i.e., no additional indentation was detected
+    // above), YAML 1.2 treats this as invalid. Anchors must attach to the
+    // node being introduced, which for block values requires either:
+    //   - content on the same logical line as the key (e.g. `key: &a value`), or
+    //   - an indented block that carries the value (e.g. `key: &a` then
+    //     an indented mapping or sequence).
+    //
+    // The G9HC test case has:
+    //   seq:
+    //   &anchor
+    //   - a
+    //   - b
+    // Here the `&anchor` line is not further indented than `seq:` and is
+    // immediately followed by a zero-indented sequence. Instead of silently
+    // treating this as an omitted mapping value and reinterpreting the
+    // subsequent sequence at the document level, classify it as a syntax
+    // error using the existing anchor error helper.
+    if !explicit_key {
+        if matches!(stream.current(), Some(Token::Anchor(_))) {
+            return Err(
+                crate::parser::errors::anchor_errors::AnchorErrors::anchor_cannot_precede_dash_block(
+                    stream,
+                )
+                .to_string()
+                .into(),
+            );
         }
     }
     // YAML compliance error: Mapping key without value (expected value after colon)
@@ -69,10 +120,10 @@ struct MappingParseContext {
 use crate::nodes::node::Node;
 use crate::nodes::node::{BlockStyle, QuoteType};
 use crate::parser::directives::DirectiveContext;
-use crate::parser::utils::node_utils::force_key_to_string;
-use crate::parser::tokens::value::parse_value_with_tokens;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
+use crate::parser::tokens::value::parse_value_with_tokens;
+use crate::parser::utils::node_utils::force_key_to_string;
 
 #[cfg(feature = "debug-trace")]
 /// Helper for debug logging of mapping parser internals.
@@ -688,6 +739,41 @@ mod tests {
             "8XDJ mapping via tokens should be rejected as invalid, but got: {:?}",
             result
         );
+    }
+
+    #[test]
+    fn debug_4hvu_mapping_tokens() {
+        // 4HVU: wrong indentation in sequence under a mapping value
+        let yaml = b"key:\n   - ok\n   - also ok\n  - wrong\n";
+        let directives = DirectiveContext::new();
+
+        // First, dump the raw token stream for inspection.
+        {
+            let mut source = Buffer::new(yaml);
+            let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+
+            println!("--- 4HVU tokens ---");
+            loop {
+                match stream.current() {
+                    Some(tok) => {
+                        println!("{:?}", tok);
+                        if matches!(tok, Token::Eof) {
+                            break;
+                        }
+                        stream.next().unwrap();
+                    }
+                    None => break,
+                }
+            }
+        }
+
+        // Then, parse via the mapping-token path and show the resulting node.
+        {
+            let mut source = Buffer::new(yaml);
+            let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
+            let node = parse_mapping_with_tokens(&mut stream, 0, &directives, 0).unwrap();
+            println!("--- 4HVU mapping node ---\n{:#?}", node);
+        }
     }
 
     #[test]

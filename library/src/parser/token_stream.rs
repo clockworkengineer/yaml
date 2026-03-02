@@ -86,6 +86,16 @@ impl<'a> TokenStream<'a> {
         self.flow_depth > 0
     }
 
+    /// Returns the current logical line index tracked by the token stream.
+    ///
+    /// This is incremented whenever a `Newline` token is consumed via `next()`
+    /// and is useful for context-aware validation in flow collections
+    /// (e.g., enforcing indentation rules across line breaks).
+    #[inline]
+    pub fn current_line_index(&self) -> usize {
+        self.current_line_index
+    }
+
     /// Get the current token without consuming it
     #[inline]
     pub fn current(&self) -> Option<&Token> {
@@ -118,9 +128,7 @@ impl<'a> TokenStream<'a> {
                     // Advance logical line index when consuming a newline.
                     self.current_line_index = self.current_line_index.saturating_add(1);
                 }
-                Token::Plain(_)
-                | Token::SingleQuoted(_)
-                | Token::DoubleQuoted(_) => {
+                Token::Plain(_) | Token::SingleQuoted(_) | Token::DoubleQuoted(_) => {
                     // Record the line index of the last content scalar.
                     self.last_content_line_index = Some(self.current_line_index);
                 }
@@ -188,14 +196,18 @@ impl<'a> TokenStream<'a> {
                 self.next()?;
                 Ok(())
             }
-            Some(_token) => Err(crate::parser::errors::token_errors::expected_specific_token(
-                self.source_mut(),
-                expected.clone(),
-            )),
-            None => Err(crate::parser::errors::token_errors::expected_specific_token(
-                self.source_mut(),
-                expected.clone(),
-            )),
+            Some(_token) => Err(
+                crate::parser::errors::token_errors::expected_specific_token(
+                    self.source_mut(),
+                    expected.clone(),
+                ),
+            ),
+            None => Err(
+                crate::parser::errors::token_errors::expected_specific_token(
+                    self.source_mut(),
+                    expected.clone(),
+                ),
+            ),
         }
     }
 
@@ -368,11 +380,9 @@ impl<'a> TokenStream<'a> {
                 }
                 Some(Token::Anchor(name)) => {
                     if decorators.anchor.is_some() {
-                        return Err(
-                            crate::parser::errors::token_errors::duplicate_anchor_found(
-                                self.source_mut(),
-                            ),
-                        );
+                        return Err(crate::parser::errors::token_errors::duplicate_anchor_found(
+                            self.source_mut(),
+                        ));
                     }
                     decorators.anchor = Some(name.clone());
                     self.next()?;
@@ -439,7 +449,8 @@ impl<'a> TokenStream<'a> {
         // same logical line as the current colon AND that the immediately
         // preceding token was a scalar (plain or quoted). This avoids
         // misclassifying flow punctuation or explicit-key constructs.
-        let same_line = matches!(self.last_content_line_index, Some(idx) if idx == self.current_line_index);
+        let same_line =
+            matches!(self.last_content_line_index, Some(idx) if idx == self.current_line_index);
         if !same_line {
             return false;
         }
@@ -461,9 +472,9 @@ impl<'a> TokenStream<'a> {
             Some(_token) => Err(crate::parser::errors::token_errors::expected_plain_scalar(
                 self.source_mut(),
             )),
-            None => Err(crate::parser::errors::token_errors::expected_plain_scalar_eof(
-                self.source_mut(),
-            )),
+            None => Err(
+                crate::parser::errors::token_errors::expected_plain_scalar_eof(self.source_mut()),
+            ),
         }
     }
 
@@ -479,9 +490,9 @@ impl<'a> TokenStream<'a> {
             Some(_token) => Err(crate::parser::errors::token_errors::expected_quoted_scalar(
                 self.source_mut(),
             )),
-            None => Err(crate::parser::errors::token_errors::expected_quoted_scalar_eof(
-                self.source_mut(),
-            )),
+            None => Err(
+                crate::parser::errors::token_errors::expected_quoted_scalar_eof(self.source_mut()),
+            ),
         }
     }
 
@@ -557,9 +568,11 @@ impl<'a> TokenStream<'a> {
                 let _ = self.consume_if(Token::Colon)?;
                 Ok(true)
             }
-            _ => Err(crate::parser::document::flow_punctuation::expected_colon_in_flow_mapping(
-                self.source_mut(),
-            )),
+            _ => Err(
+                crate::parser::document::flow_punctuation::expected_colon_in_flow_mapping(
+                    self.source_mut(),
+                ),
+            ),
         }
     }
     pub fn consume_flow_sequence_end(&mut self) -> Result<bool, crate::error::YamlError> {

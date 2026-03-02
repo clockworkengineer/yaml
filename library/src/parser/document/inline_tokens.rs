@@ -119,6 +119,15 @@ pub fn parse_inline_sequence_with_tokens(
     // Expect opening bracket
     stream.expect(Token::FlowSequenceStart)?;
 
+    // Record the indentation and logical line index at which this flow
+    // sequence starts. YAML 1.2 requires that any continuation lines for
+    // a flow sequence be indented more than the line where the sequence
+    // began. The 9C9N test case ("Wrong indented flow sequence") exercises
+    // this rule by placing subsequent items at the same (or less) indent
+    // as the containing mapping key.
+    let base_indent = stream.line_indent();
+    let base_line = stream.current_line_index();
+
     use crate::utils::optimization::{CapacityHints, NodeBuilder};
     // Use a small capacity profile for typical inline sequences
     let node_builder = NodeBuilder::with_hints(CapacityHints::small());
@@ -160,6 +169,22 @@ pub fn parse_inline_sequence_with_tokens(
                 );
             }
             _ => {
+                // If we've moved to a new logical line since the flow
+                // sequence started, enforce that the current line's
+                // indentation is strictly greater than the starting
+                // indentation. This rejects cases like 9C9N where a
+                // flow sequence continues at the same (or lower) indent
+                // as the surrounding block structure.
+                let cur_line = stream.current_line_index();
+                let cur_indent = stream.line_indent();
+                if cur_line > base_line && cur_indent <= base_indent {
+                    return Err(
+                        crate::parser::document::flow_punctuation::invalid_indentation_in_flow_sequence(
+                            stream,
+                        ),
+                    );
+                }
+
                 if !expect_item {
                     // Found value without comma separator
                     // DRY: use centralized helper to emit identical error
