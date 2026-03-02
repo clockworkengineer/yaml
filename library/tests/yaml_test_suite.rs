@@ -205,13 +205,158 @@ fn print_suite_dir_error(possible_paths: &[PathBuf]) {
     );
 }
 
+struct KnownFailure {
+    id: &'static str,
+    description: &'static str,
+}
+
 fn run_yaml_suite_tests(suite_dir: &Path) {
     let skip_list: Vec<&str> = vec![];
-    let known_failures: Vec<&str> = vec![
-        "236B", "2CMS", "4HVU", "4JVG", "5LLU", "5TRB", "5U3A", "6S55", "7LBH", "7MNF", "9C9N",
-        "9CWY", "01", "BF9H", "BS4K", "C2SP", "D49Q", "DK4H", "06", "DMG6", "EB22", "EW3V",
-        "G7JE", "G9HC", "GDY7", "GT5M", "JKF3", "KS4U", "QB6E", "QLJ7", "RHX7", "RXY3", "S98Z",
-        "00", "ZCZ6", "ZVH3",
+    let known_failures: &[KnownFailure] = &[
+        KnownFailure {
+            id: "236B",
+            description: "Invalid value after mapping",
+        },
+        KnownFailure {
+            id: "2CMS",
+            description: "Invalid mapping in plain multiline",
+        },
+        KnownFailure {
+            id: "4HVU",
+            description: "Wrong indentation in sequence",
+        },
+        KnownFailure {
+            id: "4JVG",
+            description: "Scalar value with two anchors",
+        },
+        KnownFailure {
+            id: "5LLU",
+            description: "Block scalar with wrong indented line after spaces only",
+        },
+        KnownFailure {
+            id: "5TRB",
+            description: "Invalid document-start marker in double-quoted string",
+        },
+        KnownFailure {
+            id: "5U3A",
+            description: "Sequence on same line as mapping key",
+        },
+        KnownFailure {
+            id: "6S55",
+            description: "Invalid scalar at the end of sequence",
+        },
+        KnownFailure {
+            id: "7LBH",
+            description: "Multiline double-quoted implicit keys",
+        },
+        KnownFailure {
+            id: "7MNF",
+            description: "Missing colon",
+        },
+        KnownFailure {
+            id: "9C9N",
+            description: "Wrong indented flow sequence",
+        },
+        KnownFailure {
+            id: "9CWY",
+            description: "Invalid scalar at the end of mapping",
+        },
+        KnownFailure {
+            id: "01",
+            description: "(description not available; test directory missing)",
+        },
+        KnownFailure {
+            id: "BF9H",
+            description: "Trailing comment in multiline plain scalar",
+        },
+        KnownFailure {
+            id: "BS4K",
+            description: "Comment between plain scalar lines",
+        },
+        KnownFailure {
+            id: "C2SP",
+            description: "Flow mapping key on two lines",
+        },
+        KnownFailure {
+            id: "D49Q",
+            description: "Multiline single-quoted implicit keys",
+        },
+        KnownFailure {
+            id: "DK4H",
+            description: "Implicit key followed by newline",
+        },
+        KnownFailure {
+            id: "06",
+            description: "(description not available; test directory missing)",
+        },
+        KnownFailure {
+            id: "DMG6",
+            description: "Wrong indentation in mapping",
+        },
+        KnownFailure {
+            id: "EB22",
+            description: "Missing document-end marker before directive",
+        },
+        KnownFailure {
+            id: "EW3V",
+            description: "Wrong indentation in mapping",
+        },
+        KnownFailure {
+            id: "G7JE",
+            description: "Multiline implicit keys",
+        },
+        KnownFailure {
+            id: "G9HC",
+            description: "Invalid anchor in zero-indented sequence",
+        },
+        KnownFailure {
+            id: "GDY7",
+            description: "Comment that looks like a mapping key",
+        },
+        KnownFailure {
+            id: "GT5M",
+            description: "Node anchor in sequence",
+        },
+        KnownFailure {
+            id: "JKF3",
+            description: "Multiline unindented double-quoted block key",
+        },
+        KnownFailure {
+            id: "KS4U",
+            description: "Invalid item after end of flow sequence",
+        },
+        KnownFailure {
+            id: "QB6E",
+            description: "Wrong indented multiline quoted scalar",
+        },
+        KnownFailure {
+            id: "QLJ7",
+            description: "Tag shorthand used in multiple documents but only defined in the first",
+        },
+        KnownFailure {
+            id: "RHX7",
+            description: "YAML directive without document end marker",
+        },
+        KnownFailure {
+            id: "RXY3",
+            description: "Invalid document-end marker in single-quoted string",
+        },
+        KnownFailure {
+            id: "S98Z",
+            description: "Block scalar with more spaces than first content line",
+        },
+        KnownFailure {
+            id: "00",
+            description: "(description not available; test directory missing)",
+        },
+        KnownFailure {
+            id: "ZCZ6",
+            description: "Invalid mapping in plain single-line value",
+        },
+        KnownFailure {
+            id: "ZVH3",
+            description: "Wrong indented sequence item",
+        },
     ];
     let mut passed = 0;
     let mut failed = 0;
@@ -277,7 +422,7 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
                     "{} (expected: {}, got: {})",
                     test.id, expected, got
                 ));
-                if !known_failures.contains(&test.id.as_str()) {
+                if !known_failures.iter().any(|kf| kf.id == test.id) {
                     println!("UNEXPECTED FAILURE: {}", test.id);
                     unexpected_failures.push(test.id.clone());
                 }
