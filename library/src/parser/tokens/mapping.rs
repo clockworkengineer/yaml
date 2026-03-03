@@ -69,10 +69,10 @@ struct MappingParseContext {
 use crate::nodes::node::Node;
 use crate::nodes::node::{BlockStyle, QuoteType};
 use crate::parser::directives::DirectiveContext;
-use crate::parser::utils::node_utils::force_key_to_string;
-use crate::parser::tokens::value::parse_value_with_tokens;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
+use crate::parser::tokens::value::parse_value_with_tokens;
+use crate::parser::utils::node_utils::force_key_to_string;
 
 #[cfg(feature = "debug-trace")]
 /// Helper for debug logging of mapping parser internals.
@@ -492,7 +492,10 @@ impl MappingParseContext {
             if !explicit_key
                 && !matches!(key, Node::None)
                 && stream.line_indent() <= cur_indent
-                && self.stack.last().map_or(false, |(_, pairs)| !pairs.is_empty())
+                && self
+                    .stack
+                    .last()
+                    .map_or(false, |(_, pairs)| !pairs.is_empty())
             {
                 return Err(
                     crate::parser::errors::mapping_errors::implicit_key_without_colon_at_eof(
