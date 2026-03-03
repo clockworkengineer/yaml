@@ -670,7 +670,36 @@ fn parse_mapping_value(
                             }
                         }
                     }
-                    _ => {}
+                    QuoteType::Unquoted => {
+                        // ZCZ6: `a: b: c: d` — a plain scalar value immediately
+                        // followed by ':' on the same line is ambiguous and invalid
+                        // in block context (YAML spec §7.3.3 / §8.1.1).
+                        // The lexer already stops a plain scalar at ': ', so `b`
+                        // becomes a separate Plain token; we detect the trailing ':'
+                        // here and reject rather than silently building a nested map.
+                        //
+                        // Guard: only fire for BlockStyle::None (true plain scalars).
+                        // Block scalars (Folded/Literal) may appear with a trailing ':'
+                        // in the token stream due to a separate bug in block scalar
+                        // boundary detection; those cases are NOT the ZCZ6 pattern and
+                        // must not be rejected here.
+                        if matches!(v, Node::Str(_, _, BlockStyle::None)) {
+                            if stream.is_colon_on_same_line() {
+                                if matches!(stream.peek()?, Some(Token::Plain(_))) {
+                                    // ZCZ6 guard: only reject when the key is a non-empty scalar
+                                    // (a real implicit mapping key). When the key is empty (from
+                                    // a `Colon`-token used as an explicit-value indicator, e.g.
+                                    // `  : moon: white` in V9D5), allow the value `moon: white`
+                                    // to be parsed as a compact inline mapping by the outer loop.
+                                    let key_is_nonempty = matches!(_key,
+                                        Node::Str(s, _, _) if !s.is_empty());
+                                    if key_is_nonempty {
+                                        return Err(crate::parser::errors::mapping_errors::nested_key_separator_in_block_value_same_line(stream));
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 // Note: nested ':' cases are validated elsewhere to avoid false positives with
                 // multi-line/block scalar values and flow contexts.
@@ -960,5 +989,44 @@ mod tests {
         } else {
             panic!("Expected Mapping node, got: {:?}", result);
         }
+    }
+
+    #[test]
+    fn test_zcz6_plain_value_with_nested_colon_should_error() {
+        // ZCZ6: `a: b: c: d` — plain value followed by ':' on same line
+        let config = crate::parser::config::ParserConfig::strict();
+        let result = crate::parse_with_config("a: b: c: d\n", config);
+        assert!(
+            result.is_err(),
+            "ZCZ6 should fail: 'a: b: c: d' has ambiguous nested ':' on same line, got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_k858_block_scalar_chomping_should_succeed() {
+        // K858: Spec Example 8.6 - block scalars with chomping indicators
+        let yaml = "strip: >-\n\nclip: >\n\nkeep: |+\n\n\n";
+        let config = crate::parser::config::ParserConfig::strict();
+        let result = crate::parse_with_config(yaml, config);
+        assert!(
+            result.is_ok(),
+            "K858 should succeed: block scalars with chomping indicators, got: {:?}",
+            result.err()
+        );
+    }
+
+    #[test]
+    fn test_v9d5_compact_block_mappings_should_succeed() {
+        // V9D5: Spec Example 8.19 - compact block mappings
+        // Note: use CRLF line endings as in the official test suite file
+        let yaml = "- sun: yellow\r\n- ? earth: blue\r\n  : moon: white\r\n";
+        let config = crate::parser::config::ParserConfig::strict();
+        let result = crate::parse_with_config(yaml, config);
+        assert!(
+            result.is_ok(),
+            "V9D5 should succeed: compact block mappings, got: {:?}",
+            result.err()
+        );
     }
 }

@@ -314,10 +314,6 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
             description: "(description not available; test directory missing)",
         },
         KnownFailure {
-            id: "ZCZ6",
-            description: "Invalid mapping in plain single-line value",
-        },
-        KnownFailure {
             id: "ZVH3",
             description: "Wrong indented sequence item",
         },
