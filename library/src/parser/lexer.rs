@@ -858,7 +858,28 @@ impl<'a> Lexer<'a> {
             |src| {
                 src.next();
             }, // consume '&'
-            |_, ch| {
+            |src, ch| {
+                // Per YAML 1.2 spec, anchor names (ns-anchor-name) exclude
+                // c-indicator characters, which includes ':'.  Stop at ':'
+                // when followed by a safe character or EOF so the colon
+                // remains in the stream as a separate Token::Colon for the
+                // mapping parser to consume.  This ensures `&anchor: value`
+                // correctly produces an anchored empty key rather than
+                // treating 'value' as the key with a null value.
+                if ch == ':' {
+                    let state = src.save_state();
+                    src.next();
+                    let next = src.current();
+                    src.restore_state(state);
+                    return matches!(
+                        next,
+                        None
+                            | Some(' ')
+                            | Some('\t')
+                            | Some('\n')
+                            | Some('\r')
+                    );
+                }
                 ch.is_whitespace()
                     || ch == CHAR_NEWLINE
                     || ch == CHAR_HASH
@@ -869,7 +890,7 @@ impl<'a> Lexer<'a> {
                     || ch == CHAR_RBRACE
             },
             Token::Anchor,
-            true, // allow trailing colon
+            false, // colon is now a conditional delimiter; no trailing-colon stripping needed
             "Empty anchor name",
         )
     }

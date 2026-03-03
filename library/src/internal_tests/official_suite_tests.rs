@@ -133,10 +133,13 @@ mod tests {
     // Test 26DV - Whitespace around colon in mappings
     #[test]
     fn test_26dv_whitespace_around_colon() {
-        // Testing various whitespace patterns around colons
+        // Testing various whitespace patterns around colons.
+        // Note: `key3:value3` (colon not followed by a safe character) is a
+        // plain scalar per YAML 1.2 spec and therefore an implicit mapping key
+        // with no ':' value separator — which is invalid per spec §8.2.1.  Only
+        // test patterns that are genuinely valid.
         let yaml = b"key : value
 key2  :  value2
-key3:value3
 ";
         assert_parses(yaml, "Should parse whitespace around colons");
     }
