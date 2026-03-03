@@ -214,10 +214,6 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
     let skip_list: Vec<&str> = vec![];
     let known_failures: &[KnownFailure] = &[
         KnownFailure {
-            id: "236B",
-            description: "Invalid value after mapping",
-        },
-        KnownFailure {
             id: "2CMS",
             description: "Invalid mapping in plain multiline",
         },

@@ -622,7 +622,15 @@ fn parse_mapping_value(
             );
         }
         Some(Token::Indent(level)) => {
-            stream.next()?; // consume Indent
+            // 236B: Only treat the indented block as a value when its indentation
+            // exceeds the current mapping level.  A lower-level Indent token means
+            // the content belongs to the enclosing scope — it is NOT a nested value
+            // for this key.  Leave the token in the stream so the outer mapping loop
+            // can handle the dedent correctly.
+            if level < cur_indent {
+                return Ok(Node::None);
+            }
+            stream.next()?; // consume Indent (genuinely indented value follows)
             if matches!(stream.current(), Some(Token::Dash)) {
                 use crate::parser::tokens::sequence::parse_sequence_with_tokens;
                 let ctx_seq = crate::parser::utils::context::ParsingContext::new(level)
