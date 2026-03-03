@@ -115,6 +115,16 @@ pub fn invalid_trailing_plain_text_after_quoted_scalar(stream: &mut TokenStream)
     )
 }
 
+/// GDY7: An implicit mapping key (no `?` prefix) that is followed by a comment
+/// and then EOF without ever seeing a `:` separator.  Per YAML 1.2, every
+/// implicit block-mapping entry *must* have a `:` value indicator.
+pub fn implicit_key_without_colon_at_eof(stream: &mut TokenStream) -> YamlError {
+    crate::parser::utils::error_builder::syntax_error(
+        stream.source_mut(),
+        "YAML compliance error: Implicit mapping key has no ':' value separator (comment cannot substitute for ':')",
+    )
+}
+
 // Note: Nested ':' after a value on the same line is currently tolerated for
 // compatibility with some suite cases and examples using permissive parsing.
 /// Centralized error: Nested key separator ':' encountered immediately after a block mapping value on the same line

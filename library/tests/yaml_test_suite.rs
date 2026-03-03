@@ -246,16 +246,8 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
             description: "Multiline double-quoted implicit keys",
         },
         KnownFailure {
-            id: "7MNF",
-            description: "Missing colon",
-        },
-        KnownFailure {
             id: "9C9N",
             description: "Wrong indented flow sequence",
-        },
-        KnownFailure {
-            id: "9CWY",
-            description: "Invalid scalar at the end of mapping",
         },
         KnownFailure {
             id: "01",
@@ -300,10 +292,6 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
         KnownFailure {
             id: "G9HC",
             description: "Invalid anchor in zero-indented sequence",
-        },
-        KnownFailure {
-            id: "GDY7",
-            description: "Comment that looks like a mapping key",
         },
         KnownFailure {
             id: "GT5M",

@@ -478,6 +478,30 @@ impl MappingParseContext {
 
         // Early return for EOF or None
         if matches!(cur, Some(Token::Eof) | None) {
+            // GDY7: An implicit key (no leading `?`) that reaches EOF without
+            // a `:` separator is a YAML violation — but only when:
+            //   1. The key is non-empty (not an already-null placeholder).
+            //   2. The key sits at the same (or lower) indentation as the base
+            //      of the current mapping frame (ruling out indented continuation
+            //      content that the value parser left behind in the stream — those
+            //      appear at a *higher* indent than the mapping's own base).
+            //   3. This mapping frame already has at least one completed pair,
+            //      which confirms we are inside an established block mapping and
+            //      not at the top of a fresh nested block whose content simply
+            //      happens to have no colons (e.g. NB6Z-style scalar blocks).
+            if !explicit_key
+                && !matches!(key, Node::None)
+                && stream.line_indent() <= cur_indent
+                && self.stack.last().map_or(false, |(_, pairs)| !pairs.is_empty())
+            {
+                return Err(
+                    crate::parser::errors::mapping_errors::implicit_key_without_colon_at_eof(
+                        stream,
+                    )
+                    .to_string()
+                    .into(),
+                );
+            }
             return Ok((key, Node::None));
         }
 
