@@ -322,7 +322,32 @@ pub fn parse_sequence_with_tokens(
             // Check if there's another dash at the current indent level
             match stream.current() {
                 Some(Token::Dash) => {
-                    // Dash at same indent, continue parsing
+                    // A Dash here means parse_plain_scalar consumed the preceding
+                    // Indent token while probing for a multiline continuation and
+                    // left the Dash when it found the line wasn't a plain scalar.
+                    // stream.line_indent() still reflects the indent level of that
+                    // consumed Indent token, so we can validate alignment:
+                    //   • indent < current_indent AND indent > parent_indent → the
+                    //     dash is at an in-between level that is neither a sibling
+                    //     item nor a natural dedent back to the parent.  This is the
+                    //     4HVU case: error.
+                    //   • indent <= parent_indent → dedent past the sequence base;
+                    //     end the sequence cleanly.
+                    //   • indent >= current_indent → valid continuation; carry on.
+                    let dash_indent = stream.line_indent();
+                    if dash_indent < current_indent {
+                        if dash_indent <= parent_indent {
+                            break;
+                        } else {
+                            return Err(
+                                crate::parser::utils::error_builder::indentation_error(
+                                    stream.source_mut(),
+                                    "Invalid indentation for sequence item",
+                                ),
+                            );
+                        }
+                    }
+                    // Dash at same or greater indent — valid sibling/nested item.
                     continue;
                 }
                 Some(Token::Indent(level)) if *level < current_indent => {

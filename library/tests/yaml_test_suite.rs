@@ -222,10 +222,6 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
             description: "Invalid mapping in plain multiline",
         },
         KnownFailure {
-            id: "4HVU",
-            description: "Wrong indentation in sequence",
-        },
-        KnownFailure {
             id: "4JVG",
             description: "Scalar value with two anchors",
         },
