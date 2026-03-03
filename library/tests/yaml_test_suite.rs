@@ -234,10 +234,6 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
             description: "Block scalar with wrong indented line after spaces only",
         },
         KnownFailure {
-            id: "5TRB",
-            description: "Invalid document-start marker in double-quoted string",
-        },
-        KnownFailure {
             id: "5U3A",
             description: "Sequence on same line as mapping key",
         },
@@ -288,10 +284,6 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
         KnownFailure {
             id: "06",
             description: "(description not available; test directory missing)",
-        },
-        KnownFailure {
-            id: "DMG6",
-            description: "Wrong indentation in mapping",
         },
         KnownFailure {
             id: "EB22",

@@ -1,4 +1,3 @@
-
 /*
  * Token Error Helpers
  *
@@ -114,6 +113,16 @@ pub fn unterminated_double_quoted_eof_after_escape(source: &mut dyn ISource) -> 
     crate::parser::utils::error_builder::syntax_error(
         source,
         "YAML compliance error: Unterminated double-quoted string (unexpected EOF after escape)",
+    )
+}
+
+/// Document-start or document-end marker encountered inside a double-quoted scalar.
+/// Per YAML 1.2, `---` and `...` at the beginning of a line terminate the document
+/// context even inside flow scalars, leaving the quoted string unterminated.
+pub fn document_marker_in_double_quoted(source: &mut dyn ISource) -> YamlError {
+    crate::parser::utils::error_builder::syntax_error(
+        source,
+        "YAML compliance error: Document marker (--- or ...) found inside double-quoted scalar; unterminated string",
     )
 }
 

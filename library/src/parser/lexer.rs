@@ -9,7 +9,6 @@ use crate::lexer_debug;
  *
  * Copyright (c) 2026 YAML Library Developers
  */
-
 use crate::constants::*;
 use crate::io::traits::ISource;
 use crate::parser::utils::error_helpers;
@@ -1178,6 +1177,39 @@ impl<'a> Lexer<'a> {
                         ));
                     }
                     break;
+                }
+                Some(CHAR_NEWLINE) | Some(CHAR_CARRIAGE_RETURN) => {
+                    let ch = self.source.current().unwrap();
+                    // Normalise CR / CRLF → LF in content
+                    content.push(CHAR_NEWLINE);
+                    self.source.next();
+                    if ch == CHAR_CARRIAGE_RETURN && self.source.current() == Some(CHAR_NEWLINE) {
+                        self.source.next();
+                    }
+                    // YAML 1.2: a document-start (---) or document-end (...) marker
+                    // at the beginning of a new line inside a flow scalar terminates
+                    // the document context, making the double-quoted string unterminated.
+                    let c0 = self.source.current();
+                    if c0 == Some('-') || c0 == Some('.') {
+                        let marker = c0.unwrap();
+                        if self.peek_ahead(1) == Some(marker) && self.peek_ahead(2) == Some(marker)
+                        {
+                            let c3 = self.peek_ahead(3);
+                            let is_doc_marker = c3.map_or(true, |c| {
+                                c == CHAR_SPACE
+                                    || c == CHAR_TAB
+                                    || c == CHAR_NEWLINE
+                                    || c == CHAR_CARRIAGE_RETURN
+                            });
+                            if is_doc_marker {
+                                return Err(
+                                    crate::parser::errors::token_errors::document_marker_in_double_quoted(
+                                        self.source,
+                                    ),
+                                );
+                            }
+                        }
+                    }
                 }
                 Some(ch) => {
                     content.push(ch);
