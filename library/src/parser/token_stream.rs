@@ -389,6 +389,61 @@ impl<'a> TokenStream<'a> {
         Ok(decorators)
     }
 
+    /// Probe whether the content that starts at the current position
+    /// (which should be a decorator token — `Anchor` or `Tag`) is a
+    /// mapping key (has a `:` separator after the value token) rather
+    /// than a plain decorated scalar.
+    ///
+    /// Saves and restores full token-stream + lexer + source state so
+    /// no tokens are permanently consumed.
+    ///
+    /// # 4JVG detection
+    /// Used in `parse_value_content` to distinguish:
+    /// - `&anchor scalar`  (no colon → scalar, potential double-anchor error)
+    /// - `&anchor key: val` (colon present → real mapping key)
+    pub fn probe_has_colon_after_decorator_and_value(&mut self) -> bool {
+        // --- Save full state ---
+        let source_state = self.lexer.source.save_state();
+        let lexer_snap = self.lexer.snapshot();
+        let saved_counter = self.position_counter;
+        let saved_flow_depth = self.flow_depth;
+        let saved_last_token = self.last_token.clone();
+        let saved_line_index = self.current_line_index;
+        let saved_content_line = self.last_content_line_index;
+
+        // --- Probe: skip up to 2 decorators (Anchor / Tag) ---
+        for _ in 0..2 {
+            match self.current() {
+                Some(Token::Anchor(_)) | Some(Token::Tag(_)) => {
+                    let _ = self.next();
+                }
+                _ => break,
+            }
+        }
+        // Skip one value token (Plain / Quoted / Alias / Number)
+        if matches!(
+            self.current(),
+            Some(Token::Plain(_))
+                | Some(Token::SingleQuoted(_))
+                | Some(Token::DoubleQuoted(_))
+                | Some(Token::Alias(_))
+        ) {
+            let _ = self.next();
+        }
+        let has_colon = matches!(self.current(), Some(Token::Colon));
+
+        // --- Restore full state ---
+        self.lexer.source.restore_state(source_state);
+        self.lexer.restore_snapshot(lexer_snap);
+        self.position_counter = saved_counter;
+        self.flow_depth = saved_flow_depth;
+        self.last_token = saved_last_token;
+        self.current_line_index = saved_line_index;
+        self.last_content_line_index = saved_content_line;
+
+        has_colon
+    }
+
     /// Check if we're at the start of a flow collection
     #[allow(dead_code)]
     pub fn at_flow_start(&self) -> bool {

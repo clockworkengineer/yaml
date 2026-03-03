@@ -675,6 +675,19 @@ fn parse_value_content(
                             depth + 1,
                         );
                     } else {
+                        // 4JVG: If the next token is a decorator (Anchor/Tag), probe
+                        // whether a colon follows the first value token.  When no
+                        // colon is found, the indented content is a decorated scalar
+                        // (not a mapping key), so route to parse_value_with_tokens.
+                        // This lets the caller's existing `multiple_anchors` check
+                        // fire when two anchors refer to the same scalar value.
+                        if matches!(
+                            stream.current(),
+                            Some(Token::Anchor(_)) | Some(Token::Tag(_))
+                        ) && !stream.probe_has_colon_after_decorator_and_value()
+                        {
+                            return parse_value_with_tokens(stream, directives, depth + 1);
+                        }
                         use crate::parser::tokens::mapping::parse_mapping_with_tokens;
                         return parse_mapping_with_tokens(stream, _lvl, directives, depth + 1);
                     }

@@ -1354,6 +1354,47 @@ impl<'a> Lexer<'a> {
     pub fn line_indent(&self) -> usize {
         self.last_indent
     }
+
+    /// Take a snapshot of the lexer's token-cache and boolean state for
+    /// speculative probing (look-ahead without permanently consuming tokens).
+    pub(crate) fn snapshot(&self) -> LexerSnapshot {
+        LexerSnapshot {
+            current_token: self.current_token.clone(),
+            peeked_token: self.peeked_token.clone(),
+            at_line_start: self.at_line_start,
+            in_flow: self.in_flow,
+            last_was_linebreak: self.last_was_linebreak,
+            last_indent: self.last_indent,
+            awaiting_line_content_start: self.awaiting_line_content_start,
+            last_token_started_line: self.last_token_started_line,
+        }
+    }
+
+    /// Restore a previously-taken lexer snapshot (used after speculative probing).
+    pub(crate) fn restore_snapshot(&mut self, snap: LexerSnapshot) {
+        self.current_token = snap.current_token;
+        self.peeked_token = snap.peeked_token;
+        self.at_line_start = snap.at_line_start;
+        self.in_flow = snap.in_flow;
+        self.last_was_linebreak = snap.last_was_linebreak;
+        self.last_indent = snap.last_indent;
+        self.awaiting_line_content_start = snap.awaiting_line_content_start;
+        self.last_token_started_line = snap.last_token_started_line;
+    }
+}
+
+/// Snapshot of the lexer's token-cache and boolean state.
+/// Obtained via [`Lexer::snapshot`] and restored via [`Lexer::restore_snapshot`].
+#[derive(Clone, Debug)]
+pub(crate) struct LexerSnapshot {
+    current_token: Option<Token>,
+    peeked_token: Option<Token>,
+    at_line_start: bool,
+    in_flow: bool,
+    last_was_linebreak: bool,
+    last_indent: usize,
+    awaiting_line_content_start: bool,
+    last_token_started_line: bool,
 }
 
 #[cfg(test)]
