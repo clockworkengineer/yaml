@@ -136,13 +136,31 @@ fn parse_plain_scalar(
 ) -> crate::parser::ParseResult<Node> {
     use crate::nodes::node::{BlockStyle, Node, Numeric, QuoteType};
     use crate::parser::lexer::Token;
+    // Determine the minimum indentation a continuation line must exceed.
+    //
+    // In a block-sequence context (preceding token is '-'), the scalar is
+    // the VALUE of a sequence item.  Continuation lines must be indented
+    // STRICTLY MORE than the Dash's column; a line at the same indent as
+    // the Dash would be (or start) another sequence item, not a continuation
+    // (6S55 case: `- baz\n invalid` where `invalid` is at the same indent as
+    // `- baz`).
+    //
+    // In all other contexts (mapping value, explicit key, etc.) the old
+    // behaviour applies: any non-zero indentation is sufficient, which
+    // correctly allows multi-line mapping values to continue on lines that
+    // are deeper than the mapping key (4CQQ case).
+    let base_indent = if matches!(stream.last_token(), Some(Token::Dash)) {
+        stream.line_indent()
+    } else {
+        0
+    };
     stream.next()?;
     let mut accumulated = s.to_string();
     loop {
         if stream.is_current(|t| matches!(t, Token::Newline)) {
             stream.next()?;
             if let Some(Token::Indent(level)) = stream.current() {
-                if *level > 0 {
+                if *level > base_indent {
                     stream.next()?;
                     if stream.peek()?.map_or(false, |t| matches!(t, Token::Colon)) {
                         break;
@@ -156,6 +174,12 @@ fn parse_plain_scalar(
                         break;
                     }
                 } else {
+                    // The indent level is not strictly greater than base_indent
+                    // (same level or dedent) — do not continue the scalar.
+                    // Consume the Indent token so the next meaningful token
+                    // (typically '-', a plain scalar, or a comment) is left as
+                    // current for the caller's post-item logic.
+                    stream.next()?;
                     break;
                 }
             } else {

@@ -579,6 +579,14 @@ impl<'a> TokenStream<'a> {
         self.lexer.line_indent()
     }
 
+    /// Returns the last token that was consumed from the stream.
+    /// Useful for callers that need to know the structural context at the
+    /// point where a scalar starts (e.g. whether the preceding token was a
+    /// '-' indicating a block-sequence item).
+    pub fn last_token(&self) -> Option<&Token> {
+        self.last_token.as_ref()
+    }
+
     /// Check if the next token (after whitespace) is a colon
     #[allow(dead_code)]
     pub fn has_colon_ahead(&mut self) -> Result<bool, crate::error::YamlError> {

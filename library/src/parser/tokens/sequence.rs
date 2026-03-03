@@ -403,11 +403,51 @@ pub fn parse_sequence_with_tokens(
                     stream.next()?;
                     if matches!(stream.current(), Some(Token::Dash)) {
                         continue;
+                    } else if matches!(
+                        stream.current(),
+                        Some(Token::Plain(_))
+                            | Some(Token::SingleQuoted(_))
+                            | Some(Token::DoubleQuoted(_))
+                            | Some(Token::Tag(_))
+                            | Some(Token::Anchor(_))
+                    ) && current_indent > parent_indent
+                    {
+                        // 6S55: A scalar (or other non-Dash node-starter) appearing at
+                        // the same indentation level as the sequence items is always
+                        // invalid in a block sequence — every item must begin with '-'.
+                        // Only reject when we're inside a genuinely nested sequence
+                        // (current_indent > parent_indent); at the top level both are
+                        // typically 0 so the token legitimately ends the sequence.
+                        return Err(crate::parser::utils::error_builder::indentation_error(
+                            stream.source_mut(),
+                            "Invalid scalar at sequence level (expected '-')",
+                        ));
                     } else {
                         break;
                     }
                 }
                 _ => {
+                    // 6S55 (II): The plain-scalar prober may consume the
+                    // Indent(current_indent) token and leave a Plain/Quoted
+                    // scalar as the next current token.  If that scalar sits
+                    // at the same column as the sequence items, it is not a
+                    // valid block-sequence entry (missing '-') and must be
+                    // rejected in a nested sequence context.
+                    if matches!(
+                        stream.current(),
+                        Some(Token::Plain(_))
+                            | Some(Token::SingleQuoted(_))
+                            | Some(Token::DoubleQuoted(_))
+                            | Some(Token::Tag(_))
+                            | Some(Token::Anchor(_))
+                    ) && current_indent > parent_indent
+                        && stream.line_indent() == current_indent
+                    {
+                        return Err(crate::parser::utils::error_builder::indentation_error(
+                            stream.source_mut(),
+                            "Invalid scalar at sequence level (expected '-')",
+                        ));
+                    }
                     // No more items at this level
                     break;
                 }
@@ -473,6 +513,19 @@ mod tests {
             result.is_ok(),
             "6BCT should succeed, got: {:?}",
             result.err()
+        );
+    }
+
+    #[test]
+    fn test_6s55_scalar_at_sequence_level_should_error() {
+        // 6S55: plain scalar at the same indent as sequence items (no '-') is invalid
+        let yaml = "key:\n - bar\n - baz\n invalid\n";
+        let config = crate::parser::config::ParserConfig::strict();
+        let result = crate::parse_with_config(yaml, config);
+        assert!(
+            result.is_err(),
+            "6S55 should fail: scalar at sequence level without '-', got: {:?}",
+            result
         );
     }
 }

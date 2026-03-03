@@ -222,10 +222,6 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
             description: "Sequence on same line as mapping key",
         },
         KnownFailure {
-            id: "6S55",
-            description: "Invalid scalar at the end of sequence",
-        },
-        KnownFailure {
             id: "7LBH",
             description: "Multiline double-quoted implicit keys",
         },
