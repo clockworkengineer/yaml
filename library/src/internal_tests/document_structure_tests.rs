@@ -817,4 +817,17 @@ mod tests {
             panic!("Expected Documents node");
         }
     }
+
+    #[test]
+    fn test_rhx7_yaml_directive_without_doc_end_marker_should_error() {
+        // RHX7: A %YAML directive appearing mid-stream without a preceding
+        // '...' (document-end) marker is invalid YAML.
+        let yaml = "key: value\n%YAML 1.2\n---\n";
+        let result = crate::parse_with_config(yaml, crate::parser::config::ParserConfig::strict());
+        assert!(
+            result.is_err(),
+            "RHX7: '%YAML' directive without preceding '...' should error, got: {:?}",
+            result
+        );
+    }
 }

@@ -294,10 +294,6 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
             description: "Tag shorthand used in multiple documents but only defined in the first",
         },
         KnownFailure {
-            id: "RHX7",
-            description: "YAML directive without document end marker",
-        },
-        KnownFailure {
             id: "RXY3",
             description: "Invalid document-end marker in single-quoted string",
         },

@@ -181,6 +181,35 @@ impl MappingParseContext {
                 }
             }
 
+            // Directive-line guard (RHX7): if a Plain token starting with '%' appears
+            // at column 0 right after a line break it is a YAML directive line
+            // (%YAML, %TAG, or unknown).  If we are already inside a document
+            // (at least one mapping pair has been collected), this is an invalid
+            // mid-document directive placement – return an error directly, because
+            // the TokenStream has already consumed the '%' character from the
+            // underlying source so the outer stream-level guards can no longer
+            // detect it at the raw-source level.
+            if let Some(Token::Plain(s)) = &token {
+                if s.starts_with('%')
+                    && stream.line_indent() == 0
+                    && matches!(
+                        stream.last_token(),
+                        None | Some(Token::Newline) | Some(Token::Comment(_))
+                    )
+                {
+                    let has_pairs = self.stack.iter().any(|(_, p)| !p.is_empty());
+                    if has_pairs {
+                        return Err(
+                            crate::parser::errors::directive_errors::DirectiveErrors::directives_not_allowed_midstream_msg().to_string().into()
+                        );
+                    }
+                    // No pairs yet: stop the mapping and let the outer parser handle it.
+                    self.dedent_unwind_mapping_stack(0);
+                    let (_, pairs) = self.stack.pop().unwrap();
+                    return Ok(Node::Mapping(pairs));
+                }
+            }
+
             if let Some(result) =
                 self.handle_special_tokens(stream, current_indent, &token, depth)?
             {
