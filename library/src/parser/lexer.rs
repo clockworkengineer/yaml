@@ -873,11 +873,7 @@ impl<'a> Lexer<'a> {
                     src.restore_state(state);
                     return matches!(
                         next,
-                        None
-                            | Some(' ')
-                            | Some('\t')
-                            | Some('\n')
-                            | Some('\r')
+                        None | Some(' ') | Some('\t') | Some('\n') | Some('\r')
                     );
                 }
                 ch.is_whitespace()
