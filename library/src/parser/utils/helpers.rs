@@ -614,7 +614,7 @@ pub(crate) fn classify_block_head(
                 // classify as generic value for now.
                 BlockHeadKind::Value
             }
-            Some(Token::Plain(_)) | Some(Token::SingleQuoted(_)) | Some(Token::DoubleQuoted(_)) => {
+            Some(Token::Plain(_)) | Some(Token::SingleQuoted(_)) | Some(Token::DoubleQuoted(..)) => {
                 if peek_ahead_for_mapping_key(source, directives) {
                     BlockHeadKind::BlockMapping
                 } else {

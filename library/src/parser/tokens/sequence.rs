@@ -407,7 +407,7 @@ pub fn parse_sequence_with_tokens(
                         stream.current(),
                         Some(Token::Plain(_))
                             | Some(Token::SingleQuoted(_))
-                            | Some(Token::DoubleQuoted(_))
+                            | Some(Token::DoubleQuoted(..))
                             | Some(Token::Tag(_))
                             | Some(Token::Anchor(_))
                     ) && current_indent > parent_indent
@@ -437,7 +437,7 @@ pub fn parse_sequence_with_tokens(
                         stream.current(),
                         Some(Token::Plain(_))
                             | Some(Token::SingleQuoted(_))
-                            | Some(Token::DoubleQuoted(_))
+                            | Some(Token::DoubleQuoted(..))
                             | Some(Token::Tag(_))
                             | Some(Token::Anchor(_))
                     ) && current_indent > parent_indent

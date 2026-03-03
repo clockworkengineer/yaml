@@ -55,7 +55,7 @@ pub(crate) fn validate_top_level_comment_followed_by_indented_content(
                     // top-level comment.
                     Some(crate::parser::lexer::Token::Plain(_))
                     | Some(crate::parser::lexer::Token::SingleQuoted(_))
-                    | Some(crate::parser::lexer::Token::DoubleQuoted(_))
+                    | Some(crate::parser::lexer::Token::DoubleQuoted(..))
                     | Some(crate::parser::lexer::Token::FlowMappingStart)
                     | Some(crate::parser::lexer::Token::FlowSequenceStart) => {
                         let msg = crate::parser::utils::helpers::parse_error_token(

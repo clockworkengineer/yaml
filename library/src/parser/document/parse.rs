@@ -355,7 +355,7 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
                         }
                     }
                     Some(crate::parser::lexer::Token::SingleQuoted(_))
-                    | Some(crate::parser::lexer::Token::DoubleQuoted(_))
+                    | Some(crate::parser::lexer::Token::DoubleQuoted(..))
                     | Some(crate::parser::lexer::Token::Dash)
                     | Some(crate::parser::lexer::Token::Colon) => {
                         return Err(helpers::parse_error_token(

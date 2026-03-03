@@ -630,7 +630,7 @@ fn parse_value_content(
             use crate::parser::document::inline_tokens::parse_inline_sequence_with_tokens;
             parse_inline_sequence_with_tokens(stream, directives, depth + 1)
         }
-        Some(Token::SingleQuoted(_)) | Some(Token::DoubleQuoted(_)) | Some(Token::Plain(_)) => {
+        Some(Token::SingleQuoted(_)) | Some(Token::DoubleQuoted(..) ) | Some(Token::Plain(_)) => {
             crate::parser::document::scalar::parse_scalar_with_tokens(stream, directives, 0)
         }
         Some(Token::Dash) => {

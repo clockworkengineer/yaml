@@ -466,6 +466,20 @@ impl MappingParseContext {
         let cur = stream.current();
         // Early return for colon after key
         if let Some(Token::Colon) = cur {
+            // 7LBH: An implicit block mapping key that is a double-quoted scalar
+            // spanning multiple source lines is invalid (YAML spec \u00a78.1.1).
+            // We detect it here, at the point where we confirm there IS a ':'
+            // separator (so the token really is a key, not a value).
+            // stream.last_token() holds the DoubleQuoted token since
+            // skip_newlines_and_comments() was a no-op (Colon is cur).
+            if !explicit_key {
+                if let Some(Token::DoubleQuoted(_, true)) = stream.last_token() {
+                    return Err("Implicit block mapping key cannot span multiple lines \
+                         (double-quoted scalar with literal newlines used as implicit key)"
+                        .to_string()
+                        .into());
+                }
+            }
             stream.next()?;
             let value =
                 parse_mapping_value(stream, directives, cur_indent, depth, explicit_key, &key)?;

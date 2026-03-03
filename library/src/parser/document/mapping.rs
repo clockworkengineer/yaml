@@ -56,7 +56,7 @@ pub(crate) fn parse_mapping(
                 }
                 true
             }
-            Token::SingleQuoted(_) | Token::DoubleQuoted(_) => true,
+            Token::SingleQuoted(_) | Token::DoubleQuoted(..) => true,
             _ => false,
         }
     }
@@ -65,7 +65,7 @@ pub(crate) fn parse_mapping(
     fn is_plain_safe_key_token(token: &Token) -> bool {
         match token {
             Token::Plain(value) => is_plain_safe_value_token(token) && !value.contains(':'),
-            Token::SingleQuoted(_) | Token::DoubleQuoted(_) => true,
+            Token::SingleQuoted(_) | Token::DoubleQuoted(..) => true,
             _ => false,
         }
     }

@@ -830,4 +830,28 @@ mod tests {
             result
         );
     }
+
+    #[test]
+    fn test_7lbh_multiline_double_quoted_implicit_key_should_error() {
+        // 7LBH: A double-quoted scalar that literally spans multiple source lines
+        // used as an implicit block mapping key must be rejected per YAML spec §8.1.1.
+        // The key "c\n d": 1 (with a real newline inside) is invalid.
+        // But "a\nb": 1 (escape sequence "\n") should succeed since it is one line.
+        let yaml_invalid = "\"a\\nb\": 1\n\"c\n d\": 1\n";
+        let result_invalid = crate::parse_with_config(yaml_invalid, crate::parser::config::ParserConfig::strict());
+        assert!(
+            result_invalid.is_err(),
+            "7LBH: multiline double-quoted implicit key should error, got: {:?}",
+            result_invalid
+        );
+
+        // Escape-only case must still succeed
+        let yaml_valid = "\"a\\nb\": 1\n";
+        let result_valid = crate::parse_with_config(yaml_valid, crate::parser::config::ParserConfig::strict());
+        assert!(
+            result_valid.is_ok(),
+            "7LBH: single-line double-quoted key with escape should succeed, got: {:?}",
+            result_valid
+        );
+    }
 }

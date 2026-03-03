@@ -375,7 +375,7 @@ pub(crate) fn parse_scalar_with_tokens(
     let current_token_str = format!("{:?}", current_token);
     match current_token {
         Some(Token::SingleQuoted(s)) => parse_single_quoted_scalar(stream, &s),
-        Some(Token::DoubleQuoted(s)) => parse_double_quoted_scalar(stream, &s),
+        Some(Token::DoubleQuoted(s, _)) => parse_double_quoted_scalar(stream, &s),
         Some(Token::Plain(s)) => parse_scalar_dispatch(stream, &s, directives),
         _ => Err(crate::parser::errors::token_errors::expected_scalar_token(
             stream.source_mut(),

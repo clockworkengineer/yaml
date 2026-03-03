@@ -118,7 +118,7 @@ impl<'a> TokenStream<'a> {
                     // Advance logical line index when consuming a newline.
                     self.current_line_index = self.current_line_index.saturating_add(1);
                 }
-                Token::Plain(_) | Token::SingleQuoted(_) | Token::DoubleQuoted(_) => {
+                Token::Plain(_) | Token::SingleQuoted(_) | Token::DoubleQuoted(..) => {
                     // Record the line index of the last content scalar.
                     self.last_content_line_index = Some(self.current_line_index);
                 }
@@ -425,7 +425,7 @@ impl<'a> TokenStream<'a> {
             self.current(),
             Some(Token::Plain(_))
                 | Some(Token::SingleQuoted(_))
-                | Some(Token::DoubleQuoted(_))
+                | Some(Token::DoubleQuoted(..))
                 | Some(Token::Alias(_))
         ) {
             let _ = self.next();
@@ -458,7 +458,7 @@ impl<'a> TokenStream<'a> {
     pub fn at_quoted_string(&self) -> bool {
         matches!(
             self.current(),
-            Some(Token::SingleQuoted(_)) | Some(Token::DoubleQuoted(_))
+            Some(Token::SingleQuoted(_)) | Some(Token::DoubleQuoted(..))
         )
     }
 
@@ -501,7 +501,7 @@ impl<'a> TokenStream<'a> {
         }
         matches!(
             self.last_token,
-            Some(Token::Plain(_)) | Some(Token::SingleQuoted(_)) | Some(Token::DoubleQuoted(_))
+            Some(Token::Plain(_)) | Some(Token::SingleQuoted(_)) | Some(Token::DoubleQuoted(..))
         )
     }
 
@@ -527,7 +527,7 @@ impl<'a> TokenStream<'a> {
     #[allow(dead_code)]
     pub fn consume_quoted_scalar(&mut self) -> Result<String, crate::error::YamlError> {
         match self.current() {
-            Some(Token::SingleQuoted(s)) | Some(Token::DoubleQuoted(s)) => {
+            Some(Token::SingleQuoted(s)) | Some(Token::DoubleQuoted(s, _)) => {
                 let result = s.clone();
                 self.next()?;
                 Ok(result)
@@ -554,7 +554,7 @@ impl<'a> TokenStream<'a> {
                 self.next()?;
                 Ok((result, ScalarType::SingleQuoted))
             }
-            Some(Token::DoubleQuoted(s)) => {
+            Some(Token::DoubleQuoted(s, _)) => {
                 let result = s.clone();
                 self.next()?;
                 Ok((result, ScalarType::DoubleQuoted))

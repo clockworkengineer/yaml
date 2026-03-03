@@ -94,7 +94,7 @@ pub enum Token {
     SingleQuoted(String),
 
     /// Double-quoted scalar content
-    DoubleQuoted(String),
+    DoubleQuoted(String, bool), // bool = true if the literal source spanned multiple lines
 
     /// Plain scalar content (unquoted)
     Plain(String),
@@ -975,6 +975,10 @@ impl<'a> Lexer<'a> {
         self.source.next(); // consume opening quote
 
         let mut content = String::new();
+        // Track whether the quoted string literally crosses a newline in the source
+        // (as opposed to an escape sequence like \n). Multiline double-quoted strings
+        // cannot be used as implicit block mapping keys (YAML spec §8.1.1 / 7LBH).
+        let mut crossed_newline = false;
 
         loop {
             match self.source.current() {
@@ -1199,6 +1203,8 @@ impl<'a> Lexer<'a> {
                     let ch = self.source.current().unwrap();
                     // Normalise CR / CRLF → LF in content
                     content.push(CHAR_NEWLINE);
+                    // Mark that this double-quoted string spans multiple source lines.
+                    crossed_newline = true;
                     self.source.next();
                     if ch == CHAR_CARRIAGE_RETURN && self.source.current() == Some(CHAR_NEWLINE) {
                         self.source.next();
@@ -1243,7 +1249,7 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        Ok(Token::DoubleQuoted(content))
+        Ok(Token::DoubleQuoted(content, crossed_newline))
     }
 
     /// Scan a plain (unquoted) scalar
@@ -1466,7 +1472,7 @@ mod tests {
         );
         assert_eq!(
             lexer.next().unwrap().unwrap(),
-            Token::DoubleQuoted("double".to_string())
+            Token::DoubleQuoted("double".to_string(), false)
         );
     }
     #[test]
