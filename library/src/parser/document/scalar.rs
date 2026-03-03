@@ -169,6 +169,34 @@ fn parse_plain_scalar(
                         accumulated.push(' ');
                         accumulated.push_str(seg);
                         stream.next()?;
+                        // BF9H: An inline comment after a continuation segment terminates
+                        // the scalar for this line. Per YAML spec, a plain scalar that had
+                        // a line terminated by a comment cannot continue on the next line —
+                        // any following continuation-indented plain token is invalid.
+                        if stream.is_current(|t| matches!(t, Token::Comment(_))) {
+                            stream.next()?; // consume the inline comment
+                            // Consume the newline that follows the comment (if present).
+                            if stream.is_current(|t| matches!(t, Token::Newline)) {
+                                stream.next()?;
+                                // If the next line has content indented deeper than the
+                                // base indent (i.e. it would be a continuation), that is
+                                // an error — the comment already closed this scalar line.
+                                if let Some(Token::Indent(next_level)) = stream.current() {
+                                    if *next_level > base_indent {
+                                        stream.next()?; // consume the indent
+                                        if stream.is_current(|t| matches!(t, Token::Plain(_))) {
+                                            return Err(
+                                                "Plain scalar continuation is not allowed \
+                                                 after an inline comment terminates a line"
+                                                    .to_string()
+                                                    .into(),
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                            break;
+                        }
                         continue;
                     } else {
                         break;

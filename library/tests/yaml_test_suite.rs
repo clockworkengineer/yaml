@@ -230,10 +230,6 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
             description: "(description not available; test directory missing)",
         },
         KnownFailure {
-            id: "BF9H",
-            description: "Trailing comment in multiline plain scalar",
-        },
-        KnownFailure {
             id: "BS4K",
             description: "Comment between plain scalar lines",
         },
