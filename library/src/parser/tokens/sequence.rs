@@ -338,7 +338,10 @@ pub fn parse_sequence_with_tokens(
                     //     4HVU case: error.
                     //   • indent <= parent_indent → dedent past the sequence base;
                     //     end the sequence cleanly.
-                    //   • indent >= current_indent → valid continuation; carry on.
+                    //   • indent == current_indent → valid sibling; carry on.
+                    //   • indent > current_indent → ZVH3: wrongly indented item;
+                    //     nested sequences are handled during value parsing so a
+                    //     deeper dash here is always an indentation error.
                     let dash_indent = stream.line_indent();
                     if dash_indent < current_indent {
                         if dash_indent <= parent_indent {
@@ -350,7 +353,30 @@ pub fn parse_sequence_with_tokens(
                             ));
                         }
                     }
-                    // Dash at same or greater indent — valid sibling/nested item.
+                    if dash_indent > current_indent {
+                        // ZVH3: a deeper-indented dash appearing after a *mapping*
+                        // item is a true indentation error — the mapping consumed
+                        // the Indent token and returned when it saw the Dash, so the
+                        // Dash cannot legitimately start a sibling or nested item.
+                        //
+                        // By contrast, when the previous item was a scalar, this
+                        // path is reached because the plain-scalar prober consumed
+                        // the Indent token while probing for multiline continuation
+                        // and backed off at the Dash (AB8U pattern). In that case
+                        // the Dash may validly continue or extend the sequence, so
+                        // we must NOT error.
+                        let last_was_mapping = stack
+                            .last()
+                            .and_then(|(_, items)| items.last())
+                            .map_or(false, |n| matches!(n, crate::nodes::node::Node::Mapping(_)));
+                        if last_was_mapping {
+                            return Err(crate::parser::utils::error_builder::indentation_error(
+                                stream.source_mut(),
+                                "Invalid indentation for sequence item",
+                            ));
+                        }
+                    }
+                    // Dash at same indent — valid sibling item.
                     continue;
                 }
                 Some(Token::Indent(level)) if *level < current_indent => {
@@ -396,4 +422,57 @@ pub fn parse_sequence_with_tokens(
     let (_, items) = stack.pop().unwrap_or((base_indent, Vec::new()));
     // Use NodeBuilder for final array node
     Ok(Node::Array(items))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_zvh3_wrong_indented_sequence_item_should_error() {
+        // ZVH3: `- key: value\n - item1\n`
+        // The second dash is at indent 1 while the sequence is at indent 0 — invalid.
+        let yaml = "- key: value\n - item1\n";
+        let config = crate::parser::config::ParserConfig::strict();
+        let result = crate::parse_with_config(yaml, config);
+        assert!(
+            result.is_err(),
+            "ZVH3 should fail: '- key: value\\n - item1' has wrong indented sequence item, got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_3alj_nested_sequences_should_succeed() {
+        let yaml = "- - s1_i1\n  - s1_i2\n- s2\n";
+        let config = crate::parser::config::ParserConfig::strict();
+        let result = crate::parse_with_config(yaml, config);
+        assert!(
+            result.is_ok(),
+            "3ALJ should succeed, got: {:?}",
+            result.err()
+        );
+    }
+
+    #[test]
+    fn test_ab8u_multiline_plain_scalar_should_succeed() {
+        let yaml = "- single multiline\n - sequence entry\n";
+        let config = crate::parser::config::ParserConfig::strict();
+        let result = crate::parse_with_config(yaml, config);
+        assert!(
+            result.is_ok(),
+            "AB8U should succeed, got: {:?}",
+            result.err()
+        );
+    }
+
+    #[test]
+    fn test_6bct_nested_sequence_in_sequence_should_succeed() {
+        let yaml = "- foo:   bar\n- - baz\n  -     baz\n";
+        let config = crate::parser::config::ParserConfig::strict();
+        let result = crate::parse_with_config(yaml, config);
+        assert!(
+            result.is_ok(),
+            "6BCT should succeed, got: {:?}",
+            result.err()
+        );
+    }
 }

@@ -313,10 +313,6 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
             id: "00",
             description: "(description not available; test directory missing)",
         },
-        KnownFailure {
-            id: "ZVH3",
-            description: "Wrong indented sequence item",
-        },
     ];
     let mut passed = 0;
     let mut failed = 0;
