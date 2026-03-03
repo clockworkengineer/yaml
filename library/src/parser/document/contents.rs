@@ -22,15 +22,15 @@ use crate::io::traits::ISource;
 use crate::nodes::node::Node;
 use crate::parser::ParseResult;
 use crate::parser::directives::DirectiveContext;
-use crate::parser::utils::context::{CollectionType, ParsingContext};
 use crate::parser::document::explicit_key::parse_multiple_explicit_keys;
-use crate::parser::utils::helpers;
-use crate::parser::utils::helpers::{BlockHeadKind, DocMarkerKind, classify_doc_marker};
 use crate::parser::document::indentation::{
     ensure_indent_at_least, ensure_indent_at_least_no_source,
 };
 use crate::parser::document::mapping::parse_mapping;
 use crate::parser::document::value::parse_value;
+use crate::parser::utils::context::{CollectionType, ParsingContext};
+use crate::parser::utils::helpers;
+use crate::parser::utils::helpers::{BlockHeadKind, DocMarkerKind, classify_doc_marker};
 
 /// Unified entry point for scalar/value parsing
 fn parse_scalar_or_value(
@@ -43,7 +43,7 @@ fn parse_scalar_or_value(
     if matches!(ctx.collection_type, CollectionType::None)
         && matches!(source.current(), Some(c) if c.is_alphanumeric())
     {
-        Ok(parse_plain_multiline_scalar(source, indent_level))
+        parse_plain_multiline_scalar(source, indent_level)
     } else {
         parse_value(source, directives)
     }
@@ -52,14 +52,44 @@ fn parse_scalar_or_value(
 /// Parse a top-level plain scalar spanning multiple non-empty lines, using
 /// YAML's plain line folding rules (spec example 7.12 / HS5T).
 ///
+/// Returns true if `line` (already trimmed) looks like a YAML mapping entry,
+/// i.e. it contains `": "` or ends with `':'`. Per YAML spec §7.3.3, such
+/// patterns are forbidden inside a plain scalar block because they are
+/// interpreted as mapping value indicators (2CMS).
+fn line_looks_like_mapping_entry(line: &str) -> bool {
+    line.contains(": ") || line.ends_with(':')
+}
+
 /// Treats consecutive non-empty lines as a "paragraph" where lines are
 /// folded into a single space, and blank lines separate paragraphs which
 /// are joined with a newline. Leading and trailing whitespace on each line
 /// (including tabs) is trimmed before folding, so indentation is preserved
 /// only structurally through folding, not as significant indentation.
-fn parse_plain_multiline_scalar(source: &mut dyn ISource, base_indent: usize) -> Node {
+///
+/// Returns an error if:
+/// - The first line does NOT look like a mapping key (i.e., is a plain scalar)
+/// - AND a continuation line (any line after the first) contains a mapping-value
+///   indicator (`": "` or trailing `:`), which is forbidden in plain block scalars
+///   (YAML test suite case 2CMS).
+///
+/// When the first line itself looks like a mapping key, the function skips the
+/// continuation check — those cases are misrouted mappings where the check would
+/// produce false positives.
+fn parse_plain_multiline_scalar(source: &mut dyn ISource, base_indent: usize) -> ParseResult<Node> {
     let mut paragraphs: Vec<Vec<String>> = Vec::new();
     let mut current_paragraph: Vec<String> = Vec::new();
+    let mut is_first_line = true;
+    // Track whether the first line looks like a plain scalar (not a mapping key).
+    // Only when it is a plain scalar do we enforce the continuation-line check.
+    let mut first_line_is_plain_scalar = false;
+    // Remember the indent (column position) at the start of the first line.
+    // In the normal case (called at the very beginning of a line), this will be 0.
+    // In misrouted cases (function accidentally called mid-line, e.g. after a
+    // TokenStream exits leaving the source mid-way through `- 2`), this will be
+    // a non-zero column.  Continuation lines always start fresh at column 0.
+    // By requiring `line_indent >= first_line_indent` we skip the check for
+    // lines that are clearly at a different structural level (2CMS vs AZ63).
+    let mut first_line_indent: usize = 0;
 
     loop {
         if !source.more() {
@@ -85,6 +115,43 @@ fn parse_plain_multiline_scalar(source: &mut dyn ISource, base_indent: usize) ->
             break;
         }
 
+        if is_first_line && !line.is_empty() {
+            // The first line is a plain scalar if it looks nothing like a
+            // mapping key (no ": " marker and does not end with ":").
+            first_line_is_plain_scalar = !line_looks_like_mapping_entry(&line);
+            first_line_indent = line_indent;
+        }
+
+        // Per YAML spec §7.3.3, a plain scalar in block context cannot span
+        // a continuation line that itself looks like a mapping entry (i.e.
+        // contains `": "` or ends with `:`). Such input is inherently
+        // ambiguous and must be rejected (2CMS).
+        //
+        // The check is guarded by two conditions to avoid false positives:
+        //
+        // 1. `first_line_is_plain_scalar`: only fire when the first line was
+        //    itself a plain scalar (not a mapping key).  Inputs whose first
+        //    line looks like `key:` are misrouted mappings; skip the check.
+        //
+        // 2. `line_indent >= first_line_indent`: in misrouted cases this
+        //    function is called mid-line (column > 0), so `first_line_indent`
+        //    is non-zero.  Continuation lines always start fresh at column 0,
+        //    so `line_indent (= 0) < first_line_indent (> 0)` is satisfied.
+        //    In the correct 2CMS case both values are 0 (called at line start),
+        //    so the guard passes and the check applies.
+        if !is_first_line
+            && !line.is_empty()
+            && first_line_is_plain_scalar
+            && line_indent >= first_line_indent
+            && line_looks_like_mapping_entry(&line)
+        {
+            return Err(crate::error::YamlError::from(
+                "Invalid mapping entry in plain multiline scalar: \
+                continuation line contains a mapping value indicator (\": \") \
+                which is forbidden in plain block scalars",
+            ));
+        }
+
         // Consume the newline (LF or CRLF) if present.
         match source.current() {
             Some('\r') => {
@@ -107,6 +174,8 @@ fn parse_plain_multiline_scalar(source: &mut dyn ISource, base_indent: usize) ->
         } else {
             current_paragraph.push(line);
         }
+
+        is_first_line = false;
     }
 
     if !current_paragraph.is_empty() {
@@ -121,11 +190,11 @@ fn parse_plain_multiline_scalar(source: &mut dyn ISource, base_indent: usize) ->
     }
     let combined = parts.join("\n");
 
-    Node::Str(
+    Ok(Node::Str(
         combined,
         crate::nodes::node::QuoteType::Unquoted,
         crate::nodes::node::BlockStyle::None,
-    )
+    ))
 }
 
 /// Fast token-dispatch for block constructs to prefer tokenized paths.
@@ -143,12 +212,7 @@ fn token_dispatch(
                 let mut stream =
                     crate::parser::token_stream::TokenStream::new(source, directives, false)
                         .ok()?;
-                let result = parse_mapping_with_tokens(
-                    &mut stream,
-                    level_val,
-                    directives,
-                    0,
-                );
+                let result = parse_mapping_with_tokens(&mut stream, level_val, directives, 0);
                 return Some(result.map_err(YamlError::from));
             }
             Some(crate::parser::lexer::Token::Dash) => {
@@ -279,15 +343,14 @@ pub fn parse_document_contents(
                 Some(crate::parser::lexer::Token::Dash) => {
                     let ctx_seq =
                         ctx.child_block_context(seq_indent, CollectionType::BlockSequence);
-                    let seq =
-                        crate::parser::tokens::sequence::parse_sequence_with_tokens(
-                            &mut stream,
-                            seq_indent,
-                            indent_level,
-                            directives,
-                            &ctx_seq,
-                            0,
-                        )?;
+                    let seq = crate::parser::tokens::sequence::parse_sequence_with_tokens(
+                        &mut stream,
+                        seq_indent,
+                        indent_level,
+                        directives,
+                        &ctx_seq,
+                        0,
+                    )?;
                     if let Node::None = seq {
                         return Ok(Node::None);
                     }
@@ -351,22 +414,18 @@ pub fn parse_document_contents(
                     if is_mapping_key {
                         Ok(parse_mapping(source, indent_level, directives)?)
                     } else {
-                        Ok(
-                            crate::parser::tokens::value::parse_value_with_tokens(
-                                &mut stream,
-                                directives,
-                                0,
-                            )?,
-                        )
+                        Ok(crate::parser::tokens::value::parse_value_with_tokens(
+                            &mut stream,
+                            directives,
+                            0,
+                        )?)
                     }
                 }
-                _ => Ok(
-                    crate::parser::tokens::value::parse_value_with_tokens(
-                        &mut stream,
-                        directives,
-                        0,
-                    )?,
-                ),
+                _ => Ok(crate::parser::tokens::value::parse_value_with_tokens(
+                    &mut stream,
+                    directives,
+                    0,
+                )?),
             }
         }
         Some(c) if c == '&' => {
@@ -394,32 +453,26 @@ pub fn parse_document_contents(
                                 )?;
                                 Err(crate::parser::errors::anchor_errors::AnchorErrors::anchor_cannot_precede_dash_same_line(&mut ts_err))
                             } else {
-                                Ok(
-                                    crate::parser::tokens::value::parse_value_with_tokens(
-                                        &mut stream,
-                                        directives,
-                                        0,
-                                    )?,
-                                )
+                                Ok(crate::parser::tokens::value::parse_value_with_tokens(
+                                    &mut stream,
+                                    directives,
+                                    0,
+                                )?)
                             }
                         }
                         // Newline or anything else: defer to value parser
-                        _ => Ok(
-                            crate::parser::tokens::value::parse_value_with_tokens(
-                                &mut stream,
-                                directives,
-                                0,
-                            )?,
-                        ),
+                        _ => Ok(crate::parser::tokens::value::parse_value_with_tokens(
+                            &mut stream,
+                            directives,
+                            0,
+                        )?),
                     }
                 }
-                _ => Ok(
-                    crate::parser::tokens::value::parse_value_with_tokens(
-                        &mut stream,
-                        directives,
-                        0,
-                    )?,
-                ),
+                _ => Ok(crate::parser::tokens::value::parse_value_with_tokens(
+                    &mut stream,
+                    directives,
+                    0,
+                )?),
             }
         }
         Some(c) if c == '*' => parse_scalar_or_value(source, directives, indent_level, ctx),
@@ -468,9 +521,7 @@ pub fn parse_document_contents(
                 }
                 crate::utils::skip_whitespace_and_comments(source);
             }
-            Ok(crate::parser::utils::node_utils::make_mapping_node(
-                pairs,
-            ))
+            Ok(crate::parser::utils::node_utils::make_mapping_node(pairs))
         }
         Some(c) if c == '?' => unreachable!(),
         Some(c) if c.is_alphanumeric() => {
@@ -478,14 +529,12 @@ pub fn parse_document_contents(
                 let base_indent = source.get_current_indent_level();
                 let mut stream =
                     crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-                Ok(
-                    parse_mapping_with_tokens(
-                        &mut stream,
-                        base_indent,
-                        directives,
-                        0,
-                    )?,
-                )
+                Ok(parse_mapping_with_tokens(
+                    &mut stream,
+                    base_indent,
+                    directives,
+                    0,
+                )?)
             } else {
                 parse_scalar_or_value(source, directives, indent_level, ctx)
             }
@@ -534,14 +583,17 @@ pub fn parse_document_contents(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::io::sources::buffer::Buffer;
     use crate::nodes::node::Node;
     use crate::parser::directives::DirectiveContext;
-    use crate::io::sources::buffer::Buffer;
-    use crate::parser::utils::context::ParsingContext;
     use crate::parser::utils::context::CollectionType;
+    use crate::parser::utils::context::ParsingContext;
 
     fn make_ctx_none() -> ParsingContext {
-        ParsingContext { collection_type: CollectionType::None, ..Default::default() }
+        ParsingContext {
+            collection_type: CollectionType::None,
+            ..Default::default()
+        }
     }
 
     #[test]
@@ -557,7 +609,10 @@ mod tests {
     fn test_parse_scalar_or_value_value_branch() {
         let mut buf = Buffer::new(b"42");
         let directives = DirectiveContext::default();
-        let ctx = ParsingContext { collection_type: CollectionType::BlockSequence, ..Default::default() };
+        let ctx = ParsingContext {
+            collection_type: CollectionType::BlockSequence,
+            ..Default::default()
+        };
         let node = parse_scalar_or_value(&mut buf, &directives, 0, &ctx).unwrap();
         // Accepts any parse_value result, just check not None
         assert!(node != Node::None);
@@ -579,5 +634,28 @@ mod tests {
         let ctx = make_ctx_none();
         let node = parse_document_contents(&mut buf, 0, &directives, &ctx).unwrap();
         assert_eq!(node, Node::None);
+    }
+
+    #[test]
+    fn test_2cms_regression_az63_should_succeed() {
+        // AZ63: simple mapping with sequence values - should succeed
+        let config = crate::parser::config::ParserConfig::strict();
+        let result = crate::parse_with_config("one:\n- 2\n- 3\nfour: 5\n", config);
+        assert!(
+            result.is_ok(),
+            "AZ63 should parse successfully: {:?}",
+            result.err()
+        );
+    }
+
+    #[test]
+    fn test_2cms_fix_invalid_key_value_in_continuation() {
+        // 2CMS: plain multiline scalar where continuation line looks like mapping entry
+        let config = crate::parser::config::ParserConfig::strict();
+        let result = crate::parse_with_config("this\n is\n  invalid: x\n", config);
+        assert!(
+            result.is_err(),
+            "2CMS should fail: continuation line 'invalid: x' is a mapping entry"
+        );
     }
 }

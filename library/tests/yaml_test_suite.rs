@@ -214,10 +214,6 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
     let skip_list: Vec<&str> = vec![];
     let known_failures: &[KnownFailure] = &[
         KnownFailure {
-            id: "2CMS",
-            description: "Invalid mapping in plain multiline",
-        },
-        KnownFailure {
             id: "5LLU",
             description: "Block scalar with wrong indented line after spaces only",
         },
