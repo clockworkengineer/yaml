@@ -8,9 +8,9 @@
 use crate::nodes::node::Node;
 use crate::parser::directives::DirectiveContext;
 use crate::parser::document::flow_punctuation;
-use crate::parser::tokens::value::parse_value_with_tokens;
 use crate::parser::lexer::Token;
 use crate::parser::token_stream::TokenStream;
+use crate::parser::tokens::value::parse_value_with_tokens;
 
 /// Parse a block sequence using tokens
 ///
@@ -344,12 +344,10 @@ pub fn parse_sequence_with_tokens(
                         if dash_indent <= parent_indent {
                             break;
                         } else {
-                            return Err(
-                                crate::parser::utils::error_builder::indentation_error(
-                                    stream.source_mut(),
-                                    "Invalid indentation for sequence item",
-                                ),
-                            );
+                            return Err(crate::parser::utils::error_builder::indentation_error(
+                                stream.source_mut(),
+                                "Invalid indentation for sequence item",
+                            ));
                         }
                     }
                     // Dash at same or greater indent — valid sibling/nested item.
