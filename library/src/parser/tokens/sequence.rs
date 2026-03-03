@@ -204,7 +204,12 @@ pub fn parse_sequence_with_tokens(
                 }
                 Some(Token::Dash) => {
                     // Nested sequence starts immediately (- - case)
-                    // Use current_indent + 1 as base to properly detect dedents back to current level
+                    // Use current_indent + 1 as base to properly detect dedents back to current level.
+                    // Pass current_indent (not the outer parent_indent) as the parent for the nested
+                    // call so that the indentation guard correctly treats a dedent back to
+                    // current_indent as the natural end of the inline nested sequence rather than an
+                    // error (e.g. ` - - itemA\n   - itemB\n - nextItem` must not error when the
+                    // nested sequence closes back to the outer item indent).
                     let nested_base = current_indent + 1;
                     let ctx_seq = ctx.child_block_context(
                         nested_base,
@@ -213,7 +218,7 @@ pub fn parse_sequence_with_tokens(
                     let seq = parse_sequence_with_tokens(
                         stream,
                         nested_base,
-                        parent_indent,
+                        current_indent,
                         directives,
                         &ctx_seq,
                         depth + 1,
