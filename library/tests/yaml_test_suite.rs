@@ -218,10 +218,6 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
             description: "Wrong indentation in mapping",
         },
         KnownFailure {
-            id: "G7JE",
-            description: "Multiline implicit keys",
-        },
-        KnownFailure {
             id: "JKF3",
             description: "Multiline unindented double-quoted block key",
         },

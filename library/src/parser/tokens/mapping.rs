@@ -635,6 +635,25 @@ impl MappingParseContext {
                 | Some(Token::Anchor(_))
                 | Some(Token::QuestionMark)
         ) {
+            // G7JE: An implicit block mapping key followed immediately by deeper-indented
+            // content (with no `:` separator on the key's own line) is invalid.
+            // YAML §8.1.1: implicit keys must be single-line scalars terminated by `: ` on
+            // the same line. When `parse_plain_scalar` consumed an `Indent > cur_indent`
+            // token before breaking (because it saw `Plain + Colon` on the continuation
+            // line), it left `stream.current() = Token::Plain` at `line_indent > cur_indent`.
+            // That situation means the key line had no `:` but the continuation looked like
+            // a mapping entry at a deeper level — exactly the "multiline implicit key" error.
+            if !explicit_key
+                && matches!(cur, Some(Token::Plain(_)))
+                && !matches!(key, Node::None)
+                && stream.line_indent() > cur_indent
+            {
+                return Err("Implicit block mapping key cannot span multiple lines \
+                     (implicit key with no colon on its line followed by \
+                     deeper-indented content, YAML \u{00a7}8.1.1)"
+                    .to_string()
+                    .into());
+            }
             return Ok((key, Node::None));
         }
 
@@ -1195,6 +1214,24 @@ mod tests {
             result.is_ok(),
             "V9D5 should succeed: compact block mappings, got: {:?}",
             result.err()
+        );
+    }
+
+    #[test]
+    fn test_g7je_multiline_implicit_key_should_error() {
+        // G7JE: "Multiline implicit keys"
+        // Input: `a\nb: 1\r\nc\r\n d: 1\r\n`
+        // `c` is an implicit key at indent 0 with no `:` on its line.
+        // ` d: 1` at indent 1 follows — a deeper-indented continuation
+        // without from an implicit key having colon on the same line.
+        // YAML §8.1.1: implicit block keys must be single-line.
+        let yaml = "a\\nb: 1\r\nc\r\n d: 1\r\n";
+        let config = crate::parser::config::ParserConfig::strict();
+        let result = crate::parse_with_config(yaml, config);
+        assert!(
+            result.is_err(),
+            "G7JE should fail: implicit key followed by deeper-indented content without colon, got: {:?}",
+            result
         );
     }
 
