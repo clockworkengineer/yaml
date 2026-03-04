@@ -638,14 +638,18 @@ impl MappingParseContext {
             // G7JE: An implicit block mapping key followed immediately by deeper-indented
             // content (with no `:` separator on the key's own line) is invalid.
             // YAML §8.1.1: implicit keys must be single-line scalars terminated by `: ` on
-            // the same line. When `parse_plain_scalar` consumed an `Indent > cur_indent`
-            // token before breaking (because it saw `Plain + Colon` on the continuation
-            // line), it left `stream.current() = Token::Plain` at `line_indent > cur_indent`.
-            // That situation means the key line had no `:` but the continuation looked like
-            // a mapping entry at a deeper level — exactly the "multiline implicit key" error.
+            // the same line. Detection: `parse_plain_scalar` breaks at the
+            // `Indent(level > 0) → peek=Colon` branch, leaving:
+            //   - stream.current() = Token::Plain (the nested key name)
+            //   - stream.last_token() = Token::Indent(level)  ← unique to this branch
+            //   - stream.line_indent() = level > cur_indent
+            // Requiring last_token == Indent guards against false positives where
+            // parse_plain_scalar exits via a different path and line_indent() happens
+            // to be non-zero from a prior context.
             if !explicit_key
                 && matches!(cur, Some(Token::Plain(_)))
                 && !matches!(key, Node::None)
+                && matches!(stream.last_token(), Some(Token::Indent(_)))
                 && stream.line_indent() > cur_indent
             {
                 return Err("Implicit block mapping key cannot span multiple lines \
