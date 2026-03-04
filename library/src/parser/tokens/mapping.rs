@@ -710,9 +710,10 @@ fn parse_mapping_value(
             // at or below the enclosing block mapping's indent level is invalid.
             // (YAML spec §6.1: only spaces count as indentation; tabs do not.)
             // We check min_cont_spaces BEFORE consuming the token to produce a clear error.
-            let dq_under_indent = if let Some(Token::DoubleQuoted(_, _, min_spc)) = stream.current() {
+            let dq_under_indent = if let Some(Token::DoubleQuoted(_, _, min_spc)) = stream.current()
+            {
                 let s = *min_spc;
-                s <= cur_indent  // usize::MAX (no continuation) never triggers (> any cur_indent)
+                s <= cur_indent // usize::MAX (no continuation) never triggers (> any cur_indent)
             } else {
                 false
             };

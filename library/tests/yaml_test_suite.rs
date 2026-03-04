@@ -269,10 +269,6 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
             id: "RXY3",
             description: "Invalid document-end marker in single-quoted string",
         },
-        KnownFailure {
-            id: "S98Z",
-            description: "Block scalar with more spaces than first content line",
-        },
     ];
     let mut passed = 0;
     let mut failed = 0;

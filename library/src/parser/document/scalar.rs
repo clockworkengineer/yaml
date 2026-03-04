@@ -275,6 +275,18 @@ fn parse_block_scalar(
     // Track if a comment appears before the first content line; used only
     // for diagnostics in debug builds.
     let mut _comment_before_first_content: bool = false;
+    // S98Z: track the indent of the first comment encountered before any real
+    // content (used to detect over-indented pure-blank lines in no-content
+    // block scalars).  Separate from max_blank_indent (which includes comment
+    // lines) so that comment-only block scalars like F8F9 strip are not
+    // falsely rejected.
+    let mut first_comment_indent: Option<usize> = None;
+    // Maximum indent of PURE blank lines (Indent+Newline, no Comment on the
+    // same line) seen before the first actual content line.
+    let mut pure_blank_max_indent: usize = 0;
+    // Whether the current in-progress line already had a Comment token (so
+    // its Newline should not update pure_blank_max_indent).
+    let mut current_line_had_comment: bool = false;
     loop {
         match stream.current() {
             Some(Token::Indent(level)) => {
@@ -341,6 +353,10 @@ fn parse_block_scalar(
                     if indent > max_blank_indent_before_content {
                         max_blank_indent_before_content = indent;
                     }
+                    // Also track pure-blank max separately (comment lines excluded).
+                    if !current_line_had_comment && indent > pure_blank_max_indent {
+                        pure_blank_max_indent = indent;
+                    }
                     blank_lines_before_content += 1;
                 }
                 trailing_newlines += 1;
@@ -348,10 +364,16 @@ fn parse_block_scalar(
                 pending_indent_for_line = None;
                 pending_indent_had_tab = false;
                 saw_plain_current_line = false;
+                current_line_had_comment = false;
             }
             Some(Token::Comment(_)) => {
                 if first_content_indent.is_none() {
                     _comment_before_first_content = true;
+                    // Record the indent of the FIRST comment we see before content.
+                    if first_comment_indent.is_none() {
+                        first_comment_indent = Some(pending_indent_for_line.unwrap_or(0));
+                    }
+                    current_line_had_comment = true;
                 }
                 stream.next()?;
             }
@@ -375,6 +397,22 @@ fn parse_block_scalar(
                     max_blank_indent_before_content,
                     first_indent,
                 ));
+            }
+        } else {
+            // S98Z: No content line at all, but pure blank lines (no Comment on
+            // the same row) exceeded the indentation of the first comment that
+            // terminates the block scalar.  Per YAML spec, once the block
+            // scalar's auto-detected indentation is set by the first meaningful
+            // line, subsequent blank lines must not be more indented than that
+            // level.
+            if let Some(comment_indent) = first_comment_indent {
+                if pure_blank_max_indent > comment_indent {
+                    return Err(crate::parser::errors::block_scalar_errors::BlockScalarErrors::invalid_literal_blank_indent(
+                        stream.source_mut(),
+                        pure_blank_max_indent,
+                        comment_indent,
+                    ));
+                }
             }
         }
     }
