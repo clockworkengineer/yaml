@@ -133,9 +133,22 @@ fn parse_document_main_loop(
                 // usages in our integration tests.
                 if !node.is_blank() {
                     if let Some(prev) = document_nodes.last() {
-                        if let Node::Array(_items) = prev {
-                            let at_top_level = node_start_indent == indent_level;
-                            if at_top_level {
+                        let at_top_level = node_start_indent == indent_level;
+                        if at_top_level {
+                            // BS4K: two consecutive top-level plain scalars without a
+                            // document separator ('---') is invalid YAML.
+                            if let Node::Str(_, QuoteType::Unquoted, _) = prev {
+                                if let Node::Str(_, QuoteType::Unquoted, _) = &node {
+                                    return Err(
+                                        crate::error::YamlError::from(
+                                            "Parse error: Two consecutive top-level plain scalars \
+                                             without a document separator ('---') are not allowed",
+                                        ),
+                                    );
+                                }
+                            }
+                            // TD5N: top-level sequence followed by plain scalar
+                            if let Node::Array(_items) = prev {
                                 if let Node::Str(_, QuoteType::Unquoted, _) = &node {
                                     return Err(
                                         crate::parser::errors::token_errors::document_unexpected_plain_after_top_level_sequence(

@@ -104,6 +104,18 @@ fn parse_plain_multiline_scalar(source: &mut dyn ISource, base_indent: usize) ->
         let line_start_state = source.save_state();
         let line_indent = source.get_current_indent_level();
 
+        // Detect whether this line carries an inline comment (` #` or `\t#`).
+        // Per YAML spec §7.3.3, a comment terminates a plain scalar.  When a
+        // line in a plain scalar block has an inline comment, the continuation
+        // stops here — the next line is a separate value, not a continuation.
+        let had_inline_comment = {
+            let st = source.save_state();
+            let raw_s = crate::utils::collect_until(source, |c| c == '\n' || c == '\r');
+            let has_comment = raw_s.contains(" #") || raw_s.contains("\t#");
+            source.restore_state(st);
+            has_comment
+        };
+
         // Read current line content, trimmed and without inline comments.
         let line = crate::utils::read_line_trimmed_into_string(source);
 
@@ -172,10 +184,17 @@ fn parse_plain_multiline_scalar(source: &mut dyn ISource, base_indent: usize) ->
                 current_paragraph = Vec::new();
             }
         } else {
-            current_paragraph.push(line);
+            current_paragraph.push(line.clone());
         }
 
         is_first_line = false;
+
+        // BS4K: if this line had an inline comment the plain scalar ends here.
+        // Do not fold subsequent lines into this scalar; the next line is a
+        // separate top-level value (or another key/value in the outer context).
+        if had_inline_comment && !line.is_empty() {
+            break;
+        }
     }
 
     if !current_paragraph.is_empty() {
