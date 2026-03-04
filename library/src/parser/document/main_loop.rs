@@ -139,12 +139,10 @@ fn parse_document_main_loop(
                             // document separator ('---') is invalid YAML.
                             if let Node::Str(_, QuoteType::Unquoted, _) = prev {
                                 if let Node::Str(_, QuoteType::Unquoted, _) = &node {
-                                    return Err(
-                                        crate::error::YamlError::from(
-                                            "Parse error: Two consecutive top-level plain scalars \
+                                    return Err(crate::error::YamlError::from(
+                                        "Parse error: Two consecutive top-level plain scalars \
                                              without a document separator ('---') are not allowed",
-                                        ),
-                                    );
+                                    ));
                                 }
                             }
                             // TD5N: top-level sequence followed by plain scalar

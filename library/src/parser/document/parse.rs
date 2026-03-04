@@ -718,5 +718,4 @@ mod tests {
         let result = parse(&mut source);
         assert!(result.is_err());
     }
-
 }
