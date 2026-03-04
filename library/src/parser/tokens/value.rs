@@ -460,6 +460,7 @@ pub fn parse_value_with_tokens(
                     directives,
                     depth + 1,
                     true,
+                    None,
                 )?
             } else {
                 parse_value_content(stream, directives, depth + 1)?
@@ -624,7 +625,7 @@ fn parse_value_content(
         }
         Some(Token::FlowMappingStart) => {
             use crate::parser::document::inline_tokens::parse_inline_mapping_with_tokens;
-            parse_inline_mapping_with_tokens(stream, directives, depth + 1, false)
+            parse_inline_mapping_with_tokens(stream, directives, depth + 1, false, None)
         }
         Some(Token::FlowSequenceStart) => {
             use crate::parser::document::inline_tokens::parse_inline_sequence_with_tokens;

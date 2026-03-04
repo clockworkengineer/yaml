@@ -180,7 +180,7 @@ mod tests {
         let mut src = Buffer::new(b"{key1: 1, 'key2': \"two\"}");
         let mut stream =
             crate::parser::token_stream::TokenStream::new(&mut src, &directives, false).unwrap();
-        let node = parse_inline_mapping_with_tokens(&mut stream, &directives, 0, false).unwrap();
+        let node = parse_inline_mapping_with_tokens(&mut stream, &directives, 0, false, None).unwrap();
         assert!(matches!(node, Node::Mapping(_)));
         if let Node::Mapping(pairs) = node {
             assert_eq!(pairs.len(), 2);
@@ -202,7 +202,7 @@ mod tests {
         let mut empty = Buffer::new(b"{}");
         let mut stream =
             crate::parser::token_stream::TokenStream::new(&mut empty, &directives, false).unwrap();
-        let node = parse_inline_mapping_with_tokens(&mut stream, &directives, 0, false).unwrap();
+        let node = parse_inline_mapping_with_tokens(&mut stream, &directives, 0, false, None).unwrap();
         assert!(matches!(node, Node::Mapping(ref v) if v.is_empty()));
     }
 

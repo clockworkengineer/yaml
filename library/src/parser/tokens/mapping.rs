@@ -695,7 +695,21 @@ fn parse_mapping_value(
         }
         _ => {
             stream.skip_trivia()?;
-            let v = parse_value_with_tokens(stream, directives, depth + 1)?;
+            // VJP3/00: if the value is immediately a flow mapping (no decorators),
+            // pass the current block indent so the inline mapping parser can detect
+            // content at the outer block's indentation level (YAML spec violation).
+            let v = if matches!(stream.current(), Some(Token::FlowMappingStart)) {
+                use crate::parser::document::inline_tokens::parse_inline_mapping_with_tokens;
+                parse_inline_mapping_with_tokens(
+                    stream,
+                    directives,
+                    depth + 1,
+                    false,
+                    Some(cur_indent),
+                )?
+            } else {
+                parse_value_with_tokens(stream, directives, depth + 1)?
+            };
             // Low-hanging fix (Q4CL): After a quoted scalar value, disallow trailing plain text on the same line.
             if let Node::Str(_, quote, _) = &v {
                 use crate::nodes::node::QuoteType;
@@ -931,6 +945,7 @@ mod tests {
             &directives,
             0,
             false,
+            None,
         )
         .unwrap();
         assert!(matches!(node, Node::Mapping(ref v) if v.is_empty()));

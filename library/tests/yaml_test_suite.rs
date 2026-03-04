@@ -293,10 +293,6 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
             id: "S98Z",
             description: "Block scalar with more spaces than first content line",
         },
-        KnownFailure {
-            id: "00",
-            description: "(description not available; test directory missing)",
-        },
     ];
     let mut passed = 0;
     let mut failed = 0;

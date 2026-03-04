@@ -163,6 +163,18 @@ impl<'a> Lexer<'a> {
         self.in_flow = in_flow;
     }
 
+    /// Returns true if the last processed character was a line break and no
+    /// indentation token was emitted before the current token.  This means the
+    /// current token sits at column 0 on a new line (inside a flow context,
+    /// where newlines are suppressed rather than emitted as tokens).
+    ///
+    /// Used by the parser to detect flow collection content at the outer-block
+    /// indent level (required by the YAML spec, e.g. VJP3/00).
+    #[inline]
+    pub(crate) fn last_was_linebreak(&self) -> bool {
+        self.last_was_linebreak
+    }
+
     /// Get the current token without consuming it
     #[inline]
     pub fn current(&self) -> Option<&Token> {

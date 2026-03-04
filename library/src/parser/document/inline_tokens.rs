@@ -282,6 +282,7 @@ pub fn parse_inline_mapping_with_tokens(
     directives: &DirectiveContext,
     depth: usize,
     is_set: bool,
+    outer_block_indent: Option<usize>,
 ) -> crate::parser::ParseResult<Node> {
     #[cfg(feature = "debug-trace")]
     inline_log(format!(
@@ -361,6 +362,22 @@ pub fn parse_inline_mapping_with_tokens(
                             }
                         }
                     }
+                }
+
+                // VJP3/00: Reject flow collection content that appears on a new line at
+                // the outer block context's indentation level.  The YAML spec requires flow
+                // content on continuation lines to be indented MORE than the enclosing block
+                // context (parameter n).  Detection: if `last_was_linebreak` is still true
+                // at this point, no Indent token was emitted since the last newline, which
+                // means the content sits at column 0 on a fresh line — violating the rule
+                // when there is an enclosing block mapping context (outer_block_indent is Some).
+                if outer_block_indent.is_some() && stream.is_preceded_by_linebreak() {
+                    return Err(
+                        crate::parser::utils::error_builder::indentation_error(
+                            stream.source_mut(),
+                            "Flow collection content must be indented more than enclosing block context",
+                        )
+                    );
                 }
 
                 // Parse the mapping key. Special-case an empty key in flow
@@ -589,7 +606,7 @@ mod tests {
         let directives = DirectiveContext::new();
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_inline_mapping_with_tokens(&mut stream, &directives, 0, false).unwrap();
+        let result = parse_inline_mapping_with_tokens(&mut stream, &directives, 0, false, None).unwrap();
 
         if let Node::Mapping(pairs) = result {
             assert_eq!(pairs.len(), 0);
@@ -605,7 +622,7 @@ mod tests {
         let directives = DirectiveContext::new();
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_inline_mapping_with_tokens(&mut stream, &directives, 0, false).unwrap();
+        let result = parse_inline_mapping_with_tokens(&mut stream, &directives, 0, false, None).unwrap();
 
         if let Node::Mapping(pairs) = result {
             assert_eq!(pairs.len(), 2);
@@ -621,7 +638,7 @@ mod tests {
         let directives = DirectiveContext::new();
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_inline_mapping_with_tokens(&mut stream, &directives, 0, false).unwrap();
+        let result = parse_inline_mapping_with_tokens(&mut stream, &directives, 0, false, None).unwrap();
 
         if let Node::Mapping(pairs) = result {
             assert_eq!(pairs.len(), 2);
@@ -691,7 +708,7 @@ mod tests {
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
-        let result = parse_inline_mapping_with_tokens(&mut stream, &directives, 0, false);
+        let result = parse_inline_mapping_with_tokens(&mut stream, &directives, 0, false, None);
         assert!(result.is_err());
     }
 

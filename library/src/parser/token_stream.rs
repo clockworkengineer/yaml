@@ -86,6 +86,18 @@ impl<'a> TokenStream<'a> {
         self.flow_depth > 0
     }
 
+    /// Returns true if the current token was scanned immediately after a line
+    /// break with no indentation token emitted between the break and the
+    /// content.  In practice this means the content is at column 0 on a new
+    /// line inside a flow collection (where newlines are suppressed).
+    ///
+    /// Used to detect flow collection content at the outer-block indent level
+    /// (YAML spec requirement, e.g. VJP3/00).
+    #[inline]
+    pub(crate) fn is_preceded_by_linebreak(&self) -> bool {
+        self.lexer.last_was_linebreak()
+    }
+
     /// Get the current token without consuming it
     #[inline]
     pub fn current(&self) -> Option<&Token> {

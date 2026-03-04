@@ -384,6 +384,7 @@ pub fn parse_document_contents(
                     directives,
                     0,
                     false,
+                    None,
                 )?,
             )
         }
