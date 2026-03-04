@@ -129,6 +129,16 @@ pub fn nested_key_separator_in_block_value_same_line(stream: &mut TokenStream) -
     )
 }
 
+/// 5U3A: A block sequence entry ('-') cannot appear on the same line as a mapping
+/// value colon. Block sequences must begin on a new, indented line.
+/// e.g. `key: - value` is invalid; `key:\n  - value` is valid.
+pub fn block_sequence_inline_on_mapping_value_line(stream: &mut TokenStream) -> YamlError {
+    crate::parser::utils::error_builder::syntax_error(
+        stream.source_mut(),
+        "Invalid mapping value: block sequence entry '-' cannot appear on the same line as the mapping key; use a new indented line",
+    )
+}
+
 /// Centralized error: Expected '?' token for explicit key, got {cur}
 pub fn expected_explicit_key_token(
     stream: &mut TokenStream,

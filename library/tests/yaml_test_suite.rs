@@ -214,10 +214,6 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
     let skip_list: Vec<&str> = vec![];
     let known_failures: &[KnownFailure] = &[
         KnownFailure {
-            id: "5U3A",
-            description: "Sequence on same line as mapping key",
-        },
-        KnownFailure {
             id: "9C9N",
             description: "Wrong indented flow sequence",
         },

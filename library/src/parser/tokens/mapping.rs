@@ -694,6 +694,17 @@ fn parse_mapping_value(
             }
         }
         _ => {
+            // 5U3A: A block sequence indicator '-' cannot appear on the same line
+            // as an implicit mapping value colon (YAML spec §8.2.1).
+            // We check `cur_token` (before skip_trivia) so that only an
+            // IMMEDIATELY-following Dash triggers the error; a Dash that appears
+            // after a comment/newline/indent is on a different (valid) indented line.
+            // Explicit key-value pairs (e.g. `? - a\n  : - b` in KK5P) are exempt
+            // because YAML allows block sequences as both explicit keys and values.
+            if !explicit_key && matches!(cur_token, Some(Token::Dash)) {
+                return Err(crate::parser::errors::mapping_errors::
+                    block_sequence_inline_on_mapping_value_line(stream));
+            }
             stream.skip_trivia()?;
             // VJP3/00: if the value is immediately a flow mapping (no decorators),
             // pass the current block indent so the inline mapping parser can detect
