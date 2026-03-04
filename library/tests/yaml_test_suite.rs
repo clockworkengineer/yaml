@@ -234,10 +234,6 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
             description: "Multiline implicit keys",
         },
         KnownFailure {
-            id: "G9HC",
-            description: "Invalid anchor in zero-indented sequence",
-        },
-        KnownFailure {
             id: "JKF3",
             description: "Multiline unindented double-quoted block key",
         },

@@ -49,6 +49,34 @@ fn parse_indented_mapping_value(
             return Ok(map);
         }
     }
+    // G9HC: An anchor on its own line at or below the block mapping's indentation
+    // level cannot serve as a value for the preceding key.  In YAML, a block
+    // mapping value written on a new line must be MORE indented than the key's
+    // column.  An anchor at the same (or lower) indentation is neither a valid
+    // indented value nor a legitimate standalone mapping key (it lacks ': ').
+    //
+    // Two sub-cases to detect:
+    //   (a) Token::Anchor directly — anchor at column 0 with no Indent token emitted
+    //       (only happens when last_indent was already 0 before this line).
+    //   (b) Token::Indent(level <= cur_indent) followed by Token::Anchor — anchor at
+    //       the same indentation as the current block mapping frame.
+    if indent_level.is_none() {
+        let is_direct_anchor = matches!(stream.current(), Some(Token::Anchor(_)));
+        let is_shallow_indent_before_anchor = match stream.current() {
+            Some(Token::Indent(lvl)) => {
+                let lvl = *lvl;
+                lvl <= cur_indent && matches!(stream.peek()?, Some(Token::Anchor(_)))
+            }
+            _ => false,
+        };
+        if is_direct_anchor || is_shallow_indent_before_anchor {
+            return Err(crate::parser::utils::error_builder::syntax_error(
+                stream.source_mut(),
+                "Anchor on its own line at block mapping indentation \
+                 without a valid indented value (zero-indented anchor)",
+            ));
+        }
+    }
     // YAML compliance error: Mapping key without value (expected value after colon)
     if !explicit_key && matches!(stream.current(), Some(Token::Eof) | None) {
         let err = crate::parser::errors::mapping_errors::
@@ -1167,6 +1195,22 @@ mod tests {
             result.is_ok(),
             "V9D5 should succeed: compact block mappings, got: {:?}",
             result.err()
+        );
+    }
+
+    #[test]
+    fn test_g9hc_anchor_at_mapping_indentation_should_error() {
+        // G9HC: an anchor on its own line at the block mapping's indentation
+        // level (zero-indented in this case) is invalid — the sequence that
+        // follows is not indented enough to be the anchor's decorated value
+        // for the 'seq:' key (which requires indentation > 0).
+        let yaml = "---\nseq:\n&anchor\n- a\n- b\n";
+        let config = crate::parser::config::ParserConfig::strict();
+        let result = crate::parse_with_config(yaml, config);
+        assert!(
+            result.is_err(),
+            "G9HC should fail: anchor at block mapping level without valid indented value, got: {:?}",
+            result
         );
     }
 }
