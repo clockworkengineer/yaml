@@ -126,6 +126,15 @@ pub fn document_marker_in_double_quoted(source: &mut dyn ISource) -> YamlError {
     )
 }
 
+/// Per YAML 1.2, `---` and `...` at the beginning of a line terminate the document
+/// context even inside flow scalars, leaving the quoted string unterminated.
+pub fn document_marker_in_single_quoted(source: &mut dyn ISource) -> YamlError {
+    crate::parser::utils::error_builder::syntax_error(
+        source,
+        "YAML compliance error: Document marker (--- or ...) found inside single-quoted scalar; unterminated string",
+    )
+}
+
 /// A raw TAB character at column 0 (start of continuation line) inside a double-quoted
 /// scalar is invalid. Per YAML 1.2 spec §6.1, tabs must not be used as indentation.
 /// Flow scalar continuation lines must satisfy s-flow-line-prefix(n) which requires

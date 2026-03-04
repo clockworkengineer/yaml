@@ -265,10 +265,6 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
             id: "QLJ7",
             description: "Tag shorthand used in multiple documents but only defined in the first",
         },
-        KnownFailure {
-            id: "RXY3",
-            description: "Invalid document-end marker in single-quoted string",
-        },
     ];
     let mut passed = 0;
     let mut failed = 0;
