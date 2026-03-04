@@ -179,12 +179,10 @@ pub fn parse_inline_sequence_with_tokens(
                 // the outer block context's indentation level (column 0 when the mapping
                 // key is at column 0).  Same rule as VJP3/00 for flow mappings.
                 if outer_block_indent.is_some() && stream.is_preceded_by_linebreak() {
-                    return Err(
-                        crate::parser::utils::error_builder::indentation_error(
-                            stream.source_mut(),
-                            "Flow collection content must be indented more than enclosing block context",
-                        )
-                    );
+                    return Err(crate::parser::utils::error_builder::indentation_error(
+                        stream.source_mut(),
+                        "Flow collection content must be indented more than enclosing block context",
+                    ));
                 }
 
                 // Parse what might be a value or the key of an implicit mapping.
@@ -195,6 +193,17 @@ pub fn parse_inline_sequence_with_tokens(
                 // "Expected comma or ] in flow sequence". Instead, treat it
                 // as a single plain scalar "::vector" when it appears at the
                 // start of a sequence item.
+                //
+                // DK4H: record the start-of-scan source line for the current
+                // token (the potential key) BEFORE calling parse_inline_value.
+                // In flow context scan_plain_scalar folds newlines internally
+                // and increments source_line while scanning, so by the time
+                // Token::Plain("key") is visible as current, source_line has
+                // ALREADY been incremented past the fold.  current_token_start_line()
+                // captures where that scan BEGAN (before any fold), letting us
+                // compare it against source_line() after the key is consumed to
+                // detect a crossed-line separator even in suppressed-newline context.
+                let key_start_line = stream.current_token_start_line();
                 let value_or_key = parse_inline_value(stream, directives, depth)?;
 
                 // Skip inline trivia to check if this is actually a key
@@ -219,9 +228,16 @@ pub fn parse_inline_sequence_with_tokens(
                     }
                 }
 
+                // DK4H: also detect multiline key via source_line counter.
+                // In flow context Token::Newline is suppressed, so
+                // saw_line_break is never set. But source_line() still
+                // increments for every real newline, so if it advanced
+                // between key_start_line and now the key spanned a line break.
+                let crossed_line = saw_line_break || stream.source_line() > key_start_line;
+
                 // Check if this is an implicit mapping (key: value in a flow sequence),
                 // but only when the colon is on the same line (no intervening newline/indent).
-                if !saw_line_break && matches!(stream.current(), Some(Token::Colon)) {
+                if !crossed_line && matches!(stream.current(), Some(Token::Colon)) {
                     // This is actually a key, not a standalone value
                     // Parse as a single-pair mapping
                     let _ = stream.consume_if(Token::Colon)?; // consume colon
@@ -245,6 +261,15 @@ pub fn parse_inline_sequence_with_tokens(
                         mapping
                     );
                     items.push(mapping);
+                } else if crossed_line && matches!(stream.current(), Some(Token::Colon)) {
+                    // DK4H: the key and its ':' separator are on different source
+                    // lines — implicit keys in flow sequences must be single-line
+                    // (YAML spec §7.4.1 / §8.1.1).
+                    return Err(crate::parser::utils::error_builder::syntax_error(
+                        stream.source_mut(),
+                        "Implicit key in flow sequence spans multiple lines \
+                         (key and ':' separator must be on the same line)",
+                    ));
                 } else {
                     // It's a regular value
                     #[cfg(feature = "debug-trace")]
@@ -385,12 +410,10 @@ pub fn parse_inline_mapping_with_tokens(
                 // means the content sits at column 0 on a fresh line — violating the rule
                 // when there is an enclosing block mapping context (outer_block_indent is Some).
                 if outer_block_indent.is_some() && stream.is_preceded_by_linebreak() {
-                    return Err(
-                        crate::parser::utils::error_builder::indentation_error(
-                            stream.source_mut(),
-                            "Flow collection content must be indented more than enclosing block context",
-                        )
-                    );
+                    return Err(crate::parser::utils::error_builder::indentation_error(
+                        stream.source_mut(),
+                        "Flow collection content must be indented more than enclosing block context",
+                    ));
                 }
 
                 // Parse the mapping key. Special-case an empty key in flow
@@ -619,7 +642,8 @@ mod tests {
         let directives = DirectiveContext::new();
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_inline_mapping_with_tokens(&mut stream, &directives, 0, false, None).unwrap();
+        let result =
+            parse_inline_mapping_with_tokens(&mut stream, &directives, 0, false, None).unwrap();
 
         if let Node::Mapping(pairs) = result {
             assert_eq!(pairs.len(), 0);
@@ -635,7 +659,8 @@ mod tests {
         let directives = DirectiveContext::new();
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_inline_mapping_with_tokens(&mut stream, &directives, 0, false, None).unwrap();
+        let result =
+            parse_inline_mapping_with_tokens(&mut stream, &directives, 0, false, None).unwrap();
 
         if let Node::Mapping(pairs) = result {
             assert_eq!(pairs.len(), 2);
@@ -651,7 +676,8 @@ mod tests {
         let directives = DirectiveContext::new();
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_inline_mapping_with_tokens(&mut stream, &directives, 0, false, None).unwrap();
+        let result =
+            parse_inline_mapping_with_tokens(&mut stream, &directives, 0, false, None).unwrap();
 
         if let Node::Mapping(pairs) = result {
             assert_eq!(pairs.len(), 2);
@@ -763,5 +789,35 @@ mod tests {
         } else {
             panic!("Expected Array node");
         }
+    }
+
+    #[test]
+    fn test_dk4h_multiline_implicit_key_in_flow_seq_should_error() {
+        // DK4H: in a flow sequence, an implicit key is separated from its
+        // ':' by a newline — this is invalid (YAML spec §7.4.1 implicit keys
+        // must be single-line). The lexer suppresses Token::Newline in flow
+        // context, so we detect this via the token_start_source_line counter.
+        let yaml = "---\n[ key\n  : value ]\n";
+        let config = crate::parser::config::ParserConfig::strict();
+        let result = crate::parse_with_config(yaml, config);
+        assert!(
+            result.is_err(),
+            "DK4H should fail: implicit key in flow sequence with colon on next line, got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_same_line_implicit_key_in_flow_seq_should_succeed() {
+        // Verify that a same-line implicit key in a flow sequence still works
+        // after the DK4H fix (avoid regression).
+        let yaml = "[key: value]";
+        let config = crate::parser::config::ParserConfig::strict();
+        let result = crate::parse_with_config(yaml, config);
+        assert!(
+            result.is_ok(),
+            "Same-line implicit key in flow sequence should succeed, got: {:?}",
+            result.err()
+        );
     }
 }

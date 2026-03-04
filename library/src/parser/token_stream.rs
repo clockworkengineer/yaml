@@ -623,6 +623,19 @@ impl<'a> TokenStream<'a> {
         self.lexer.source_line()
     }
 
+    /// Returns the source-line index at the START of the scan that produced
+    /// the CURRENT token.  In flow context, `scan_plain_scalar` folds
+    /// newlines internally and increments `source_line`, so `source_line()`
+    /// is already at the post-fold line by the time the token is visible.
+    /// Recording this value BEFORE consuming a key token and then comparing
+    /// `source_line()` afterwards reveals whether the scan crossed a line —
+    /// specifically, whether the separator (e.g. colon) lives on a different
+    /// source line than the key itself.
+    #[inline]
+    pub fn current_token_start_line(&self) -> usize {
+        self.lexer.token_start_source_line()
+    }
+
     /// Returns the last token that was consumed from the stream.
     /// Useful for callers that need to know the structural context at the
     /// point where a scalar starts (e.g. whether the preceding token was a

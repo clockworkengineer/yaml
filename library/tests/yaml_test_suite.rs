@@ -214,10 +214,6 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
     let skip_list: Vec<&str> = vec![];
     let known_failures: &[KnownFailure] = &[
         KnownFailure {
-            id: "DK4H",
-            description: "Implicit key followed by newline",
-        },
-        KnownFailure {
             id: "06",
             description: "(description not available; test directory missing)",
         },

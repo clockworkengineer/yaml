@@ -145,6 +145,15 @@ pub struct Lexer<'a> {
     // Incremented in handle_newline regardless of flow context so that callers
     // can detect multi-line keys even when Newline tokens are suppressed.
     source_line: usize,
+    // The value of source_line at the START of the scan that produced
+    // current_token.  Set at the beginning of every scan_token() call.
+    // Because scan_plain_scalar in flow context folds newlines internally
+    // (incrementing source_line but NOT calling handle_newline recursively),
+    // this field captures where the scan BEGAN, letting callers detect that
+    // a plain scalar's scan crossed a line even though the caller only sees
+    // the completed token.  Compare against source_line() after the token
+    // is consumed to determine whether a line boundary was crossed.
+    token_start_source_line: usize,
 }
 
 impl<'a> Lexer<'a> {
@@ -162,6 +171,7 @@ impl<'a> Lexer<'a> {
             last_token_started_line: false,
             last_indent_had_tab: false,
             source_line: 0,
+            token_start_source_line: 0,
         }
     }
 
@@ -210,6 +220,17 @@ impl<'a> Lexer<'a> {
         self.source_line
     }
 
+    /// Returns the source-line index at the START of the scan that produced
+    /// `current_token`.  Because scan_plain_scalar in flow context folds
+    /// newlines internally (advancing source_line but not emitting a
+    /// Token::Newline), `source_line()` is already incremented by the time
+    /// the token is visible.  Comparing `source_line()` against this value
+    /// after consuming the token reveals whether the scan crossed a line.
+    #[inline]
+    pub(crate) fn token_start_source_line(&self) -> usize {
+        self.token_start_source_line
+    }
+
     /// Get the current token without consuming it
     #[inline]
     pub fn current(&self) -> Option<&Token> {
@@ -240,6 +261,12 @@ impl<'a> Lexer<'a> {
 
     /// Scan and return the next token from the source
     fn scan_token(&mut self) -> Result<Option<Token>, crate::error::YamlError> {
+        // Record where this scan started (used for multiline-key detection:
+        // after the token is consumed, comparing source_line() > token_start_source_line()
+        // reveals whether the scan crossed a line boundary, even in flow context
+        // where Token::Newline is suppressed and the fold happens inside
+        // scan_plain_scalar rather than handle_newline).
+        self.token_start_source_line = self.source_line;
         // If we're awaiting the first content token of a line but a non-indentation
         // token has already been emitted, clear the flag to avoid misclassifying
         // mid-line tokens as starting the line's content.
