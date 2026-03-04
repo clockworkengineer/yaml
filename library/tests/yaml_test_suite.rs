@@ -214,10 +214,6 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
     let skip_list: Vec<&str> = vec![];
     let known_failures: &[KnownFailure] = &[
         KnownFailure {
-            id: "01",
-            description: "(description not available; test directory missing)",
-        },
-        KnownFailure {
             id: "BS4K",
             description: "Comment between plain scalar lines",
         },
@@ -264,10 +260,6 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
         KnownFailure {
             id: "KS4U",
             description: "Invalid item after end of flow sequence",
-        },
-        KnownFailure {
-            id: "QB6E",
-            description: "Wrong indented multiline quoted scalar",
         },
         KnownFailure {
             id: "QLJ7",

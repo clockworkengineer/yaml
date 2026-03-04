@@ -94,7 +94,7 @@ pub enum Token {
     SingleQuoted(String),
 
     /// Double-quoted scalar content
-    DoubleQuoted(String, bool), // bool = true if the literal source spanned multiple lines
+    DoubleQuoted(String, bool, usize), // bool = true if spanned multiple lines; usize = min leading spaces on any continuation line (usize::MAX = no continuation)
 
     /// Plain scalar content (unquoted)
     Plain(String),
@@ -1019,6 +1019,9 @@ impl<'a> Lexer<'a> {
         // (as opposed to an escape sequence like \n). Multiline double-quoted strings
         // cannot be used as implicit block mapping keys (YAML spec §8.1.1 / 7LBH).
         let mut crossed_newline = false;
+        // Minimum count of leading SPACE characters on any continuation line
+        // (tabs never count as spaces per §6.1). usize::MAX = no line crossing.
+        let mut min_cont_spaces: usize = usize::MAX;
 
         loop {
             match self.source.current() {
@@ -1273,6 +1276,30 @@ impl<'a> Lexer<'a> {
                             }
                         }
                     }
+                    // Count leading SPACE characters on the continuation line
+                    // (tabs do NOT count as spaces for indentation purposes per YAML §6.1).
+                    // Track the minimum across all continuation lines so the parser can
+                    // validate that the continuation is more indented than the enclosing
+                    // block context.  Skip empty lines (next char is \r, \n, or EOF);
+                    // only non-empty continuation lines count for the indentation check.
+                    {
+                        let mut sp = 0usize;
+                        let mut peek_pos = 0;
+                        loop {
+                            match self.peek_ahead(peek_pos) {
+                                Some(CHAR_SPACE) => { sp += 1; peek_pos += 1; }
+                                _ => break,
+                            }
+                        }
+                        let next_after = self.peek_ahead(peek_pos);
+                        let is_empty_line = matches!(
+                            next_after,
+                            None | Some(CHAR_NEWLINE) | Some(CHAR_CARRIAGE_RETURN)
+                        );
+                        if !is_empty_line && sp < min_cont_spaces {
+                            min_cont_spaces = sp;
+                        }
+                    }
                 }
                 Some(ch) => {
                     content.push(ch);
@@ -1289,7 +1316,7 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        Ok(Token::DoubleQuoted(content, crossed_newline))
+        Ok(Token::DoubleQuoted(content, crossed_newline, min_cont_spaces))
     }
 
     /// Scan a plain (unquoted) scalar
@@ -1512,7 +1539,7 @@ mod tests {
         );
         assert_eq!(
             lexer.next().unwrap().unwrap(),
-            Token::DoubleQuoted("double".to_string(), false)
+            Token::DoubleQuoted("double".to_string(), false, usize::MAX)
         );
     }
     #[test]

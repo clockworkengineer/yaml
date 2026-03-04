@@ -286,9 +286,7 @@ pub fn parse_value_with_tokens(
         let tag_is_seq = decorators
             .tag
             .as_ref()
-            .map(|t| {
-                crate::parser::utils::node_utils::resolved_is_seq(&directives.resolve_tag(t))
-            })
+            .map(|t| crate::parser::utils::node_utils::resolved_is_seq(&directives.resolve_tag(t)))
             .unwrap_or(false);
 
         if tag_is_seq {
@@ -306,7 +304,8 @@ pub fn parse_value_with_tokens(
 
                 if matches!(stream.current(), Some(Token::FlowSequenceStart)) {
                     use crate::parser::document::inline_tokens::parse_inline_sequence_with_tokens;
-                    let seq = parse_inline_sequence_with_tokens(stream, directives, depth + 1, None)?;
+                    let seq =
+                        parse_inline_sequence_with_tokens(stream, directives, depth + 1, None)?;
                     let mut result =
                         Node::Tagged(Box::new(seq), "tag:yaml.org,2002:seq".to_string());
                     if let Some(anchor_name) = decorators.anchor {
@@ -432,9 +431,7 @@ pub fn parse_value_with_tokens(
         let tag_is_set = decorators
             .tag
             .as_ref()
-            .map(|t| {
-                crate::parser::utils::node_utils::resolved_is_set(&directives.resolve_tag(t))
-            })
+            .map(|t| crate::parser::utils::node_utils::resolved_is_set(&directives.resolve_tag(t)))
             .unwrap_or(false);
 
         // SY6V: Disallow an anchor immediately followed by a plain token that starts
@@ -631,7 +628,7 @@ fn parse_value_content(
             use crate::parser::document::inline_tokens::parse_inline_sequence_with_tokens;
             parse_inline_sequence_with_tokens(stream, directives, depth + 1, None)
         }
-        Some(Token::SingleQuoted(_)) | Some(Token::DoubleQuoted(..) ) | Some(Token::Plain(_)) => {
+        Some(Token::SingleQuoted(_)) | Some(Token::DoubleQuoted(..)) | Some(Token::Plain(_)) => {
             crate::parser::document::scalar::parse_scalar_with_tokens(stream, directives, 0)
         }
         Some(Token::Dash) => {

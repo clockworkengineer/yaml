@@ -553,7 +553,7 @@ impl<'a> TokenStream<'a> {
     #[allow(dead_code)]
     pub fn consume_quoted_scalar(&mut self) -> Result<String, crate::error::YamlError> {
         match self.current() {
-            Some(Token::SingleQuoted(s)) | Some(Token::DoubleQuoted(s, _)) => {
+            Some(Token::SingleQuoted(s)) | Some(Token::DoubleQuoted(s, _, _)) => {
                 let result = s.clone();
                 self.next()?;
                 Ok(result)
@@ -580,7 +580,7 @@ impl<'a> TokenStream<'a> {
                 self.next()?;
                 Ok((result, ScalarType::SingleQuoted))
             }
-            Some(Token::DoubleQuoted(s, _)) => {
+            Some(Token::DoubleQuoted(s, _, _)) => {
                 let result = s.clone();
                 self.next()?;
                 Ok((result, ScalarType::DoubleQuoted))

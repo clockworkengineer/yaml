@@ -126,6 +126,17 @@ pub fn document_marker_in_double_quoted(source: &mut dyn ISource) -> YamlError {
     )
 }
 
+/// A raw TAB character at column 0 (start of continuation line) inside a double-quoted
+/// scalar is invalid. Per YAML 1.2 spec §6.1, tabs must not be used as indentation.
+/// Flow scalar continuation lines must satisfy s-flow-line-prefix(n) which requires
+/// spaces (not tabs) for the indentation portion.
+pub fn tab_as_indentation_in_double_quoted(source: &mut dyn ISource) -> YamlError {
+    crate::parser::utils::error_builder::syntax_error(
+        source,
+        "Syntax error: Tab character used as indentation in double-quoted scalar continuation line; only spaces are valid for indentation",
+    )
+}
+
 /// Unterminated double-quoted string (unexpected EOF)
 pub fn unterminated_double_quoted_eof(source: &mut dyn ISource) -> YamlError {
     crate::parser::utils::error_builder::syntax_error(

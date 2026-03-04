@@ -473,7 +473,7 @@ impl MappingParseContext {
             // stream.last_token() holds the DoubleQuoted token since
             // skip_newlines_and_comments() was a no-op (Colon is cur).
             if !explicit_key {
-                if let Some(Token::DoubleQuoted(_, true)) = stream.last_token() {
+                if let Some(Token::DoubleQuoted(_, true, _)) = stream.last_token() {
                     return Err("Implicit block mapping key cannot span multiple lines \
                          (double-quoted scalar with literal newlines used as implicit key)"
                         .to_string()
@@ -706,6 +706,23 @@ fn parse_mapping_value(
                     block_sequence_inline_on_mapping_value_line(stream));
             }
             stream.skip_trivia()?;
+            // DK95/01: A double-quoted scalar whose continuation lines are indented
+            // at or below the enclosing block mapping's indent level is invalid.
+            // (YAML spec §6.1: only spaces count as indentation; tabs do not.)
+            // We check min_cont_spaces BEFORE consuming the token to produce a clear error.
+            let dq_under_indent = if let Some(Token::DoubleQuoted(_, _, min_spc)) = stream.current() {
+                let s = *min_spc;
+                s <= cur_indent  // usize::MAX (no continuation) never triggers (> any cur_indent)
+            } else {
+                false
+            };
+            if dq_under_indent {
+                return Err(
+                    crate::parser::errors::token_errors::tab_as_indentation_in_double_quoted(
+                        stream.source_mut(),
+                    ),
+                );
+            }
             // VJP3/00: if the value is immediately a flow mapping (no decorators),
             // pass the current block indent so the inline mapping parser can detect
             // content at the outer block's indentation level (YAML spec violation).
@@ -722,12 +739,7 @@ fn parse_mapping_value(
                 // 9C9N: same outer-block-indent guard as for flow mappings — reject
                 // flow sequence continuation lines at or below the block mapping indent.
                 use crate::parser::document::inline_tokens::parse_inline_sequence_with_tokens;
-                parse_inline_sequence_with_tokens(
-                    stream,
-                    directives,
-                    depth + 1,
-                    Some(cur_indent),
-                )?
+                parse_inline_sequence_with_tokens(stream, directives, depth + 1, Some(cur_indent))?
             } else {
                 parse_value_with_tokens(stream, directives, depth + 1)?
             };
