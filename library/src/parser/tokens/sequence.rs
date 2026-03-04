@@ -415,13 +415,23 @@ pub fn parse_sequence_with_tokens(
                     stream.next()?;
                     if matches!(stream.current(), Some(Token::Dash)) {
                         continue;
+                    } else if matches!(stream.current(), Some(Token::Anchor(_))) {
+                        // GT5M: an anchor on its own line at the sequence indentation
+                        // level (without a preceding '-') is always a syntax error —
+                        // anchors must annotate a node and every block sequence item
+                        // must begin with '-'. The 'current_indent > parent_indent'
+                        // guard used for plain scalars does NOT apply here because an
+                        // anchor can never legitimately stand alone at this level.
+                        return Err(crate::parser::utils::error_builder::syntax_error(
+                            stream.source_mut(),
+                            "Anchor on its own line at block sequence level (missing '-')",
+                        ));
                     } else if matches!(
                         stream.current(),
                         Some(Token::Plain(_))
                             | Some(Token::SingleQuoted(_))
                             | Some(Token::DoubleQuoted(..))
                             | Some(Token::Tag(_))
-                            | Some(Token::Anchor(_))
                     ) && current_indent > parent_indent
                     {
                         // 6S55: A scalar (or other non-Dash node-starter) appearing at
@@ -439,6 +449,17 @@ pub fn parse_sequence_with_tokens(
                     }
                 }
                 _ => {
+                    // GT5M (II): When the plain-scalar prober consumed the Indent token
+                    // and left an Anchor as the next token, an anchor at the sequence's
+                    // indentation level (without '-') is always a syntax error.
+                    if matches!(stream.current(), Some(Token::Anchor(_)))
+                        && stream.line_indent() == current_indent
+                    {
+                        return Err(crate::parser::utils::error_builder::syntax_error(
+                            stream.source_mut(),
+                            "Anchor on its own line at block sequence level (missing '-')",
+                        ));
+                    }
                     // 6S55 (II): The plain-scalar prober may consume the
                     // Indent(current_indent) token and leave a Plain/Quoted
                     // scalar as the next current token.  If that scalar sits
@@ -451,7 +472,6 @@ pub fn parse_sequence_with_tokens(
                             | Some(Token::SingleQuoted(_))
                             | Some(Token::DoubleQuoted(..))
                             | Some(Token::Tag(_))
-                            | Some(Token::Anchor(_))
                     ) && current_indent > parent_indent
                         && stream.line_indent() == current_indent
                     {
@@ -537,6 +557,19 @@ mod tests {
         assert!(
             result.is_err(),
             "6S55 should fail: scalar at sequence level without '-', got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_gt5m_anchor_on_own_line_at_seq_level_should_error() {
+        // GT5M: anchor on its own line at the sequence indentation level (without '-') is invalid
+        let yaml = "- item1\n&node\n- item2\n";
+        let config = crate::parser::config::ParserConfig::strict();
+        let result = crate::parse_with_config(yaml, config);
+        assert!(
+            result.is_err(),
+            "GT5M should fail: anchor on its own line at block sequence level without '-', got: {:?}",
             result
         );
     }

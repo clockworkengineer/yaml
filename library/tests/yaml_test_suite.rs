@@ -238,10 +238,6 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
             description: "Invalid anchor in zero-indented sequence",
         },
         KnownFailure {
-            id: "GT5M",
-            description: "Node anchor in sequence",
-        },
-        KnownFailure {
             id: "JKF3",
             description: "Multiline unindented double-quoted block key",
         },
