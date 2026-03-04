@@ -1321,7 +1321,10 @@ impl<'a> Lexer<'a> {
                         let mut peek_pos = 0;
                         loop {
                             match self.peek_ahead(peek_pos) {
-                                Some(CHAR_SPACE) => { sp += 1; peek_pos += 1; }
+                                Some(CHAR_SPACE) => {
+                                    sp += 1;
+                                    peek_pos += 1;
+                                }
                                 _ => break,
                             }
                         }
@@ -1350,7 +1353,11 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        Ok(Token::DoubleQuoted(content, crossed_newline, min_cont_spaces))
+        Ok(Token::DoubleQuoted(
+            content,
+            crossed_newline,
+            min_cont_spaces,
+        ))
     }
 
     /// Scan a plain (unquoted) scalar
