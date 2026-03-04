@@ -498,30 +498,79 @@ pub fn parse_document_contents(
                 }
                 crate::utils::skip_whitespace_and_comments(source);
 
-                let mut stream =
-                    crate::parser::token_stream::TokenStream::new(source, directives, false)?;
-                let value_node = match stream.current() {
-                    Some(crate::parser::lexer::Token::Newline)
-                    | Some(crate::parser::lexer::Token::DocumentStart)
-                    | Some(crate::parser::lexer::Token::DocumentEnd)
-                    | None => Node::None,
-                    _ => crate::parser::tokens::value::parse_value_with_tokens(
-                        &mut stream,
-                        directives,
-                        0,
-                    )?,
+                let value_node = {
+                    // Contain `stream` inside this block so it is dropped before
+                    // we need to inspect `source` directly for the QLJ7 doc-marker
+                    // check below. The stream borrows `source` mutably and must be
+                    // released before we can call `source.save_state()`.
+                    let mut stream =
+                        crate::parser::token_stream::TokenStream::new(source, directives, false)?;
+                    match stream.current() {
+                        Some(crate::parser::lexer::Token::Newline)
+                        | Some(crate::parser::lexer::Token::DocumentStart)
+                        | Some(crate::parser::lexer::Token::DocumentEnd)
+                        | None => Node::None,
+                        _ => crate::parser::tokens::value::parse_value_with_tokens(
+                            &mut stream,
+                            directives,
+                            0,
+                        )?,
+                    }
+                    // `stream` (and its mutable borrow of `source`) is dropped here.
                 };
 
                 pairs.push((Node::None, value_node));
 
-                crate::utils::skip_until_newline(source);
-                if source
-                    .current()
-                    .map_or(false, crate::utils::is_line_terminator)
-                {
-                    source.next();
+                // QLJ7: After parsing the value, the lexer may have consumed the
+                // trailing newline via lookahead, leaving source positioned at the
+                // start of the *next* line — which may be a document-start/end
+                // marker (--- or ...). Calling `skip_until_newline` in that state
+                // would swallow the marker, preventing the outer document parser
+                // from ever seeing a second `---` and allowing undefined tag
+                // handles (like `!prefix!`) to silently slip through in subsequent
+                // documents. Guard against this by checking whether the current
+                // position is already at a `---` or `...` marker before skipping.
+                let at_doc_marker = {
+                    let st = source.save_state();
+                    let c0 = source.current();
+                    let c1 = if c0.is_some() {
+                        source.next();
+                        source.current()
+                    } else {
+                        None
+                    };
+                    let c2 = if c1.is_some() {
+                        source.next();
+                        source.current()
+                    } else {
+                        None
+                    };
+                    let c3 = if c2.is_some() {
+                        source.next();
+                        source.current()
+                    } else {
+                        None
+                    };
+                    source.restore_state(st);
+                    let is_triple_dash = c0 == Some('-') && c1 == Some('-') && c2 == Some('-');
+                    let is_triple_dot = c0 == Some('.') && c1 == Some('.') && c2 == Some('.');
+                    let sep_ok = c3.map_or(true, |c| {
+                        crate::utils::is_horizontal_space(c)
+                            || crate::utils::is_line_terminator(c)
+                            || c == '#'
+                    });
+                    (is_triple_dash || is_triple_dot) && sep_ok
+                };
+                if !at_doc_marker {
+                    crate::utils::skip_until_newline(source);
+                    if source
+                        .current()
+                        .map_or(false, crate::utils::is_line_terminator)
+                    {
+                        source.next();
+                    }
+                    crate::utils::skip_whitespace_and_comments(source);
                 }
-                crate::utils::skip_whitespace_and_comments(source);
             }
             Ok(crate::parser::utils::node_utils::make_mapping_node(pairs))
         }
