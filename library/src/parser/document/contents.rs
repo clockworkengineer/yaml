@@ -752,4 +752,5 @@ mod tests {
             result.is_err(),
             "C2SP: multiline flow sequence as implicit mapping key should error"
         );
-    }}
+    }
+}
