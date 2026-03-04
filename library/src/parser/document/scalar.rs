@@ -267,6 +267,10 @@ fn parse_block_scalar(
     let mut max_blank_indent_before_content: usize = 0;
     let mut blank_lines_before_content: usize = 0;
     let mut pending_indent_for_line: Option<usize> = None;
+    // Whether the pending indent included a tab character.  Tab-inclusive
+    // lines are more-indented content lines (the tab is scalar content) and
+    // must NOT be counted toward the blank-line over-indentation check.
+    let mut pending_indent_had_tab: bool = false;
     let mut saw_plain_current_line: bool = false;
     // Track if a comment appears before the first content line; used only
     // for diagnostics in debug builds.
@@ -275,6 +279,7 @@ fn parse_block_scalar(
         match stream.current() {
             Some(Token::Indent(level)) => {
                 pending_indent_for_line = Some(*level);
+                pending_indent_had_tab = stream.last_indent_had_tab();
                 stream.next()?;
             }
             Some(Token::Plain(line)) => {
@@ -329,6 +334,7 @@ fn parse_block_scalar(
                 if !saw_plain_current_line
                     && first_content_indent.is_none()
                     && pending_indent_for_line.is_some()
+                    && !pending_indent_had_tab  // Tab-inclusive lines are content, not blank
                 {
                     let indent = pending_indent_for_line.unwrap_or(0);
                     if indent > max_blank_indent_before_content {
@@ -339,6 +345,7 @@ fn parse_block_scalar(
                 trailing_newlines += 1;
                 stream.next()?;
                 pending_indent_for_line = None;
+                pending_indent_had_tab = false;
                 saw_plain_current_line = false;
             }
             Some(Token::Comment(_)) => {
@@ -354,10 +361,12 @@ fn parse_block_scalar(
         }
     }
 
-    // Loosen blank line indentation rules: allow any number/indentation of blank lines before first content line
-    // Only enforce indentation rules on actual content lines, not on blank lines before content
+    // Enforce blank line indentation rules for both literal (|) and folded (>) block scalars.
+    // YAML spec §8.1: blank lines before the first content line must not be more indented
+    // than the first actual content line. Applies to both styles when no explicit indent
+    // indicator is given (5LLU / W9L4 pattern).
     let indicator = block_header.chars().next().unwrap();
-    if indicator == '|' && !has_explicit_indent_indicator {
+    if (indicator == '|' || indicator == '>') && !has_explicit_indent_indicator {
         if let Some(first_indent) = first_content_indent {
             if blank_lines_before_content >= 1 && max_blank_indent_before_content > first_indent {
                 return Err(crate::parser::errors::block_scalar_errors::BlockScalarErrors::invalid_literal_blank_indent(

@@ -137,6 +137,10 @@ pub struct Lexer<'a> {
     awaiting_line_content_start: bool,
     // True if the most recently emitted non-indentation token started the line's content
     last_token_started_line: bool,
+    // True if the most recently scanned indentation included a tab character.
+    // Used by parse_block_scalar to distinguish pure-space blank lines from
+    // tab-containing lines (which are actually more-indented content lines).
+    last_indent_had_tab: bool,
 }
 
 impl<'a> Lexer<'a> {
@@ -152,6 +156,7 @@ impl<'a> Lexer<'a> {
             last_indent: 0,
             awaiting_line_content_start: false,
             last_token_started_line: false,
+            last_indent_had_tab: false,
         }
     }
 
@@ -173,6 +178,21 @@ impl<'a> Lexer<'a> {
     #[inline]
     pub(crate) fn last_was_linebreak(&self) -> bool {
         self.last_was_linebreak
+    }
+
+    /// Returns true if the most recently scanned indentation included at least
+    /// one tab character.  Lines whose indentation contained a tab are treated
+    /// as more-indented content lines in block scalars (the tab becomes part
+    /// of the scalar's content) rather than pure blank lines.
+    ///
+    /// IMPORTANT: Only returns true when spaces PRECEDE the tab (space+tab).
+    /// A tab-only line at column 0 does NOT set this flag — it should still be
+    /// counted as a blank line for the blank-indent over-indentation check.
+    /// This distinguishes Y79Y/000 (tab-only → error) from Y79Y/001 and R4YG
+    /// (space+tab → valid content line with tab as the scalar payload).
+    #[inline]
+    pub(crate) fn last_indent_had_tab(&self) -> bool {
+        self.last_indent_had_tab
     }
 
     /// Get the current token without consuming it
@@ -684,6 +704,7 @@ impl<'a> Lexer<'a> {
     fn scan_indentation(&mut self, in_flow: bool) -> Result<usize, crate::error::YamlError> {
         let mut count = 0;
         let mut tab_at_start = false;
+        let mut saw_tab = false;
         let first_char_is_tab = self.source.current() == Some(CHAR_TAB);
 
         while let Some(ch) = self.source.current() {
@@ -722,12 +743,19 @@ impl<'a> Lexer<'a> {
                     }
                 }
                 count += 1;
+                saw_tab = true;
                 self.source.next();
             } else {
                 break;
             }
         }
         self.last_was_linebreak = false;
+        // Only mark as "space-then-tab" when the tab appeared AFTER at least one
+        // space (first_char_is_tab is false). A tab-only line at column 0
+        // (first_char_is_tab && saw_tab) must NOT be excluded from blank-line
+        // over-indentation counting — Y79Y/000 requires it to be treated as a
+        // regular blank line whose indent level triggers the error check.
+        self.last_indent_had_tab = saw_tab && !first_char_is_tab;
         Ok(count)
     }
 

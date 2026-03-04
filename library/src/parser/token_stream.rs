@@ -98,6 +98,20 @@ impl<'a> TokenStream<'a> {
         self.lexer.last_was_linebreak()
     }
 
+    /// Returns true if the most recently scanned indentation block (the last
+    /// `Token::Indent` produced by the lexer) included at least one tab
+    /// character alongside the leading spaces.
+    ///
+    /// In block scalars, lines whose indentation contains a tab are actually
+    /// more-indented *content* lines (the tab becomes part of the scalar value)
+    /// rather than pure blank lines.  This allows `parse_block_scalar` to skip
+    /// the blank-indent check for such lines without falsely rejecting valid
+    /// folded block scalars (e.g. R4YG).
+    #[inline]
+    pub(crate) fn last_indent_had_tab(&self) -> bool {
+        self.lexer.last_indent_had_tab()
+    }
+
     /// Get the current token without consuming it
     #[inline]
     pub fn current(&self) -> Option<&Token> {
