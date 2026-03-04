@@ -225,19 +225,59 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
                 // The suite merges/ignores these, so do not push an extra empty doc here.
             }
             saw_marker = true;
-            // Consume any additional consecutive document start markers on following lines
+            // Consume any additional consecutive document start markers on following lines,
+            // including runs separated by bare line terminators only (\n or \r\n).
+            // We skip bare newlines to collapse ---\n--- sequences into a single marker
+            // boundary. We do NOT collapse when whitespace-only lines with spaces
+            // separate the markers — such lines represent intentional empty-document
+            // content and not a simple run-of-markers boundary.
             loop {
                 let st2 = source.save_state();
-                let ts2 =
-                    crate::parser::token_stream::TokenStream::new(source, &directives, false)?;
-                let next_is_start = matches!(
-                    ts2.current(),
-                    Some(crate::parser::lexer::Token::DocumentStart)
-                );
+                // Speculatively skip only bare line terminators (LF / CRLF).
+                loop {
+                    match source.current() {
+                        Some('\r') => {
+                            source.next();
+                            if matches!(source.current(), Some('\n')) {
+                                source.next();
+                            }
+                        }
+                        Some('\n') => {
+                            source.next();
+                        }
+                        _ => break,
+                    }
+                }
+                let next_is_start = if let Ok(ts2) =
+                    crate::parser::token_stream::TokenStream::new(source, &directives, false)
+                {
+                    matches!(
+                        ts2.current(),
+                        Some(crate::parser::lexer::Token::DocumentStart)
+                    )
+                } else {
+                    false
+                };
+                // Always restore so we can re-consume cleanly on the next step.
                 source.restore_state(st2);
                 if next_is_start {
+                    // Physically consume the bare newlines, then the next '---'.
+                    loop {
+                        match source.current() {
+                            Some('\r') => {
+                                source.next();
+                                if matches!(source.current(), Some('\n')) {
+                                    source.next();
+                                }
+                            }
+                            Some('\n') => {
+                                source.next();
+                            }
+                            _ => break,
+                        }
+                    }
                     parse_document_markers(source, &directives).map_err(to_yaml_error)?;
-                    // continue the loop to collapse runs of '---'
+                    // continue the loop to collapse more consecutive markers
                     continue;
                 }
                 break;
@@ -501,14 +541,29 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
             // inside the document main loop, not here.
             true
         } else {
-            // TokenStream-based check for explicit '---' ahead
+            // TokenStream-based check for explicit '---' ahead.
+            // We additionally peek past the DocumentStart to verify there is
+            // actual content (or another marker) after it. A bare trailing
+            // '---' with nothing following (EOF or only trivia to EOF) acts as
+            // a stream terminator and should NOT start another document
+            // iteration — doing so would produce a spurious empty Document([]).
             let dir = crate::parser::directives::DirectiveContext::new();
             let mut ts_ahead = crate::parser::token_stream::TokenStream::new(source, &dir, false)?;
             ts_ahead.skip_trivia()?;
-            matches!(
+            if matches!(
                 ts_ahead.current(),
                 Some(crate::parser::lexer::Token::DocumentStart)
-            )
+            ) {
+                // Consume the DocumentStart and look for non-trivial content.
+                ts_ahead.next()?;
+                ts_ahead.skip_trivia()?;
+                !matches!(
+                    ts_ahead.current(),
+                    None | Some(crate::parser::lexer::Token::Eof)
+                )
+            } else {
+                false
+            }
         };
         // Restore the original position after ahead checks
         source.restore_state(st_ahead);
