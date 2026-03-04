@@ -1199,6 +1199,21 @@ mod tests {
     }
 
     #[test]
+    fn test_eb22_directive_after_content_without_doc_end_should_error() {
+        // EB22: "Missing document-end marker before directive"
+        // A %YAML directive appears after document content but without a preceding
+        // document-end marker (...). This is invalid per YAML spec.
+        let yaml = "---\r\nscalar1 # comment\r\n%YAML 1.2\r\n---\r\nscalar2\r\n";
+        let config = crate::parser::config::ParserConfig::strict();
+        let result = crate::parse_with_config(yaml, config);
+        assert!(
+            result.is_err(),
+            "EB22 should fail: %YAML directive after content without document-end marker, got: {:?}",
+            result
+        );
+    }
+
+    #[test]
     fn test_dk95_06_tab_after_spaces_indentation_should_error() {
         // DK95/06: "Tabs that look like indentation"
         // Input: foo:\r\n  a: 1\r\n  \tb: 2\r\n
