@@ -718,6 +718,16 @@ fn parse_mapping_value(
                     false,
                     Some(cur_indent),
                 )?
+            } else if matches!(stream.current(), Some(Token::FlowSequenceStart)) {
+                // 9C9N: same outer-block-indent guard as for flow mappings — reject
+                // flow sequence continuation lines at or below the block mapping indent.
+                use crate::parser::document::inline_tokens::parse_inline_sequence_with_tokens;
+                parse_inline_sequence_with_tokens(
+                    stream,
+                    directives,
+                    depth + 1,
+                    Some(cur_indent),
+                )?
             } else {
                 parse_value_with_tokens(stream, directives, depth + 1)?
             };

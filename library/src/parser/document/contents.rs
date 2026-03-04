@@ -396,6 +396,7 @@ pub fn parse_document_contents(
                     &mut stream,
                     directives,
                     0,
+                    None,
                 )?,
             )
         }

@@ -149,7 +149,7 @@ mod tests {
         let mut src = Buffer::new(b"[1, 'two', 3]");
         let mut stream =
             crate::parser::token_stream::TokenStream::new(&mut src, &directives, false).unwrap();
-        let node = parse_inline_sequence_with_tokens(&mut stream, &directives, 0).unwrap();
+        let node = parse_inline_sequence_with_tokens(&mut stream, &directives, 0, None).unwrap();
         assert!(matches!(node, Node::Array(_)));
         if let Node::Array(items) = node {
             assert_eq!(items.len(), 3);
@@ -170,7 +170,7 @@ mod tests {
         let mut empty = Buffer::new(b"[]");
         let mut stream =
             crate::parser::token_stream::TokenStream::new(&mut empty, &directives, false).unwrap();
-        let node = parse_inline_sequence_with_tokens(&mut stream, &directives, 0).unwrap();
+        let node = parse_inline_sequence_with_tokens(&mut stream, &directives, 0, None).unwrap();
         assert!(matches!(node, Node::Array(ref v) if v.is_empty()));
     }
 

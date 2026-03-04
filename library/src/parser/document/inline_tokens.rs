@@ -108,6 +108,7 @@ pub fn parse_inline_sequence_with_tokens(
     stream: &mut TokenStream,
     directives: &DirectiveContext,
     depth: usize,
+    outer_block_indent: Option<usize>,
 ) -> crate::parser::ParseResult<Node> {
     #[cfg(feature = "debug-trace")]
     log::debug!(
@@ -172,6 +173,18 @@ pub fn parse_inline_sequence_with_tokens(
                     {
                         return Err(e);
                     }
+                }
+
+                // 9C9N: Reject flow sequence content that appears on a new line at
+                // the outer block context's indentation level (column 0 when the mapping
+                // key is at column 0).  Same rule as VJP3/00 for flow mappings.
+                if outer_block_indent.is_some() && stream.is_preceded_by_linebreak() {
+                    return Err(
+                        crate::parser::utils::error_builder::indentation_error(
+                            stream.source_mut(),
+                            "Flow collection content must be indented more than enclosing block context",
+                        )
+                    );
                 }
 
                 // Parse what might be a value or the key of an implicit mapping.
@@ -558,7 +571,7 @@ mod tests {
         let directives = DirectiveContext::new();
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_inline_sequence_with_tokens(&mut stream, &directives, 0).unwrap();
+        let result = parse_inline_sequence_with_tokens(&mut stream, &directives, 0, None).unwrap();
 
         if let Node::Array(items) = result {
             assert_eq!(items.len(), 0);
@@ -574,7 +587,7 @@ mod tests {
         let directives = DirectiveContext::new();
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_inline_sequence_with_tokens(&mut stream, &directives, 0).unwrap();
+        let result = parse_inline_sequence_with_tokens(&mut stream, &directives, 0, None).unwrap();
 
         if let Node::Array(items) = result {
             assert_eq!(items.len(), 3);
@@ -590,7 +603,7 @@ mod tests {
         let directives = DirectiveContext::new();
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_inline_sequence_with_tokens(&mut stream, &directives, 0).unwrap();
+        let result = parse_inline_sequence_with_tokens(&mut stream, &directives, 0, None).unwrap();
 
         if let Node::Array(items) = result {
             assert_eq!(items.len(), 2);
@@ -654,7 +667,7 @@ mod tests {
         let directives = DirectiveContext::new();
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_inline_sequence_with_tokens(&mut stream, &directives, 0).unwrap();
+        let result = parse_inline_sequence_with_tokens(&mut stream, &directives, 0, None).unwrap();
 
         if let Node::Array(items) = result {
             assert_eq!(items.len(), 2);
@@ -675,7 +688,7 @@ mod tests {
         let directives = DirectiveContext::new();
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
 
-        let result = parse_inline_sequence_with_tokens(&mut stream, &directives, 0).unwrap();
+        let result = parse_inline_sequence_with_tokens(&mut stream, &directives, 0, None).unwrap();
 
         if let Node::Array(items) = result {
             assert_eq!(items.len(), 1);
@@ -693,7 +706,7 @@ mod tests {
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
-        let result = parse_inline_sequence_with_tokens(&mut stream, &directives, 0).unwrap();
+        let result = parse_inline_sequence_with_tokens(&mut stream, &directives, 0, None).unwrap();
         if let Node::Array(items) = result {
             assert_eq!(items.len(), 3);
             assert!(matches!(&items[2], Node::Str(s, _, _) if s == "@"));
@@ -718,7 +731,7 @@ mod tests {
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
-        let result = parse_inline_sequence_with_tokens(&mut stream, &directives, 0);
+        let result = parse_inline_sequence_with_tokens(&mut stream, &directives, 0, None);
         match result {
             Ok(Node::Array(items)) => {
                 assert_eq!(items.len(), 3);
@@ -743,7 +756,7 @@ mod tests {
         let mut source = Buffer::new(yaml);
         let directives = DirectiveContext::new();
         let mut stream = TokenStream::new(&mut source, &directives, false).unwrap();
-        let result = parse_inline_sequence_with_tokens(&mut stream, &directives, 0).unwrap();
+        let result = parse_inline_sequence_with_tokens(&mut stream, &directives, 0, None).unwrap();
         if let Node::Array(items) = result {
             assert_eq!(items.len(), 1);
             assert!(matches!(&items[0], Node::Str(s, _, _) if s == "::"));

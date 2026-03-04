@@ -306,7 +306,7 @@ pub fn parse_value_with_tokens(
 
                 if matches!(stream.current(), Some(Token::FlowSequenceStart)) {
                     use crate::parser::document::inline_tokens::parse_inline_sequence_with_tokens;
-                    let seq = parse_inline_sequence_with_tokens(stream, directives, depth + 1)?;
+                    let seq = parse_inline_sequence_with_tokens(stream, directives, depth + 1, None)?;
                     let mut result =
                         Node::Tagged(Box::new(seq), "tag:yaml.org,2002:seq".to_string());
                     if let Some(anchor_name) = decorators.anchor {
@@ -629,7 +629,7 @@ fn parse_value_content(
         }
         Some(Token::FlowSequenceStart) => {
             use crate::parser::document::inline_tokens::parse_inline_sequence_with_tokens;
-            parse_inline_sequence_with_tokens(stream, directives, depth + 1)
+            parse_inline_sequence_with_tokens(stream, directives, depth + 1, None)
         }
         Some(Token::SingleQuoted(_)) | Some(Token::DoubleQuoted(..) ) | Some(Token::Plain(_)) => {
             crate::parser::document::scalar::parse_scalar_with_tokens(stream, directives, 0)
