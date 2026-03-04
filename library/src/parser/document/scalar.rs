@@ -178,8 +178,20 @@ fn parse_plain_scalar(
             }
             if let Some(Token::Indent(level)) = stream.current() {
                 if *level > base_indent {
+                    // DK95/06: capture whether this line's indentation mixed spaces+tabs
+                    // BEFORE consuming the Indent token (next() would scan the following
+                    // token and could change last_indent_had_tab).
+                    let indent_had_tab = stream.last_indent_had_tab();
                     stream.next()?;
                     if stream.peek()?.map_or(false, |t| matches!(t, Token::Colon)) {
+                        // The continuation "line" is actually a mapping key (Plain + Colon).
+                        // If the indentation used space+tab mixing, reject it — tabs cannot
+                        // be used as structural indentation (YAML spec §6.1, DK95/06).
+                        if indent_had_tab {
+                            return Err(
+                                crate::parser::errors::indentation_errors::IndentationErrors::tabs_not_allowed_yaml_syntax(stream.source_mut()),
+                            );
+                        }
                         break;
                     }
                     if let Some(Token::Plain(seg)) = stream.current() {

@@ -1199,6 +1199,22 @@ mod tests {
     }
 
     #[test]
+    fn test_dk95_06_tab_after_spaces_indentation_should_error() {
+        // DK95/06: "Tabs that look like indentation"
+        // Input: foo:\r\n  a: 1\r\n  \tb: 2\r\n
+        // The line "  \tb: 2" has 2 spaces + tab before the mapping key "b".
+        // This is a tab used as indentation which is invalid in YAML block context.
+        let yaml = "foo:\r\n  a: 1\r\n  \tb: 2\r\n";
+        let config = crate::parser::config::ParserConfig::strict();
+        let result = crate::parse_with_config(yaml, config);
+        assert!(
+            result.is_err(),
+            "DK95/06 should fail: tab after spaces in indentation before mapping key, got: {:?}",
+            result
+        );
+    }
+
+    #[test]
     fn test_g9hc_anchor_at_mapping_indentation_should_error() {
         // G9HC: an anchor on its own line at the block mapping's indentation
         // level (zero-indented in this case) is invalid — the sequence that

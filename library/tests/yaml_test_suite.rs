@@ -214,10 +214,6 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
     let skip_list: Vec<&str> = vec![];
     let known_failures: &[KnownFailure] = &[
         KnownFailure {
-            id: "06",
-            description: "(description not available; test directory missing)",
-        },
-        KnownFailure {
             id: "EB22",
             description: "Missing document-end marker before directive",
         },
