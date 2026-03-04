@@ -472,6 +472,7 @@ impl MappingParseContext {
         #[cfg(feature = "debug-trace")]
         log::debug!("mapping_pair: start at token = {:?}", stream.current());
 
+        let key_start_line = stream.source_line();
         let (explicit_key, key) = self.parse_mapping_key(stream, directives, depth)?;
         #[cfg(feature = "debug-trace")]
         mapping_log(format!(
@@ -503,6 +504,25 @@ impl MappingParseContext {
                     if s.contains('\n') {
                         return Err("Implicit block mapping key cannot span multiple lines \
                              (single-quoted scalar with literal newlines used as implicit key)"
+                            .to_string()
+                            .into());
+                    }
+                }
+                // C2SP: A flow collection (sequence or mapping) spanning multiple
+                // source lines used as an implicit block mapping key is invalid
+                // (YAML spec §8.1.1 — implicit keys must be single-line).
+                // We detect this by comparing the raw source-line counter recorded
+                // before parsing the key against the counter now.  Unlike
+                // `current_line()`, `source_line()` tracks newlines inside flow
+                // collections (where `Token::Newline` is suppressed), so it fires
+                // correctly for cases like `[23\n]: 42`.
+                if stream.source_line() > key_start_line {
+                    if matches!(
+                        key,
+                        crate::nodes::node::Node::Array(_) | crate::nodes::node::Node::Mapping(_)
+                    ) {
+                        return Err("Implicit block mapping key cannot span multiple lines \
+                             (flow collection used as implicit key spans multiple source lines)"
                             .to_string()
                             .into());
                     }

@@ -605,6 +605,24 @@ impl<'a> TokenStream<'a> {
         self.lexer.line_indent()
     }
 
+    /// Returns the current logical line index (0-based).  Increments every
+    /// time a `Newline` token is consumed.  Useful for detecting whether a
+    /// key or value spans multiple source lines.
+    #[inline]
+    pub fn current_line(&self) -> usize {
+        self.current_line_index
+    }
+
+    /// Returns the number of newlines seen in the raw source (0-based).
+    /// Unlike `current_line()`, this counter is incremented for every line
+    /// break — including those inside flow collections where `Token::Newline`
+    /// is suppressed.  Use this to detect multi-line keys regardless of
+    /// collection context.
+    #[inline]
+    pub fn source_line(&self) -> usize {
+        self.lexer.source_line()
+    }
+
     /// Returns the last token that was consumed from the stream.
     /// Useful for callers that need to know the structural context at the
     /// point where a scalar starts (e.g. whether the preceding token was a

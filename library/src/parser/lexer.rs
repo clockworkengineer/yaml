@@ -141,6 +141,10 @@ pub struct Lexer<'a> {
     // Used by parse_block_scalar to distinguish pure-space blank lines from
     // tab-containing lines (which are actually more-indented content lines).
     last_indent_had_tab: bool,
+    // Cumulative count of newlines seen in the source (0-based, flow-transparent).
+    // Incremented in handle_newline regardless of flow context so that callers
+    // can detect multi-line keys even when Newline tokens are suppressed.
+    source_line: usize,
 }
 
 impl<'a> Lexer<'a> {
@@ -157,6 +161,7 @@ impl<'a> Lexer<'a> {
             awaiting_line_content_start: false,
             last_token_started_line: false,
             last_indent_had_tab: false,
+            source_line: 0,
         }
     }
 
@@ -193,6 +198,16 @@ impl<'a> Lexer<'a> {
     #[inline]
     pub(crate) fn last_indent_had_tab(&self) -> bool {
         self.last_indent_had_tab
+    }
+
+    /// Returns the number of newlines seen in the source so far (0-based).
+    /// This counter is incremented for every line break encountered, including
+    /// those inside flow collections where `Token::Newline` is suppressed.
+    /// Callers can snapshot this value before parsing a key and compare after
+    /// to detect multi-line keys in all contexts.
+    #[inline]
+    pub(crate) fn source_line(&self) -> usize {
+        self.source_line
     }
 
     /// Get the current token without consuming it
@@ -775,6 +790,7 @@ impl<'a> Lexer<'a> {
 
         self.at_line_start = true;
         self.last_was_linebreak = true;
+        self.source_line = self.source_line.saturating_add(1);
         if self.in_flow {
             // Suppress Token::Newline in flow context
             return self.scan_token();
@@ -1382,6 +1398,9 @@ impl<'a> Lexer<'a> {
                     } else {
                         self.source.next();
                     }
+                    // Track the newline for multiline-key detection even
+                    // though we do not emit a Token::Newline in flow context.
+                    self.source_line = self.source_line.saturating_add(1);
                     // Consume any following spaces (but not tabs) so we
                     // don't accumulate multiple spaces.
                     while let Some(ws) = self.source.current() {

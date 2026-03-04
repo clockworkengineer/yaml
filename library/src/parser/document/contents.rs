@@ -410,14 +410,28 @@ pub fn parse_document_contents(
         Some(c) if c == crate::constants::CHAR_LBRACKET => {
             let mut stream =
                 crate::parser::token_stream::TokenStream::new(source, directives, true)?;
-            Ok(
-                crate::parser::document::inline_tokens::parse_inline_sequence_with_tokens(
-                    &mut stream,
-                    directives,
-                    0,
-                    None,
-                )?,
-            )
+            let start_line = stream.source_line();
+            let result = crate::parser::document::inline_tokens::parse_inline_sequence_with_tokens(
+                &mut stream,
+                directives,
+                0,
+                None,
+            )?;
+            // C2SP: A flow sequence spanning multiple source lines used as an
+            // implicit block mapping key is invalid (YAML spec §8.1.1).
+            // After parsing, if the sequence consumed a newline AND a bare ':'
+            // follows (implicit-key indicator on the block level), error.
+            if stream.source_line() > start_line {
+                if matches!(stream.current(), Some(crate::parser::lexer::Token::Colon)) {
+                    return Err(
+                        "Parse error: implicit block mapping key spans multiple lines \
+                         (multiline flow collection cannot be an implicit block mapping key)"
+                            .to_string()
+                            .into(),
+                    );
+                }
+            }
+            Ok(result)
         }
         Some(c) if c == crate::constants::CHAR_EXCLAMATION => {
             let mut stream =
@@ -728,4 +742,14 @@ mod tests {
             "2CMS should fail: continuation line 'invalid: x' is a mapping entry"
         );
     }
-}
+
+    #[test]
+    fn test_c2sp_multiline_flow_seq_implicit_key_errors() {
+        // C2SP: [23\n]: 42 — flow sequence spanning two lines used as implicit mapping key
+        let config = crate::parser::config::ParserConfig::strict();
+        let result = crate::parse_with_config("[23\n]: 42\n", config);
+        assert!(
+            result.is_err(),
+            "C2SP: multiline flow sequence as implicit mapping key should error"
+        );
+    }}

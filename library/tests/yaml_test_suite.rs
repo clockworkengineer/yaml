@@ -214,10 +214,6 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
     let skip_list: Vec<&str> = vec![];
     let known_failures: &[KnownFailure] = &[
         KnownFailure {
-            id: "C2SP",
-            description: "Flow mapping key on two lines",
-        },
-        KnownFailure {
             id: "DK4H",
             description: "Implicit key followed by newline",
         },
