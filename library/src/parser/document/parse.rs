@@ -1,4 +1,3 @@
-
 //! Document Parsing Entry Points
 //!
 //! Provides entry points and core logic for parsing YAML documents, handling directives,
@@ -11,11 +10,11 @@ use crate::nodes::node::Node;
 use crate::nodes::node::Node::Document;
 
 use crate::parser::ParseResult;
+use crate::parser::document::main_loop::parse_document;
 use crate::parser::errors::directive_errors::DirectiveErrors;
 use crate::parser::utils::helpers::{
     self, handle_directives, parse_document_end_marker, parse_document_markers, to_yaml_error,
 };
-use crate::parser::document::main_loop::parse_document;
 use crate::utils::{is_horizontal_space, is_line_terminator};
 
 /// Checks for explicit directives and ensures a document follows them.
@@ -149,7 +148,6 @@ pub fn parse(source: &mut dyn ISource) -> ParseResult<Node> {
             source.restore_state(st);
             res
         };
-
         // Additional early guard for QLJ7: if a tag with an explicit handle
         // appears on the same line as '---' and the current document's directives
         // do not declare that handle, reject before parsing the document.
@@ -635,7 +633,12 @@ mod tests {
         let mut source = Buffer::new(yaml);
         let node = parse(&mut source).unwrap();
         if let Node::Documents(docs) = node {
-            assert!(docs.is_empty() || docs.iter().all(|d| matches!(d, Node::Document(nodes) if nodes.is_empty())));
+            assert!(
+                docs.is_empty()
+                    || docs
+                        .iter()
+                        .all(|d| matches!(d, Node::Document(nodes) if nodes.is_empty()))
+            );
         } else {
             panic!("Expected Documents node");
         }
@@ -660,4 +663,5 @@ mod tests {
         let result = parse(&mut source);
         assert!(result.is_err());
     }
+
 }

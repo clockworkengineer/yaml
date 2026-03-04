@@ -154,7 +154,24 @@ impl MappingParseContext {
         depth: usize,
     ) -> crate::parser::ParseResult<Node> {
         loop {
+            // Save source position before skipping newlines. The lexer's look-ahead
+            // will pre-fetch the token AFTER the newline(s), which may be
+            // Token::DocumentStart (---) or Token::DocumentEnd (...). Fetching that
+            // token advances the underlying source PAST the marker characters, making
+            // the marker invisible to the outer parse loop's is_document_marker check.
+            // By restoring source to this saved position whenever we are about to
+            // return due to a document marker, we ensure the outer parser can see the
+            // '---'/'...' marker again.
+            let pre_skip_state = stream.source_mut().save_state();
             let saw_comment_between_entries = stream.skip_newlines_and_comments_with_flag()?;
+            // If after skipping newlines/comments we are at a document-start marker
+            // (---), restore source to just before it so the outer stream-level
+            // parser can correctly re-detect and handle the new document.
+            // Note: DocumentEnd (...) is intentionally NOT restored — the lexer
+            // consuming past '...' is correct for document-end terminated blocks.
+            if matches!(stream.current(), Some(Token::DocumentStart)) {
+                stream.source_mut().restore_state(pre_skip_state);
+            }
             self.handle_dedent(stream);
             let current_indent = self.get_current_indent();
             let token = stream.current().cloned();

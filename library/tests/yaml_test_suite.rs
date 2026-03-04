@@ -261,10 +261,6 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
             id: "KS4U",
             description: "Invalid item after end of flow sequence",
         },
-        KnownFailure {
-            id: "QLJ7",
-            description: "Tag shorthand used in multiple documents but only defined in the first",
-        },
     ];
     let mut passed = 0;
     let mut failed = 0;

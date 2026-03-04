@@ -61,9 +61,21 @@ pub fn parse_sequence_with_tokens(
     stream.skip_trivia()?;
 
     loop {
+        // Save source position before skipping newlines. The lexer's look-ahead
+        // may pre-fetch Token::DocumentStart/End (--- / ...) which advances the
+        // underlying source past the marker characters, making the marker invisible
+        // to the outer parse loop's is_document_marker check. Restore source to
+        // this position when we are about to return due to a document boundary.
+        let pre_skip_state = stream.source_mut().save_state();
         // Skip comments and newlines between sequence items
         // DO NOT skip Indent tokens here - we need them for dedent detection
         stream.skip_newlines_and_comments()?;
+        // Only restore for DocumentStart (---): the lexer consuming past '---'
+        // makes it invisible to the outer parser. DocumentEnd (...) does NOT need
+        // restoration — its existing handling was already correct.
+        if matches!(stream.current(), Some(Token::DocumentStart)) {
+            stream.source_mut().restore_state(pre_skip_state);
+        }
         // If a stray comma remains after an inline flow item, consume it
         if matches!(stream.current(), Some(Token::Comma)) {
             let _ = stream.consume_if(Token::Comma)?;

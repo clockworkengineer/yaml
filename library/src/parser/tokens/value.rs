@@ -648,6 +648,12 @@ fn parse_value_content(
         Some(Token::Newline) => {
             // Handle newline before an indented block value. If there's an increased indent
             // after the newline, parse a nested mapping or sequence as the value.
+            // Save source state before consuming the Newline: the lexer's look-ahead will
+            // scan the next token (possibly Token::DocumentStart from '---'), advancing the
+            // underlying source past those marker characters. If we end up returning an
+            // empty value because there is no indented block after the newline, we must
+            // restore source so the outer parser can detect the document boundary.
+            let pre_newline_state = stream.source_mut().save_state();
             stream.next()?; // consume Newline
             // Check for indentation increase
             if let Some(Token::Indent(level)) = stream.current() {
@@ -691,7 +697,17 @@ fn parse_value_content(
                     }
                 }
             }
-            // No indentation increase; treat as empty string value
+            // No indentation increase: if we are at a DocumentStart marker (---)
+            // or at EOF (None), restore source so the outer parser can detect the
+            // document boundary or EOF correctly.
+            // Note: DocumentEnd (...) is intentionally NOT restored here.
+            if matches!(
+                stream.current(),
+                Some(Token::DocumentStart) | None
+            ) {
+                stream.source_mut().restore_state(pre_newline_state);
+            }
+            // Treat as empty string value
             Ok(Node::Str(
                 String::new(),
                 QuoteType::Unquoted,

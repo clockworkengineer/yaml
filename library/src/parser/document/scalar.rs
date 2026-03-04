@@ -158,7 +158,24 @@ fn parse_plain_scalar(
     let mut accumulated = s.to_string();
     loop {
         if stream.is_current(|t| matches!(t, Token::Newline)) {
+            // Save source position before consuming the Newline token.
+            // The lexer's look-ahead will scan the next token after the
+            // newline, which may be Token::DocumentStart (---) or
+            // Token::DocumentEnd (...), advancing the underlying source
+            // past those marker characters in the process. If that happens,
+            // we restore source so the outer parser can re-detect the
+            // document boundary.
+            let pre_newline_state = stream.source_mut().save_state();
             stream.next()?;
+            // If the next token is a document-start marker (---), restore source
+            // and terminate the scalar without including continuation content.
+            // Note: DocumentEnd (...) is intentionally NOT restored here — the lexer
+            // consuming past '...' is correct and expected behaviour for document-end
+            // terminated scalars (e.g. `aaa: bbb\n...`).
+            if matches!(stream.current(), Some(Token::DocumentStart)) {
+                stream.source_mut().restore_state(pre_newline_state);
+                break;
+            }
             if let Some(Token::Indent(level)) = stream.current() {
                 if *level > base_indent {
                     stream.next()?;
