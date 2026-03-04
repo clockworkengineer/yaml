@@ -334,7 +334,8 @@ fn parse_block_scalar(
                 if !saw_plain_current_line
                     && first_content_indent.is_none()
                     && pending_indent_for_line.is_some()
-                    && !pending_indent_had_tab  // Tab-inclusive lines are content, not blank
+                    && !pending_indent_had_tab
+                // Tab-inclusive lines are content, not blank
                 {
                     let indent = pending_indent_for_line.unwrap_or(0);
                     if indent > max_blank_indent_before_content {
