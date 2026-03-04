@@ -218,10 +218,6 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
             description: "Flow mapping key on two lines",
         },
         KnownFailure {
-            id: "D49Q",
-            description: "Multiline single-quoted implicit keys",
-        },
-        KnownFailure {
             id: "DK4H",
             description: "Implicit key followed by newline",
         },

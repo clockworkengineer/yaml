@@ -496,6 +496,17 @@ impl MappingParseContext {
                         .to_string()
                         .into());
                 }
+                // D49Q: A single-quoted scalar spanning multiple source lines
+                // (i.e. the content contains a literal newline) is also invalid
+                // as an implicit block mapping key (YAML spec §8.1.1).
+                if let Some(Token::SingleQuoted(s)) = stream.last_token() {
+                    if s.contains('\n') {
+                        return Err("Implicit block mapping key cannot span multiple lines \
+                             (single-quoted scalar with literal newlines used as implicit key)"
+                            .to_string()
+                            .into());
+                    }
+                }
             }
             stream.next()?;
             let value =
