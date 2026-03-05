@@ -212,10 +212,7 @@ struct KnownFailure {
 
 fn run_yaml_suite_tests(suite_dir: &Path) {
     let skip_list: Vec<&str> = vec![];
-    let known_failures: &[KnownFailure] = &[KnownFailure {
-        id: "KS4U",
-        description: "Invalid item after end of flow sequence",
-    }];
+    let known_failures: &[KnownFailure] = &[];
     let mut passed = 0;
     let mut failed = 0;
     let mut skipped = 0;

@@ -1362,4 +1362,21 @@ mod tests {
             result
         );
     }
+
+    #[test]
+    fn test_ks4u_invalid_item_after_end_of_flow_sequence_should_error() {
+        // KS4U: "Invalid item after end of flow sequence"
+        // Input: `---\n[\nsequence item\n]\ninvalid item\n`
+        // After the flow sequence (the document value) is closed with `]`,
+        // `invalid item` appears on a new line.  A document can have only one
+        // root node; trailing plain-scalar content after the closing `]` is invalid.
+        let yaml = "---\r\n[\r\nsequence item\r\n]\r\ninvalid item\r\n";
+        let config = crate::parser::config::ParserConfig::strict();
+        let result = crate::parse_with_config(yaml, config);
+        assert!(
+            result.is_err(),
+            "KS4U should fail: plain scalar after closing ']' of top-level flow sequence, got: {:?}",
+            result
+        );
+    }
 }
