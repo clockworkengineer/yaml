@@ -324,6 +324,38 @@ pub fn parse_sequence_with_tokens(
                         }
                     }
                 }
+                Some(Token::DoubleQuoted(..)) | Some(Token::SingleQuoted(_)) => {
+                    // JKF3 / D49Q: Detect implicit block mapping where a quoted scalar
+                    // is used as a key (followed immediately by ':').  This mirrors the
+                    // existing Plain-scalar handling above.  Routing through
+                    // parse_mapping_with_tokens lets the existing multiline-key guard in
+                    // parse_mapping_pair fire for cases such as:
+                    //   - - "bar\nbar": x   (JKF3 — continuation at indent 0 → error)
+                    stream.skip_newlines_and_comments()?;
+                    let is_colon = if matches!(
+                        stream.current(),
+                        Some(Token::DoubleQuoted(..)) | Some(Token::SingleQuoted(_))
+                    ) {
+                        matches!(stream.peek()?, Some(Token::Colon))
+                    } else {
+                        false
+                    };
+                    if is_colon {
+                        use crate::parser::tokens::mapping::parse_mapping_with_tokens;
+                        let indent = current_indent;
+                        let mapping =
+                            parse_mapping_with_tokens(stream, indent, directives, depth + 1)?;
+                        if let Some((_, items)) = stack.last_mut() {
+                            items.push(mapping);
+                        }
+                        stream.skip_newlines_and_comments()?;
+                    } else {
+                        let value = parse_value_with_tokens(stream, directives, depth + 1)?;
+                        if let Some((_, items)) = stack.last_mut() {
+                            items.push(value);
+                        }
+                    }
+                }
                 _ => {
                     let value = parse_value_with_tokens(stream, directives, depth + 1)?;
                     if let Some((_, items)) = stack.last_mut() {

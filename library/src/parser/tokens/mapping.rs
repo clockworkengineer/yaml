@@ -256,15 +256,17 @@ impl MappingParseContext {
                 //                                      subsequent same-column keys are valid)
                 if line_indent > current_indent
                     && matches!(stream.last_token(), Some(Token::Indent(_)))
-                    && self.stack.last().map_or(false, |(_, pairs)| !pairs.is_empty())
+                    && self
+                        .stack
+                        .last()
+                        .map_or(false, |(_, pairs)| !pairs.is_empty())
                     && !self.first_key_was_inline
                     && stream.peek()?.map_or(false, |t| matches!(t, Token::Colon))
                 {
                     return Err(
-                        crate::parser::errors::mapping_errors::
-                            wrong_indentation_in_mapping(stream)
-                                .to_string()
-                                .into(),
+                        crate::parser::errors::mapping_errors::wrong_indentation_in_mapping(stream)
+                            .to_string()
+                            .into(),
                     );
                 }
             }
@@ -1340,6 +1342,23 @@ mod tests {
         assert!(
             result.is_err(),
             "G9HC should fail: anchor at block mapping level without valid indented value, got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_jkf3_multiline_unindented_double_quoted_block_key_should_error() {
+        // JKF3: "Multiline unidented double quoted block key"
+        // Input: `- - "bar\r\nbar": x`
+        // The double-quoted key spans two source lines.  The continuation `bar"` is at
+        // column 0 — less indented than the enclosing block sequence context.
+        // YAML §8.1.1: implicit block mapping keys must fit on a single line.
+        let yaml = "- - \"bar\r\nbar\": x\r\n";
+        let config = crate::parser::config::ParserConfig::strict();
+        let result = crate::parse_with_config(yaml, config);
+        assert!(
+            result.is_err(),
+            "JKF3 should fail: multiline double-quoted implicit block key, got: {:?}",
             result
         );
     }
