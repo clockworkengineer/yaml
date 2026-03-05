@@ -431,6 +431,36 @@ pub fn parse_document_contents(
                     );
                 }
             }
+            // KS4U: A document-level flow sequence is the entire document value.
+            // Any non-boundary content on a following line is invalid (YAML allows
+            // only one root node per document without an explicit '---' separator).
+            // Skip trivia first, then check for unexpected content tokens.
+            {
+                let _ = stream.skip_trivia();
+                use crate::parser::lexer::Token;
+                let is_invalid = matches!(
+                    stream.current(),
+                    Some(Token::Plain(_))
+                        | Some(Token::DoubleQuoted(..))
+                        | Some(Token::SingleQuoted(_))
+                        // Token::Dash excluded: a `-` following a flow sequence is a
+                        // valid block sequence item indicator in a nested context.
+                        // Invalid same-level sequences (e.g. two root nodes) are caught
+                        // by the parse_document_main_loop TD5N-style checks instead.
+                        | Some(Token::Anchor(_))
+                        | Some(Token::Tag(_))
+                        | Some(Token::FlowMappingStart)
+                        | Some(Token::FlowSequenceStart)
+                        | Some(Token::QuestionMark)
+                );
+                if is_invalid {
+                    return Err(crate::parser::utils::error_builder::syntax_error(
+                        stream.source_mut(),
+                        "Invalid item after end of flow sequence: \
+                         unexpected content after closing ']'",
+                    ));
+                }
+            }
             Ok(result)
         }
         Some(c) if c == crate::constants::CHAR_EXCLAMATION => {

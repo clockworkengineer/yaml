@@ -135,34 +135,10 @@ pub fn parse_inline_sequence_with_tokens(
                 // Closing bracket - done
                 let _ = stream.consume_flow_sequence_end()?;
                 // If at top-level (depth == 0), check for extra closing bracket (4H7K)
-                // and for invalid content after the end of the flow sequence (KS4U).
                 if depth == 0 {
                     skip_inline_trivia(stream)?;
                     if matches!(stream.current(), Some(Token::FlowSequenceEnd)) {
                         return Err(crate::parser::document::flow_punctuation::unexpected_extra_closing_bracket_in_flow_sequence(stream));
-                    }
-                    // KS4U: a top-level flow sequence is the entire document value;
-                    // any non-blank/non-boundary token on a following line is invalid.
-                    // (The skip_inline_trivia above already consumed the newline after ']',
-                    // so the current token is whatever non-trivia content follows.)
-                    let is_invalid_trailing = matches!(
-                        stream.current(),
-                        Some(Token::Plain(_))
-                            | Some(Token::DoubleQuoted(..))
-                            | Some(Token::SingleQuoted(_))
-                            | Some(Token::Dash)
-                            | Some(Token::Anchor(_))
-                            | Some(Token::Tag(_))
-                            | Some(Token::FlowMappingStart)
-                            | Some(Token::FlowSequenceStart)
-                            | Some(Token::QuestionMark)
-                    );
-                    if is_invalid_trailing {
-                        return Err(crate::parser::utils::error_builder::syntax_error(
-                            stream.source_mut(),
-                            "Invalid item after end of flow sequence: \
-                             unexpected content after closing ']'",
-                        ));
                     }
                 }
                 break;
