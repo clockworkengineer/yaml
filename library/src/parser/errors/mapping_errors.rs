@@ -72,6 +72,22 @@ pub fn inconsistent_dedent_within_mapping_value_for_keys(
     .with_note("Ensure all keys under the nested mapping use the same indentation.")
 }
 
+/// Centralized error: Wrong indentation in mapping (EW3V)
+///
+/// Fires when a block mapping key is more indented than the mapping's base level,
+/// indicating inconsistent/wrong indentation (YAML spec §8.1).
+pub fn wrong_indentation_in_mapping(stream: &mut TokenStream) -> EnhancedError {
+    EnhancedError::new(crate::parser::utils::error_builder::mapping_key_error_yaml(
+        stream.source_mut(),
+        "Wrong indentation in mapping: key is more indented than the mapping's base level",
+    ))
+    .with_code(ErrorCode::E009)
+    .with_note(
+        "All keys in a block mapping must be at the same indentation level. \
+         A more-indented key after a completed key-value pair is invalid (YAML §8.1).",
+    )
+}
+
 /// Centralized error: Invalid anchored alias key (anchors cannot be applied to alias nodes)
 ///
 /// Returns an EnhancedError with code E004 and note, matching existing behavior and text.

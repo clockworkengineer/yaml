@@ -92,6 +92,12 @@ struct MappingParseContext {
     stack: Vec<(usize, Vec<(Node, Node)>)>,
     /// The base indentation level for this mapping
     base_indent: usize,
+    /// True when the very first key of this mapping was parsed inline (on the same
+    /// line as a preceding `-` token, i.e. a compact block sequence item).  In that
+    /// case the caller supplied base_indent=sequence_indent but the actual key column
+    /// may be higher; subsequent keys at the key column are valid and should NOT
+    /// trigger the EW3V (wrong indentation) check.
+    first_key_was_inline: bool,
 }
 
 use crate::nodes::node::Node;
@@ -131,6 +137,7 @@ pub fn parse_single_mapping_pair_with_tokens(
     let ctx = MappingParseContext {
         stack: vec![(0, Vec::new())],
         base_indent: 0,
+        first_key_was_inline: false,
     };
     let (key, value) = ctx.parse_mapping_pair(stream, directives, 0, 0)?;
     Ok(Node::Mapping(vec![(key, value)]))
@@ -167,6 +174,7 @@ pub fn parse_mapping_with_tokens(
             Vec::with_capacity(node_builder.hints().mapping_pairs),
         )],
         base_indent,
+        first_key_was_inline: false,
     };
 
     stream.skip_trivia()?;
@@ -208,6 +216,15 @@ impl MappingParseContext {
             // Keys in a mapping must be at the base indent level of that mapping.
             if matches!(token, Some(Token::Plain(_))) && self.stack.len() == 1 {
                 let line_indent = stream.line_indent();
+                // Track whether the very first key was parsed inline with a preceding
+                // '-' token (compact block sequence item). In that layout the caller
+                // supplies base_indent = sequence_indent, but the key column is higher;
+                // subsequent keys at that same higher column are valid.
+                if self.stack.last().map_or(true, |(_, p)| p.is_empty()) {
+                    if matches!(stream.last_token(), Some(Token::Dash)) {
+                        self.first_key_was_inline = true;
+                    }
+                }
                 if line_indent < self.base_indent && depth > 0 {
                     // DMG6: Key is less indented than this mapping's base.
                     // Check if dedenting to an invalid intermediate level.
@@ -223,6 +240,32 @@ impl MappingParseContext {
                     // Valid dedent - exit this mapping.
                     let (_, pairs) = self.stack.pop().unwrap();
                     return Ok(Node::Mapping(pairs));
+                }
+                // EW3V: Key is MORE indented than this mapping's current indent level.
+                // Only fire when ALL of the following hold:
+                //   1. line_indent > current_indent  (key is at the wrong, higher indent)
+                //   2. last_token == Indent           (consumed by parse_plain_scalar's
+                //                                      continuation look-ahead)
+                //   3. pairs are non-empty            (there is already a first key at the
+                //                                      lower indent level)
+                //   4. peek() == Colon               (the token IS a mapping key, not just
+                //                                      a dangling plain scalar — filters cases
+                //                                      like 36F6's `c` and F6MC's `regular`)
+                //   5. first_key_was_inline == false  (compact sequence items `- key: v` have
+                //                                      base_indent lower than the key column;
+                //                                      subsequent same-column keys are valid)
+                if line_indent > current_indent
+                    && matches!(stream.last_token(), Some(Token::Indent(_)))
+                    && self.stack.last().map_or(false, |(_, pairs)| !pairs.is_empty())
+                    && !self.first_key_was_inline
+                    && stream.peek()?.map_or(false, |t| matches!(t, Token::Colon))
+                {
+                    return Err(
+                        crate::parser::errors::mapping_errors::
+                            wrong_indentation_in_mapping(stream)
+                                .to_string()
+                                .into(),
+                    );
                 }
             }
 
@@ -1218,6 +1261,21 @@ mod tests {
             result.is_ok(),
             "V9D5 should succeed: compact block mappings, got: {:?}",
             result.err()
+        );
+    }
+
+    #[test]
+    fn test_ew3v_wrong_indentation_in_mapping_should_error() {
+        // EW3V: "Wrong indentation in mapping"
+        // k1 is at indent 0, k2 is at indent 1 — keys at different indent levels in
+        // the same block mapping is invalid (YAML §8.1).
+        let yaml = "k1: v1\n k2: v2\n";
+        let config = crate::parser::config::ParserConfig::strict();
+        let result = crate::parse_with_config(yaml, config);
+        assert!(
+            result.is_err(),
+            "EW3V should fail: second key more indented than first key in same mapping, got: {:?}",
+            result
         );
     }
 

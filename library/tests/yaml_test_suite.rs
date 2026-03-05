@@ -214,10 +214,6 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
     let skip_list: Vec<&str> = vec![];
     let known_failures: &[KnownFailure] = &[
         KnownFailure {
-            id: "EW3V",
-            description: "Wrong indentation in mapping",
-        },
-        KnownFailure {
             id: "JKF3",
             description: "Multiline unindented double-quoted block key",
         },
