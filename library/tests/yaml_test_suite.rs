@@ -148,7 +148,7 @@ fn run_yaml_suite_case(yaml: &str, should_error: bool, timeout: Duration) -> Sui
     }
 }
 
-// Run all YAML test suite cases and assert pass rate >= 90%
+// Run all YAML test suite cases and assert pass rate >= 100%
 #[test]
 pub fn run_yaml_test_suite() {
     let _panic_hook_guard = PanicHookGuard::new_silent();
@@ -311,8 +311,8 @@ fn run_yaml_suite_tests(suite_dir: &Path) {
             unexpected_failures
         );
         assert!(
-            pass_rate >= 90.0,
-            "YAML test suite pass rate is below 90%: {:.1}%",
+            pass_rate >= 100.0,
+            "YAML test suite pass rate is below 100%: {:.1}%",
             pass_rate
         );
     }
