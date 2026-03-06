@@ -67,11 +67,31 @@ Verified: `cargo check` clean, 402/402 YAML test suite tests passing.
 
 ### Lower Priority
 
-#### 3. Consider splitting large token files
-- `tokens/mapping.rs` (929 lines, 38KB)
-- `tokens/value.rs` (879 lines, 37KB)
+#### 3. ✅ Split large token files — COMPLETED
 
-These are large but focused on specific responsibilities. Splitting might not provide significant benefits unless clear sub-responsibilities emerge.
+**`tokens/mapping.rs` (1359 lines) → `tokens/mapping/`:**
+```
+tokens/mapping/
+  mod.rs    - imports, MappingParseContext struct, parse_mapping_with_tokens,
+              parse_indented_mapping_value, mapping_log, tests
+  loop.rs   - impl MappingParseContext { parse_mapping_loop }
+  stack.rs  - impl MappingParseContext { get_current_indent,
+              dedent_unwind_mapping_stack, handle_dedent, handle_special_tokens,
+              try_parse_and_insert_pair, handle_indent_tokens,
+              handle_mapping_control_tokens }
+  pair.rs   - impl MappingParseContext { parse_mapping_pair, parse_mapping_key }
+              + apply_decorators_to_key + parse_mapping_value
+```
+
+**`tokens/value.rs` (869 lines) → `tokens/value/`:**
+```
+tokens/value/
+  mod.rs     - imports, parse_value_with_tokens, parse_value_content, tests
+  coerce.rs  - should_preserve_double_bang, pick_tag_text, try_coerce_tag
+```
+
+All callers unchanged — the `include!` macro injects each file into the parent module at compile time.
+Verified: `cargo check` clean.
 
 ## Current Structure Summary
 
@@ -95,9 +115,15 @@ parser/
   │   ├── parse.rs (27KB)
   │   ├── scalar.rs (21KB)
   │   └── ... (smaller focused files)
-  ├── tokens/ (3 files)
-  │   ├── mapping.rs (38KB) - Large but focused
-  │   ├── value.rs (37KB) - Large but focused
+  ├── tokens/
+  │   ├── mapping/ ✅ Split into 4 focused files
+  │   │   ├── mod.rs   - struct, entry points, tests
+  │   │   ├── loop.rs  - main parse loop
+  │   │   ├── stack.rs - indent/dedent stack management
+  │   │   └── pair.rs  - pair/key/value parsing
+  │   ├── value/ ✅ Split into 2 focused files
+  │   │   ├── mod.rs    - parse_value_with_tokens, parse_value_content, tests
+  │   │   └── coerce.rs - tag coercion helpers
   │   └── sequence.rs (18KB)
   ├── utils/ (10 files)
   │   ├── helpers.rs (41KB) ⚠️ Very large, should split
@@ -109,8 +135,9 @@ parser/
 
 ## Notes
 
-The parser structure is significantly improved. Steps 1 and 2 of the recommended improvements are now complete:
+All three recommended improvements are now complete:
 1. ✅ **helpers.rs** — Split into 5 focused sub-modules (`core`, `document_markers`, `validation`, `peek_ahead`, `comments`)
 2. ✅ **lexer.rs** — Split into 6 focused sub-files using the `include!` macro strategy
+3. ✅ **mapping.rs** + **value.rs** — Split into focused sub-files using the `include!` macro strategy
 
-The remaining large files (`tokens/mapping.rs`, `tokens/value.rs`) are focused on specific responsibilities and are maintainable as-is.
+The parser module is well-organized with no files exceeding ~400 lines.
