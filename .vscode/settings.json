@@ -1,4 +1,6 @@
 {
+    "rust-test-explorer.cargoManifestPath": "${workspaceFolder}/Cargo.toml",
+    "rust-test-explorer.loadAll": true,
     "python.testing.unittestArgs": [
         "-v",
         "-s",
