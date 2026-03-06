@@ -28,6 +28,17 @@ use crate::parser::tokens::value::parse_value_with_tokens;
 /// - Natural handling of empty items after decorators
 use crate::parser::utils::context::ParsingContext;
 
+/// Push `item` onto the top frame of the sequence parser's node-stack.
+///
+/// Every sequence item collection in `parse_sequence_with_tokens` goes through
+/// this single call site, replacing the 13 identical inline `if let` blocks.
+#[inline]
+fn seq_stack_push(stack: &mut Vec<(usize, Vec<Node>)>, item: Node) {
+    if let Some((_, items)) = stack.last_mut() {
+        items.push(item);
+    }
+}
+
 pub fn parse_sequence_with_tokens(
     stream: &mut TokenStream,
     base_indent: usize,
@@ -36,11 +47,6 @@ pub fn parse_sequence_with_tokens(
     ctx: &ParsingContext,
     depth: usize,
 ) -> crate::parser::ParseResult<Node> {
-    #[cfg(feature = "debug-trace")]
-    log::debug!(
-        "sequence_tokens: start parse_sequence_with_tokens at indent {}",
-        base_indent
-    );
     #[cfg(feature = "debug-trace")]
     log::debug!(
         "sequence_tokens: ENTER parse_sequence_with_tokens, indent={}, depth={}",
@@ -170,16 +176,12 @@ pub fn parse_sequence_with_tokens(
                                     directives,
                                     depth + 1,
                                 )?;
-                                if let Some((_, items)) = stack.last_mut() {
-                                    items.push(mapping);
-                                }
+                                seq_stack_push(&mut stack, mapping);
                             }
                         }
                         _ => {
                             // No indented content after the newline - this IS an empty item
-                            if let Some((_, items)) = stack.last_mut() {
-                                items.push(Node::None);
-                            }
+                            seq_stack_push(&mut stack, Node::None);
                             // Continue to next iteration after handling empty item
                             continue;
                         }
@@ -187,9 +189,7 @@ pub fn parse_sequence_with_tokens(
                 }
                 None => {
                     // EOF after dash - empty item
-                    if let Some((_, items)) = stack.last_mut() {
-                        items.push(Node::None);
-                    }
+                    seq_stack_push(&mut stack, Node::None);
                     continue;
                 }
                 Some(Token::Comment(_)) => {
@@ -198,9 +198,7 @@ pub fn parse_sequence_with_tokens(
                     // After skipping comments, check again for empty item
                     match stream.current() {
                         Some(Token::Newline) | None => {
-                            if let Some((_, items)) = stack.last_mut() {
-                                items.push(Node::None);
-                            }
+                            seq_stack_push(&mut stack, Node::None);
                             if let Some(Token::Newline) = stream.current() {
                                 stream.next()?;
                             }
@@ -208,9 +206,7 @@ pub fn parse_sequence_with_tokens(
                         _ => {
                             // Parse the value after the comment
                             let value = parse_value_with_tokens(stream, directives, depth + 1)?;
-                            if let Some((_, items)) = stack.last_mut() {
-                                items.push(value);
-                            }
+                            seq_stack_push(&mut stack, value);
                         }
                     }
                 }
@@ -235,9 +231,7 @@ pub fn parse_sequence_with_tokens(
                         &ctx_seq,
                         depth + 1,
                     )?;
-                    if let Some((_, items)) = stack.last_mut() {
-                        items.push(seq);
-                    }
+                    seq_stack_push(&mut stack, seq);
                 }
                 Some(Token::Indent(level)) => {
                     let indent = *level;
@@ -255,9 +249,7 @@ pub fn parse_sequence_with_tokens(
                         use crate::parser::tokens::mapping::parse_mapping_with_tokens;
                         let mapping =
                             parse_mapping_with_tokens(stream, indent, directives, depth + 1)?;
-                        if let Some((_, items)) = stack.last_mut() {
-                            items.push(mapping);
-                        }
+                        seq_stack_push(&mut stack, mapping);
                     } else {
                         // Dedent: close current sequence
                         let (_, items) = stack.pop().unwrap();
@@ -272,9 +264,7 @@ pub fn parse_sequence_with_tokens(
                 }
                 Some(Token::FlowSequenceStart) | Some(Token::FlowMappingStart) => {
                     let value = parse_value_with_tokens(stream, directives, depth + 1)?;
-                    if let Some((_, items)) = stack.last_mut() {
-                        items.push(value);
-                    }
+                    seq_stack_push(&mut stack, value);
                     // Delegate trailing comma/closer consumption to centralized
                     // helper to keep flow punctuation behavior in one place while
                     // preserving existing semantics for block sequences.
@@ -300,9 +290,7 @@ pub fn parse_sequence_with_tokens(
                         let indent = current_indent;
                         let mapping =
                             parse_mapping_with_tokens(stream, indent, directives, depth + 1)?;
-                        if let Some((_, items)) = stack.last_mut() {
-                            items.push(mapping);
-                        }
+                        seq_stack_push(&mut stack, mapping);
                         // Don't skip Indent tokens - needed for dedent detection
                         stream.skip_newlines_and_comments()?;
                         if matches!(stream.current(), Some(Token::Comma)) {
@@ -319,9 +307,7 @@ pub fn parse_sequence_with_tokens(
                         stream.skip_newlines_and_comments()?;
                     } else {
                         let value = parse_value_with_tokens(stream, directives, depth + 1)?;
-                        if let Some((_, items)) = stack.last_mut() {
-                            items.push(value);
-                        }
+                        seq_stack_push(&mut stack, value);
                     }
                 }
                 Some(Token::DoubleQuoted(..)) | Some(Token::SingleQuoted(_)) => {
@@ -345,22 +331,16 @@ pub fn parse_sequence_with_tokens(
                         let indent = current_indent;
                         let mapping =
                             parse_mapping_with_tokens(stream, indent, directives, depth + 1)?;
-                        if let Some((_, items)) = stack.last_mut() {
-                            items.push(mapping);
-                        }
+                        seq_stack_push(&mut stack, mapping);
                         stream.skip_newlines_and_comments()?;
                     } else {
                         let value = parse_value_with_tokens(stream, directives, depth + 1)?;
-                        if let Some((_, items)) = stack.last_mut() {
-                            items.push(value);
-                        }
+                        seq_stack_push(&mut stack, value);
                     }
                 }
                 _ => {
                     let value = parse_value_with_tokens(stream, directives, depth + 1)?;
-                    if let Some((_, items)) = stack.last_mut() {
-                        items.push(value);
-                    }
+                    seq_stack_push(&mut stack, value);
                 }
             }
 
@@ -526,6 +506,23 @@ pub fn parse_sequence_with_tokens(
     let (_, items) = stack.pop().unwrap_or((base_indent, Vec::new()));
     // Use NodeBuilder for final array node
     Ok(Node::Array(items))
+}
+
+/// Convenience wrapper: build a block-sequence context at `level` and call
+/// `parse_sequence_with_tokens`.  Eliminates the five-line boilerplate that
+/// appears at every Dash-dispatch site in the mapping and value parsers.
+pub fn parse_block_sequence_at(
+    stream: &mut TokenStream,
+    level: usize,
+    parent_indent: usize,
+    directives: &DirectiveContext,
+    depth: usize,
+) -> crate::parser::ParseResult<Node> {
+    let ctx = ParsingContext::new(level).child_block_context(
+        level,
+        crate::parser::utils::context::CollectionType::BlockSequence,
+    );
+    parse_sequence_with_tokens(stream, level, parent_indent, directives, &ctx, depth)
 }
 
 #[cfg(test)]

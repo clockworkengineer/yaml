@@ -27,6 +27,27 @@ fn should_preserve_double_bang(tag_raw: &str) -> bool {
     }
 }
 
+/// Determine the tag string to store in `Node::Tagged`.
+///
+/// - `!!`-prefixed known core tags → preserve the raw `!!` form
+/// - `!!`-prefixed unknown tags    → canonicalize to the resolved URI
+/// - all other tags (custom/handle) → preserve the raw form verbatim
+///
+/// This consolidates two identical blocks that previously appeared in
+/// `parse_value_with_tokens` (empty-decorated path and full-content path).
+#[inline]
+fn pick_tag_text(tag_raw: &str, resolved: String) -> String {
+    if tag_raw.starts_with("!!") {
+        if should_preserve_double_bang(tag_raw) {
+            tag_raw.to_owned()
+        } else {
+            resolved
+        }
+    } else {
+        tag_raw.to_owned()
+    }
+}
+
 /// Try to coerce a value based on a tag
 fn try_coerce_tag(tag: &str, node: Node) -> Option<Node> {
     match tag {
@@ -240,17 +261,6 @@ pub fn parse_value_with_tokens(
         depth,
         stream.current()
     );
-    #[cfg(feature = "debug-trace")]
-    log::debug!(
-        "value_tokens: parse_value_with_tokens (depth {}), current token: {:?}",
-        depth,
-        stream.current()
-    );
-    #[cfg(feature = "debug-trace")]
-    log::debug!(
-        "value_tokens: start parse_value_with_tokens at token = {:?}",
-        stream.current()
-    );
     // Handle aliases first (they don't have content)
     if matches!(stream.current(), Some(Token::Alias(_))) {
         if let Some(Token::Alias(name)) = stream.current() {
@@ -318,14 +328,8 @@ pub fn parse_value_with_tokens(
             // Outside flow, an increased indentation after !!seq indicates
             // a block sequence value (e.g. `!!seq` followed by `- a`).
             if let Some(Token::Indent(level)) = stream.current() {
-                use crate::parser::tokens::sequence::parse_sequence_with_tokens;
-                let ctx_seq = crate::parser::utils::context::ParsingContext::new(*level)
-                    .child_block_context(
-                        *level,
-                        crate::parser::utils::context::CollectionType::BlockSequence,
-                    );
-                let seq =
-                    parse_sequence_with_tokens(stream, *level, 0, directives, &ctx_seq, depth + 1)?;
+                use crate::parser::tokens::sequence::parse_block_sequence_at;
+                let seq = parse_block_sequence_at(stream, *level, 0, directives, depth + 1)?;
                 let mut result = Node::Tagged(Box::new(seq), "tag:yaml.org,2002:seq".to_string());
                 if let Some(anchor_name) = decorators.anchor {
                     result = Node::Anchored(Box::new(result), anchor_name);
@@ -398,18 +402,7 @@ pub fn parse_value_with_tokens(
                     if let Some(coerced) = try_coerce_tag(&resolved, result.clone()) {
                         result = coerced;
                     } else {
-                        // Preserve tag text: keep '!!...' for known core tags used in tests;
-                        // canonicalize unknown '!!...' to full URI; otherwise use resolved.
-                        let tag_out = if tag_raw_ref.starts_with("!!") {
-                            if should_preserve_double_bang(tag_raw_ref) {
-                                tag_raw_ref.clone()
-                            } else {
-                                resolved
-                            }
-                        } else {
-                            // Preserve literal tag for custom/handle-based tags (e.g., !e!custom)
-                            tag_raw_ref.clone()
-                        };
+                        let tag_out = pick_tag_text(tag_raw_ref, resolved);
                         result = Node::Tagged(Box::new(result), tag_out);
                     }
                 }
@@ -543,19 +536,8 @@ pub fn parse_value_with_tokens(
             } else if let Some(coerced) = try_coerce_tag(&tag_resolved, result.clone()) {
                 result = coerced;
             } else {
-                // Preserve tag text similarly to the empty-decorated case
                 let tag_out = match decorators.tag.as_ref() {
-                    Some(tag_raw_ref) => {
-                        if tag_raw_ref.starts_with("!!") {
-                            if should_preserve_double_bang(tag_raw_ref) {
-                                tag_raw_ref.clone()
-                            } else {
-                                tag_resolved
-                            }
-                        } else {
-                            tag_raw_ref.clone()
-                        }
-                    }
+                    Some(tag_raw_ref) => pick_tag_text(tag_raw_ref, tag_resolved),
                     None => tag_resolved,
                 };
                 result = Node::Tagged(Box::new(result), tag_out);
@@ -632,13 +614,8 @@ fn parse_value_content(
             crate::parser::document::scalar::parse_scalar_with_tokens(stream, directives, 0)
         }
         Some(Token::Dash) => {
-            use crate::parser::tokens::sequence::parse_sequence_with_tokens;
-            let ctx_seq = crate::parser::utils::context::ParsingContext::new(0)
-                .child_block_context(
-                    0,
-                    crate::parser::utils::context::CollectionType::BlockSequence,
-                );
-            parse_sequence_with_tokens(stream, 0, 0, directives, &ctx_seq, depth + 1)
+            use crate::parser::tokens::sequence::parse_block_sequence_at;
+            parse_block_sequence_at(stream, 0, 0, directives, depth + 1)
         }
         Some(Token::Indent(level)) => {
             // Indented value: parse nested mapping
@@ -664,20 +641,8 @@ fn parse_value_content(
                     stream.skip_newlines_and_comments()?;
                     // Decide between sequence or mapping based on next token
                     if matches!(stream.current(), Some(Token::Dash)) {
-                        use crate::parser::tokens::sequence::parse_sequence_with_tokens;
-                        let ctx_seq = crate::parser::utils::context::ParsingContext::new(_lvl)
-                            .child_block_context(
-                                _lvl,
-                                crate::parser::utils::context::CollectionType::BlockSequence,
-                            );
-                        return parse_sequence_with_tokens(
-                            stream,
-                            _lvl,
-                            0,
-                            directives,
-                            &ctx_seq,
-                            depth + 1,
-                        );
+                        use crate::parser::tokens::sequence::parse_block_sequence_at;
+                        return parse_block_sequence_at(stream, _lvl, 0, directives, depth + 1);
                     } else {
                         // 4JVG: If the next token is a decorator (Anchor/Tag), probe
                         // whether a colon follows the first value token.  When no
@@ -701,10 +666,7 @@ fn parse_value_content(
             // or at EOF (None), restore source so the outer parser can detect the
             // document boundary or EOF correctly.
             // Note: DocumentEnd (...) is intentionally NOT restored here.
-            if matches!(
-                stream.current(),
-                Some(Token::DocumentStart) | None
-            ) {
+            if matches!(stream.current(), Some(Token::DocumentStart) | None) {
                 stream.source_mut().restore_state(pre_newline_state);
             }
             // Treat as empty string value

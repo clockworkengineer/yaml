@@ -1,14 +1,11 @@
 {
-    "files.exclude": {
-        "**/.git": true,
-        "**/.svn": true,
-        "**/.hg": true,
-        "**/.DS_Store": true,
-        "**/Thumbs.db": true,
-        "**/.venv": true,
-        "**/.vscode": true,
-        "**/target": true,
-        "**/.idea": true
-    },
-    "explorerExclude.backup": {}
+    "python.testing.unittestArgs": [
+        "-v",
+        "-s",
+        "./library",
+        "-p",
+        "*test.py"
+    ],
+    "python.testing.pytestEnabled": false,
+    "python.testing.unittestEnabled": true
 }

@@ -245,13 +245,11 @@ fn token_dispatch(
                 let mut stream =
                     crate::parser::token_stream::TokenStream::new(source, directives, false)
                         .ok()?;
-                let ctx_seq = ctx.child_block_context(seq_indent, CollectionType::BlockSequence);
-                let result = crate::parser::tokens::sequence::parse_sequence_with_tokens(
+                let result = crate::parser::tokens::sequence::parse_block_sequence_at(
                     &mut stream,
                     seq_indent,
                     ctx.indent_level,
                     directives,
-                    &ctx_seq,
                     0,
                 );
                 return Some(result.map_err(YamlError::from));
@@ -360,14 +358,11 @@ pub fn parse_document_contents(
                     return Ok(Node::None);
                 }
                 Some(crate::parser::lexer::Token::Dash) => {
-                    let ctx_seq =
-                        ctx.child_block_context(seq_indent, CollectionType::BlockSequence);
-                    let seq = crate::parser::tokens::sequence::parse_sequence_with_tokens(
+                    let seq = crate::parser::tokens::sequence::parse_block_sequence_at(
                         &mut stream,
                         seq_indent,
                         indent_level,
                         directives,
-                        &ctx_seq,
                         0,
                     )?;
                     if let Node::None = seq {

@@ -29,20 +29,8 @@ fn parse_indented_mapping_value(
     if let Some(level) = indent_level {
         stream.skip_newlines_and_comments()?;
         if matches!(stream.current(), Some(Token::Dash)) {
-            use crate::parser::tokens::sequence::parse_sequence_with_tokens;
-            let ctx_seq = crate::parser::utils::context::ParsingContext::new(level)
-                .child_block_context(
-                    level,
-                    crate::parser::utils::context::CollectionType::BlockSequence,
-                );
-            let seq = parse_sequence_with_tokens(
-                stream,
-                level,
-                cur_indent,
-                directives,
-                &ctx_seq,
-                depth + 1,
-            )?;
+            use crate::parser::tokens::sequence::parse_block_sequence_at;
+            let seq = parse_block_sequence_at(stream, level, cur_indent, directives, depth + 1)?;
             return Ok(seq);
         } else {
             let map = parse_mapping_with_tokens(stream, level, directives, depth + 1)?;
@@ -819,20 +807,8 @@ fn parse_mapping_value(
             }
             stream.next()?; // consume Indent (genuinely indented value follows)
             if matches!(stream.current(), Some(Token::Dash)) {
-                use crate::parser::tokens::sequence::parse_sequence_with_tokens;
-                let ctx_seq = crate::parser::utils::context::ParsingContext::new(level)
-                    .child_block_context(
-                        level,
-                        crate::parser::utils::context::CollectionType::BlockSequence,
-                    );
-                return parse_sequence_with_tokens(
-                    stream,
-                    level,
-                    cur_indent,
-                    directives,
-                    &ctx_seq,
-                    depth + 1,
-                );
+                use crate::parser::tokens::sequence::parse_block_sequence_at;
+                return parse_block_sequence_at(stream, level, cur_indent, directives, depth + 1);
             } else {
                 return parse_mapping_with_tokens(stream, level, directives, depth + 1);
             }

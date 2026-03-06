@@ -635,12 +635,10 @@ pub(crate) fn classify_block_head(
     kind
 }
 
-/// Validates that no inline content exists after a document end marker ('...') on the same line.
-///
-/// Assumes the TokenStream is positioned immediately after the DocumentEnd token.
-/// Consumes any spaces or an inline comment up to the end of the line. Errors if non-trivia
-/// content is encountered before the newline.
-pub(crate) fn validate_no_inline_content_after_document_end(
+/// Validates that no non-trivia content appears after a document end marker (`...`)
+/// on the same line.  Consumes spaces and an inline comment up to the line end;
+/// returns an error if any other content is found.
+pub(crate) fn validate_trailing_content_after_document_end(
     stream: &mut TokenStream,
 ) -> crate::parser::ParseResult<()> {
     loop {
@@ -669,17 +667,6 @@ pub(crate) fn validate_no_inline_content_after_document_end(
         }
     }
     Ok(())
-}
-
-/// Standardized entry point for validating that no non-trivia content
-/// appears after a document end marker (`...`) on the same line.
-///
-/// This wraps `validate_no_inline_content_after_document_end` so that
-/// higher-level callers have a single, self-documenting API to use.
-pub(crate) fn validate_trailing_content_after_document_end(
-    stream: &mut TokenStream,
-) -> crate::parser::ParseResult<()> {
-    validate_no_inline_content_after_document_end(stream)
 }
 
 /// Parses a comment line from the source.

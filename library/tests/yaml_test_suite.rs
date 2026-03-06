@@ -207,6 +207,7 @@ fn print_suite_dir_error(possible_paths: &[PathBuf]) {
 
 struct KnownFailure {
     id: &'static str,
+    #[allow(dead_code)]
     description: &'static str,
 }
 
