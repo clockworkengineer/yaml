@@ -7,7 +7,8 @@
         "**/Thumbs.db": true,
         "**/.venv": true,
         "**/.vscode": true,
-        "**/target": true
+        "**/target": true,
+        "**/.idea": true
     },
     "explorerExclude.backup": {}
 }

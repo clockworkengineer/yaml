@@ -3,16 +3,16 @@
 [![Rust](https://img.shields.io/badge/rust-1.88.0+-orange.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-![Tests](https://img.shields.io/badge/internal_tests-362%20passing-green.svg)
-![YAML 1.2](https://img.shields.io/badge/YAML_1.2-90.5%25%20(364%2F402)-yellow.svg)
+![Tests](https://img.shields.io/badge/internal_tests-1014%20passing-green.svg)
+![YAML 1.2](https://img.shields.io/badge/YAML_1.2-100%25%20(402%2F402)-brightgreen.svg)
 
-A comprehensive, high-performance YAML library for Rust with strong YAML 1.2 specification compliance (90.5%, 364/402 tests passing as of Feb 2026), excellent ergonomics, advanced error handling, validation, and extensive format conversion capabilities.
+A comprehensive, high-performance YAML library for Rust with full YAML 1.2 specification compliance (100%, 402/402 tests passing as of Mar 2026), excellent ergonomics, advanced error handling, validation, and extensive format conversion capabilities.
 
 ## ✨ Features
 
 
 ### 🏅 **Core YAML Support**
-- **90.5% YAML 1.2 specification compliance** (364/402 tests passing)
+- **100% YAML 1.2 specification compliance** (402/402 tests passing)
 - **Unicode-aware parsing** with BOM detection
 - **Multi-document streams** support
 - **Anchors and aliases** including on mapping keys, with circular reference detection
@@ -47,9 +47,37 @@ A comprehensive, high-performance YAML library for Rust with strong YAML 1.2 spe
 - **Memory-efficient** node representation
 - **Thread-safe** operations
 - **Error recovery** and detailed diagnostics
-- **Comprehensive test suite** (362+ internal tests, 364/402 YAML 1.2 official tests, 90.5% pass rate)
+- **Comprehensive test suite** (1014+ internal tests, 402/402 YAML 1.2 official tests, 100% pass rate)
 - **JSON Schema-style validation** for YAML documents
 - **Error codes and suggestions** for programmatic error handling
+
+
+### 🔨 **Fluent Builder API**
+- **`ArrayBuilder`** - Chainable API for constructing sequences
+- **`MappingBuilder`** - Chainable API for constructing mappings
+- **`SetBuilder`** - Chainable API for constructing sets
+- **`make_node!` macro** - Concise literal syntax for node construction
+
+
+### 🔍 **Developer Tools**
+- **Node inspection** (`NodeDebugger`, `node_type`, `node_depth`, `print_tree`)
+- **Node diffing** (`diff_nodes`, `DiffResult`) for comparing document trees
+- **Execution tracing** (`Tracer`, `TraceGuard`) for debugging
+- **Debug assertions** (`DebugAssert`, `DebugContext`) with configurable levels
+
+
+### 🧪 **Testing Infrastructure**
+- **Fuzz testing** (`YamlFuzzer`, `fuzz_parse`, `fuzz_roundtrip`) for robustness
+- **Property-based testing** (`PropertySuite`) for invariant checking
+- **Memory safety auditing** (`SafetyAudit`, `audit_node`) for correctness
+
+
+### ⚡ **Optimization Utilities**
+- **`CapacityHints`** for pre-sizing allocations
+- **`FastPathDetector`** for common YAML pattern shortcuts
+- **`NodeBuilder`** with allocation reuse
+- **`StringInterner` / `SimpleInterner`** for string deduplication
+- **`InternedString`** / `CommonStrings`** for zero-cost key sharing
 
 ## 🛡️ Error Handling & Validation
 
@@ -92,7 +120,7 @@ yaml_lib = "0.1.8"
 use yaml_lib::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Parse YAML from string
+    // Parse YAML from a string (convenience function)
     let yaml_str = r#"
     name: "YAML Library"
     version: 1.0
@@ -102,9 +130,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       - multi-format
     "#;
     
+    let document = parse_string(yaml_str)?;
+    println!("{:#?}", document);
+    
+    // Or parse from a file directly
+    // let document = parse_file("config.yaml")?;
+    
+    // Or use the lower-level source-based API
     let mut source = BufferSource::new(yaml_str.as_bytes());
     let document = parse(&mut source)?;
-    
     println!("{:#?}", document);
     Ok(())
 }
@@ -223,12 +257,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 | Function | Description |
 |----------|-------------|
 | `parse()` | Parse YAML from any source into a Node tree |
+| `parse_string()` | Parse YAML from an in-memory `&str` (default config) |
+| `parse_file()` | Parse YAML from a file path (default config) |
+| `parse_with_config()` | Parse YAML from a string with a `ParserConfig` |
+| `parse_string_with_recovery()` | Parse with error recovery, returns `(Node, Vec<YamlError>)` |
 | `stringify()` | Convert Node tree back to YAML format |
 | `to_json()` / `to_json_pretty()` | Convert to JSON format |
 | `to_xml()` / `to_xml_pretty()` | Convert to XML format |
 | `to_toml()` / `to_toml_pretty()` | Convert to TOML format |
 | `to_bencode()` | Convert to Bencode format |
-| `make_node()` | Helper macro for creating nodes |
+| `make_node!` | Macro for creating nodes with literal syntax |
 | `make_set()` | Create set nodes with duplicate removal |
 
 ### File Utilities
@@ -241,25 +279,44 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## 🎯 Examples
 
-The repository includes comprehensive examples:
+The repository includes 23 comprehensive examples:
 
-- **[yaml_parse_and_stringify](examples/yaml_parse_and_stringify/)** - Basic parsing and serialization
-- **[yaml_to_json](examples/yaml_to_json/)** - YAML to JSON conversion
-- **[yaml_to_xml](examples/yaml_to_xml/)** - YAML to XML conversion  
-- **[yaml_to_bencode](examples/yaml_to_bencode/)** - YAML to Bencode conversion
-- **[yaml_fibonacci](examples/yaml_fibonacci/)** - Advanced YAML generation
-- **[yaml_utility_lib](examples/yaml_utility_lib/)** - Library usage patterns
+| Example | Description |
+|---------|-------------|
+| [yaml_parse_and_stringify](../examples/yaml_parse_and_stringify/) | Basic parsing and serialization |
+| [yaml_to_json](../examples/yaml_to_json/) | YAML → JSON conversion |
+| [yaml_to_xml](../examples/yaml_to_xml/) | YAML → XML conversion |
+| [yaml_to_toml](../examples/yaml_to_toml/) | YAML → TOML conversion |
+| [yaml_to_bencode](../examples/yaml_to_bencode/) | YAML → Bencode conversion |
+| [yaml_anchors_aliases](../examples/yaml_anchors_aliases/) | Anchors, aliases, and merge keys |
+| [yaml_advanced_tags](../examples/yaml_advanced_tags/) | Custom and standard tag handling |
+| [yaml_multi_document](../examples/yaml_multi_document/) | Multi-document YAML streams |
+| [yaml_node_manipulation](../examples/yaml_node_manipulation/) | Programmatic tree building |
+| [yaml_fluent_api](../examples/yaml_fluent_api/) | Fluent builder API |
+| [yaml_error_handling](../examples/yaml_error_handling/) | Error codes and recovery |
+| [yaml_validation](../examples/yaml_validation/) | JSON Schema-style validation |
+| [yaml_safe_access](../examples/yaml_safe_access/) | Nil-safe deep path access |
+| [yaml_tree_traversal](../examples/yaml_tree_traversal/) | Iterators and traversal orders |
+| [yaml_streaming](../examples/yaml_streaming/) | Streaming serialization |
+| [yaml_string_interning](../examples/yaml_string_interning/) | String deduplication |
+| [yaml_performance](../examples/yaml_performance/) | Benchmark helpers |
+| [yaml_performance_opts](../examples/yaml_performance_opts/) | Optimization strategies |
+| [yaml_embedded_systems](../examples/yaml_embedded_systems/) | `no_std` / embedded target |
+| [yaml_embedded_safe](../examples/yaml_embedded_safe/) | Safe embedded parsing |
+| [yaml_fibonacci](../examples/yaml_fibonacci/) | Algorithmic YAML generation |
+| [yaml_comprehensive](../examples/yaml_comprehensive/) | End-to-end showcase |
+| [yaml_utility_lib](../examples/yaml_utility_lib/) | Library usage patterns |
 
-Run examples:
+Run any example:
 ```bash
-cargo run --example yaml_parse_and_stringify
-cargo run --example yaml_to_json
-cargo run --example yaml_to_xml
+cargo run -p yaml_parse_and_stringify
+cargo run -p yaml_to_json
+cargo run -p yaml_validation
 ```
 
 ## 🧪 Testing
 
-The library includes an extensive test suite with 362+ tests covering:
+The library includes an extensive test suite with 1014+ tests covering:
 
 - **Basic parsing** - All YAML constructs and edge cases
 - **Document structure** - Multi-document streams, markers, directives
@@ -269,6 +326,9 @@ The library includes an extensive test suite with 362+ tests covering:
 - **Nested structures** - Deep nesting and complex documents
 - **Flow syntax** - Inline sequences and mappings
 - **Set operations** - Unique collections and operations
+- **Anchor/alias resolution** - Including circular reference detection
+- **Directive handling** - `%YAML` and `%TAG` directives
+- **Official YAML test suite** - 402/402 tests (100% compliance)
 
 ```bash
 # Run all tests
@@ -371,10 +431,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **Language**: Rust 🦀
 - **Minimum Rust Version**: 1.88.0
-- **Lines of Code**: ~10,000+
-- **Test Coverage**: 362+ tests
-- **Documentation**: Comprehensive inline docs
-- **Examples**: 6 comprehensive examples
+- **Lines of Code**: ~15,000+
+- **Internal Tests**: 1014+ passing
+- **Official YAML 1.2 Tests**: 402/402 (100%)
+- **Documentation**: Comprehensive inline docs and doc-tests
+- **Examples**: 23 comprehensive examples
 
 ---
 
