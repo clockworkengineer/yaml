@@ -19,53 +19,29 @@ This document tracks potential improvements to the parser module structure.
 
 ### High Priority
 
-#### 1. Split `utils/helpers.rs` (1008 lines, 41KB)
-This file has grown very large and could be split into focused modules:
+#### ~~1. Split `utils/helpers.rs` (1008 lines, 41KB)~~ ✅ Completed
 
-**Proposed structure:**
+**Implemented structure:**
 ```
 parser/utils/
   helpers/
-    mod.rs              - Re-exports all helper functions
-    document_markers.rs - Document marker classification and parsing
-      - classify_doc_marker
-      - peek_tag_after_doc_start
-      - parse_document_markers
-      - parse_document_end_marker
-    validation.rs       - Validation helper functions
-      - validate_indentation_and_whitespace
-      - validate_no_tab_indentation_tokens
-      - validate_no_inline_content_after_document_end
-      - validate_trailing_content_after_document_end
-      - validate_comment_spacing_token
-    peek_ahead.rs       - Peek-ahead and classification logic
-      - peek_ahead_for_mapping_key
-      - classify_block_head
-    comments.rs         - Comment parsing helpers
-      - parse_comment_token
-      - validate_comment_spacing_token (or keep in validation.rs)
-    core.rs             - Core utility functions
-      - handle_directives
-      - to_yaml_error
-      - is_token
-      - parse_error_token
-      - node_to_inline_string
+    mod.rs              - Re-exports all helper functions (no logic)
+    core.rs             - handle_directives, to_yaml_error, is_token,
+                          parse_error_token, node_to_inline_string
+    document_markers.rs - DocMarkerKind, classify_doc_marker,
+                          peek_tag_after_doc_start, parse_document_markers,
+                          parse_document_end_marker
+    validation.rs       - validate_indentation_and_whitespace,
+                          validate_no_tab_indentation_tokens,
+                          validate_trailing_content_after_document_end,
+                          validate_comment_spacing_token (+ all validation tests)
+    peek_ahead.rs       - BlockHeadKind, peek_ahead_for_mapping_key,
+                          classify_block_head
+    comments.rs         - parse_comment_token
 ```
 
-**Benefits:**
-- Easier to navigate and maintain
-- Clear separation of concerns
-- Each file would be ~200-300 lines instead of 1000+
-
-**Effort:** High (1008 lines with complex interdependencies, extensive import tracking needed)
-
-**Note**: Initial attempt showed this requires careful extraction of:
-- 17+ public functions
-- Shared imports and types (DocMarkerKind, BlockHeadKind, etc.)
-- Unit tests distributed throughout the file
-- Complex error handling patterns
-
-This refactoring would take significant time and testing to ensure correctness.
+All callers unchanged — `mod.rs` re-exports every public symbol.
+Verified: `cargo check` clean, 402/402 YAML test suite tests passing.
 
 ### Medium Priority
 
