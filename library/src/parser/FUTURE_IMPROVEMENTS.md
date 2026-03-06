@@ -45,26 +45,25 @@ Verified: `cargo check` clean, 402/402 YAML test suite tests passing.
 
 ### Medium Priority
 
-#### 2. Split `lexer.rs` (1478 lines, 61KB)
-The lexer is very large and could be modularized:
+#### 2. ✅ Split `lexer.rs` (1729 lines, 61KB) — COMPLETED
 
-**Proposed structure:**
+Used the `include!` macro strategy so private struct fields remain accessible without any visibility changes.
+
+**Implemented structure:**
 ```
 parser/lexer/
-  mod.rs           - Main lexer struct and core logic
-  scalars.rs       - Scalar tokenization (plain, folded, literal)
-  strings.rs       - Quoted string handling (single, double)
-  flow.rs          - Flow collection tokenization
-  block.rs         - Block structure tokenization
-  directives.rs    - Directive tokenization (%YAML, %TAG)
+  mod.rs           - Token enum, Lexer struct, new/accessors, scan_token,
+                     peek_ahead, scan_until_newline, snapshot/restore, tests
+  block.rs         - peek_next_non_whitespace, skip_horizontal_whitespace,
+                     emit_indentation_token_if_any, scan_indentation, handle_newline
+  flow.rs          - validate_post_flow_closer
+  decorators.rs    - scan_tag, scan_anchor, scan_alias, scan_directive
+  strings.rs       - scan_single_quoted, scan_double_quoted
+  scalars.rs       - scan_plain_scalar
 ```
 
-**Benefits:**
-- Easier to understand lexer components
-- Better testability of individual tokenization features
-- Reduced cognitive load per file
-
-**Effort:** High (lexer is complex with shared state)
+All callers unchanged — the `include!` macro injects each file into the `lexer` module at compile time, preserving all private-field access patterns.
+Verified: `cargo check` clean, 402/402 YAML test suite tests passing.
 
 ### Lower Priority
 
@@ -80,7 +79,13 @@ These are large but focused on specific responsibilities. Splitting might not pr
 parser/
   ├── config.rs (15KB) - Parser configuration
   ├── directives.rs (9.5KB) - Directive handling
-  ├── lexer.rs (61KB) ⚠️ Very large
+  ├── lexer/ ✅ Split into 6 focused files
+  │   ├── mod.rs       - struct, Token, scan_token, utilities, tests
+  │   ├── block.rs     - indentation & newline handling
+  │   ├── flow.rs      - flow-closer validation
+  │   ├── decorators.rs - tag/anchor/alias/directive scanning
+  │   ├── strings.rs   - quoted scalar scanning
+  │   └── scalars.rs   - plain scalar scanning
   ├── token_stream.rs (29KB) - Token stream wrapper
   ├── mod.rs
   ├── document/ (17 files)
@@ -104,8 +109,8 @@ parser/
 
 ## Notes
 
-The parser structure is significantly improved after steps 1-6. The main remaining opportunities are:
-1. **helpers.rs** - Would benefit most from splitting
-2. **lexer.rs** - Could be split but requires more careful design
+The parser structure is significantly improved. Steps 1 and 2 of the recommended improvements are now complete:
+1. ✅ **helpers.rs** — Split into 5 focused sub-modules (`core`, `document_markers`, `validation`, `peek_ahead`, `comments`)
+2. ✅ **lexer.rs** — Split into 6 focused sub-files using the `include!` macro strategy
 
-Both improvements are optional and the current structure is maintainable.
+The remaining large files (`tokens/mapping.rs`, `tokens/value.rs`) are focused on specific responsibilities and are maintainable as-is.
