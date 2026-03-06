@@ -23,5 +23,8 @@ members = [
     "examples/yaml_streaming",
     "examples/yaml_validation",
     "examples/yaml_comprehensive",
+    "examples/yaml_diff",
+    "examples/yaml_devtools",
+    "examples/yaml_config_layers",
     "library",
 ]
