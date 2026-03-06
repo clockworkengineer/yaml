@@ -1,11 +1,9 @@
-
 //! Miscellaneous Utilities Module
 //!
 //! Provides miscellaneous helpers for YAML processing, including version retrieval
 //! and document counting utilities. Used for general-purpose tasks not covered by other modules.
 //!
 //! Copyright (c) 2026 YAML Library Developers
-
 
 use crate::Node;
 
@@ -52,7 +50,7 @@ mod tests {
     use crate::parse;
     #[test]
     fn test_get_version_env() {
-        assert_eq!(get_version(), "0.1.8");
+        assert_eq!(get_version(), "0.2.0");
     }
     #[test]
     fn test_get_number_of_documents_nobegin_empty() {
