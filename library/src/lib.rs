@@ -61,7 +61,7 @@ pub mod testing;
 /// Module containing  utility functions for the YAML library
 mod utils;
 /// Module for YAML validation and schema support
-#[cfg(feature = "alloc")]
+#[cfg(feature = "validation")]
 pub mod validation;
 
 /// ============
@@ -270,13 +270,13 @@ pub use utils::string_interner::StringInterner;
 
 // Validation API
 /// Validation engine and error types
-#[cfg(feature = "alloc")]
+#[cfg(feature = "validation")]
 pub use validation::engine::{SchemaValidator, ValidationContext};
 /// Schema types for defining validation rules
-#[cfg(feature = "alloc")]
+#[cfg(feature = "validation")]
 pub use validation::schema::{ArraySchema, ObjectSchema, PropertySchema, Schema, SchemaType};
 /// Built-in validators
-#[cfg(feature = "alloc")]
+#[cfg(feature = "validation")]
 pub use validation::validators::{
     CustomValidator, EnumValidator, LengthValidator, PatternValidator, RangeValidator,
     RequiredValidator, TypeValidator, ValidationResult, Validator,

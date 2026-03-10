@@ -42,6 +42,7 @@ pub fn make_block_scalar_node(content: String, is_folded: bool) -> Node {
     Node::Str(content, QuoteType::Unquoted, style)
 }
 /// Check if node is a string node
+#[inline]
 pub fn is_string_node(node: &Node) -> bool {
     matches!(node, Node::Str(_, _, _))
 }
@@ -65,15 +66,18 @@ pub fn normalize_node(node: &Node) -> Node {
 
 /// Deduplicate nodes in an array or set
 
+#[inline]
 pub fn is_number_node(node: &Node) -> bool {
     matches!(node, Node::Number(_))
 }
 
+#[inline]
 pub fn is_boolean_node(node: &Node) -> bool {
     matches!(node, Node::Boolean(_))
 }
 
 #[allow(dead_code)]
+#[inline]
 pub fn is_none_node(node: &Node) -> bool {
     matches!(node, Node::None)
 }

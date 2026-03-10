@@ -17,6 +17,7 @@ pub trait NodeStringConvert {
 }
 
 impl NodeStringConvert for Node {
+    #[inline]
     fn to_string_lossy(&self) -> alloc::string::String {
         match self {
             Node::Str(s, _, _) => s.clone(),
@@ -26,12 +27,14 @@ impl NodeStringConvert for Node {
             _ => format!("{:?}", self),
         }
     }
+    #[inline]
     fn as_str(&self) -> Option<&str> {
         match self {
             Node::Str(s, _, _) => Some(s.as_str()),
             _ => None,
         }
     }
+    #[inline]
     fn clone_as_string(&self) -> Option<Node> {
         self.as_str().map(|s| Node::from(s))
     }
@@ -278,6 +281,7 @@ impl Numeric {
     ///
     /// This is intended for formatting and key generation where
     /// a human-readable representation is sufficient.
+    #[inline]
     pub fn to_string_lossy(&self) -> alloc::string::String {
         match self {
             Numeric::Integer(i) => i.to_string(),
@@ -458,6 +462,7 @@ impl From<alloc::string::String> for Node {
 #[cfg(feature = "alloc")]
 impl Node {
     /// Returns true if the node is considered blank (None, empty array, empty string, comment, or recursively blank document/anchored node)
+    #[inline]
     pub fn is_blank(&self) -> bool {
         match self {
             Node::None => true,
@@ -483,6 +488,7 @@ impl Node {
     /// assert!(array.get(0).is_some());
     /// assert!(array.get(5).is_none());
     /// ```
+    #[inline]
     pub fn get(&self, index: usize) -> Option<&Node> {
         match self {
             Node::Array(arr) => arr.get(index),
@@ -505,6 +511,7 @@ impl Node {
     /// assert!(mapping.get_key("key").is_some());
     /// assert!(mapping.get_key("nonexistent").is_none());
     /// ```
+    #[inline]
     pub fn get_key(&self, key: &str) -> Option<&Node> {
         match self {
             Node::Mapping(pairs) => {
@@ -533,6 +540,7 @@ impl Node {
     ///     *node = Node::from(10);
     /// }
     /// ```
+    #[inline]
     pub fn get_mut(&mut self, index: usize) -> Option<&mut Node> {
         match self {
             Node::Array(arr) => arr.get_mut(index),
@@ -555,6 +563,7 @@ impl Node {
     ///     *node = Node::from("new_value");
     /// }
     /// ```
+    #[inline]
     pub fn get_key_mut(&mut self, key: &str) -> Option<&mut Node> {
         match self {
             Node::Mapping(pairs) => {
@@ -583,6 +592,7 @@ impl Node {
     /// let mapping = Node::Mapping(vec![]);
     /// assert!(!mapping.is_sequence());
     /// ```
+    #[inline]
     pub fn is_sequence(&self) -> bool {
         matches!(self, Node::Array(_) | Node::Set(_))
     }
@@ -599,6 +609,7 @@ impl Node {
     /// let array = Node::Array(vec![]);
     /// assert!(!array.is_mapping());
     /// ```
+    #[inline]
     pub fn is_mapping(&self) -> bool {
         matches!(self, Node::Mapping(_))
     }
@@ -615,6 +626,7 @@ impl Node {
     /// let scalar = Node::from(42);
     /// assert_eq!(scalar.len(), None);
     /// ```
+    #[inline]
     pub fn len(&self) -> Option<usize> {
         match self {
             Node::Array(arr) => Some(arr.len()),
@@ -636,6 +648,7 @@ impl Node {
     /// let array = Node::Array(vec![Node::from(1)]);
     /// assert!(!array.is_empty());
     /// ```
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.len().map_or(false, |l| l == 0)
     }
@@ -652,6 +665,7 @@ impl Node {
     /// let string = Node::from("text");
     /// assert_eq!(string.as_i32(), None);
     /// ```
+    #[inline]
     pub fn as_i32(&self) -> Option<i32> {
         match self {
             #[cfg(feature = "embedded")]
@@ -691,6 +705,7 @@ impl Node {
     /// let string = Node::from("text");
     /// assert_eq!(string.as_f32(), None);
     /// ```
+    #[inline]
     pub fn as_f32(&self) -> Option<f32> {
         match self {
             #[cfg(feature = "embedded")]
@@ -724,6 +739,7 @@ impl Node {
     /// let number = Node::from(42);
     /// assert_eq!(number.as_str(), None);
     /// ```
+    #[inline]
     pub fn as_str(&self) -> Option<&str> {
         match self {
             Node::Str(s, _, _) => Some(s.as_str()),
@@ -743,6 +759,7 @@ impl Node {
     /// let number = Node::from(42);
     /// assert_eq!(number.as_bool(), None);
     /// ```
+    #[inline]
     pub fn as_bool(&self) -> Option<bool> {
         match self {
             Node::Boolean(b) => Some(*b),
@@ -762,8 +779,9 @@ impl Node {
     /// let number = Node::from(42);
     /// assert!(!number.is_string());
     /// ```
+    #[inline]
     pub fn is_string(&self) -> bool {
-        crate::nodes::node_utils::is_string_node(self)
+        matches!(self, Node::Str(_, _, _))
     }
 
     /// Check if this node is a number
@@ -778,8 +796,9 @@ impl Node {
     /// let string = Node::from("text");
     /// assert!(!string.is_number());
     /// ```
+    #[inline]
     pub fn is_number(&self) -> bool {
-        crate::nodes::node_utils::is_number_node(self)
+        matches!(self, Node::Number(_))
     }
 
     /// Check if this node is a boolean
@@ -794,15 +813,17 @@ impl Node {
     /// let number = Node::from(42);
     /// assert!(!number.is_boolean());
     /// ```
+    #[inline]
     pub fn is_boolean(&self) -> bool {
-        crate::nodes::node_utils::is_boolean_node(self)
+        matches!(self, Node::Boolean(_))
     }
 
     /// Alias for is_string() for consistency with as_str()
     ///
     /// Returns true for Node::Str variants.
+    #[inline]
     pub fn is_str(&self) -> bool {
-        self.is_string()
+        matches!(self, Node::Str(_, _, _))
     }
 
     /// Check if this node is an array
@@ -817,6 +838,7 @@ impl Node {
     /// let number = Node::from(42);
     /// assert!(!number.is_array());
     /// ```
+    #[inline]
     pub fn is_array(&self) -> bool {
         matches!(self, Node::Array(_))
     }
@@ -824,6 +846,7 @@ impl Node {
     /// Check if this node is a set
     ///
     /// Returns true for Node::Set variants.
+    #[inline]
     pub fn is_set(&self) -> bool {
         matches!(self, Node::Set(_))
     }
@@ -840,6 +863,7 @@ impl Node {
     /// let number = Node::from(42);
     /// assert!(!number.is_none());
     /// ```
+    #[inline]
     pub fn is_none(&self) -> bool {
         matches!(self, Node::None)
     }
@@ -856,6 +880,7 @@ impl Node {
     /// let mapping = Node::Mapping(vec![]);
     /// assert!(mapping.as_slice().is_none());
     /// ```
+    #[inline]
     pub fn as_slice(&self) -> Option<&[Node]> {
         match self {
             Node::Array(arr) => Some(arr.as_slice()),
@@ -878,6 +903,7 @@ impl Node {
     /// let array = Node::Array(vec![]);
     /// assert!(array.as_mapping().is_none());
     /// ```
+    #[inline]
     pub fn as_mapping(&self) -> Option<&[(Node, Node)]> {
         match self {
             Node::Mapping(pairs) => Some(pairs.as_slice()),
@@ -898,6 +924,7 @@ impl Node {
     /// assert!(mapping.contains_key("key"));
     /// assert!(!mapping.contains_key("nonexistent"));
     /// ```
+    #[inline]
     pub fn contains_key(&self, key: &str) -> bool {
         self.get_key(key).is_some()
     }
@@ -919,13 +946,15 @@ impl Node {
     /// ```
     pub fn keys(&self) -> alloc::vec::Vec<&str> {
         match self {
-            Node::Mapping(pairs) => pairs
-                .iter()
-                .filter_map(|(k, _)| match k {
-                    Node::Str(s, _, _) => Some(s.as_str()),
-                    _ => None,
-                })
-                .collect(),
+            Node::Mapping(pairs) => {
+                let mut keys = alloc::vec::Vec::with_capacity(pairs.len());
+                for (k, _) in pairs {
+                    if let Node::Str(s, _, _) = k {
+                        keys.push(s.as_str());
+                    }
+                }
+                keys
+            }
             _ => alloc::vec::Vec::new(),
         }
     }

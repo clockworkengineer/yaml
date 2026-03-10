@@ -22,6 +22,7 @@ use crate::parser::utils::error_helpers;
 use crate::parser::utils::token_scan;
 
 // Helper for tag delimiter logic to avoid borrow checker issues
+#[inline]
 fn is_tag_delimiter(source: &mut dyn ISource, ch: char) -> bool {
     if ch == CHAR_COLON {
         let state = source.save_state();
