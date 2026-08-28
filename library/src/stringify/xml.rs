@@ -11,7 +11,6 @@
 //! # Usage
 //! Use the provided functions to serialize YAML nodes to XML for output or further processing.
 
-use crate::error::YamlError;
 use crate::io::traits::IDestination;
 use crate::nodes::node::*;
 use crate::stringify::format::node_to_key_like_string;
