@@ -2,6 +2,7 @@
 
 [![Rust](https://img.shields.io/badge/rust-1.88.0+-orange.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Donate-orange.svg)](https://buymeacoffee.com/roberttizz1)
 
 ![Tests](https://img.shields.io/badge/internal_tests-1014%20passing-green.svg)
 ![YAML 1.2](https://img.shields.io/badge/YAML_1.2-100%25%20(402%2F402)-brightgreen.svg)
@@ -420,6 +421,14 @@ cargo test
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## ☕ Support
+
+If you find this library useful, feel free to support its development!
+
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Donate-orange.svg)](https://buymeacoffee.com/roberttizz1)
+
+You can [buy me a coffee here](https://buymeacoffee.com/roberttizz1).
 
 ## 🙏 Acknowledgments
 
