@@ -47,14 +47,12 @@ mod file;
 mod internal_tests;
 /// Module providing input/output operations for reading and writing YAML data
 mod io;
-/// Module containing utility functions and helpers for YAML processing
-mod misc;
 /// Module containing YAML data structure definitions and node types
 mod nodes;
 /// Module implementing YAML parsing and value extraction
 /// Module for converting YAML structures to formatted strings
 #[cfg(feature = "stringify")]
-mod stringify;
+pub mod stringify;
 /// Module for testing infrastructure (fuzzing, property testing, safety)
 #[cfg(feature = "alloc")]
 pub mod testing;
@@ -100,12 +98,12 @@ pub use io::sources::buffer::Buffer as BufferSource;
 /// Source implementation for reading YAML data from a file
 pub use io::sources::file::File as FileSource;
 /// Returns the base node of document number n (0-based), reporting any errors.
-pub use misc::get_document_base as get_document;
+pub use nodes::node_utils::get_document_base as get_document;
 /// Returns the number of documents in a YAML stream represented by the Documents node.
-pub use misc::get_number_of_documents;
+pub use nodes::node_utils::get_number_of_documents;
 
 /// Returns the current version of the YAML library
-pub use misc::get_version as version;
+pub use nodes::node_utils::get_version as version;
 /// Fluent builder for constructing Array nodes
 #[cfg(feature = "alloc")]
 pub use nodes::node::ArrayBuilder;

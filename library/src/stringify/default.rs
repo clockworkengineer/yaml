@@ -9,6 +9,17 @@ use crate::constants::*;
 use crate::error::YamlError;
 use crate::io::traits::IDestination;
 use crate::nodes::node::*;
+use crate::stringify::traits::NodeSerializer;
+
+/// Default YAML Serializer implementing `NodeSerializer` (OCP & DIP)
+#[derive(Debug, Default, Clone, Copy)]
+pub struct YamlSerializer;
+
+impl NodeSerializer for YamlSerializer {
+    fn serialize(&self, node: &Node, dest: &mut dyn IDestination) -> crate::error::Result<()> {
+        stringify(node, dest)
+    }
+}
 
 /// Escapes special characters in a string for double-quoted YAML representation.
 ///

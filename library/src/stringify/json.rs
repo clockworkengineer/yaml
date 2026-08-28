@@ -10,7 +10,22 @@ use crate::io::traits::IDestination;
 use crate::nodes::node::*;
 use crate::stringify::format::node_to_key_like_string;
 use crate::stringify::serializer::{FormatWriter, StreamResult, walk_node};
+use crate::stringify::traits::NodeSerializer;
 use crate::utils::escape::escape_for_json;
+
+/// JSON Serializer implementing `NodeSerializer` (OCP & DIP)
+#[derive(Debug, Default, Clone, Copy)]
+pub struct JsonSerializer;
+
+impl NodeSerializer for JsonSerializer {
+    fn serialize(&self, node: &Node, dest: &mut dyn IDestination) -> crate::error::Result<()> {
+        stringify(node, dest)
+    }
+
+    fn serialize_pretty(&self, node: &Node, dest: &mut dyn IDestination) -> crate::error::Result<()> {
+        stringify_pretty(node, dest, 2)
+    }
+}
 
 /// Escapes special characters in a string for JSON representation.
 ///

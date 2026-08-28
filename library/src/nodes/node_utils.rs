@@ -76,10 +76,40 @@ pub fn is_boolean_node(node: &Node) -> bool {
     matches!(node, Node::Boolean(_))
 }
 
-#[allow(dead_code)]
 #[inline]
 pub fn is_none_node(node: &Node) -> bool {
     matches!(node, Node::None)
+}
+
+/// Returns the current version of the package as specified in Cargo.toml.
+pub fn get_version() -> &'static str {
+    env!("CARGO_PKG_VERSION")
+}
+
+/// Returns the number of documents in a YAML stream represented by the Documents node.
+pub fn get_number_of_documents(documents: &Node) -> Result<usize, String> {
+    match documents {
+        Node::Documents(docs) => Ok(docs.len()),
+        _ => Err("Expected Documents node".to_string()),
+    }
+}
+
+/// Returns the base node of document number n (0-based), reporting any errors.
+pub fn get_document_base(node: &Node, n: usize) -> Result<&Node, String> {
+    match node {
+        Node::Documents(docs) => {
+            if n < docs.len() {
+                Ok(&docs[n])
+            } else {
+                Err(format!(
+                    "Document index {} out of bounds ({} documents)",
+                    n,
+                    docs.len()
+                ))
+            }
+        }
+        _ => Err("Expected Documents node".to_string()),
+    }
 }
 
 #[cfg(test)]

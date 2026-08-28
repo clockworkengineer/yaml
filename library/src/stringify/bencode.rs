@@ -8,6 +8,17 @@
 use crate::io::traits::IDestination;
 use crate::nodes::node::*;
 use crate::stringify::format::node_to_key_like_string;
+use crate::stringify::traits::NodeSerializer;
+
+/// Bencode Serializer implementing `NodeSerializer` (OCP & DIP)
+#[derive(Debug, Default, Clone, Copy)]
+pub struct BencodeSerializer;
+
+impl NodeSerializer for BencodeSerializer {
+    fn serialize(&self, node: &Node, dest: &mut dyn IDestination) -> crate::error::Result<()> {
+        stringify(node, dest).map_err(Into::into)
+    }
+}
 
 /// Recursively encodes a YAML node to Bencode format.
 ///

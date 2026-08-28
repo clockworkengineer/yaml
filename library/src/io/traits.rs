@@ -9,7 +9,8 @@
 /// Provides basic operations for sequential character-based reading.
 use crate::constants::{CHAR_SPACE, CHAR_TAB};
 
-pub trait ISource {
+/// Interface for sequential character reading from an input source.
+pub trait ICharStream {
     /// Advances the reading position to the next character.
     fn next(&mut self);
     /// Returns the character at the current reading position.
@@ -18,26 +19,31 @@ pub trait ISource {
     fn more(&mut self) -> bool;
     /// Resets the reading position to the beginning of the source.
     fn reset(&mut self);
-    /// Resets are supported; prefer `save_state`/`restore_state` for speculative reads.
+}
 
+/// Interface for snapshotting and restoring stream read state.
+pub trait IStatefulStream {
     /// Opaque, concrete snapshot of a source read position and metadata.
-    /// Using a concrete struct avoids associated-type issues with dyn ISource.
     fn save_state(&mut self) -> SaveState;
-
     /// Restore a previously-saved state.
     fn restore_state(&mut self, state: SaveState);
+}
 
+/// Interface for indentation-aware stream validation.
+pub trait IIndentationAware {
     fn is_whitespace(&self, c: char) -> bool {
         c == CHAR_SPACE || c == CHAR_TAB
     }
-
-    /// Check if character is a tab (used for validation)
     fn is_tab(&self, c: char) -> bool {
         c == CHAR_TAB
     }
-
     fn get_current_indent_level(&self) -> usize;
 }
+
+/// Composite source trait combining character streaming, state snapshots, and indentation tracking.
+pub trait ISource: ICharStream + IStatefulStream + IIndentationAware {}
+
+impl<T: ICharStream + IStatefulStream + IIndentationAware + ?Sized> ISource for T {}
 
 /// Concrete save/restore snapshot used by all ISource implementations.
 #[derive(Clone, Debug, PartialEq, Eq)]

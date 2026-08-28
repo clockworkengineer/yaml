@@ -5,64 +5,9 @@
 //!
 //! Copyright (c) 2026 YAML Library Developers
 
-use crate::io::traits::ISource;
-use crate::io::util::read_all;
-use std::fs::File as StdFile;
-use std::io::{Read, Seek, SeekFrom};
+use crate::io::traits::{ICharStream, IIndentationAware, IStatefulStream};
 
-/// File
-
-pub struct File {
-    file: StdFile,
-    current_byte: Option<u8>,
-    column: usize,
-    line: usize,
-}
-impl File {
-    /// Reads the entire file into a Vec<u8> using shared helper
-    pub fn read_all_bytes(&mut self) -> std::io::Result<Vec<u8>> {
-        read_all(&mut self.file)
-    }
-}
-
-impl File {
-    /// new
-    pub fn new(path: &str) -> std::io::Result<Self> {
-        let mut file = StdFile::open(path)?;
-
-        // Read first byte and handle CRLF
-        let mut first = [0u8; 1];
-        let current_byte = if file.read(&mut first)? == 1 {
-            if first[0] == b'\r' {
-                // Check if this is CRLF
-                let mut next = [0u8; 1];
-                if file.read(&mut next)? == 1 && next[0] == b'\n' {
-                    // CRLF - treat as \n
-                    Some(b'\n')
-                } else {
-                    // Standalone CR or CR followed by non-LF
-                    if next[0] != 0 {
-                        file.seek(SeekFrom::Current(-1))?;
-                    }
-                    Some(first[0])
-                }
-            } else {
-                Some(first[0])
-            }
-        } else {
-            None
-        };
-
-        Ok(Self {
-            file,
-            current_byte,
-            column: 0,
-            line: 0,
-        })
-    }
-}
-
-impl ISource for File {
+impl ICharStream for File {
     fn next(&mut self) {
         // Read next byte
         let mut byte1 = [0u8; 1];
@@ -122,11 +67,15 @@ impl ISource for File {
             self.line = 0;
         }
     }
+}
 
+impl IIndentationAware for File {
     fn get_current_indent_level(&self) -> usize {
         self.column
     }
+}
 
+impl IStatefulStream for File {
     fn save_state(&mut self) -> crate::io::traits::SaveState {
         let pos = self.file.stream_position().unwrap_or(0);
         crate::io::traits::SaveState {
@@ -144,6 +93,84 @@ impl ISource for File {
         self.line = state.line;
     }
 }
+use crate::io::util::read_all;
+use std::fs::File as StdFile;
+use std::io::{Read, Seek, SeekFrom};
+
+/// File
+
+pub struct File {
+    file: StdFile,
+    current_byte: Option<u8>,
+    column: usize,
+    line: usize,
+}
+impl File {
+    /// Reads the entire file into a Vec<u8> using shared helper
+    pub fn read_all_bytes(&mut self) -> std::io::Result<Vec<u8>> {
+        read_all(&mut self.file)
+    }
+}
+
+impl File {
+    /// new
+    pub fn new(path: &str) -> std::io::Result<Self> {
+        let mut file = StdFile::open(path)?;
+
+        // Read first byte and handle CRLF
+        let mut first = [0u8; 1];
+        let current_byte = if file.read(&mut first)? == 1 {
+            if first[0] == b'\r' {
+                // Check if this is CRLF
+                let mut next = [0u8; 1];
+                if file.read(&mut next)? == 1 && next[0] == b'\n' {
+                    // CRLF - treat as \n
+                    Some(b'\n')
+                } else {
+                    // Standalone CR or CR followed by non-LF
+                    if next[0] != 0 {
+                        file.seek(SeekFrom::Current(-1))?;
+                    }
+                    Some(first[0])
+                }
+            } else {
+                Some(first[0])
+            }
+        } else {
+            None
+        };
+
+        Ok(Self {
+            file,
+            current_byte,
+            column: 0,
+            line: 0,
+        })
+    }
+    pub fn next(&mut self) {
+        ICharStream::next(self)
+    }
+    pub fn current(&mut self) -> Option<char> {
+        ICharStream::current(self)
+    }
+    pub fn more(&mut self) -> bool {
+        ICharStream::more(self)
+    }
+    pub fn reset(&mut self) {
+        ICharStream::reset(self)
+    }
+    pub fn get_current_indent_level(&self) -> usize {
+        IIndentationAware::get_current_indent_level(self)
+    }
+    pub fn save_state(&mut self) -> crate::io::traits::SaveState {
+        IStatefulStream::save_state(self)
+    }
+    pub fn restore_state(&mut self, state: crate::io::traits::SaveState) {
+        IStatefulStream::restore_state(self, state)
+    }
+}
+
+
 
 #[cfg(test)]
 mod tests {

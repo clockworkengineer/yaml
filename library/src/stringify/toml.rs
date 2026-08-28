@@ -8,6 +8,21 @@
 use crate::io::traits::IDestination;
 use crate::nodes::node::*;
 use crate::stringify::format::node_to_key_like_string;
+use crate::stringify::traits::NodeSerializer;
+
+/// TOML Serializer implementing `NodeSerializer` (OCP & DIP)
+#[derive(Debug, Default, Clone, Copy)]
+pub struct TomlSerializer;
+
+impl NodeSerializer for TomlSerializer {
+    fn serialize(&self, node: &Node, dest: &mut dyn IDestination) -> crate::error::Result<()> {
+        stringify(node, dest).map_err(Into::into)
+    }
+
+    fn serialize_pretty(&self, node: &Node, dest: &mut dyn IDestination) -> crate::error::Result<()> {
+        stringify_pretty(node, dest, 2).map_err(Into::into)
+    }
+}
 
 fn escape_toml_string(s: &str) -> String {
     let mut out = String::with_capacity(s.len());

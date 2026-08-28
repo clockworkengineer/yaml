@@ -11,10 +11,26 @@
 //! # Usage
 //! Use the provided functions to serialize YAML nodes to XML for output or further processing.
 
+use crate::error::YamlError;
 use crate::io::traits::IDestination;
 use crate::nodes::node::*;
 use crate::stringify::format::node_to_key_like_string;
+use crate::stringify::traits::NodeSerializer;
 use crate::utils::escape::escape_for_xml;
+
+/// XML Serializer implementing `NodeSerializer` (OCP & DIP)
+#[derive(Debug, Default, Clone, Copy)]
+pub struct XmlSerializer;
+
+impl NodeSerializer for XmlSerializer {
+    fn serialize(&self, node: &Node, dest: &mut dyn IDestination) -> crate::error::Result<()> {
+        stringify(node, dest).map_err(Into::into)
+    }
+
+    fn serialize_pretty(&self, node: &Node, dest: &mut dyn IDestination) -> crate::error::Result<()> {
+        stringify_pretty(node, dest, 2).map_err(Into::into)
+    }
+}
 
 fn escape_xml_string(s: &str) -> String {
     escape_for_xml(s)

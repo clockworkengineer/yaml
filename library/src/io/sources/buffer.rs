@@ -5,48 +5,9 @@
 //!
 //! Copyright (c) 2026 YAML Library Developers
 
-use crate::io::traits::ISource;
+use crate::io::traits::{ICharStream, IIndentationAware, IStatefulStream};
 
-/// A memory buffer implementation for reading JSON data from bytes.
-/// Provides functionality to traverse and read byte content from memory.
-pub struct Buffer {
-    /// Internal vector storing the raw bytes
-    buffer: Vec<u8>,
-    /// Current reading position in the buffer
-    position: usize,
-    /// Current column position in the buffer
-    column: usize,
-    /// Current line position in the buffer
-    line: usize,
-}
-
-impl Buffer {
-    /// Creates a new Buffer instance with the specified byte slice.
-    ///
-    /// # Arguments
-    /// * `to_add` - The byte slice to initialize the buffer with
-    ///
-    /// # Returns
-    /// A new Buffer containing the provided bytes
-    pub fn new(to_add: &[u8]) -> Self {
-        Self {
-            buffer: to_add.to_vec(),
-            position: 0,
-            column: 0,
-            line: 0,
-        }
-    }
-    /// Converts the buffer content to a String.
-    ///
-    /// # Returns
-    /// A String containing UTF-8 interpretation of the buffer bytes.
-    pub fn to_string(&self) -> String {
-        // Use shared helper for conversion
-        String::from_utf8_lossy(&self.buffer).into_owned()
-    }
-}
-
-impl ISource for Buffer {
+impl ICharStream for Buffer {
     /// Moves to the next character in the buffer
     fn next(&mut self) {
         if !self.more() {
@@ -94,11 +55,15 @@ impl ISource for Buffer {
     fn reset(&mut self) {
         self.position = 0;
     }
+}
 
+impl IIndentationAware for Buffer {
     fn get_current_indent_level(&self) -> usize {
         self.column
     }
+}
 
+impl IStatefulStream for Buffer {
     fn save_state(&mut self) -> crate::io::traits::SaveState {
         crate::io::traits::SaveState {
             pos: self.position as u64,
@@ -118,6 +83,68 @@ impl ISource for Buffer {
         self.line = state.line;
     }
 }
+
+/// A memory buffer implementation for reading JSON data from bytes.
+/// Provides functionality to traverse and read byte content from memory.
+pub struct Buffer {
+    /// Internal vector storing the raw bytes
+    buffer: Vec<u8>,
+    /// Current reading position in the buffer
+    position: usize,
+    /// Current column position in the buffer
+    column: usize,
+    /// Current line position in the buffer
+    line: usize,
+}
+
+impl Buffer {
+    /// Creates a new Buffer instance with the specified byte slice.
+    ///
+    /// # Arguments
+    /// * `to_add` - The byte slice to initialize the buffer with
+    ///
+    /// # Returns
+    /// A new Buffer containing the provided bytes
+    pub fn new(to_add: &[u8]) -> Self {
+        Self {
+            buffer: to_add.to_vec(),
+            position: 0,
+            column: 0,
+            line: 0,
+        }
+    }
+    /// Converts the buffer content to a String.
+    ///
+    /// # Returns
+    /// A String containing UTF-8 interpretation of the buffer bytes.
+    pub fn to_string(&self) -> String {
+        // Use shared helper for conversion
+        String::from_utf8_lossy(&self.buffer).into_owned()
+    }
+    pub fn next(&mut self) {
+        ICharStream::next(self)
+    }
+    pub fn current(&mut self) -> Option<char> {
+        ICharStream::current(self)
+    }
+    pub fn more(&mut self) -> bool {
+        ICharStream::more(self)
+    }
+    pub fn reset(&mut self) {
+        ICharStream::reset(self)
+    }
+    pub fn get_current_indent_level(&self) -> usize {
+        IIndentationAware::get_current_indent_level(self)
+    }
+    pub fn save_state(&mut self) -> crate::io::traits::SaveState {
+        IStatefulStream::save_state(self)
+    }
+    pub fn restore_state(&mut self, state: crate::io::traits::SaveState) {
+        IStatefulStream::restore_state(self, state)
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
